@@ -1,0 +1,60 @@
+# Example REST API in Glyph
+# This demonstrates the basic syntax and features
+
+# Define a User type
+: User {
+  id: int!
+  name: str!
+  email: str!
+  created_at: timestamp
+}
+
+# Define an Error type
+: Error {
+  code: str!
+  message: str!
+}
+
+# Get all users
+@ route /api/users -> List[User]
+  + auth(jwt)
+  + ratelimit(100/min)
+  % db: Database
+  $ users = db.users.all()
+  > users
+
+# Get user by ID
+@ route /api/users/:id -> User
+  + auth(jwt)
+  % db: Database
+  $ user = db.users.get(id)
+  > user
+
+# Create new user
+@ route /api/users [POST] -> User
+  + auth(jwt, role: admin)
+  % db: Database
+  $ user = db.users.create(input)
+  > user
+
+# Update user
+@ route /api/users/:id [PUT] -> User
+  + auth(jwt)
+  % db: Database
+  $ user = db.users.update(id, input)
+  > user
+
+: DeleteResponse {
+  success: bool!
+}
+
+# Delete user
+@ route /api/users/:id [DELETE] -> DeleteResponse
+  + auth(jwt, role: admin)
+  % db: Database
+  $ result = db.users.delete(id)
+  > {success: true}
+
+# Health check endpoint
+@ route /health
+  > {status: "ok", timestamp: now()}

@@ -1,0 +1,62 @@
+# Glyph While Loop Demonstration
+# This file demonstrates the while loop feature
+
+# Example 1: Simple counter
+@ route /counter [GET]
+  $ i = 0
+  $ result = 0
+  while i < 5 {
+    $ result = result + i
+    $ i = i + 1
+  }
+  > {count: i, sum: result}
+
+# Example 2: Nested while loops
+@ route /nested [GET]
+  $ i = 0
+  $ total = 0
+  while i < 3 {
+    $ j = 0
+    while j < 2 {
+      $ total = total + 1
+      $ j = j + 1
+    }
+    $ i = i + 1
+  }
+  > {total: total}
+
+# Example 3: While loop with complex condition
+@ route /conditional [GET]
+  $ i = 0
+  $ max = 10
+  while i < max && i < 5 {
+    $ i = i + 1
+  }
+  > {finalValue: i}
+
+# Example 4: While loop with if statement
+@ route /fibonacci [GET]
+  $ a = 0
+  $ b = 1
+  $ count = 0
+  $ result = 0
+  while count < 10 {
+    if count < 5 {
+      $ result = result + a
+    }
+    $ temp = a + b
+    $ a = b
+    $ b = temp
+    $ count = count + 1
+  }
+  > {result: result, iterations: count}
+
+# Example 5: While loop that might not execute
+@ route /conditional-execute [GET]
+  $ value = 100
+  $ executed = false
+  while value < 50 {
+    $ executed = true
+    $ value = value + 1
+  }
+  > {executed: executed, value: value}

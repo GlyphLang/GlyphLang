@@ -1,0 +1,354 @@
+# Blog API Example
+# Demonstrates nested resources, multiple types, and complex data relationships
+
+# Define blog post type
+: Post {
+  id: int!
+  title: str!
+  content: str!
+  author: str!
+  tags: List[str]
+  published: bool!
+  views: int!
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+# Define comment type
+: Comment {
+  id: int!
+  post_id: int!
+  author: str!
+  content: str!
+  upvotes: int!
+  created_at: timestamp
+}
+
+# Define author profile type
+: Author {
+  id: int!
+  name: str!
+  email: str!
+  bio: str
+  posts_count: int!
+  joined_at: timestamp
+}
+
+# Response types
+: PostList {
+  posts: List[Post]
+  total: int!
+  page: int!
+  per_page: int!
+}
+
+: PostWithComments {
+  post: Post
+  comments: List[Comment]
+  comments_count: int!
+}
+
+: ApiResponse {
+  success: bool!
+  message: str!
+  data: any
+}
+
+# Get all blog posts with pagination
+@ route /api/posts [GET] -> PostList
+  + ratelimit(100/min)
+  % db: Database
+
+  # Default pagination values
+  $ page = 1
+  $ perPage = 10
+
+  if query.page != null && query.page > 0 {
+    $ page = query.page
+  }
+
+  if query.per_page != null && query.per_page > 0 && query.per_page <= 50 {
+    $ perPage = query.per_page
+  }
+
+  $ offset = (page - 1) * perPage
+  $ posts = db.posts.paginate(offset, perPage)
+  $ total = db.posts.count()
+
+  > {
+    posts: posts,
+    total: total,
+    page: page,
+    per_page: perPage
+  }
+
+# Get a single post with all comments
+@ route /api/posts/:id [GET] -> PostWithComments
+  + ratelimit(200/min)
+  % db: Database
+
+  $ post = db.posts.get(id)
+
+  if post == null {
+    > {
+      success: false,
+      message: "Post not found",
+      code: "NOT_FOUND"
+    }
+  } else {
+    # Increment view count
+    $ post.views = post.views + 1
+    $ updated = db.posts.update(id, post)
+
+    # Get all comments for this post
+    $ comments = db.comments.filter("post_id", id)
+    $ commentsCount = comments.length()
+
+    > {
+      post: updated,
+      comments: comments,
+      comments_count: commentsCount
+    }
+  }
+
+# Create a new blog post
+@ route /api/posts [POST] -> ApiResponse
+  + auth(jwt)
+  + ratelimit(20/min)
+  % db: Database
+
+  # Validate required fields
+  if input.title == null || input.title == "" {
+    > {
+      success: false,
+      message: "Title is required",
+      code: "VALIDATION_ERROR"
+    }
+  } else {
+    if input.content == null || input.content == "" {
+      > {
+        success: false,
+        message: "Content is required",
+        code: "VALIDATION_ERROR"
+      }
+    } else {
+      # Set default tags if not provided
+      $ tags = []
+      if input.tags != null {
+        $ tags = input.tags
+      }
+
+      # Create new post
+      $ newPost = {
+        id: db.posts.nextId(),
+        title: input.title,
+        content: input.content,
+        author: auth.user.name,
+        tags: tags,
+        published: false,
+        views: 0,
+        created_at: now(),
+        updated_at: now()
+      }
+
+      $ saved = db.posts.create(newPost)
+
+      > {
+        success: true,
+        message: "Post created successfully",
+        data: saved
+      }
+    }
+  }
+
+# Update a blog post
+@ route /api/posts/:id [PUT] -> ApiResponse
+  + auth(jwt)
+  + ratelimit(30/min)
+  % db: Database
+
+  $ post = db.posts.get(id)
+
+  if post == null {
+    > {
+      success: false,
+      message: "Post not found",
+      code: "NOT_FOUND"
+    }
+  } else {
+    # Check if user is the author
+    if post.author != auth.user.name && auth.user.role != "admin" {
+      > {
+        success: false,
+        message: "Unauthorized to edit this post",
+        code: "FORBIDDEN"
+      }
+    } else {
+      # Update fields if provided
+      if input.title != null && input.title != "" {
+        $ post.title = input.title
+      }
+
+      if input.content != null && input.content != "" {
+        $ post.content = input.content
+      }
+
+      if input.tags != null {
+        $ post.tags = input.tags
+      }
+
+      if input.published != null {
+        $ post.published = input.published
+      }
+
+      $ post.updated_at = now()
+      $ updated = db.posts.update(id, post)
+
+      > {
+        success: true,
+        message: "Post updated successfully",
+        data: updated
+      }
+    }
+  }
+
+# Delete a blog post
+@ route /api/posts/:id [DELETE] -> ApiResponse
+  + auth(jwt, role: admin)
+  + ratelimit(10/min)
+  % db: Database
+
+  $ post = db.posts.get(id)
+
+  if post == null {
+    > {
+      success: false,
+      message: "Post not found",
+      code: "NOT_FOUND"
+    }
+  } else {
+    # Delete all associated comments first
+    $ deleted = db.comments.deleteWhere("post_id", id)
+    $ result = db.posts.delete(id)
+
+    > {
+      success: true,
+      message: "Post and associated comments deleted",
+      data: post
+    }
+  }
+
+# Add a comment to a post
+@ route /api/posts/:id/comments [POST] -> ApiResponse
+  + auth(jwt)
+  + ratelimit(50/min)
+  % db: Database
+
+  $ post = db.posts.get(id)
+
+  if post == null {
+    > {
+      success: false,
+      message: "Post not found",
+      code: "NOT_FOUND"
+    }
+  } else {
+    if input.content == null || input.content == "" {
+      > {
+        success: false,
+        message: "Comment content is required",
+        code: "VALIDATION_ERROR"
+      }
+    } else {
+      $ newComment = {
+        id: db.comments.nextId(),
+        post_id: id,
+        author: auth.user.name,
+        content: input.content,
+        upvotes: 0,
+        created_at: now()
+      }
+
+      $ saved = db.comments.create(newComment)
+
+      > {
+        success: true,
+        message: "Comment added successfully",
+        data: saved
+      }
+    }
+  }
+
+# Get posts by tag
+@ route /api/posts/tags/:tag [GET] -> PostList
+  + ratelimit(100/min)
+  % db: Database
+
+  # Find all posts that contain this tag
+  $ filteredPosts = db.posts.filterArray("tags", tag)
+  $ total = filteredPosts.length()
+
+  > {
+    posts: filteredPosts,
+    total: total,
+    page: 1,
+    per_page: total
+  }
+
+# Get posts by author
+@ route /api/authors/:author/posts [GET] -> PostList
+  + ratelimit(100/min)
+  % db: Database
+
+  $ authorPosts = db.posts.filter("author", author)
+  $ total = authorPosts.length()
+
+  > {
+    posts: authorPosts,
+    total: total,
+    page: 1,
+    per_page: total
+  }
+
+# Get published posts only
+@ route /api/posts/published [GET] -> PostList
+  + ratelimit(200/min)
+  % db: Database
+
+  $ publishedPosts = db.posts.filter("published", true)
+  $ total = publishedPosts.length()
+
+  # Sort by views (most popular first)
+  $ sorted = publishedPosts.sortBy("views", "desc")
+
+  > {
+    posts: sorted,
+    total: total,
+    page: 1,
+    per_page: total
+  }
+
+# Upvote a comment
+@ route /api/comments/:id/upvote [PATCH] -> ApiResponse
+  + auth(jwt)
+  + ratelimit(100/min)
+  % db: Database
+
+  $ comment = db.comments.get(id)
+
+  if comment == null {
+    > {
+      success: false,
+      message: "Comment not found",
+      code: "NOT_FOUND"
+    }
+  } else {
+    $ comment.upvotes = comment.upvotes + 1
+    $ updated = db.comments.update(id, comment)
+
+    > {
+      success: true,
+      message: "Comment upvoted",
+      data: updated
+    }
+  }

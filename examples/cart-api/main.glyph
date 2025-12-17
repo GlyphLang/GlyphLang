@@ -1,0 +1,508 @@
+# E-commerce Shopping Cart API
+# Demonstrates complex calculations, nested objects, and business logic
+
+# Define product type
+: Product {
+  id: int!
+  name: str!
+  description: str
+  price: float!
+  category: str!
+  stock: int!
+  image_url: str
+  rating: float
+}
+
+# Define cart item type
+: CartItem {
+  product_id: int!
+  product_name: str!
+  quantity: int!
+  unit_price: float!
+  subtotal: float!
+}
+
+# Define shopping cart type
+: Cart {
+  id: int!
+  user_id: int!
+  items: List[CartItem]
+  subtotal: float!
+  tax: float!
+  shipping: float!
+  discount: float!
+  total: float!
+  updated_at: timestamp
+}
+
+# Define order type
+: Order {
+  id: int!
+  cart_id: int!
+  user_id: int!
+  status: str!
+  total: float!
+  created_at: timestamp
+}
+
+# Response types
+: ProductList {
+  products: List[Product]
+  total: int!
+  category: str
+}
+
+: CartResponse {
+  success: bool!
+  message: str!
+  cart: Cart
+}
+
+: ApiResponse {
+  success: bool!
+  message: str!
+  data: any
+}
+
+# Get all products with optional category filtering
+@ route /api/products [GET] -> ProductList
+  + ratelimit(100/min)
+  % db: Database
+
+  $ allProducts = []
+  $ category = ""
+
+  if query.category != null && query.category != "" {
+    $ allProducts = db.products.filter("category", query.category)
+    $ category = query.category
+  } else {
+    $ allProducts = db.products.all()
+  }
+
+  $ total = allProducts.length()
+
+  > {
+    products: allProducts,
+    total: total,
+    category: category
+  }
+
+# Get product by ID
+@ route /api/products/:id [GET] -> Product
+  + ratelimit(200/min)
+  % db: Database
+
+  $ product = db.products.get(id)
+
+  if product == null {
+    > {
+      success: false,
+      message: "Product not found",
+      code: "NOT_FOUND"
+    }
+  } else {
+    > product
+  }
+
+# Get user's shopping cart
+@ route /api/cart [GET] -> Cart
+  + auth(jwt)
+  + ratelimit(100/min)
+  % db: Database
+
+  $ userId = auth.user.id
+  $ cart = db.carts.filter("user_id", userId)
+
+  if cart == null || cart.length() == 0 {
+    # Create empty cart
+    $ newCart = {
+      id: db.carts.nextId(),
+      user_id: userId,
+      items: [],
+      subtotal: 0.0,
+      tax: 0.0,
+      shipping: 0.0,
+      discount: 0.0,
+      total: 0.0,
+      updated_at: now()
+    }
+    $ saved = db.carts.create(newCart)
+    > saved
+  } else {
+    > cart[0]
+  }
+
+# Add item to cart
+@ route /api/cart/items [POST] -> CartResponse
+  + auth(jwt)
+  + ratelimit(50/min)
+  % db: Database
+
+  $ userId = auth.user.id
+
+  # Validate input
+  if input.product_id == null || input.quantity == null {
+    > {
+      success: false,
+      message: "Product ID and quantity are required",
+      code: "VALIDATION_ERROR"
+    }
+  } else {
+    if input.quantity <= 0 {
+      > {
+        success: false,
+        message: "Quantity must be greater than 0",
+        code: "VALIDATION_ERROR"
+      }
+    } else {
+      # Get product details
+      $ product = db.products.get(input.product_id)
+
+      if product == null {
+        > {
+          success: false,
+          message: "Product not found",
+          code: "NOT_FOUND"
+        }
+      } else {
+        # Check stock availability
+        if product.stock < input.quantity {
+          > {
+            success: false,
+            message: "Insufficient stock available",
+            code: "OUT_OF_STOCK"
+          }
+        } else {
+          # Get or create cart
+          $ cart = db.carts.findOne("user_id", userId)
+
+          # Calculate item subtotal
+          $ itemSubtotal = product.price * input.quantity
+
+          # Create cart item
+          $ newItem = {
+            product_id: product.id,
+            product_name: product.name,
+            quantity: input.quantity,
+            unit_price: product.price,
+            subtotal: itemSubtotal
+          }
+
+          # Add item to cart items
+          $ cart.items = cart.items + [newItem]
+
+          # Recalculate cart totals
+          $ cart.subtotal = cart.subtotal + itemSubtotal
+          $ cart.tax = cart.subtotal * 0.08
+          $ cart.shipping = 10.0
+
+          # Free shipping over $100
+          if cart.subtotal >= 100.0 {
+            $ cart.shipping = 0.0
+          }
+
+          $ cart.total = cart.subtotal + cart.tax + cart.shipping - cart.discount
+          $ cart.updated_at = now()
+
+          $ updated = db.carts.update(cart.id, cart)
+
+          > {
+            success: true,
+            message: "Item added to cart",
+            cart: updated
+          }
+        }
+      }
+    }
+  }
+
+# Update cart item quantity
+@ route /api/cart/items/:product_id [PUT] -> CartResponse
+  + auth(jwt)
+  + ratelimit(50/min)
+  % db: Database
+
+  $ userId = auth.user.id
+  $ cart = db.carts.findOne("user_id", userId)
+
+  if cart == null {
+    > {
+      success: false,
+      message: "Cart not found",
+      code: "NOT_FOUND"
+    }
+  } else {
+    if input.quantity == null || input.quantity < 0 {
+      > {
+        success: false,
+        message: "Invalid quantity",
+        code: "VALIDATION_ERROR"
+      }
+    } else {
+      # Find the item in cart
+      $ itemFound = false
+      $ updatedItems = []
+      $ newSubtotal = 0.0
+
+      # In real implementation, would iterate through cart.items
+      # For now, simulate updating the quantity
+      $ product = db.products.get(product_id)
+
+      if product != null && input.quantity <= product.stock {
+        $ itemSubtotal = product.price * input.quantity
+
+        $ updatedItem = {
+          product_id: product.id,
+          product_name: product.name,
+          quantity: input.quantity,
+          unit_price: product.price,
+          subtotal: itemSubtotal
+        }
+
+        # Recalculate totals
+        $ cart.subtotal = itemSubtotal
+        $ cart.tax = cart.subtotal * 0.08
+        $ cart.shipping = 10.0
+
+        if cart.subtotal >= 100.0 {
+          $ cart.shipping = 0.0
+        }
+
+        $ cart.total = cart.subtotal + cart.tax + cart.shipping - cart.discount
+        $ cart.updated_at = now()
+
+        $ updated = db.carts.update(cart.id, cart)
+
+        > {
+          success: true,
+          message: "Cart updated successfully",
+          cart: updated
+        }
+      } else {
+        > {
+          success: false,
+          message: "Invalid product or insufficient stock",
+          code: "VALIDATION_ERROR"
+        }
+      }
+    }
+  }
+
+# Remove item from cart
+@ route /api/cart/items/:product_id [DELETE] -> CartResponse
+  + auth(jwt)
+  + ratelimit(50/min)
+  % db: Database
+
+  $ userId = auth.user.id
+  $ cart = db.carts.findOne("user_id", userId)
+
+  if cart == null {
+    > {
+      success: false,
+      message: "Cart not found",
+      code: "NOT_FOUND"
+    }
+  } else {
+    # Remove item and recalculate
+    $ cart.items = cart.items.filter("product_id", "!=", product_id)
+
+    # Recalculate subtotal
+    $ cart.subtotal = 0.0
+    # In real implementation, would sum all item subtotals
+
+    $ cart.tax = cart.subtotal * 0.08
+    $ cart.shipping = 10.0
+
+    if cart.subtotal >= 100.0 {
+      $ cart.shipping = 0.0
+    }
+
+    $ cart.total = cart.subtotal + cart.tax + cart.shipping - cart.discount
+    $ cart.updated_at = now()
+
+    $ updated = db.carts.update(cart.id, cart)
+
+    > {
+      success: true,
+      message: "Item removed from cart",
+      cart: updated
+    }
+  }
+
+# Clear entire cart
+@ route /api/cart/clear [DELETE] -> CartResponse
+  + auth(jwt)
+  + ratelimit(20/min)
+  % db: Database
+
+  $ userId = auth.user.id
+  $ cart = db.carts.findOne("user_id", userId)
+
+  if cart == null {
+    > {
+      success: false,
+      message: "Cart not found",
+      code: "NOT_FOUND"
+    }
+  } else {
+    $ cart.items = []
+    $ cart.subtotal = 0.0
+    $ cart.tax = 0.0
+    $ cart.shipping = 0.0
+    $ cart.discount = 0.0
+    $ cart.total = 0.0
+    $ cart.updated_at = now()
+
+    $ updated = db.carts.update(cart.id, cart)
+
+    > {
+      success: true,
+      message: "Cart cleared successfully",
+      cart: updated
+    }
+  }
+
+# Apply discount code
+@ route /api/cart/discount [POST] -> CartResponse
+  + auth(jwt)
+  + ratelimit(30/min)
+  % db: Database
+
+  $ userId = auth.user.id
+  $ cart = db.carts.findOne("user_id", userId)
+
+  if cart == null {
+    > {
+      success: false,
+      message: "Cart not found",
+      code: "NOT_FOUND"
+    }
+  } else {
+    if input.code == null || input.code == "" {
+      > {
+        success: false,
+        message: "Discount code is required",
+        code: "VALIDATION_ERROR"
+      }
+    } else {
+      # Validate discount code
+      $ discount = db.discounts.findOne("code", input.code)
+
+      if discount == null {
+        > {
+          success: false,
+          message: "Invalid discount code",
+          code: "INVALID_CODE"
+        }
+      } else {
+        # Check if discount is active
+        if discount.active == false {
+          > {
+            success: false,
+            message: "Discount code has expired",
+            code: "EXPIRED_CODE"
+          }
+        } else {
+          # Apply discount
+          $ discountAmount = 0.0
+
+          if discount.type == "percentage" {
+            $ discountAmount = cart.subtotal * (discount.value / 100.0)
+          } else {
+            $ discountAmount = discount.value
+          }
+
+          # Ensure discount doesn't exceed subtotal
+          if discountAmount > cart.subtotal {
+            $ discountAmount = cart.subtotal
+          }
+
+          $ cart.discount = discountAmount
+          $ cart.total = cart.subtotal + cart.tax + cart.shipping - cart.discount
+          $ cart.updated_at = now()
+
+          $ updated = db.carts.update(cart.id, cart)
+
+          > {
+            success: true,
+            message: "Discount applied successfully",
+            cart: updated
+          }
+        }
+      }
+    }
+  }
+
+# Checkout - create order from cart
+@ route /api/cart/checkout [POST] -> ApiResponse
+  + auth(jwt)
+  + ratelimit(10/min)
+  % db: Database
+
+  $ userId = auth.user.id
+  $ cart = db.carts.findOne("user_id", userId)
+
+  if cart == null {
+    > {
+      success: false,
+      message: "Cart not found",
+      code: "NOT_FOUND"
+    }
+  } else {
+    if cart.items.length() == 0 {
+      > {
+        success: false,
+        message: "Cart is empty",
+        code: "EMPTY_CART"
+      }
+    } else {
+      # Create order
+      $ order = {
+        id: db.orders.nextId(),
+        cart_id: cart.id,
+        user_id: userId,
+        status: "pending",
+        total: cart.total,
+        created_at: now()
+      }
+
+      $ savedOrder = db.orders.create(order)
+
+      # Update product stock
+      # In real implementation, would iterate and update each product
+
+      # Clear cart after checkout
+      $ cart.items = []
+      $ cart.subtotal = 0.0
+      $ cart.tax = 0.0
+      $ cart.shipping = 0.0
+      $ cart.discount = 0.0
+      $ cart.total = 0.0
+      $ updated = db.carts.update(cart.id, cart)
+
+      > {
+        success: true,
+        message: "Order placed successfully",
+        data: savedOrder
+      }
+    }
+  }
+
+# Get product categories
+@ route /api/categories [GET]
+  + ratelimit(100/min)
+  % db: Database
+
+  $ categories = [
+    {name: "Electronics", count: 25},
+    {name: "Clothing", count: 40},
+    {name: "Books", count: 30},
+    {name: "Home & Garden", count: 20},
+    {name: "Sports", count: 15}
+  ]
+
+  > {
+    categories: categories,
+    total: 5
+  }

@@ -1,0 +1,9 @@
+# Multiple routes
+@ route /health
+  > {status: "ok", timestamp: 1234567890}
+
+@ route /version
+  > {version: "0.1.0"}
+
+@ route /info/:id
+  > {id: id, info: "Details about " + id}

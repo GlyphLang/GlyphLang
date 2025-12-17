@@ -1,0 +1,3 @@
+@ route /test
+  $ t = now()
+  > {time: t, double: t}

@@ -1,0 +1,237 @@
+# Todo List API Example
+# Demonstrates CRUD operations, path parameters, and different HTTP methods
+
+# Define a Todo type
+: Todo {
+  id: int!
+  title: str!
+  description: str
+  completed: bool!
+  priority: str
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+# Define response types
+: TodoList {
+  todos: List[Todo]
+  total: int!
+  completed: int!
+  pending: int!
+}
+
+: CreateTodoRequest {
+  title: str!
+  description: str
+  priority: str
+}
+
+: UpdateTodoRequest {
+  title: str
+  description: str
+  completed: bool
+  priority: str
+}
+
+: TodoResponse {
+  success: bool!
+  message: str!
+  todo: Todo
+}
+
+: ErrorResponse {
+  success: bool!
+  message: str!
+  code: str!
+}
+
+# Get all todos with filtering
+@ route /api/todos [GET] -> TodoList
+  + ratelimit(100/min)
+  % db: Database
+
+  # Fetch all todos from database
+  $ todos = db.todos.all()
+  $ total = todos.length()
+
+  # Count completed and pending
+  $ completed = 0
+  $ pending = 0
+
+  # In a real implementation, this would iterate through todos
+  $ completed = db.todos.count("completed", true)
+  $ pending = db.todos.count("completed", false)
+
+  > {
+    todos: todos,
+    total: total,
+    completed: completed,
+    pending: pending
+  }
+
+# Get a specific todo by ID
+@ route /api/todos/:id [GET] -> Todo
+  + ratelimit(200/min)
+  % db: Database
+
+  $ todo = db.todos.get(id)
+
+  # Check if todo exists
+  if todo == null {
+    > {
+      success: false,
+      message: "Todo not found",
+      code: "NOT_FOUND"
+    }
+  } else {
+    > todo
+  }
+
+# Create a new todo
+@ route /api/todos [POST] -> TodoResponse
+  + ratelimit(50/min)
+  % db: Database
+
+  # Validate input
+  if input.title == "" || input.title == null {
+    > {
+      success: false,
+      message: "Title is required",
+      code: "VALIDATION_ERROR"
+    }
+  } else {
+    # Set default priority if not provided
+    $ priority = "medium"
+    if input.priority != null && input.priority != "" {
+      $ priority = input.priority
+    }
+
+    # Create new todo
+    $ newTodo = {
+      id: db.todos.nextId(),
+      title: input.title,
+      description: input.description,
+      completed: false,
+      priority: priority,
+      created_at: now(),
+      updated_at: now()
+    }
+
+    $ saved = db.todos.create(newTodo)
+
+    > {
+      success: true,
+      message: "Todo created successfully",
+      todo: saved
+    }
+  }
+
+# Update an existing todo
+@ route /api/todos/:id [PUT] -> TodoResponse
+  + ratelimit(50/min)
+  % db: Database
+
+  $ existingTodo = db.todos.get(id)
+
+  # Check if todo exists
+  if existingTodo == null {
+    > {
+      success: false,
+      message: "Todo not found",
+      code: "NOT_FOUND"
+    }
+  } else {
+    # Update fields if provided
+    $ updatedTodo = existingTodo
+
+    if input.title != null && input.title != "" {
+      $ updatedTodo.title = input.title
+    }
+
+    if input.description != null {
+      $ updatedTodo.description = input.description
+    }
+
+    if input.completed != null {
+      $ updatedTodo.completed = input.completed
+    }
+
+    if input.priority != null && input.priority != "" {
+      $ updatedTodo.priority = input.priority
+    }
+
+    $ updatedTodo.updated_at = now()
+
+    $ saved = db.todos.update(id, updatedTodo)
+
+    > {
+      success: true,
+      message: "Todo updated successfully",
+      todo: saved
+    }
+  }
+
+# Delete a todo
+@ route /api/todos/:id [DELETE] -> TodoResponse
+  + ratelimit(50/min)
+  % db: Database
+
+  $ existingTodo = db.todos.get(id)
+
+  if existingTodo == null {
+    > {
+      success: false,
+      message: "Todo not found",
+      code: "NOT_FOUND"
+    }
+  } else {
+    $ result = db.todos.delete(id)
+
+    > {
+      success: true,
+      message: "Todo deleted successfully",
+      todo: existingTodo
+    }
+  }
+
+# Mark todo as completed
+@ route /api/todos/:id/complete [PATCH] -> TodoResponse
+  + ratelimit(100/min)
+  % db: Database
+
+  $ todo = db.todos.get(id)
+
+  if todo == null {
+    > {
+      success: false,
+      message: "Todo not found",
+      code: "NOT_FOUND"
+    }
+  } else {
+    $ todo.completed = true
+    $ todo.updated_at = now()
+    $ saved = db.todos.update(id, todo)
+
+    > {
+      success: true,
+      message: "Todo marked as completed",
+      todo: saved
+    }
+  }
+
+# Get todos by priority
+@ route /api/todos/priority/:priority [GET] -> TodoList
+  + ratelimit(100/min)
+  % db: Database
+
+  $ filteredTodos = db.todos.filter("priority", priority)
+  $ total = filteredTodos.length()
+  $ completed = db.todos.countWhere("priority", priority, "completed", true)
+  $ pending = total - completed
+
+  > {
+    todos: filteredTodos,
+    total: total,
+    completed: completed,
+    pending: pending
+  }

@@ -1,0 +1,152 @@
+GlyphLang Release Build System
+=============================
+
+Version: 1.0.0
+Last Updated: 2025-12-15
+
+This directory contains all installer and release scripts for GlyphLang.
+
+Quick Start
+-----------
+
+1. Build binaries (cross-platform):
+   cd lang && go build -ldflags="-s -w" -o glyph.exe ./cmd/glyph
+
+2. Build all platforms from Linux/macOS:
+   GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o dist/glyph-windows-amd64.exe ./cmd/glyph
+   GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/glyph-linux-amd64 ./cmd/glyph
+   GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o dist/glyph-linux-arm64 ./cmd/glyph
+   GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o dist/glyph-darwin-amd64 ./cmd/glyph
+   GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/glyph-darwin-arm64 ./cmd/glyph
+
+
+Installation Methods
+--------------------
+
+UNIX (Linux/macOS):
+  curl -fsSL https://glyph-lang.github.io/install.sh | bash
+
+Windows (PowerShell):
+  iwr -useb https://glyph-lang.github.io/install.ps1 | iex
+
+macOS (Homebrew):
+  brew tap glyph-lang/tap && brew install glyph
+
+Linux (apt):
+  sudo dpkg -i glyph_1.0.0_amd64.deb
+
+Linux (rpm):
+  sudo rpm -i glyph-1.0.0-1.x86_64.rpm
+
+
+Windows Installer (Inno Setup)
+------------------------------
+
+Prerequisites:
+1. Inno Setup 6.x installed (https://jrsoftware.org/isinfo.php)
+2. Built binary in dist/glyph-windows-amd64.exe
+
+Building:
+1. Open glyph-setup.iss in Inno Setup Compiler
+2. Press F9 or click Build > Compile
+3. Output: dist/glyph-1.0.0-windows-setup.exe
+
+Command Line Build:
+  "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" glyph-setup.iss
+
+The installer will:
+- Install glyph.exe to C:\Program Files\GlyphLang (or user-selected location)
+- Optionally add to PATH (recommended, enabled by default)
+- Create Start Menu shortcuts
+- Associate .glyph files with the compiler
+- Provide clean uninstallation
+
+
+Debian Package (.deb)
+---------------------
+
+Build:
+  ./build-deb.sh 1.0.0
+
+Output: dist/glyph_1.0.0_amd64.deb
+
+Install:
+  sudo dpkg -i dist/glyph_1.0.0_amd64.deb
+
+
+RPM Package (.rpm)
+------------------
+
+Build (requires rpmbuild):
+  ./build-rpm.sh 1.0.0
+
+Output: ~/rpmbuild/RPMS/x86_64/glyph-1.0.0-1.x86_64.rpm
+
+Install:
+  sudo rpm -i glyph-1.0.0-1.x86_64.rpm
+
+
+macOS Package (.pkg)
+--------------------
+
+Build (requires macOS):
+  ./build-macos-pkg.sh 1.0.0 arm64   # For Apple Silicon
+  ./build-macos-pkg.sh 1.0.0 amd64   # For Intel Macs
+
+Output: dist/glyph-1.0.0-macos-arm64.pkg (or amd64)
+
+
+Homebrew Formula
+----------------
+
+The formula is in homebrew/glyph.rb
+
+After a release, update SHA256 hashes:
+  ./update-homebrew.sh 1.0.0
+
+Then push to the tap repository:
+  brew tap glyph-lang/tap
+  cd $(brew --repo glyph-lang/tap)
+  cp /path/to/homebrew/glyph.rb Formula/
+  git commit -am "Update to v1.0.0"
+  git push
+
+
+GitHub Actions Release
+----------------------
+
+The release workflow (.github/workflows/release.yml) automatically:
+1. Builds binaries for all platforms
+2. Creates Windows installer
+3. Creates .deb package
+4. Creates .rpm package
+5. Creates macOS .pkg installers
+6. Creates a GitHub release with all assets
+
+Trigger a release:
+  git tag v1.0.0
+  git push origin v1.0.0
+
+Or manually from GitHub Actions UI.
+
+
+File Structure
+--------------
+
+installer/
+├── BUILD.txt              # This file
+├── glyph-setup.iss         # Windows Inno Setup script
+├── install.sh             # UNIX installer script
+├── install.ps1            # Windows PowerShell installer
+├── build-deb.sh           # Debian package builder
+├── build-rpm.sh           # RPM package builder
+├── build-macos-pkg.sh     # macOS package builder
+├── update-homebrew.sh     # Update Homebrew formula
+├── deb/
+│   └── DEBIAN/
+│       ├── control        # Debian package metadata
+│       └── postinst       # Post-install script
+├── rpm/
+│   └── glyph.spec          # RPM spec file
+└── homebrew/
+    └── glyph.rb            # Homebrew formula

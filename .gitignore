@@ -1,0 +1,95 @@
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+go.sum
+
+# Rust
+/glyph-core/target/
+/glyph-core/target/
+target/
+/glyph-core/Cargo.lock
+Cargo.lock
+
+# Build artifacts
+/build/
+/dist/
+*.abcx
+*.glyphx
+*.glybc
+
+# IDE & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.fleet/
+.atom/
+.sublime-*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+*.lnk
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Claude Code
+.claude/
+
+# Project Summary & Status Documents
+docs/project_summary/
+PROJECT_COMPLETE.txt
+*_STATUS.md
+*_SUMMARY.md
+*_COMPLETE.md
+
+# Test artifacts
+test_*.abc
+test_*.glyph
+nul
+test_output.txt
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*~
+
+# Dependencies
+node_modules/
+vendor/
+
+# Coverage
+*.coverprofile
+coverage/
+.coverage
+
+# Docker
+.dockerignore
+
+# Website (if needed to be excluded from main repo)
+# website/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3

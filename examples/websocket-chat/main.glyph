@@ -1,0 +1,140 @@
+// Real-Time WebSocket Chat Application
+// Demonstrates WebSocket support in Glyph with rooms, broadcasting, and event handling
+
+// Message type for chat
+type ChatMessage {
+  username: string
+  text: string
+  room: string
+  timestamp: int
+}
+
+// User type
+type User {
+  id: string
+  username: string
+  room: string
+}
+
+// WebSocket route for chat
+@ ws /chat {
+  // Handle new connections
+  on connect {
+    // Send welcome message
+    ws.send({
+      type: "system",
+      message: "Welcome to Glyph Chat! Type /join <room> to join a room."
+    })
+  }
+
+  // Handle incoming messages
+  on message {
+    // Parse message data
+    let data = input.data
+
+    // Handle commands
+    if data.type == "join_room" {
+      // Join a room
+      ws.join(data.room)
+
+      // Notify user
+      ws.send({
+        type: "system",
+        message: "You joined room: " + data.room
+      })
+
+      // Notify room
+      ws.broadcast_to_room(data.room, {
+        type: "system",
+        message: data.username + " joined the room"
+      })
+    }
+    else if data.type == "leave_room" {
+      // Leave a room
+      ws.leave(data.room)
+
+      // Notify user
+      ws.send({
+        type: "system",
+        message: "You left room: " + data.room
+      })
+
+      // Notify room
+      ws.broadcast_to_room(data.room, {
+        type: "system",
+        message: data.username + " left the room"
+      })
+    }
+    else if data.type == "chat_message" {
+      // Broadcast message to room
+      if data.room != "" {
+        ws.broadcast_to_room(data.room, {
+          type: "chat",
+          username: data.username,
+          text: data.text,
+          room: data.room,
+          timestamp: now()
+        })
+      } else {
+        // Broadcast to all if no room specified
+        ws.broadcast({
+          type: "chat",
+          username: data.username,
+          text: data.text,
+          timestamp: now()
+        })
+      }
+    }
+    else if data.type == "ping" {
+      // Respond to ping
+      ws.send({
+        type: "pong",
+        timestamp: now()
+      })
+    }
+  }
+
+  // Handle disconnections
+  on disconnect {
+    // Notify all rooms this user was in
+    // Note: This would require tracking user's rooms
+    // For now, we'll just log the disconnect
+  }
+}
+
+// REST API endpoints for chat metadata
+
+@ GET /api/chat/rooms {
+  // Return list of active rooms
+  return {
+    rooms: ws.get_rooms(),
+    count: ws.get_room_count()
+  }
+}
+
+@ GET /api/chat/rooms/:room {
+  let room_name = room
+
+  return {
+    room: room_name,
+    users: ws.get_room_users(room_name),
+    count: ws.get_room_user_count(room_name)
+  }
+}
+
+@ GET /api/chat/stats {
+  return {
+    total_connections: ws.get_connection_count(),
+    total_rooms: ws.get_room_count(),
+    uptime: ws.get_uptime()
+  }
+}
+
+// Health check
+@ GET /health {
+  return {
+    status: "ok",
+    service: "Glyph WebSocket Chat",
+    timestamp: now()
+  }
+}

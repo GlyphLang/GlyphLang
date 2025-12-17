@@ -1,0 +1,63 @@
+# For Loop Examples in Glyph
+
+# Example 1: Simple array iteration
+@ route /users [GET]
+  $ users = [{name: "Alice", age: 30}, {name: "Bob", age: 25}, {name: "Charlie", age: 35}]
+  $ greetings = []
+
+  for user in users {
+    $ greeting = "Hello, " + user.name
+    $ greetings = greetings + [greeting]
+  }
+
+  > {greetings: greetings}
+
+# Example 2: Array iteration with index
+@ route /items [GET]
+  $ items = ["apple", "banana", "cherry"]
+  $ indexed = []
+
+  for index, item in items {
+    $ entry = {position: index, value: item}
+    $ indexed = indexed + [entry]
+  }
+
+  > {indexed: indexed}
+
+# Example 3: Object iteration (returns key-value pairs)
+@ route /config [GET]
+  $ config = {host: "localhost", port: "8080", debug: "true"}
+  $ settings = []
+
+  for key, value in config {
+    $ setting = {key: key, value: value}
+    $ settings = settings + [setting]
+  }
+
+  > {settings: settings}
+
+# Example 4: Nested loops
+@ route /matrix [GET]
+  $ matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+  $ sum = 0
+
+  for row in matrix {
+    for cell in row {
+      $ sum = sum + cell
+    }
+  }
+
+  > {total: sum}
+
+# Example 5: Filtering with for loop
+@ route /adults [GET]
+  $ people = [{name: "Alice", age: 30}, {name: "Bob", age: 17}, {name: "Charlie", age: 25}]
+  $ adults = []
+
+  for person in people {
+    if person.age >= 18 {
+      $ adults = adults + [person]
+    }
+  }
+
+  > {adults: adults}

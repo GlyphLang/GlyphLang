@@ -1,0 +1,508 @@
+# Authentication Demo API
+# Demonstrates JWT authentication, protected routes, and role-based access control
+
+# Define user types
+: User {
+  id: int!
+  username: str!
+  email: str!
+  role: str!
+  created_at: timestamp
+  last_login: timestamp
+}
+
+: UserProfile {
+  id: int!
+  username: str!
+  email: str!
+  role: str!
+  full_name: str
+  bio: str
+  avatar_url: str
+  created_at: timestamp
+}
+
+# Auth request/response types
+: LoginRequest {
+  username: str!
+  password: str!
+}
+
+: RegisterRequest {
+  username: str!
+  email: str!
+  password: str!
+  full_name: str
+}
+
+: AuthResponse {
+  success: bool!
+  message: str!
+  token: str
+  user: User
+}
+
+: TokenRefreshResponse {
+  success: bool!
+  token: str!
+  expires_at: timestamp
+}
+
+: PasswordChangeRequest {
+  current_password: str!
+  new_password: str!
+}
+
+: ApiResponse {
+  success: bool!
+  message: str!
+  data: any
+}
+
+# Public endpoint - no auth required
+@ route /api/health
+  + ratelimit(1000/min)
+
+  > {
+    status: "ok",
+    timestamp: now(),
+    version: "1.0.0"
+  }
+
+# Register new user
+@ route /api/auth/register [POST] -> AuthResponse
+  + ratelimit(10/min)
+  % db: Database
+
+  # Validate input
+  if input.username == null || input.username == "" {
+    > {
+      success: false,
+      message: "Username is required",
+      code: "VALIDATION_ERROR"
+    }
+  } else {
+    if input.email == null || input.email == "" {
+      > {
+        success: false,
+        message: "Email is required",
+        code: "VALIDATION_ERROR"
+      }
+    } else {
+      if input.password == null || input.password.length() < 8 {
+        > {
+          success: false,
+          message: "Password must be at least 8 characters",
+          code: "VALIDATION_ERROR"
+        }
+      } else {
+        # Check if username already exists
+        $ existingUser = db.users.findOne("username", input.username)
+
+        if existingUser != null {
+          > {
+            success: false,
+            message: "Username already taken",
+            code: "USERNAME_EXISTS"
+          }
+        } else {
+          # Check if email already exists
+          $ existingEmail = db.users.findOne("email", input.email)
+
+          if existingEmail != null {
+            > {
+              success: false,
+              message: "Email already registered",
+              code: "EMAIL_EXISTS"
+            }
+          } else {
+            # Hash password
+            $ hashedPassword = crypto.hash(input.password)
+
+            # Create new user
+            $ newUser = {
+              id: db.users.nextId(),
+              username: input.username,
+              email: input.email,
+              password: hashedPassword,
+              role: "user",
+              created_at: now(),
+              last_login: now()
+            }
+
+            $ saved = db.users.create(newUser)
+
+            # Generate JWT token
+            $ token = jwt.sign({
+              user_id: saved.id,
+              username: saved.username,
+              role: saved.role
+            }, "7d")
+
+            # Remove password from response
+            $ userResponse = {
+              id: saved.id,
+              username: saved.username,
+              email: saved.email,
+              role: saved.role,
+              created_at: saved.created_at,
+              last_login: saved.last_login
+            }
+
+            > {
+              success: true,
+              message: "User registered successfully",
+              token: token,
+              user: userResponse
+            }
+          }
+        }
+      }
+    }
+  }
+
+# Login endpoint
+@ route /api/auth/login [POST] -> AuthResponse
+  + ratelimit(20/min)
+  % db: Database
+
+  # Validate input
+  if input.username == null || input.username == "" {
+    > {
+      success: false,
+      message: "Username is required",
+      code: "VALIDATION_ERROR"
+    }
+  } else {
+    if input.password == null || input.password == "" {
+      > {
+        success: false,
+        message: "Password is required",
+        code: "VALIDATION_ERROR"
+      }
+    } else {
+      # Find user by username
+      $ user = db.users.findOne("username", input.username)
+
+      if user == null {
+        > {
+          success: false,
+          message: "Invalid username or password",
+          code: "INVALID_CREDENTIALS"
+        }
+      } else {
+        # Verify password
+        $ passwordValid = crypto.verify(input.password, user.password)
+
+        if passwordValid == false {
+          > {
+            success: false,
+            message: "Invalid username or password",
+            code: "INVALID_CREDENTIALS"
+          }
+        } else {
+          # Update last login
+          $ user.last_login = now()
+          $ updated = db.users.update(user.id, user)
+
+          # Generate JWT token
+          $ token = jwt.sign({
+            user_id: user.id,
+            username: user.username,
+            role: user.role
+          }, "7d")
+
+          # Remove password from response
+          $ userResponse = {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            role: user.role,
+            created_at: user.created_at,
+            last_login: user.last_login
+          }
+
+          > {
+            success: true,
+            message: "Login successful",
+            token: token,
+            user: userResponse
+          }
+        }
+      }
+    }
+  }
+
+# Logout endpoint (client-side token removal, server can blacklist if needed)
+@ route /api/auth/logout [POST] -> ApiResponse
+  + auth(jwt)
+  + ratelimit(50/min)
+
+  # In a real implementation, might add token to blacklist
+  # For now, just return success (client removes token)
+
+  > {
+    success: true,
+    message: "Logged out successfully",
+    data: null
+  }
+
+# Get current user profile (protected route)
+@ route /api/auth/me [GET] -> UserProfile
+  + auth(jwt)
+  + ratelimit(100/min)
+  % db: Database
+
+  $ userId = auth.user.id
+  $ user = db.users.get(userId)
+
+  if user == null {
+    > {
+      success: false,
+      message: "User not found",
+      code: "NOT_FOUND"
+    }
+  } else {
+    $ profile = db.profiles.findOne("user_id", userId)
+
+    > {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      full_name: profile.full_name,
+      bio: profile.bio,
+      avatar_url: profile.avatar_url,
+      created_at: user.created_at
+    }
+  }
+
+# Update user profile (protected route)
+@ route /api/auth/profile [PUT] -> ApiResponse
+  + auth(jwt)
+  + ratelimit(30/min)
+  % db: Database
+
+  $ userId = auth.user.id
+  $ profile = db.profiles.findOne("user_id", userId)
+
+  if profile == null {
+    # Create new profile
+    $ newProfile = {
+      user_id: userId,
+      full_name: input.full_name,
+      bio: input.bio,
+      avatar_url: input.avatar_url
+    }
+    $ saved = db.profiles.create(newProfile)
+
+    > {
+      success: true,
+      message: "Profile created successfully",
+      data: saved
+    }
+  } else {
+    # Update existing profile
+    if input.full_name != null {
+      $ profile.full_name = input.full_name
+    }
+
+    if input.bio != null {
+      $ profile.bio = input.bio
+    }
+
+    if input.avatar_url != null {
+      $ profile.avatar_url = input.avatar_url
+    }
+
+    $ updated = db.profiles.update(profile.id, profile)
+
+    > {
+      success: true,
+      message: "Profile updated successfully",
+      data: updated
+    }
+  }
+
+# Change password (protected route)
+@ route /api/auth/password [PUT] -> ApiResponse
+  + auth(jwt)
+  + ratelimit(10/min)
+  % db: Database
+
+  $ userId = auth.user.id
+  $ user = db.users.get(userId)
+
+  if input.current_password == null || input.new_password == null {
+    > {
+      success: false,
+      message: "Current and new password are required",
+      code: "VALIDATION_ERROR"
+    }
+  } else {
+    if input.new_password.length() < 8 {
+      > {
+        success: false,
+        message: "New password must be at least 8 characters",
+        code: "VALIDATION_ERROR"
+      }
+    } else {
+      # Verify current password
+      $ passwordValid = crypto.verify(input.current_password, user.password)
+
+      if passwordValid == false {
+        > {
+          success: false,
+          message: "Current password is incorrect",
+          code: "INVALID_PASSWORD"
+        }
+      } else {
+        # Hash new password
+        $ hashedPassword = crypto.hash(input.new_password)
+        $ user.password = hashedPassword
+        $ updated = db.users.update(userId, user)
+
+        > {
+          success: true,
+          message: "Password changed successfully",
+          data: null
+        }
+      }
+    }
+  }
+
+# Refresh JWT token (protected route)
+@ route /api/auth/refresh [POST] -> TokenRefreshResponse
+  + auth(jwt)
+  + ratelimit(50/min)
+
+  $ userId = auth.user.id
+  $ username = auth.user.username
+  $ role = auth.user.role
+
+  # Generate new token
+  $ newToken = jwt.sign({
+    user_id: userId,
+    username: username,
+    role: role
+  }, "7d")
+
+  $ expiresAt = now() + (7 * 24 * 60 * 60)
+
+  > {
+    success: true,
+    token: newToken,
+    expires_at: expiresAt
+  }
+
+# Admin-only endpoint - get all users
+@ route /api/admin/users [GET]
+  + auth(jwt, role: admin)
+  + ratelimit(50/min)
+  % db: Database
+
+  $ allUsers = db.users.all()
+
+  # Remove passwords from response
+  $ sanitizedUsers = []
+  # In real implementation, would map through users
+
+  > {
+    users: allUsers,
+    total: allUsers.length()
+  }
+
+# Admin-only endpoint - delete user
+@ route /api/admin/users/:id [DELETE] -> ApiResponse
+  + auth(jwt, role: admin)
+  + ratelimit(10/min)
+  % db: Database
+
+  $ targetUser = db.users.get(id)
+
+  if targetUser == null {
+    > {
+      success: false,
+      message: "User not found",
+      code: "NOT_FOUND"
+    }
+  } else {
+    # Prevent admin from deleting themselves
+    if targetUser.id == auth.user.id {
+      > {
+        success: false,
+        message: "Cannot delete your own account",
+        code: "FORBIDDEN"
+      }
+    } else {
+      # Delete user profile first
+      $ profileDeleted = db.profiles.deleteWhere("user_id", id)
+
+      # Delete user
+      $ deleted = db.users.delete(id)
+
+      > {
+        success: true,
+        message: "User deleted successfully",
+        data: targetUser
+      }
+    }
+  }
+
+# Moderator-only endpoint - update user role
+@ route /api/admin/users/:id/role [PUT] -> ApiResponse
+  + auth(jwt, role: moderator)
+  + ratelimit(20/min)
+  % db: Database
+
+  $ targetUser = db.users.get(id)
+
+  if targetUser == null {
+    > {
+      success: false,
+      message: "User not found",
+      code: "NOT_FOUND"
+    }
+  } else {
+    if input.role == null || input.role == "" {
+      > {
+        success: false,
+        message: "Role is required",
+        code: "VALIDATION_ERROR"
+      }
+    } else {
+      # Validate role
+      $ validRoles = ["user", "moderator", "admin"]
+      $ roleValid = false
+
+      if input.role == "user" || input.role == "moderator" || input.role == "admin" {
+        $ roleValid = true
+      }
+
+      if roleValid == false {
+        > {
+          success: false,
+          message: "Invalid role. Must be: user, moderator, or admin",
+          code: "VALIDATION_ERROR"
+        }
+      } else {
+        # Only admins can assign admin role
+        if input.role == "admin" && auth.user.role != "admin" {
+          > {
+            success: false,
+            message: "Only admins can assign admin role",
+            code: "FORBIDDEN"
+          }
+        } else {
+          $ targetUser.role = input.role
+          $ updated = db.users.update(id, targetUser)
+
+          > {
+            success: true,
+            message: "User role updated successfully",
+            data: updated
+          }
+        }
+      }
+    }
+  }

@@ -1,0 +1,50 @@
+@route /order-status/:status [GET]
+  switch status {
+    case "pending" {
+      > {message: "Order is pending", color: "yellow"}
+    }
+    case "shipped" {
+      > {message: "Order has shipped", color: "blue"}
+    }
+    case "delivered" {
+      > {message: "Order delivered", color: "green"}
+    }
+    default {
+      > {message: "Unknown status", color: "red"}
+    }
+  }
+
+@route /number-name/:num [GET]
+  $ n = 1
+  switch n {
+    case 1 {
+      > "one"
+    }
+    case 2 {
+      > "two"
+    }
+    case 3 {
+      > "three"
+    }
+    default {
+      > "unknown"
+    }
+  }
+
+@route /grade/:score [GET]
+  $ grade = ""
+  switch score {
+    case 90 {
+      $ grade = "A"
+    }
+    case 80 {
+      $ grade = "B"
+    }
+    case 70 {
+      $ grade = "C"
+    }
+    default {
+      $ grade = "F"
+    }
+  }
+  > {grade: grade, score: score}

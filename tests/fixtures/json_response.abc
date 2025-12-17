@@ -1,0 +1,13 @@
+# Route with JSON response
+: User {
+  id: int!
+  name: str!
+  email: str!
+}
+
+@ route /api/user
+  > {
+    id: 1,
+    name: "Test User",
+    email: "test@example.com"
+  }

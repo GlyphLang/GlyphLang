@@ -1,0 +1,5 @@
+# Route with authentication
+@ route /api/protected
+  + auth(jwt)
+  + ratelimit(100/min)
+  > {message: "Protected data"}

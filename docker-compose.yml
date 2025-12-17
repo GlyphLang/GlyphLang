@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+  # Glyph Application
+  glyph:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: glyph-app
+    ports:
+      - "8080:8080"
+    environment:
+      - Glyph_ENV=production
+      - Glyph_PORT=8080
+      - Glyph_LOG_LEVEL=info
+    volumes:
+      # Mount your Glyph application
+      - ./examples:/app/examples:ro
+    restart: unless-stopped
+    networks:
+      - glyph-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # PostgreSQL Database (for database integration)
+  postgres:
+    image: postgres:16-alpine
+    container_name: glyph-postgres
+    environment:
+      - POSTGRES_DB=glyph_db
+      - POSTGRES_USER=glyph_user
+      - POSTGRES_PASSWORD=glyph_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
+    networks:
+      - glyph-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U glyph_user -d glyph_db"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Redis (for caching/sessions)
+  redis:
+    image: redis:7-alpine
+    container_name: glyph-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - glyph-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Prometheus (monitoring)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: glyph-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    restart: unless-stopped
+    networks:
+      - glyph-network
+
+  # Grafana (metrics visualization)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: glyph-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./deploy/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./deploy/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    restart: unless-stopped
+    networks:
+      - glyph-network
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+networks:
+  glyph-network:
+    driver: bridge

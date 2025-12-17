@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+
+echo "GlyphLang installed successfully!"
+echo ""
+echo "Get started with:"
+echo "  glyph --help"
+echo "  glyph init my-project"
+echo "  glyph dev my-project/main.glyph"
+echo ""
+
+exit 0

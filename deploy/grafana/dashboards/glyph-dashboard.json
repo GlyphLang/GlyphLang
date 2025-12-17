@@ -1,0 +1,89 @@
+{
+  "dashboard": {
+    "title": "Glyph Application Metrics",
+    "tags": ["glyph", "application"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Request Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{job=\"glyph-app\"}[5m])",
+            "legendFormat": "{{method}} {{path}}",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Response Time (p95)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"glyph-app\"}[5m]))",
+            "legendFormat": "{{method}} {{path}}",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Error Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{job=\"glyph-app\",status=~\"5..\"}[5m])",
+            "legendFormat": "{{method}} {{path}}",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "CPU Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(process_cpu_seconds_total{job=\"glyph-app\"}[5m]) * 100",
+            "legendFormat": "{{pod}}",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Memory Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes{job=\"glyph-app\"} / 1024 / 1024",
+            "legendFormat": "{{pod}}",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Active Connections",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "http_connections_active{job=\"glyph-app\"}",
+            "legendFormat": "{{pod}}",
+            "refId": "A"
+          }
+        ]
+      }
+    ],
+    "schemaVersion": 27,
+    "version": 1
+  }
+}

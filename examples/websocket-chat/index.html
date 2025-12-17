@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glyph WebSocket Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 900px;
+            height: 600px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .status {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .status.connected {
+            color: #4ade80;
+        }
+
+        .status.disconnected {
+            color: #f87171;
+        }
+
+        .chat-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 200px;
+            background: #f8f9fa;
+            border-right: 1px solid #e9ecef;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .sidebar h3 {
+            font-size: 14px;
+            color: #6c757d;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .room-list {
+            list-style: none;
+        }
+
+        .room-item {
+            padding: 8px 12px;
+            margin-bottom: 5px;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-size: 14px;
+        }
+
+        .room-item:hover {
+            background: #e9ecef;
+        }
+
+        .room-item.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .main-chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #ffffff;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.system {
+            text-align: center;
+            color: #6c757d;
+            font-size: 14px;
+            font-style: italic;
+        }
+
+        .message.chat .username {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 3px;
+        }
+
+        .message.chat .text {
+            color: #212529;
+            line-height: 1.5;
+        }
+
+        .message.chat .timestamp {
+            font-size: 12px;
+            color: #adb5bd;
+            margin-top: 3px;
+        }
+
+        .input-area {
+            padding: 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 10px;
+        }
+
+        .username-input {
+            padding: 10px 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+            width: 150px;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .send-button {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        .send-button:hover {
+            transform: translateY(-2px);
+        }
+
+        .send-button:active {
+            transform: translateY(0);
+        }
+
+        .room-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .room-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+
+        .room-button {
+            padding: 8px 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+
+        .room-button:hover {
+            background: #5568d3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Glyph WebSocket Chat</h1>
+            <div class="status" id="status">Disconnected</div>
+        </div>
+
+        <div class="chat-container">
+            <div class="sidebar">
+                <div class="room-controls">
+                    <input type="text" class="room-input" id="roomInput" placeholder="Room name">
+                    <button class="room-button" onclick="joinRoom()">Join</button>
+                </div>
+                <h3>Rooms</h3>
+                <ul class="room-list" id="roomList">
+                    <li class="room-item" onclick="switchRoom('general')">general</li>
+                </ul>
+            </div>
+
+            <div class="main-chat">
+                <div class="messages" id="messages"></div>
+                <div class="input-area">
+                    <div class="input-container">
+                        <input type="text" class="username-input" id="username" placeholder="Username" value="User">
+                        <input type="text" class="message-input" id="messageInput" placeholder="Type a message..." onkeypress="handleKeyPress(event)">
+                        <button class="send-button" onclick="sendMessage()">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let currentRoom = 'general';
+        let username = 'User';
+
+        function connect() {
+            const wsUrl = 'ws://localhost:8080/chat';
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                updateStatus(true);
+                addSystemMessage('Connected to server');
+                joinRoom('general');
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleMessage(data);
+            };
+
+            ws.onclose = () => {
+                updateStatus(false);
+                addSystemMessage('Disconnected from server');
+                setTimeout(connect, 3000); // Reconnect after 3 seconds
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        function updateStatus(connected) {
+            const status = document.getElementById('status');
+            status.textContent = connected ? 'Connected' : 'Disconnected';
+            status.className = 'status ' + (connected ? 'connected' : 'disconnected');
+        }
+
+        function handleMessage(data) {
+            if (data.type === 'system') {
+                addSystemMessage(data.message);
+            } else if (data.type === 'chat') {
+                addChatMessage(data.username, data.text, data.timestamp);
+            } else if (data.type === 'pong') {
+                console.log('Pong received');
+            }
+        }
+
+        function addSystemMessage(text) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message system';
+            messageDiv.textContent = text;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function addChatMessage(username, text, timestamp) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message chat';
+
+            const time = new Date(timestamp * 1000).toLocaleTimeString();
+
+            messageDiv.innerHTML = `
+                <div class="username">${username}</div>
+                <div class="text">${text}</div>
+                <div class="timestamp">${time}</div>
+            `;
+
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const usernameInput = document.getElementById('username');
+            const text = input.value.trim();
+            username = usernameInput.value.trim() || 'User';
+
+            if (text && ws && ws.readyState === WebSocket.OPEN) {
+                const message = {
+                    type: 'chat_message',
+                    username: username,
+                    text: text,
+                    room: currentRoom,
+                    timestamp: Math.floor(Date.now() / 1000)
+                };
+
+                ws.send(JSON.stringify({
+                    type: 'json',
+                    data: message
+                }));
+
+                input.value = '';
+            }
+        }
+
+        function joinRoom(roomName = null) {
+            if (!roomName) {
+                const roomInput = document.getElementById('roomInput');
+                roomName = roomInput.value.trim();
+                roomInput.value = '';
+            }
+
+            if (roomName && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'join_room',
+                    room: roomName
+                }));
+
+                currentRoom = roomName;
+                updateRoomList(roomName);
+            }
+        }
+
+        function switchRoom(roomName) {
+            currentRoom = roomName;
+            updateRoomList(roomName);
+            addSystemMessage(`Switched to room: ${roomName}`);
+        }
+
+        function updateRoomList(activeRoom) {
+            const roomList = document.getElementById('roomList');
+            const items = roomList.getElementsByClassName('room-item');
+
+            for (let item of items) {
+                item.classList.remove('active');
+                if (item.textContent === activeRoom) {
+                    item.classList.add('active');
+                }
+            }
+
+            // Add room if it doesn't exist
+            let found = false;
+            for (let item of items) {
+                if (item.textContent === activeRoom) {
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                const li = document.createElement('li');
+                li.className = 'room-item active';
+                li.textContent = activeRoom;
+                li.onclick = () => switchRoom(activeRoom);
+                roomList.appendChild(li);
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        // Connect on load
+        connect();
+
+        // Send ping every 30 seconds
+        setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'ping',
+                    timestamp: Math.floor(Date.now() / 1000)
+                }));
+            }
+        }, 30000);
+    </script>
+</body>
+</html>

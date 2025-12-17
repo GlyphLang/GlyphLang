@@ -1,0 +1,345 @@
+# Database Demo - Complete CRUD Operations Example
+# This example demonstrates database integration with PostgreSQL
+
+# Define User type
+: User {
+  id: int!
+  username: str!
+  email: str!
+  full_name: str
+  age: int
+  active: bool!
+  created_at: int
+  updated_at: int
+}
+
+# Define response types
+: UserResponse {
+  success: bool!
+  message: str!
+  user: User
+}
+
+: UserListResponse {
+  success: bool!
+  message: str!
+  users: List[User]
+  total: int!
+}
+
+: CreateUserRequest {
+  username: str!
+  email: str!
+  full_name: str
+  age: int
+}
+
+: UpdateUserRequest {
+  username: str
+  email: str
+  full_name: str
+  age: int
+  active: bool
+}
+
+# Get all users
+@ route /api/users [GET] -> UserListResponse
+  + ratelimit(100/min)
+  % db: Database
+
+  $ users = db.users.all()
+  $ total = db.users.length()
+
+  > {
+    success: true,
+    message: "Users retrieved successfully",
+    users: users,
+    total: total
+  }
+
+# Get a specific user by ID
+@ route /api/users/:id [GET] -> UserResponse
+  + ratelimit(200/min)
+  % db: Database
+
+  $ user = db.users.get(id)
+
+  if user == null {
+    > {
+      success: false,
+      message: "User not found",
+      user: null
+    }
+  } else {
+    > {
+      success: true,
+      message: "User found",
+      user: user
+    }
+  }
+
+# Create a new user
+@ route /api/users [POST] -> UserResponse
+  + ratelimit(50/min)
+  % db: Database
+
+  # Validate required fields
+  if input.username == null || input.username == "" {
+    > {
+      success: false,
+      message: "Username is required",
+      user: null
+    }
+  } else {
+    if input.email == null || input.email == "" {
+      > {
+        success: false,
+        message: "Email is required",
+        user: null
+      }
+    } else {
+      # Check if username already exists
+      $ existing = db.users.filter("username", input.username)
+      if existing.length() > 0 {
+        > {
+          success: false,
+          message: "Username already exists",
+          user: null
+        }
+      } else {
+        # Create new user
+        $ timestamp = now()
+        $ newUser = {
+          id: db.users.nextId(),
+          username: input.username,
+          email: input.email,
+          full_name: input.full_name,
+          age: input.age,
+          active: true,
+          created_at: timestamp,
+          updated_at: timestamp
+        }
+
+        $ created = db.users.create(newUser)
+
+        > {
+          success: true,
+          message: "User created successfully",
+          user: created
+        }
+      }
+    }
+  }
+
+# Update a user
+@ route /api/users/:id [PUT] -> UserResponse
+  + ratelimit(50/min)
+  % db: Database
+
+  $ existingUser = db.users.get(id)
+
+  if existingUser == null {
+    > {
+      success: false,
+      message: "User not found",
+      user: null
+    }
+  } else {
+    # Build update object
+    $ updates = {
+      updated_at: now()
+    }
+
+    if input.username != null && input.username != "" {
+      $ updates.username = input.username
+    }
+
+    if input.email != null && input.email != "" {
+      $ updates.email = input.email
+    }
+
+    if input.full_name != null {
+      $ updates.full_name = input.full_name
+    }
+
+    if input.age != null {
+      $ updates.age = input.age
+    }
+
+    if input.active != null {
+      $ updates.active = input.active
+    }
+
+    $ updated = db.users.update(id, updates)
+
+    > {
+      success: true,
+      message: "User updated successfully",
+      user: updated
+    }
+  }
+
+# Delete a user
+@ route /api/users/:id [DELETE] -> UserResponse
+  + ratelimit(50/min)
+  % db: Database
+
+  $ existingUser = db.users.get(id)
+
+  if existingUser == null {
+    > {
+      success: false,
+      message: "User not found",
+      user: null
+    }
+  } else {
+    $ result = db.users.delete(id)
+
+    > {
+      success: true,
+      message: "User deleted successfully",
+      user: existingUser
+    }
+  }
+
+# Get active users
+@ route /api/users/active [GET] -> UserListResponse
+  + ratelimit(100/min)
+  % db: Database
+
+  $ activeUsers = db.users.filter("active", true)
+  $ total = activeUsers.length()
+
+  > {
+    success: true,
+    message: "Active users retrieved",
+    users: activeUsers,
+    total: total
+  }
+
+# Get users by age range
+@ route /api/users/age/:min/:max [GET] -> UserListResponse
+  + ratelimit(100/min)
+  % db: Database
+
+  # Note: In a full implementation, we'd use a range query
+  # For now, we demonstrate with filter
+  $ allUsers = db.users.all()
+  $ filteredUsers = []
+
+  for user in allUsers {
+    if user.age >= min && user.age <= max {
+      $ filteredUsers = filteredUsers + [user]
+    }
+  }
+
+  > {
+    success: true,
+    message: "Users in age range retrieved",
+    users: filteredUsers,
+    total: filteredUsers.length()
+  }
+
+# Search users by username
+@ route /api/users/search/:query [GET] -> UserListResponse
+  + ratelimit(100/min)
+  % db: Database
+
+  # Simple search - in production, this would use SQL LIKE or full-text search
+  $ allUsers = db.users.all()
+  $ results = []
+
+  for user in allUsers {
+    # Check if username contains the query (case-insensitive would be better)
+    if user.username.contains(query) {
+      $ results = results + [user]
+    }
+  }
+
+  > {
+    success: true,
+    message: "Search completed",
+    users: results,
+    total: results.length()
+  }
+
+# Deactivate a user (soft delete)
+@ route /api/users/:id/deactivate [PATCH] -> UserResponse
+  + ratelimit(50/min)
+  % db: Database
+
+  $ user = db.users.get(id)
+
+  if user == null {
+    > {
+      success: false,
+      message: "User not found",
+      user: null
+    }
+  } else {
+    $ updates = {
+      active: false,
+      updated_at: now()
+    }
+
+    $ updated = db.users.update(id, updates)
+
+    > {
+      success: true,
+      message: "User deactivated successfully",
+      user: updated
+    }
+  }
+
+# Reactivate a user
+@ route /api/users/:id/activate [PATCH] -> UserResponse
+  + ratelimit(50/min)
+  % db: Database
+
+  $ user = db.users.get(id)
+
+  if user == null {
+    > {
+      success: false,
+      message: "User not found",
+      user: null
+    }
+  } else {
+    $ updates = {
+      active: true,
+      updated_at: now()
+    }
+
+    $ updated = db.users.update(id, updates)
+
+    > {
+      success: true,
+      message: "User activated successfully",
+      user: updated
+    }
+  }
+
+# Get user statistics
+@ route /api/users/stats [GET] -> UserStatsResponse
+  + ratelimit(100/min)
+  % db: Database
+
+  $ totalUsers = db.users.length()
+  $ activeUsers = db.users.count("active", true)
+  $ inactiveUsers = db.users.count("active", false)
+
+  > {
+    success: true,
+    message: "Statistics retrieved",
+    total: totalUsers,
+    active: activeUsers,
+    inactive: inactiveUsers
+  }
+
+: UserStatsResponse {
+  success: bool!
+  message: str!
+  total: int!
+  active: int!
+  inactive: int!
+}

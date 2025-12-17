@@ -1,0 +1,19 @@
+Package: glyph
+Version: 1.0.0
+Section: devel
+Priority: optional
+Architecture: amd64
+Maintainer: GlyphLang Team <hello@glyph-lang.dev>
+Homepage: https://github.com/glyphlang/glyph
+Description: AI-First Backend Language
+ GlyphLang is a programming language designed for AI/LLM code generation.
+ Features symbol-based syntax, sub-microsecond compilation, and built-in
+ security scanning. Perfect for building REST APIs, WebSocket servers,
+ and microservices.
+ .
+ Key features:
+  - Symbol-based syntax (@, $, %, >, +, :) optimized for LLMs
+  - 867ns compilation time
+  - 2.93 ns/op VM execution
+  - Built-in SQL injection and XSS detection
+  - WebSocket support with room-based messaging

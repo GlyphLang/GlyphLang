@@ -1,0 +1,3 @@
+# Invalid syntax (missing route path)
+@ route
+  > {status: "ok"}

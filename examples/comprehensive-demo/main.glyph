@@ -1,0 +1,183 @@
+# Comprehensive Glyph Demo
+# Showcasing all language features
+
+: User {
+  id: int!
+  name: str!
+  age: int!
+  isPremium: bool
+  tags: List[str]
+}
+
+# Simple route with object literal
+@ route /hello
+  > {
+    message: "Hello, World!",
+    timestamp: 1234567890,
+    version: "1.0"
+  }
+
+# Route with path parameters and return type
+@ route /greet/:name -> User
+  $ message = "Hello, " + name + "!"
+  > {
+    id: 1,
+    name: name,
+    age: 25,
+    isPremium: false,
+    message: message
+  }
+
+# Route with if/else statement
+@ route /check-age/:age
+  $ ageNum = 18
+
+  if ageNum >= 18 {
+    > {
+      status: "adult",
+      canVote: true,
+      message: "You are an adult"
+    }
+  } else {
+    > {
+      status: "minor",
+      canVote: false,
+      message: "You are a minor"
+    }
+  }
+
+# Route with logical operators (AND/OR)
+@ route /access/:age/:premium [GET]
+  $ hasAccess = false
+
+  # Complex logical expression
+  if age >= 18 && premium {
+    $ hasAccess = true
+    $ level = "premium-adult"
+  } else {
+    if age >= 18 || premium {
+      $ hasAccess = true
+      $ level = "partial-access"
+    } else {
+      $ level = "restricted"
+    }
+  }
+
+  > {
+    hasAccess: hasAccess,
+    accessLevel: level
+  }
+
+# Route with array literals
+@ route /users [GET]
+  $ userList = [
+    {name: "Alice", age: 30, role: "admin"},
+    {name: "Bob", age: 25, role: "user"},
+    {name: "Charlie", age: 35, role: "moderator"}
+  ]
+
+  $ ages = [30, 25, 35]
+  $ roles = ["admin", "user", "moderator"]
+
+  > {
+    users: userList,
+    ages: ages,
+    roles: roles,
+    count: 3
+  }
+
+# Route with nested arrays
+@ route /matrix
+  $ matrix = [
+    [1, 2, 3],
+    [4, 5, 6],
+    [7, 8, 9]
+  ]
+
+  $ numbers = [1, 2, 3, 4, 5]
+
+  > {
+    matrix: matrix,
+    numbers: numbers,
+    dimensions: "3x3"
+  }
+
+# Route with complex expressions
+@ route /calculate/:x/:y [POST]
+  $ sum = x + y
+  $ product = x * y
+  $ comparison = x > y
+
+  $ result = {
+    sum: sum,
+    product: product,
+    xGreaterThanY: comparison,
+    bothPositive: x > 0 && y > 0,
+    eitherPositive: x > 0 || y > 0
+  }
+
+  > result
+
+# Route with middleware and auth
+@ route /api/admin/stats [GET]
+  + auth(jwt)
+  + ratelimit(100/min)
+
+  $ stats = {
+    totalUsers: 1000,
+    activeUsers: 750,
+    premiumUsers: 250
+  }
+
+  > stats
+
+# Route with nested if statements
+@ route /eligibility/:age/:income/:credit
+  if age >= 21 {
+    if income > 50000 {
+      if credit > 700 {
+        > {eligible: true, tier: "platinum", rate: 3.5}
+      } else {
+        > {eligible: true, tier: "gold", rate: 4.5}
+      }
+    } else {
+      if credit > 650 {
+        > {eligible: true, tier: "silver", rate: 5.5}
+      } else {
+        > {eligible: false, tier: "none", rate: 0}
+      }
+    }
+  } else {
+    > {eligible: false, tier: "too-young", rate: 0}
+  }
+
+# Route demonstrating all operators
+@ route /operators
+  $ a = 10
+  $ b = 20
+  $ c = 5
+
+  # Arithmetic
+  $ sum = a + b
+  $ diff = b - a
+  $ prod = a * c
+  $ quot = b / c
+
+  # Comparison
+  $ eq = a == 10
+  $ ne = a != b
+  $ lt = a < b
+  $ gt = b > a
+  $ le = a <= 10
+  $ ge = b >= 20
+
+  # Logical
+  $ andResult = true && false
+  $ orResult = true || false
+  $ complexLogic = (a > 5 && b < 25) || c == 0
+
+  > {
+    arithmetic: {sum: sum, diff: diff, prod: prod, quot: quot},
+    comparison: {eq: eq, ne: ne, lt: lt, gt: gt, le: le, ge: ge},
+    logical: {and: andResult, or: orResult, complex: complexLogic}
+  }

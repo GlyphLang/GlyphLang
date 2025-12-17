@@ -1,0 +1,97 @@
+{
+  "name": "glyph",
+  "displayName": "Glyph Language Support",
+  "description": "Language support for Glyph (AI Backend Compiler)",
+  "version": "0.1.0",
+  "publisher": "glyph-lang",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:glyph"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "glyph",
+        "aliases": [
+          "Glyph",
+          "glyph"
+        ],
+        "extensions": [
+          ".glyph",
+          ".glybc"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "glyph",
+        "scopeName": "source.glyph",
+        "path": "./syntaxes/glyph.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Glyph",
+      "properties": {
+        "glyph.lsp.path": {
+          "type": "string",
+          "default": "glyph",
+          "description": "Path to the Glyph LSP server executable"
+        },
+        "glyph.lsp.logFile": {
+          "type": "string",
+          "default": "",
+          "description": "Path to LSP log file for debugging (optional)"
+        },
+        "glyph.compiler.optimizationLevel": {
+          "type": "string",
+          "enum": [
+            "O0",
+            "O1",
+            "O2",
+            "O3"
+          ],
+          "default": "O2",
+          "description": "Compiler optimization level (O0=none, O1=basic, O2=standard, O3=aggressive)",
+          "enumDescriptions": [
+            "No optimization - fastest compilation",
+            "Basic optimization - constant folding only",
+            "Standard optimization - constant folding, algebraic simplification, dead code elimination",
+            "Aggressive optimization - all optimizations including strength reduction and LICM"
+          ]
+        },
+        "glyph.diagnostics.showOptimizerHints": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show optimizer hints in diagnostics"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.75.0",
+    "@types/node": "16.x",
+    "@typescript-eslint/eslint-plugin": "^5.45.0",
+    "@typescript-eslint/parser": "^5.45.0",
+    "eslint": "^8.28.0",
+    "typescript": "^4.9.3"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^8.0.2"
+  }
+}

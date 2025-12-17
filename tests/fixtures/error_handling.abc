@@ -1,0 +1,14 @@
+# Route with error handling
+: Error {
+  code: str!
+  message: str!
+}
+
+: DataResponse {
+  data: str!
+}
+
+@ route /api/data/:id -> DataResponse
+  % db: Database
+  $ result = db.data.get(id)
+  > result

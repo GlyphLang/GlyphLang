@@ -1,0 +1,361 @@
+# Glyph CLI Documentation
+
+The Glyph command-line interface (CLI) provides tools for developing, running, and deploying Glyph applications.
+
+## Installation
+
+```bash
+# Build from source
+make build
+
+# Or install to your system
+make install
+```
+
+## Commands
+
+### `glyph dev <file>`
+
+Start a development server with hot reload.
+
+```bash
+glyph dev examples/hello-world/main.glyph
+
+# Options:
+#   -p, --port <port>     Port to listen on (default: 3000)
+#   -w, --watch <bool>    Watch for file changes (default: true)
+```
+
+**Features:**
+- Starts HTTP server on specified port
+- Watches source file for changes
+- Automatically reloads on file save (pending full implementation)
+- Pretty colored output for requests and errors
+- Graceful shutdown with Ctrl+C
+
+**Example:**
+```bash
+$ glyph dev examples/hello-world/main.glyph -p 8080
+[INFO] Starting development server on port 8080...
+[INFO] Watching examples/hello-world/main.glyph for changes...
+[SUCCESS] Server listening on http://localhost:8080
+[INFO] Press Ctrl+C to stop
+```
+
+### `glyph run <file>`
+
+Run an Glyph source file once (production mode).
+
+```bash
+glyph run examples/rest-api/main.glyph
+
+# Options:
+#   -p, --port <port>     Port to listen on (default: 3000)
+```
+
+**Features:**
+- Parses and runs Glyph source
+- Starts HTTP server
+- Request logging
+- Graceful shutdown
+
+**Example:**
+```bash
+$ glyph run examples/rest-api/main.glyph
+[INFO] Running examples/rest-api/main.glyph...
+[SUCCESS] Server listening on http://localhost:3000
+[INFO] Press Ctrl+C to stop
+```
+
+### `glyph compile <file>`
+
+Compile Glyph source code to bytecode.
+
+```bash
+glyph compile examples/hello-world/main.glyph
+
+# Options:
+#   -o, --output <file>      Output file (default: source.glybc)
+#   -O, --opt-level <0-3>    Optimization level (default: 2)
+```
+
+**Features:**
+- Compiles source to optimized bytecode
+- Multiple optimization levels
+- Custom output path
+
+**Example:**
+```bash
+$ glyph compile examples/hello-world/main.glyph -o build/hello.glybc -O 3
+[INFO] Compiling examples/hello-world/main.glyph (optimization level: 3)...
+[SUCCESS] Compiled successfully to build/hello.glybc (8 bytes)
+```
+
+### `glyph init <name>`
+
+Initialize a new Glyph project.
+
+```bash
+glyph init my-project
+
+# Options:
+#   -t, --template <name>    Project template (default: rest-api)
+#                           Available: hello-world, rest-api
+```
+
+**Features:**
+- Creates project directory
+- Generates main.glyph with template
+- Ready to run with `glyph dev`
+
+**Example:**
+```bash
+$ glyph init my-api -t rest-api
+[INFO] Creating project: my-api
+[INFO] Template: rest-api
+[SUCCESS] Project created successfully in my-api/
+[INFO] Run: cd my-api && glyph dev main.glyph
+```
+
+### `glyph --version`
+
+Display Glyph version.
+
+```bash
+$ glyph --version
+Glyph version 0.1.0-alpha
+```
+
+### `glyph --help`
+
+Display help information.
+
+```bash
+$ glyph --help
+Glyph is a programming language specifically designed for AI agents
+to rapidly build high-performance, secure backend applications.
+
+Usage:
+  glyph [command]
+
+Available Commands:
+  compile     Compile source code to bytecode
+  dev         Start development server with hot reload
+  init        Initialize new project
+  run         Run Glyph source file
+  help        Help about any command
+  version     Display version
+
+Flags:
+  -h, --help      help for glyph
+  -v, --version   version for glyph
+
+Use "glyph [command] --help" for more information about a command.
+```
+
+## Features
+
+### Pretty Output
+
+The CLI uses colored output for better readability:
+
+- **[INFO]** - Cyan - General information
+- **[SUCCESS]** - Green - Successful operations
+- **[WARNING]** - Yellow - Warnings
+- **[ERROR]** - Red - Errors
+- **[GET/POST/etc]** - Magenta - HTTP requests
+
+### Request Logging
+
+All HTTP requests are logged with method, path, and duration:
+
+```
+[GET] /hello (234µs)
+[POST] /api/users (1.2ms)
+[GET] /api/users/123 (456µs)
+```
+
+### Graceful Shutdown
+
+Servers handle Ctrl+C gracefully:
+
+```
+^C
+[WARNING] Shutting down server...
+[SUCCESS] Server stopped gracefully
+```
+
+### File Watching
+
+In dev mode, the CLI watches your source file and notifies on changes:
+
+```
+[WARNING] File changed, reloading...
+[INFO] Hot reload triggered (server restart not yet implemented)
+```
+
+## Integration Status
+
+### Currently Working
+- ✅ CLI command structure
+- ✅ File reading and parsing
+- ✅ HTTP server startup
+- ✅ Route registration
+- ✅ Request logging
+- ✅ Graceful shutdown
+- ✅ File watching
+- ✅ Pretty error messages
+- ✅ Project initialization
+
+### In Progress (Pending Other Components)
+- 🔄 Rust parser integration (FFI bridge)
+- 🔄 Full interpreter execution
+- 🔄 Hot reload server restart
+- 🔄 Database connections
+- 🔄 Middleware execution
+- 🔄 Authentication/authorization
+
+### Not Yet Implemented
+- ⏳ Bytecode VM execution
+- ⏳ Production deployment tools
+- ⏳ Debug mode
+- ⏳ Profiling tools
+
+## Testing
+
+### Unit Tests
+
+```bash
+# Run CLI unit tests
+go test ./cmd/glyph/...
+
+# Run with coverage
+go test -cover ./cmd/glyph/...
+```
+
+### Integration Tests
+
+```bash
+# Run integration test script
+chmod +x test_cli.sh
+./test_cli.sh
+```
+
+The integration tests verify:
+1. CLI builds successfully
+2. Version command works
+3. Help command works
+4. Init command creates projects
+5. Compile command generates bytecode
+6. Run command starts server
+7. Dev command starts server with watching
+
+## Example Workflows
+
+### Quick Start
+
+```bash
+# Create a new project
+glyph init my-api -t hello-world
+
+# Start development
+cd my-api
+glyph dev main.glyph
+
+# In another terminal, test it
+curl http://localhost:3000/hello
+```
+
+### Development Workflow
+
+```bash
+# Start dev server with hot reload
+glyph dev main.glyph -p 8080
+
+# Edit main.glyph in your editor
+# Changes are automatically detected
+
+# Test your API
+curl http://localhost:8080/api/users
+```
+
+### Production Build
+
+```bash
+# Compile to bytecode
+glyph compile main.glyph -o build/app.glybc -O 3
+
+# Run in production
+glyph run build/app.glybc -p 80
+```
+
+## Troubleshooting
+
+### Port Already in Use
+
+```bash
+# Use a different port
+glyph dev main.glyph -p 3001
+```
+
+### File Not Found
+
+```bash
+# Use absolute path
+glyph dev /path/to/main.glyph
+
+# Or relative path from current directory
+glyph dev examples/hello-world/main.glyph
+```
+
+### Permission Denied
+
+```bash
+# Use higher port number (>1024) or run with sudo
+glyph dev main.glyph -p 8080
+```
+
+## Architecture
+
+The CLI orchestrates three main components:
+
+1. **Parser (Rust)** - Lexical analysis and AST generation
+2. **Interpreter (Go)** - AST execution and runtime
+3. **Server (Go)** - HTTP routing and middleware
+
+```
+┌─────────────────┐
+│   Glyph CLI      │
+│   (main.go)     │
+└────────┬────────┘
+         │
+    ┌────┴────┬──────────┬──────────┐
+    │         │          │          │
+┌───▼───┐ ┌──▼──┐ ┌─────▼────┐ ┌──▼──┐
+│Parser │ │ VM  │ │Interpreter│ │Server│
+│(Rust) │ │(Go) │ │  (Go)     │ │(Go) │
+└───────┘ └─────┘ └──────────┘ └─────┘
+```
+
+## Next Steps
+
+Once the parser and interpreter components are complete:
+
+1. Replace `parseSource()` stub with Rust FFI calls
+2. Integrate full interpreter execution in route handlers
+3. Implement hot reload with server restart
+4. Add middleware execution
+5. Add database connection pooling
+6. Add request validation
+7. Add authentication/authorization
+
+## Contributing
+
+When adding new CLI commands:
+
+1. Add the command definition in `main()`
+2. Create a `run*` handler function
+3. Implement the command logic
+4. Add tests in `main_test.go`
+5. Update this documentation
+6. Add integration test in `test_cli.sh`

@@ -92,7 +92,7 @@ Visit http://localhost:3000/hello - Done! 🎉
 ## Project Structure
 
 ```
-ai_lang/
+glyph/
 ├── cmd/glyph/          # CLI tool
 ├── pkg/
 │   ├── vm/            # Virtual machine (Go)

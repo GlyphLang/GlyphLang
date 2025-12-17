@@ -1,0 +1,320 @@
+// This is an example of how to integrate OpenTelemetry tracing with an GLYPHLANG server.
+// To use this, copy the relevant parts to your main application file.
+
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/glyphlang/glyph/pkg/server"
+	"github.com/glyphlang/glyph/pkg/tracing"
+	"go.opentelemetry.io/otel/attribute"
+)
+
+func main() {
+	// Initialize tracing
+	tracingConfig := &tracing.Config{
+		ServiceName:    "glyphlang-example",
+		ServiceVersion: "1.0.0",
+		Environment:    getEnv("ENVIRONMENT", "development"),
+		ExporterType:   getEnv("OTEL_EXPORTER_TYPE", "stdout"),
+		OTLPEndpoint:   getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317"),
+		SamplingRate:   1.0, // Trace everything in development
+		Enabled:        true,
+	}
+
+	tp, err := tracing.InitTracing(tracingConfig)
+	if err != nil {
+		log.Fatalf("Failed to initialize tracing: %v", err)
+	}
+
+	// Ensure proper shutdown
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := tp.Shutdown(shutdownCtx); err != nil {
+			log.Printf("Error shutting down tracer provider: %v", err)
+		}
+	}()
+
+	log.Println("✓ Tracing initialized successfully")
+
+	// Create server with tracing middleware
+	s := server.NewServer(
+		server.WithAddr(":8080"),
+		server.WithMiddleware(createTracingMiddleware()),
+		server.WithMiddleware(server.LoggingMiddleware()),
+		server.WithMiddleware(server.RecoveryMiddleware()),
+	)
+
+	// Register example routes
+	routes := []*server.Route{
+		{
+			Method: server.GET,
+			Path:   "/",
+			Handler: handleRoot,
+		},
+		{
+			Method: server.GET,
+			Path:   "/users/:id",
+			Handler: handleGetUser,
+		},
+		{
+			Method: server.POST,
+			Path:   "/users",
+			Handler: handleCreateUser,
+		},
+		{
+			Method: server.GET,
+			Path:   "/health",
+			Handler: handleHealth,
+		},
+	}
+
+	if err := s.RegisterRoutes(routes); err != nil {
+		log.Fatalf("Failed to register routes: %v", err)
+	}
+
+	// Start server in a goroutine
+	go func() {
+		log.Printf("Server starting on :8080")
+		if err := s.Start(":8080"); err != nil {
+			log.Printf("Server error: %v", err)
+		}
+	}()
+
+	// Wait for interrupt signal
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	<-sigChan
+
+	log.Println("Shutting down server...")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := s.Stop(shutdownCtx); err != nil {
+		log.Printf("Error during shutdown: %v", err)
+	}
+
+	log.Println("Server stopped gracefully")
+}
+
+// createTracingMiddleware creates a tracing middleware compatible with the GLYPHLANG server
+func createTracingMiddleware() server.Middleware {
+	// List of paths to exclude from tracing
+	excludedPaths := map[string]bool{
+		"/health":  true,
+		"/metrics": true,
+		"/ping":    true,
+	}
+
+	return func(next server.RouteHandler) server.RouteHandler {
+		return func(ctx *server.Context) error {
+			// Skip tracing for excluded paths
+			if excludedPaths[ctx.Request.URL.Path] {
+				return next(ctx)
+			}
+
+			// Extract trace context from incoming request
+			traceCtx := tracing.ExtractContext(ctx.Request.Context(), ctx.Request)
+
+			// Generate span name
+			spanName := fmt.Sprintf("HTTP %s %s", ctx.Request.Method, ctx.Request.URL.Path)
+
+			// Start span with server span kind
+			traceCtx, span := tracing.StartSpan(traceCtx, spanName, tracing.SpanKind.Server)
+			defer span.End()
+
+			// Update request context
+			ctx.Request = ctx.Request.WithContext(traceCtx)
+
+			// Record start time
+			start := time.Now()
+
+			// Add request attributes
+			tracing.SetAttributes(traceCtx,
+				attribute.String("http.method", ctx.Request.Method),
+				attribute.String("http.url", ctx.Request.URL.Path),
+				attribute.String("http.host", ctx.Request.Host),
+				attribute.String("http.user_agent", ctx.Request.UserAgent()),
+			)
+
+			// Add path parameters as attributes
+			for key, value := range ctx.PathParams {
+				tracing.SetAttributes(traceCtx,
+					attribute.String(fmt.Sprintf("http.path_param.%s", key), value),
+				)
+			}
+
+			// Add trace IDs to response headers for debugging
+			if traceID := tracing.GetTraceID(traceCtx); traceID != "" {
+				ctx.ResponseWriter.Header().Set("X-Trace-ID", traceID)
+			}
+			if spanID := tracing.GetSpanID(traceCtx); spanID != "" {
+				ctx.ResponseWriter.Header().Set("X-Span-ID", spanID)
+			}
+
+			// Call next handler
+			err := next(ctx)
+
+			// Record duration
+			duration := time.Since(start)
+
+			// Add response attributes
+			statusCode := ctx.StatusCode
+			if err != nil && statusCode == 0 {
+				statusCode = 500
+			}
+
+			tracing.SetAttributes(traceCtx,
+				attribute.Int("http.status_code", statusCode),
+				attribute.Float64("http.duration_ms", float64(duration.Milliseconds())),
+			)
+
+			// Record error if present
+			if err != nil {
+				tracing.SetError(traceCtx, err)
+			}
+
+			return err
+		}
+	}
+}
+
+// Route Handlers
+
+func handleRoot(ctx *server.Context) error {
+	response := map[string]interface{}{
+		"message": "Welcome to GLYPHLANG API with OpenTelemetry Tracing",
+		"version": "1.0.0",
+		"trace":   tracing.GetTracingInfo(ctx.Request.Context()),
+	}
+	return server.SendJSON(ctx, 200, response)
+}
+
+func handleGetUser(ctx *server.Context) error {
+	// Extract trace context
+	traceCtx := ctx.Request.Context()
+
+	// Get user ID from path params
+	userID := ctx.PathParams["id"]
+
+	// Create a child span for database operation
+	dbCtx, dbSpan := tracing.StartSpan(traceCtx, "database.get_user", tracing.SpanKind.Internal)
+	defer dbSpan.End()
+
+	// Add attributes
+	tracing.SetAttributes(dbCtx,
+		attribute.String("user.id", userID),
+		attribute.String("db.operation", "SELECT"),
+		attribute.String("db.table", "users"),
+	)
+
+	// Simulate database query
+	tracing.AddEvent(dbCtx, "query_started")
+	time.Sleep(10 * time.Millisecond) // Simulate DB latency
+	tracing.AddEvent(dbCtx, "query_completed")
+
+	// Mock user data
+	user := map[string]interface{}{
+		"id":    userID,
+		"name":  "John Doe",
+		"email": "john@example.com",
+	}
+
+	return server.SendJSON(ctx, 200, user)
+}
+
+func handleCreateUser(ctx *server.Context) error {
+	traceCtx := ctx.Request.Context()
+
+	// Create a child span for validation
+	validationCtx, validationSpan := tracing.StartSpan(traceCtx, "validate_user_input", tracing.SpanKind.Internal)
+	defer validationSpan.End()
+
+	// Simulate validation
+	tracing.AddEvent(validationCtx, "validation_started")
+	time.Sleep(5 * time.Millisecond)
+	tracing.AddEvent(validationCtx, "validation_passed")
+
+	// Create a child span for database operation
+	dbCtx, dbSpan := tracing.StartSpan(traceCtx, "database.create_user", tracing.SpanKind.Internal)
+	defer dbSpan.End()
+
+	// Add attributes
+	tracing.SetAttributes(dbCtx,
+		attribute.String("db.operation", "INSERT"),
+		attribute.String("db.table", "users"),
+	)
+
+	// Simulate database insert
+	time.Sleep(15 * time.Millisecond)
+
+	response := map[string]interface{}{
+		"id":      "12345",
+		"message": "User created successfully",
+	}
+
+	return server.SendJSON(ctx, 201, response)
+}
+
+func handleHealth(ctx *server.Context) error {
+	return server.SendJSON(ctx, 200, map[string]string{
+		"status": "healthy",
+	})
+}
+
+// Helper function
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+/*
+USAGE:
+
+1. Copy the relevant parts to your main.go
+
+2. Set environment variables (optional):
+   export ENVIRONMENT=development
+   export OTEL_EXPORTER_TYPE=stdout  # or "otlp" for production
+   export OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317
+
+3. Run your application:
+   go run main.go
+
+4. Test the endpoints:
+   curl http://localhost:8080/
+   curl http://localhost:8080/users/123
+   curl -X POST http://localhost:8080/users -d '{"name":"Jane Doe"}'
+
+5. Check the trace output in your terminal (stdout exporter)
+   or in Jaeger UI at http://localhost:16686 (OTLP exporter)
+
+6. Notice the X-Trace-ID and X-Span-ID headers in the responses
+
+For production with Jaeger:
+
+1. Start Jaeger:
+   docker run -d --name jaeger \
+     -e COLLECTOR_OTLP_ENABLED=true \
+     -p 16686:16686 \
+     -p 4317:4317 \
+     jaegertracing/all-in-one:latest
+
+2. Set environment:
+   export ENVIRONMENT=production
+   export OTEL_EXPORTER_TYPE=otlp
+   export OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317
+
+3. Run your application and view traces at http://localhost:16686
+*/

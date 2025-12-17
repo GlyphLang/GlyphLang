@@ -1,0 +1,17 @@
+# Hello World Example
+# This is a simple Glyph program
+
+: Message {
+  text: str!
+  timestamp: int
+}
+
+@ route /hello
+  > {text: "Hello, World!", timestamp: 1234567890}
+
+@ route /greet/:name -> Message
+  $ message = {
+    text: "Hello, " + name + "!",
+    timestamp: now()
+  }
+  > message

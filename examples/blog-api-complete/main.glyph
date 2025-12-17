@@ -1,0 +1,424 @@
+# Complete Blog API with Advanced Features
+# Demonstrates: CRUD, validation, security, pagination, filtering
+
+# =================
+# Health & Info
+# =================
+
+@ route /health [GET]
+  > {
+    :status = "ok",
+    :version = "1.0.0",
+    :uptime = 3600
+  }
+
+@ route / [GET]
+  > {
+    :name = "Blog API",
+    :version = "1.0.0",
+    :description = "Complete blog API with posts, comments, and users",
+    :endpoints = {
+      :posts = "/posts",
+      :post_detail = "/posts/:id",
+      :comments = "/posts/:id/comments",
+      :users = "/users",
+      :search = "/search"
+    }
+  }
+
+# =================
+# Posts Management
+# =================
+
+@ route /posts [GET]
+  $ page: int = 1
+  $ limit: int = 10
+  $ author: string = ""
+  $ published: bool = true
+
+  # Mock database with sample posts
+  $ all_posts = [
+    {
+      :id = 1,
+      :title = "Getting Started with Glyph",
+      :slug = "getting-started-with-glyph",
+      :content = "Glyph is a revolutionary backend language designed for AI-generated code. With sub-microsecond compilation times and built-in security scanning, it's the perfect choice for modern backends.",
+      :excerpt = "Learn the basics of Glyph in this comprehensive guide.",
+      :author = "Alice Johnson",
+      :author_id = 1,
+      :category = "Tutorial",
+      :tags = ["glyph", "getting-started", "tutorial"],
+      :published = true,
+      :featured = true,
+      :views = 1523,
+      :likes = 87,
+      :comments_count = 12,
+      :read_time = 5,
+      :created_at = "2025-01-01T10:00:00Z",
+      :updated_at = "2025-01-01T10:00:00Z"
+    },
+    {
+      :id = 2,
+      :title = "Building REST APIs with Glyph",
+      :slug = "building-rest-apis",
+      :content = "Learn how to build production-ready REST APIs using Glyph. We'll cover routing, validation, error handling, and best practices.",
+      :excerpt = "Master REST API development with Glyph.",
+      :author = "Bob Smith",
+      :author_id = 2,
+      :category = "Tutorial",
+      :tags = ["glyph", "rest-api", "backend"],
+      :published = true,
+      :featured = false,
+      :views = 892,
+      :likes = 45,
+      :comments_count = 8,
+      :read_time = 8,
+      :created_at = "2025-01-02T14:30:00Z",
+      :updated_at = "2025-01-02T14:30:00Z"
+    },
+    {
+      :id = 3,
+      :title = "Advanced Glyph Patterns",
+      :slug = "advanced-glyph-patterns",
+      :content = "Dive deep into advanced patterns, optimization techniques, and architectural best practices for Glyph applications.",
+      :excerpt = "Take your Glyph skills to the next level.",
+      :author = "Charlie Davis",
+      :author_id = 3,
+      :category = "Advanced",
+      :tags = ["glyph", "patterns", "advanced"],
+      :published = false,
+      :featured = false,
+      :views = 234,
+      :likes = 15,
+      :comments_count = 3,
+      :read_time = 12,
+      :created_at = "2025-01-03T09:15:00Z",
+      :updated_at = "2025-01-03T09:15:00Z"
+    },
+    {
+      :id = 4,
+      :title = "Database Integration Guide",
+      :slug = "database-integration",
+      :content = "Connect your Glyph application to PostgreSQL, MySQL, or MongoDB. Learn about connection pooling, transactions, and ORMs.",
+      :excerpt = "Master database integration in Glyph.",
+      :author = "Alice Johnson",
+      :author_id = 1,
+      :category = "Tutorial",
+      :tags = ["glyph", "database", "postgresql"],
+      :published = true,
+      :featured = true,
+      :views = 2103,
+      :likes = 134,
+      :comments_count = 23,
+      :read_time = 15,
+      :created_at = "2025-01-04T16:00:00Z",
+      :updated_at = "2025-01-04T16:00:00Z"
+    },
+    {
+      :id = 5,
+      :title = "Real-time Features with WebSockets",
+      :slug = "websockets-guide",
+      :content = "Build real-time applications using Glyph's WebSocket support. Create chat apps, live notifications, and collaborative tools.",
+      :excerpt = "Add real-time capabilities to your Glyph apps.",
+      :author = "Bob Smith",
+      :author_id = 2,
+      :category = "Tutorial",
+      :tags = ["glyph", "websockets", "realtime"],
+      :published = true,
+      :featured = false,
+      :views = 1456,
+      :likes = 92,
+      :comments_count = 18,
+      :read_time = 10,
+      :created_at = "2025-01-05T11:30:00Z",
+      :updated_at = "2025-01-05T11:30:00Z"
+    }
+  ]
+
+  # Filter by author if specified
+  $ filtered_posts = []
+  if author != "" {
+    for post in all_posts {
+      if post.author == author && post.published == published {
+        $ filtered_posts = filtered_posts + [post]
+      }
+    }
+  } else {
+    for post in all_posts {
+      if post.published == published {
+        $ filtered_posts = filtered_posts + [post]
+      }
+    }
+  }
+
+  # Calculate pagination
+  $ total = 5
+  $ total_pages = (total + limit - 1) / limit
+
+  # Return response
+  > {
+    :posts = filtered_posts,
+    :meta = {
+      :pagination = {
+        :current_page = page,
+        :per_page = limit,
+        :total_items = total,
+        :total_pages = total_pages,
+        :has_next = page < total_pages,
+        :has_prev = page > 1
+      },
+      :filters = {
+        :author = author,
+        :published = published
+      }
+    }
+  }
+
+@ route /posts/:id [GET]
+  $ post_id = int(id)
+
+  # Validation
+  ? validate_range(post_id, 1, 1000000)
+
+  $ post = {
+    :id = post_id,
+    :title = "Sample Post " + id,
+    :slug = "sample-post-" + id,
+    :content = "This is the full content for post " + id + ". Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+    :excerpt = "Short excerpt for post " + id,
+    :author = "Alice Johnson",
+    :author_id = 1,
+    :category = "Tutorial",
+    :tags = ["sample", "demo"],
+    :published = true,
+    :featured = false,
+    :views = 100,
+    :likes = 5,
+    :comments_count = 2,
+    :read_time = 5,
+    :created_at = "2025-01-01T10:00:00Z",
+    :updated_at = "2025-01-01T10:00:00Z",
+    :related_posts = [
+      {:id = 1, :title = "Related Post 1"},
+      {:id = 2, :title = "Related Post 2"}
+    ]
+  }
+
+  > {post: post}
+
+@ route /posts [POST]
+  $ title: string
+  $ content: string
+  $ excerpt: string
+  $ author: string
+  $ category: string
+  $ tags: array
+  $ published: bool = false
+  $ featured: bool = false
+
+  # Validation
+  ? validate_length(title, 3, 200)
+  ? validate_length(content, 50, 50000)
+  ? validate_length(excerpt, 10, 500)
+  ? validate_length(author, 2, 100)
+  ? validate_length(category, 2, 50)
+
+  # Security
+  ? scan_xss(title)
+  ? scan_xss(content)
+  ? scan_xss(excerpt)
+
+  # Generate slug from title (simplified)
+  $ slug = title
+
+  $ new_post = {
+    :id = 123,
+    :title = title,
+    :slug = slug,
+    :content = content,
+    :excerpt = excerpt,
+    :author = author,
+    :category = category,
+    :tags = tags,
+    :published = published,
+    :featured = featured,
+    :views = 0,
+    :likes = 0,
+    :comments_count = 0,
+    :read_time = 5,
+    :created_at = timestamp(),
+    :updated_at = timestamp()
+  }
+
+  > {
+    :message = "Post created successfully",
+    :post = new_post
+  }
+
+@ route /posts/:id [PUT]
+  $ post_id = int(id)
+  $ title: string
+  $ content: string
+  $ published: bool
+
+  ? validate_range(post_id, 1, 1000000)
+  ? validate_length(title, 3, 200)
+  ? validate_length(content, 50, 50000)
+
+  > {
+    :message = "Post updated successfully",
+    :id = post_id
+  }
+
+@ route /posts/:id [DELETE]
+  $ post_id = int(id)
+  ? validate_range(post_id, 1, 1000000)
+
+  > {
+    :message = "Post deleted successfully",
+    :id = post_id
+  }
+
+# =================
+# Post Actions
+# =================
+
+@ route /posts/:id/like [POST]
+  $ post_id = int(id)
+  $ new_likes = 6
+
+  > {
+    :message = "Post liked",
+    :post_id = post_id,
+    :likes = new_likes
+  }
+
+@ route /posts/:id/view [POST]
+  $ post_id = int(id)
+  $ new_views = 101
+
+  > {
+    :message = "View recorded",
+    :post_id = post_id,
+    :views = new_views
+  }
+
+# =================
+# Comments
+# =================
+
+@ route /posts/:postId/comments [GET]
+  $ post_id = int(postId)
+
+  $ comments = [
+    {
+      :id = 1,
+      :post_id = post_id,
+      :author = "Bob Smith",
+      :author_id = 2,
+      :content = "Great article! Very informative.",
+      :likes = 3,
+      :created_at = "2025-01-01T11:00:00Z"
+    },
+    {
+      :id = 2,
+      :post_id = post_id,
+      :author = "Charlie Davis",
+      :author_id = 3,
+      :content = "Thanks for sharing this!",
+      :likes = 1,
+      :created_at = "2025-01-01T12:30:00Z"
+    }
+  ]
+
+  > {
+    :post_id = post_id,
+    :comments = comments,
+    :count = 2
+  }
+
+@ route /posts/:postId/comments [POST]
+  $ post_id = int(postId)
+  $ author: string
+  $ content: string
+
+  ? validate_length(author, 2, 100)
+  ? validate_length(content, 1, 1000)
+  ? scan_xss(content)
+
+  $ new_comment = {
+    :id = 3,
+    :post_id = post_id,
+    :author = author,
+    :content = content,
+    :likes = 0,
+    :created_at = timestamp()
+  }
+
+  > {
+    :message = "Comment added successfully",
+    :comment = new_comment
+  }
+
+# =================
+# Search
+# =================
+
+@ route /search [GET]
+  $ query: string
+  $ category: string = ""
+
+  ? validate_length(query, 1, 100)
+
+  $ results = [
+    {:id = 1, :title = "Getting Started with Glyph", :excerpt = "Learn Glyph basics...", :score = 0.95},
+    {:id = 4, :title = "Database Integration Guide", :excerpt = "Connect to databases...", :score = 0.87}
+  ]
+
+  > {
+    :query = query,
+    :category = category,
+    :results = results,
+    :count = 2,
+    :took_ms = 12
+  }
+
+# =================
+# Categories & Tags
+# =================
+
+@ route /categories [GET]
+  $ categories = [
+    {:name = "Tutorial", :slug = "tutorial", :count = 15},
+    {:name = "Advanced", :slug = "advanced", :count = 8},
+    {:name = "News", :slug = "news", :count = 12}
+  ]
+
+  > {categories: categories}
+
+@ route /tags [GET]
+  $ tags = [
+    {:name = "glyph", :slug = "glyph", :count = 25},
+    {:name = "database", :slug = "database", :count = 10},
+    {:name = "tutorial", :slug = "tutorial", :count = 18}
+  ]
+
+  > {tags: tags}
+
+# =================
+# Statistics
+# =================
+
+@ route /stats [GET]
+  $ stats = {
+    :total_posts = 50,
+    :published_posts = 42,
+    :draft_posts = 8,
+    :total_comments = 234,
+    :total_views = 15432,
+    :total_likes = 892,
+    :total_authors = 5,
+    :posts_this_month = 12
+  }
+
+  > {stats: stats}

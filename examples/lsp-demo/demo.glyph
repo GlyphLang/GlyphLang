@@ -1,0 +1,56 @@
+# Glyph LSP Demo
+# This file demonstrates LSP features
+
+# Type Definition - Hover over "User" to see type info
+: User {
+  id: int!
+  name: str!
+  email: str!
+  age: int
+}
+
+# Type Definition with custom type reference
+: Post {
+  id: int!
+  title: str!
+  content: str!
+  author: User  # Hover over "User" to see the type definition
+}
+
+# GET route - Hover over "route" keyword for docs
+@ route /api/users [GET]
+  + auth(jwt)
+  + ratelimit(100/min)
+  > {users: []}
+
+# POST route with path parameter
+@ route /api/users/:id [GET]
+  $ user = {
+    id: id,
+    name: "John Doe",
+    email: "john@example.com",
+    age: 30
+  }
+  > user
+
+# Route with conditional logic
+@ route /api/posts [POST]
+  $ title = "New Post"
+
+  if title {
+    > {success: true, message: "Post created"}
+  } else {
+    > {success: false, error: "Title required"}
+  }
+
+# Demonstrate completions:
+# - Type "@" and you'll see "route" completion
+# - Type ":" and you'll see type completions (int, str, bool, float)
+# - Type "route-" and you'll see route snippets
+# - In a route body, type "if", "while", "for" for control flow
+
+# Demonstrate diagnostics:
+# Uncomment the following line to see a syntax error:
+# : InvalidType {
+#   field str!
+# }
