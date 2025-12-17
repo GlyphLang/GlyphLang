@@ -5,7 +5,7 @@
 $ErrorActionPreference = 'Stop'
 
 # Configuration
-$Repo = "glyph-lang/glyph"
+$Repo = "GlyphLang/GlyphLang"
 $InstallDir = if ($env:Glyph_INSTALL_DIR) { $env:Glyph_INSTALL_DIR } else { "$env:LOCALAPPDATA\GlyphLang" }
 $BinDir = if ($env:Glyph_BIN_DIR) { $env:Glyph_BIN_DIR } else { "$InstallDir\bin" }
 $Version = if ($env:Glyph_VERSION) { $env:Glyph_VERSION } else { "latest" }
@@ -42,7 +42,8 @@ function Get-DownloadUrl {
 
     Write-Info "Installing GlyphLang version: $Version"
 
-    $filename = "glyph-$Platform.zip"
+    # Raw binary (not zipped)
+    $filename = "glyph-$Platform.exe"
     return "https://github.com/$Repo/releases/download/v$Version/$filename"
 }
 
@@ -52,34 +53,39 @@ function Install-GlyphLang {
     Write-Info "Creating installation directory: $InstallDir"
     New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
 
-    $tempDir = New-Item -ItemType Directory -Force -Path "$env:TEMP\glyph-install-$(Get-Random)"
-    $archivePath = "$tempDir\glyph.zip"
+    $binaryPath = "$BinDir\glyph.exe"
+
+    Write-Info "Downloading GlyphLang..."
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
+    $ProgressPreference = 'SilentlyContinue'
 
     try {
-        Write-Info "Downloading GlyphLang..."
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest -Uri $DownloadUrl -OutFile $archivePath -UseBasicParsing
+        # Use HttpClient with redirect handling for GitHub releases
+        Add-Type -AssemblyName System.Net.Http
+        $handler = New-Object System.Net.Http.HttpClientHandler
+        $handler.AllowAutoRedirect = $true
+        $client = New-Object System.Net.Http.HttpClient($handler)
+        $client.DefaultRequestHeaders.Add("User-Agent", "GlyphLang-Installer")
 
-        Write-Info "Extracting..."
-        Expand-Archive -Path $archivePath -DestinationPath $tempDir -Force
-
-        # Find the binary
-        $binary = Get-ChildItem -Path $tempDir -Filter "glyph*.exe" -Recurse | Select-Object -First 1
-        if (-not $binary) {
-            $binary = Get-ChildItem -Path $tempDir -Filter "glyph*" -Recurse | Where-Object { -not $_.PSIsContainer -and $_.Extension -ne ".zip" } | Select-Object -First 1
+        $response = $client.GetAsync($DownloadUrl).Result
+        if ($response.IsSuccessStatusCode) {
+            $bytes = $response.Content.ReadAsByteArrayAsync().Result
+            [System.IO.File]::WriteAllBytes($binaryPath, $bytes)
+        } else {
+            throw "HTTP $($response.StatusCode)"
         }
-
-        if (-not $binary) {
-            Write-Error "Could not find glyph binary in archive"
-        }
-
-        Write-Info "Installing to $BinDir\glyph.exe..."
-        Copy-Item -Path $binary.FullName -Destination "$BinDir\glyph.exe" -Force
-
-        Write-Success "GlyphLang installed successfully!"
-    } finally {
-        Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+        $client.Dispose()
+    } catch {
+        Write-Error "Download failed: $_"
     }
+
+    if (-not (Test-Path $binaryPath)) {
+        Write-Error "Download failed. Binary not found at $binaryPath"
+    }
+
+    $fileSize = (Get-Item $binaryPath).Length / 1MB
+    Write-Info "Installed to $BinDir\glyph.exe ($([math]::Round($fileSize, 1)) MB)"
+    Write-Success "GlyphLang installed successfully!"
 }
 
 function Add-ToPath {
@@ -117,12 +123,14 @@ function Test-Installation {
 
 function Show-Banner {
     Write-Host ""
-    Write-Host "  ██████╗ ██╗██████╗  █████╗ ██╗      █████╗ ███╗   ██╗ ██████╗ " -ForegroundColor Magenta
-    Write-Host " ██╔══██╗██║██╔══██╗██╔══██╗██║     ██╔══██╗████╗  ██║██╔════╝ " -ForegroundColor Magenta
-    Write-Host " ███████║██║██║  ██║███████║██║     ███████║██╔██╗ ██║██║  ███╗" -ForegroundColor Magenta
-    Write-Host " ██╔══██║██║██║  ██║██╔══██║██║     ██╔══██║██║╚██╗██║██║   ██║" -ForegroundColor Magenta
-    Write-Host " ██║  ██║██║██████╔╝██║  ██║███████╗██║  ██║██║ ╚████║╚██████╔╝" -ForegroundColor Magenta
-    Write-Host " ╚═╝  ╚═╝╚═╝╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝ " -ForegroundColor Magenta
+    Write-Host "   _____ _             _     _                        " -ForegroundColor Magenta
+    Write-Host "  / ____| |           | |   | |                       " -ForegroundColor Magenta
+    Write-Host " | |  __| |_   _ _ __ | |__ | |     __ _ _ __   __ _  " -ForegroundColor Magenta
+    Write-Host " | | |_ | | | | | '_ \| '_ \| |    / _' | '_ \ / _' | " -ForegroundColor Magenta
+    Write-Host " | |__| | | |_| | |_) | | | | |___| (_| | | | | (_| | " -ForegroundColor Magenta
+    Write-Host "  \_____|_|\__, | .__/|_| |_|______\__,_|_| |_|\__, | " -ForegroundColor Magenta
+    Write-Host "            __/ | |                             __/ | " -ForegroundColor Magenta
+    Write-Host "           |___/|_|                            |___/  " -ForegroundColor Magenta
     Write-Host ""
     Write-Host "  AI-First Backend Language Installer" -ForegroundColor Cyan
     Write-Host ""

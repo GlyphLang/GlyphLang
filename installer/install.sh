@@ -6,7 +6,7 @@
 set -e
 
 # Configuration
-REPO="glyph-lang/glyph"
+REPO="GlyphLang/GlyphLang"
 INSTALL_DIR="${GLYPH_INSTALL_DIR:-$HOME/.glyph}"
 BIN_DIR="${Glyph_BIN_DIR:-$INSTALL_DIR/bin}"
 VERSION="${Glyph_VERSION:-latest}"
@@ -71,13 +71,9 @@ get_download_url() {
 
     info "Installing GlyphLang version: $VERSION"
 
-    # Construct download URL
+    # Construct download URL (raw binaries, not zipped)
     FILENAME="glyph-${PLATFORM}"
-    if [ "$OS" = "darwin" ]; then
-        DOWNLOAD_URL="https://github.com/${REPO}/releases/download/v${VERSION}/${FILENAME}.zip"
-    else
-        DOWNLOAD_URL="https://github.com/${REPO}/releases/download/v${VERSION}/${FILENAME}.zip"
-    fi
+    DOWNLOAD_URL="https://github.com/${REPO}/releases/download/v${VERSION}/${FILENAME}"
 }
 
 # Download and install
@@ -85,34 +81,19 @@ install() {
     info "Creating installation directory: $INSTALL_DIR"
     mkdir -p "$BIN_DIR"
 
-    TEMP_DIR=$(mktemp -d)
-    trap "rm -rf $TEMP_DIR" EXIT
-
     info "Downloading GlyphLang..."
-    ARCHIVE_PATH="$TEMP_DIR/glyph.zip"
+    BINARY_PATH="$BIN_DIR/glyph"
 
     if command -v curl &> /dev/null; then
-        curl -fsSL "$DOWNLOAD_URL" -o "$ARCHIVE_PATH" || error "Download failed. Check if the release exists."
+        curl -fsSL "$DOWNLOAD_URL" -o "$BINARY_PATH" || error "Download failed. Check if the release exists."
     elif command -v wget &> /dev/null; then
-        wget -q "$DOWNLOAD_URL" -O "$ARCHIVE_PATH" || error "Download failed. Check if the release exists."
-    fi
-
-    info "Extracting..."
-    if command -v unzip &> /dev/null; then
-        unzip -q "$ARCHIVE_PATH" -d "$TEMP_DIR"
+        wget -q "$DOWNLOAD_URL" -O "$BINARY_PATH" || error "Download failed. Check if the release exists."
     else
-        error "unzip not found. Please install unzip."
-    fi
-
-    # Find the binary
-    BINARY=$(find "$TEMP_DIR" -name "glyph*" -type f ! -name "*.zip" | head -1)
-    if [ -z "$BINARY" ]; then
-        error "Could not find glyph binary in archive"
+        error "Neither curl nor wget found. Please install one of them."
     fi
 
     info "Installing to $BIN_DIR/glyph..."
-    mv "$BINARY" "$BIN_DIR/glyph"
-    chmod +x "$BIN_DIR/glyph"
+    chmod +x "$BINARY_PATH"
 
     success "GlyphLang installed successfully!"
 }
@@ -184,12 +165,12 @@ verify() {
 # Main
 main() {
     echo ""
-    echo "  █████╗ ██╗██████╗  █████╗ ██╗      █████╗ ███╗   ██╗ ██████╗ "
-    echo " ██╔══██╗██║██╔══██╗██╔══██╗██║     ██╔══██╗████╗  ██║██╔════╝ "
-    echo " ███████║██║██║  ██║███████║██║     ███████║██╔██╗ ██║██║  ███╗"
-    echo " ██╔══██║██║██║  ██║██╔══██║██║     ██╔══██║██║╚██╗██║██║   ██║"
-    echo " ██║  ██║██║██████╔╝██║  ██║███████╗██║  ██║██║ ╚████║╚██████╔╝"
-    echo " ╚═╝  ╚═╝╚═╝╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝ "
+    echo "  ██████╗ ██╗  ██╗   ██╗██████╗ ██╗  ██╗██╗      █████╗ ███╗   ██╗ ██████╗ "
+    echo " ██╔════╝ ██║  ╚██╗ ██╔╝██╔══██╗██║  ██║██║     ██╔══██╗████╗  ██║██╔════╝ "
+    echo " ██║  ███╗██║   ╚████╔╝ ██████╔╝███████║██║     ███████║██╔██╗ ██║██║  ███╗"
+    echo " ██║   ██║██║    ╚██╔╝  ██╔═══╝ ██╔══██║██║     ██╔══██║██║╚██╗██║██║   ██║"
+    echo " ╚██████╔╝███████╗██║   ██║     ██║  ██║███████╗██║  ██║██║ ╚████║╚██████╔╝"
+    echo "  ╚═════╝ ╚══════╝╚═╝   ╚═╝     ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝ "
     echo ""
     echo "  AI-First Backend Language Installer"
     echo ""
