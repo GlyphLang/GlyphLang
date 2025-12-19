@@ -91,6 +91,32 @@ to rapidly build high-performance, secure backend applications.`,
 	}
 	lspCmd.Flags().StringP("log", "l", "", "Log file for debugging (optional)")
 
+	// Exec command - execute CLI commands defined with @ command
+	var execCmd = &cobra.Command{
+		Use:   "exec <file> <command> [args...]",
+		Short: "Execute a CLI command defined in a GLYPH file",
+		Long: `Execute CLI commands defined with @ command in a GLYPH file.
+
+Example:
+  # In my-cli.glyph:
+  @ command hello name: str!
+    $ greeting = "Hello, " + name + "!"
+    > greeting
+
+  # Run it:
+  glyph exec my-cli.glyph hello --name "World"`,
+		Args: cobra.MinimumNArgs(2),
+		RunE: runExec,
+	}
+
+	// List commands - list all commands in a GLYPH file
+	var listCmdsCmd = &cobra.Command{
+		Use:   "commands <file>",
+		Short: "List all CLI commands defined in a GLYPH file",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runListCommands,
+	}
+
 	// Version command (built-in, but we can customize)
 	rootCmd.SetVersionTemplate(`GLYPH version {{.Version}}
 `)
@@ -102,6 +128,8 @@ to rapidly build high-performance, secure backend applications.`,
 	rootCmd.AddCommand(devCmd)
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(lspCmd)
+	rootCmd.AddCommand(execCmd)
+	rootCmd.AddCommand(listCmdsCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		printError(err)
@@ -985,4 +1013,254 @@ func runLSP(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// runExec handles the exec command - executes CLI commands defined with @ command
+func runExec(cmd *cobra.Command, args []string) error {
+	filePath := args[0]
+	cmdName := args[1]
+	cmdArgs := args[2:]
+
+	// Read source file
+	source, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Parse source
+	module, err := parseSource(string(source))
+	if err != nil {
+		return fmt.Errorf("parse error: %w", err)
+	}
+
+	// Create interpreter and load module
+	interp := interpreter.NewInterpreter()
+	if err := interp.LoadModule(*module); err != nil {
+		return fmt.Errorf("failed to load module: %w", err)
+	}
+
+	// Find the command
+	glyphCmd, ok := interp.GetCommand(cmdName)
+	if !ok {
+		// List available commands
+		commands := interp.GetCommands()
+		if len(commands) == 0 {
+			return fmt.Errorf("no commands found in %s", filePath)
+		}
+		var available []string
+		for name := range commands {
+			available = append(available, name)
+		}
+		return fmt.Errorf("command '%s' not found. Available commands: %v", cmdName, available)
+	}
+
+	// Parse command arguments
+	argsMap := parseCommandArgs(cmdArgs, glyphCmd.Params)
+
+	// Execute command
+	start := time.Now()
+	result, err := interp.ExecuteCommand(&glyphCmd, argsMap)
+	execTime := time.Since(start)
+
+	if err != nil {
+		return fmt.Errorf("command execution failed: %w", err)
+	}
+
+	// Print result
+	if result != nil {
+		resultJSON, err := json.MarshalIndent(result, "", "  ")
+		if err != nil {
+			fmt.Println(result)
+		} else {
+			fmt.Println(string(resultJSON))
+		}
+	}
+
+	printInfo(fmt.Sprintf("Execution time: %s", execTime))
+	return nil
+}
+
+// parseCommandArgs parses CLI arguments into a map based on command parameters
+func parseCommandArgs(args []string, params []interpreter.CommandParam) map[string]interface{} {
+	result := make(map[string]interface{})
+
+	positionalIdx := 0
+	i := 0
+	for i < len(args) {
+		arg := args[i]
+
+		// Check for flag arguments (--name value or --name=value)
+		if len(arg) > 2 && arg[:2] == "--" {
+			flagPart := arg[2:]
+			var name, value string
+
+			if eqIdx := indexOf(flagPart, '='); eqIdx != -1 {
+				name = flagPart[:eqIdx]
+				value = flagPart[eqIdx+1:]
+			} else {
+				name = flagPart
+				if i+1 < len(args) {
+					i++
+					value = args[i]
+				}
+			}
+
+			result[name] = value
+		} else {
+			// Positional argument
+			for _, param := range params {
+				if !param.IsFlag && positionalIdx == 0 {
+					result[param.Name] = arg
+					positionalIdx++
+					break
+				}
+			}
+			positionalIdx++
+		}
+		i++
+	}
+
+	return result
+}
+
+// indexOf returns the index of char c in string s, or -1 if not found
+func indexOf(s string, c byte) int {
+	for i := 0; i < len(s); i++ {
+		if s[i] == c {
+			return i
+		}
+	}
+	return -1
+}
+
+// runListCommands lists all commands in a GLYPH file
+func runListCommands(cmd *cobra.Command, args []string) error {
+	filePath := args[0]
+
+	// Read source file
+	source, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Parse source
+	module, err := parseSource(string(source))
+	if err != nil {
+		return fmt.Errorf("parse error: %w", err)
+	}
+
+	// Create interpreter and load module
+	interp := interpreter.NewInterpreter()
+	if err := interp.LoadModule(*module); err != nil {
+		return fmt.Errorf("failed to load module: %w", err)
+	}
+
+	// Get commands
+	commands := interp.GetCommands()
+	cronTasks := interp.GetCronTasks()
+	eventHandlers := interp.GetAllEventHandlers()
+	queueWorkers := interp.GetQueueWorkers()
+
+	if len(commands) == 0 && len(cronTasks) == 0 && len(eventHandlers) == 0 && len(queueWorkers) == 0 {
+		printInfo("No commands, cron tasks, event handlers, or queue workers found in " + filePath)
+		return nil
+	}
+
+	// Print commands
+	if len(commands) > 0 {
+		printSuccess("CLI Commands:")
+		for name, cmd := range commands {
+			var params []string
+			for _, p := range cmd.Params {
+				paramStr := p.Name
+				if p.Type != nil {
+					paramStr += ": " + typeToString(p.Type)
+				}
+				if p.Required {
+					paramStr += "!"
+				}
+				if p.IsFlag {
+					paramStr = "--" + paramStr
+				}
+				params = append(params, paramStr)
+			}
+			fmt.Printf("  @ command %s %s\n", name, joinStrings(params, " "))
+			if cmd.Description != "" {
+				fmt.Printf("    %s\n", cmd.Description)
+			}
+		}
+	}
+
+	// Print cron tasks
+	if len(cronTasks) > 0 {
+		printSuccess("\nCron Tasks:")
+		for _, task := range cronTasks {
+			name := task.Name
+			if name == "" {
+				name = "(anonymous)"
+			}
+			fmt.Printf("  @ cron \"%s\" %s\n", task.Schedule, name)
+		}
+	}
+
+	// Print event handlers
+	if len(eventHandlers) > 0 {
+		printSuccess("\nEvent Handlers:")
+		for eventType, handlers := range eventHandlers {
+			fmt.Printf("  @ event \"%s\" (%d handler(s))\n", eventType, len(handlers))
+		}
+	}
+
+	// Print queue workers
+	if len(queueWorkers) > 0 {
+		printSuccess("\nQueue Workers:")
+		for queueName, worker := range queueWorkers {
+			opts := []string{}
+			if worker.Concurrency > 0 {
+				opts = append(opts, fmt.Sprintf("concurrency=%d", worker.Concurrency))
+			}
+			if worker.MaxRetries > 0 {
+				opts = append(opts, fmt.Sprintf("retries=%d", worker.MaxRetries))
+			}
+			optsStr := ""
+			if len(opts) > 0 {
+				optsStr = " [" + joinStrings(opts, ", ") + "]"
+			}
+			fmt.Printf("  @ queue \"%s\"%s\n", queueName, optsStr)
+		}
+	}
+
+	return nil
+}
+
+// typeToString converts an interpreter.Type to a string representation
+func typeToString(t interpreter.Type) string {
+	switch v := t.(type) {
+	case interpreter.IntType:
+		return "int"
+	case interpreter.StringType:
+		return "str"
+	case interpreter.BoolType:
+		return "bool"
+	case interpreter.FloatType:
+		return "float"
+	case interpreter.NamedType:
+		return v.Name
+	case interpreter.ArrayType:
+		return typeToString(v.ElementType) + "[]"
+	default:
+		return "any"
+	}
+}
+
+// joinStrings joins strings with a separator (simple helper)
+func joinStrings(strs []string, sep string) string {
+	if len(strs) == 0 {
+		return ""
+	}
+	result := strs[0]
+	for i := 1; i < len(strs); i++ {
+		result += sep + strs[i]
+	}
+	return result
 }

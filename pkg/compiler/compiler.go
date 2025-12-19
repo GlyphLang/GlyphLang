@@ -122,6 +122,130 @@ func (c *Compiler) CompileRoute(route *interpreter.Route) ([]byte, error) {
 	return c.buildBytecode(), nil
 }
 
+// CompileCommand compiles a CLI command to bytecode
+func (c *Compiler) CompileCommand(cmd *interpreter.Command) ([]byte, error) {
+	c.Reset()
+
+	// Create command scope
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+
+	// Add command parameters to symbol table
+	for _, param := range cmd.Params {
+		nameIdx := c.addConstant(vm.StringValue{Val: param.Name})
+		c.symbolTable.Define(param.Name, nameIdx)
+	}
+
+	// Optimize and compile body
+	optimizedBody := c.optimizer.OptimizeStatements(cmd.Body)
+	for _, stmt := range optimizedBody {
+		if err := c.compileStatement(stmt); err != nil {
+			return nil, err
+		}
+	}
+
+	if len(optimizedBody) == 0 || !isReturnStatement(optimizedBody[len(optimizedBody)-1]) {
+		c.emit(vm.OpHalt)
+	}
+
+	return c.buildBytecode(), nil
+}
+
+// CompileCronTask compiles a cron task to bytecode
+func (c *Compiler) CompileCronTask(task *interpreter.CronTask) ([]byte, error) {
+	c.Reset()
+
+	// Create task scope
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+
+	// Add injections to symbol table
+	for _, injection := range task.Injections {
+		nameIdx := c.addConstant(vm.StringValue{Val: injection.Name})
+		c.symbolTable.Define(injection.Name, nameIdx)
+	}
+
+	// Optimize and compile body
+	optimizedBody := c.optimizer.OptimizeStatements(task.Body)
+	for _, stmt := range optimizedBody {
+		if err := c.compileStatement(stmt); err != nil {
+			return nil, err
+		}
+	}
+
+	if len(optimizedBody) == 0 || !isReturnStatement(optimizedBody[len(optimizedBody)-1]) {
+		c.emit(vm.OpHalt)
+	}
+
+	return c.buildBytecode(), nil
+}
+
+// CompileEventHandler compiles an event handler to bytecode
+func (c *Compiler) CompileEventHandler(handler *interpreter.EventHandler) ([]byte, error) {
+	c.Reset()
+
+	// Create handler scope
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+
+	// Add event data variable
+	eventIdx := c.addConstant(vm.StringValue{Val: "event"})
+	c.symbolTable.Define("event", eventIdx)
+	inputIdx := c.addConstant(vm.StringValue{Val: "input"})
+	c.symbolTable.Define("input", inputIdx)
+
+	// Add injections to symbol table
+	for _, injection := range handler.Injections {
+		nameIdx := c.addConstant(vm.StringValue{Val: injection.Name})
+		c.symbolTable.Define(injection.Name, nameIdx)
+	}
+
+	// Optimize and compile body
+	optimizedBody := c.optimizer.OptimizeStatements(handler.Body)
+	for _, stmt := range optimizedBody {
+		if err := c.compileStatement(stmt); err != nil {
+			return nil, err
+		}
+	}
+
+	if len(optimizedBody) == 0 || !isReturnStatement(optimizedBody[len(optimizedBody)-1]) {
+		c.emit(vm.OpHalt)
+	}
+
+	return c.buildBytecode(), nil
+}
+
+// CompileQueueWorker compiles a queue worker to bytecode
+func (c *Compiler) CompileQueueWorker(worker *interpreter.QueueWorker) ([]byte, error) {
+	c.Reset()
+
+	// Create worker scope
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+
+	// Add message variable
+	messageIdx := c.addConstant(vm.StringValue{Val: "message"})
+	c.symbolTable.Define("message", messageIdx)
+	inputIdx := c.addConstant(vm.StringValue{Val: "input"})
+	c.symbolTable.Define("input", inputIdx)
+
+	// Add injections to symbol table
+	for _, injection := range worker.Injections {
+		nameIdx := c.addConstant(vm.StringValue{Val: injection.Name})
+		c.symbolTable.Define(injection.Name, nameIdx)
+	}
+
+	// Optimize and compile body
+	optimizedBody := c.optimizer.OptimizeStatements(worker.Body)
+	for _, stmt := range optimizedBody {
+		if err := c.compileStatement(stmt); err != nil {
+			return nil, err
+		}
+	}
+
+	if len(optimizedBody) == 0 || !isReturnStatement(optimizedBody[len(optimizedBody)-1]) {
+		c.emit(vm.OpHalt)
+	}
+
+	return c.buildBytecode(), nil
+}
+
 // compileStatement compiles a statement
 func (c *Compiler) compileStatement(stmt interpreter.Statement) error {
 	switch s := stmt.(type) {

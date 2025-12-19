@@ -1,0 +1,38 @@
+# Event Handlers Demo
+# Using ~ symbol for events (AI-optimized syntax)
+
+# Handle user creation event
+~ "user.created" {
+  $ user_id = event.id
+  $ email = event.email
+  $ timestamp = now()
+  > {handled: true, user_id: user_id, email: email}
+}
+
+# Handle async user update
+~ "user.updated" async {
+  $ user_id = event.id
+  $ changes = event.changes
+  > {processed: true, user_id: user_id}
+}
+
+# Handle order completion
+~ "order.completed" {
+  $ order_id = event.order_id
+  $ user_id = event.user_id
+  $ total = event.total
+  > {processed: true, order_id: order_id}
+}
+
+# Handle payment failure
+~ "payment.failed" {
+  $ order_id = event.order_id
+  $ reason = event.reason
+  > {alert: "payment_failure", order_id: order_id, reason: reason}
+}
+
+# HTTP endpoint to emit test events
+@ route /events/emit [POST]
+  + auth(jwt)
+  $ event_type = input.type
+  > {emitted: true, type: event_type}

@@ -1,0 +1,41 @@
+# Cron Tasks Demo
+# Using * symbol for cron (AI-optimized syntax)
+
+# Daily cleanup task at midnight
+* "0 0 * * *" daily_cleanup {
+  % db: Database
+  > {task: "cleanup", timestamp: now()}
+}
+
+# Hourly stats collection
+* "0 * * * *" hourly_stats {
+  % db: Database
+  $ stats = {
+    timestamp: now(),
+    active_users: 42
+  }
+  > stats
+}
+
+# Every 5 minutes health check
+* "*/5 * * * *" health_check {
+  > {status: "healthy", checked_at: now()}
+}
+
+# Weekly report on Sundays at 9am
+* "0 9 * * 0" weekly_report {
+  + retries(3)
+  % db: Database
+  $ report = {
+    week: "current",
+    generated_at: now()
+  }
+  > report
+}
+
+# HTTP endpoint to check cron status
+@ route /cron/status [GET]
+  > {
+    message: "Cron scheduler running",
+    jobs: ["daily_cleanup", "hourly_stats", "health_check", "weekly_report"]
+  }

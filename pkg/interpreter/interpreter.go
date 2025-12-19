@@ -6,21 +6,29 @@ import (
 
 // Interpreter is the main interpreter struct
 type Interpreter struct {
-	globalEnv   *Environment
-	functions   map[string]Function
-	typeDefs    map[string]TypeDef
-	typeChecker *TypeChecker
-	dbHandler   interface{} // Database handler for dependency injection
+	globalEnv     *Environment
+	functions     map[string]Function
+	typeDefs      map[string]TypeDef
+	commands      map[string]Command
+	cronTasks     []CronTask
+	eventHandlers map[string][]EventHandler
+	queueWorkers  map[string]QueueWorker
+	typeChecker   *TypeChecker
+	dbHandler     interface{} // Database handler for dependency injection
 }
 
 // NewInterpreter creates a new interpreter instance
 func NewInterpreter() *Interpreter {
 	typeChecker := NewTypeChecker()
 	return &Interpreter{
-		globalEnv:   NewEnvironment(),
-		functions:   make(map[string]Function),
-		typeDefs:    make(map[string]TypeDef),
-		typeChecker: typeChecker,
+		globalEnv:     NewEnvironment(),
+		functions:     make(map[string]Function),
+		typeDefs:      make(map[string]TypeDef),
+		commands:      make(map[string]Command),
+		cronTasks:     []CronTask{},
+		eventHandlers: make(map[string][]EventHandler),
+		queueWorkers:  make(map[string]QueueWorker),
+		typeChecker:   typeChecker,
 	}
 }
 
@@ -56,6 +64,22 @@ func (i *Interpreter) LoadModule(module Module) error {
 			// Routes are not stored in global env
 			// They will be executed directly via ExecuteRoute
 			continue
+
+		case *WebSocketRoute:
+			// WebSocket routes are handled by the server
+			continue
+
+		case *Command:
+			i.commands[it.Name] = *it
+
+		case *CronTask:
+			i.cronTasks = append(i.cronTasks, *it)
+
+		case *EventHandler:
+			i.eventHandlers[it.EventType] = append(i.eventHandlers[it.EventType], *it)
+
+		case *QueueWorker:
+			i.queueWorkers[it.QueueName] = *it
 
 		default:
 			return fmt.Errorf("unsupported item type: %T", item)
@@ -234,4 +258,190 @@ func (i *Interpreter) GetTypeDef(name string) (TypeDef, bool) {
 func (i *Interpreter) GetFunction(name string) (Function, bool) {
 	fn, ok := i.functions[name]
 	return fn, ok
+}
+
+// GetCommand retrieves a command by name
+func (i *Interpreter) GetCommand(name string) (Command, bool) {
+	cmd, ok := i.commands[name]
+	return cmd, ok
+}
+
+// GetCommands returns all registered commands
+func (i *Interpreter) GetCommands() map[string]Command {
+	return i.commands
+}
+
+// GetCronTasks returns all registered cron tasks
+func (i *Interpreter) GetCronTasks() []CronTask {
+	return i.cronTasks
+}
+
+// GetEventHandlers returns all event handlers for a given event type
+func (i *Interpreter) GetEventHandlers(eventType string) []EventHandler {
+	return i.eventHandlers[eventType]
+}
+
+// GetAllEventHandlers returns all registered event handlers
+func (i *Interpreter) GetAllEventHandlers() map[string][]EventHandler {
+	return i.eventHandlers
+}
+
+// GetQueueWorker retrieves a queue worker by queue name
+func (i *Interpreter) GetQueueWorker(queueName string) (QueueWorker, bool) {
+	worker, ok := i.queueWorkers[queueName]
+	return worker, ok
+}
+
+// GetQueueWorkers returns all registered queue workers
+func (i *Interpreter) GetQueueWorkers() map[string]QueueWorker {
+	return i.queueWorkers
+}
+
+// ExecuteCommand executes a CLI command with the given arguments
+func (i *Interpreter) ExecuteCommand(cmd *Command, args map[string]interface{}) (interface{}, error) {
+	// Create a new environment for the command
+	cmdEnv := NewChildEnvironment(i.globalEnv)
+
+	// Add command arguments to environment
+	for _, param := range cmd.Params {
+		if val, ok := args[param.Name]; ok {
+			cmdEnv.Define(param.Name, val)
+		} else if param.Default != nil {
+			// Use default value
+			defaultVal, err := i.EvaluateExpression(param.Default, cmdEnv)
+			if err != nil {
+				return nil, err
+			}
+			cmdEnv.Define(param.Name, defaultVal)
+		} else if param.Required {
+			return nil, fmt.Errorf("missing required argument: %s", param.Name)
+		}
+	}
+
+	// Execute command body
+	result, err := i.executeStatements(cmd.Body, cmdEnv)
+	if err != nil {
+		if retErr, ok := err.(*returnValue); ok {
+			result = retErr.value
+		} else {
+			return nil, err
+		}
+	}
+
+	// Validate return type if specified
+	if cmd.ReturnType != nil {
+		if err := i.typeChecker.CheckType(result, cmd.ReturnType); err != nil {
+			return nil, fmt.Errorf("return type mismatch in command %s: %v", cmd.Name, err)
+		}
+	}
+
+	return result, nil
+}
+
+// ExecuteCronTask executes a cron task
+func (i *Interpreter) ExecuteCronTask(task *CronTask) (interface{}, error) {
+	// Create a new environment for the task
+	taskEnv := NewChildEnvironment(i.globalEnv)
+
+	// Handle dependency injections
+	for _, injection := range task.Injections {
+		if _, ok := injection.Type.(DatabaseType); ok {
+			if i.dbHandler != nil {
+				taskEnv.Define(injection.Name, i.dbHandler)
+			}
+		}
+	}
+
+	// Execute task body
+	result, err := i.executeStatements(task.Body, taskEnv)
+	if err != nil {
+		if retErr, ok := err.(*returnValue); ok {
+			result = retErr.value
+		} else {
+			return nil, err
+		}
+	}
+
+	return result, nil
+}
+
+// ExecuteEventHandler executes an event handler with the given event data
+func (i *Interpreter) ExecuteEventHandler(handler *EventHandler, eventData interface{}) (interface{}, error) {
+	// Create a new environment for the handler
+	handlerEnv := NewChildEnvironment(i.globalEnv)
+
+	// Add event data to environment
+	handlerEnv.Define("event", eventData)
+	handlerEnv.Define("input", eventData)
+
+	// Handle dependency injections
+	for _, injection := range handler.Injections {
+		if _, ok := injection.Type.(DatabaseType); ok {
+			if i.dbHandler != nil {
+				handlerEnv.Define(injection.Name, i.dbHandler)
+			}
+		}
+	}
+
+	// Execute handler body
+	result, err := i.executeStatements(handler.Body, handlerEnv)
+	if err != nil {
+		if retErr, ok := err.(*returnValue); ok {
+			result = retErr.value
+		} else {
+			return nil, err
+		}
+	}
+
+	return result, nil
+}
+
+// EmitEvent triggers all handlers for a given event type
+func (i *Interpreter) EmitEvent(eventType string, eventData interface{}) error {
+	handlers := i.eventHandlers[eventType]
+	for _, handler := range handlers {
+		if handler.Async {
+			// In a real implementation, this would be executed asynchronously
+			go func(h EventHandler) {
+				i.ExecuteEventHandler(&h, eventData)
+			}(handler)
+		} else {
+			_, err := i.ExecuteEventHandler(&handler, eventData)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// ExecuteQueueWorker executes a queue worker with the given message
+func (i *Interpreter) ExecuteQueueWorker(worker *QueueWorker, message interface{}) (interface{}, error) {
+	// Create a new environment for the worker
+	workerEnv := NewChildEnvironment(i.globalEnv)
+
+	// Add message to environment
+	workerEnv.Define("message", message)
+	workerEnv.Define("input", message)
+
+	// Handle dependency injections
+	for _, injection := range worker.Injections {
+		if _, ok := injection.Type.(DatabaseType); ok {
+			if i.dbHandler != nil {
+				workerEnv.Define(injection.Name, i.dbHandler)
+			}
+		}
+	}
+
+	// Execute worker body
+	result, err := i.executeStatements(worker.Body, workerEnv)
+	if err != nil {
+		if retErr, ok := err.(*returnValue); ok {
+			result = retErr.value
+		} else {
+			return nil, err
+		}
+	}
+
+	return result, nil
 }

@@ -60,6 +60,38 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 				return nil, err
 			}
 			items = append(items, item)
+		case BANG:
+			// ! for CLI commands (more token-efficient than @ command)
+			p.advance() // consume !
+			item, err := p.parseCommand()
+			if err != nil {
+				return nil, err
+			}
+			items = append(items, item)
+		case STAR:
+			// * for cron tasks (more token-efficient than @ cron)
+			p.advance() // consume *
+			item, err := p.parseCronTask()
+			if err != nil {
+				return nil, err
+			}
+			items = append(items, item)
+		case TILDE:
+			// ~ for event handlers (more token-efficient than @ event)
+			p.advance() // consume ~
+			item, err := p.parseEventHandler()
+			if err != nil {
+				return nil, err
+			}
+			items = append(items, item)
+		case AMPERSAND:
+			// & for queue workers (more token-efficient than @ queue)
+			p.advance() // consume &
+			item, err := p.parseQueueWorker()
+			if err != nil {
+				return nil, err
+			}
+			items = append(items, item)
 		case IDENT:
 			// Check for "type" keyword as alternative syntax
 			if p.current().Literal == "type" {
@@ -73,7 +105,7 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 				return nil, p.errorWithHint(
 					fmt.Sprintf("Unexpected token %s", p.current().Type),
 					p.current(),
-					"Top-level items must start with ':' (for type definitions) or '@' (for routes)",
+					"Top-level items must start with ':', '@', '!', '*', '~', or '&'",
 				)
 			}
 		case EOF:
@@ -82,7 +114,7 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 			return nil, p.errorWithHint(
 				fmt.Sprintf("Unexpected token %s", p.current().Type),
 				p.current(),
-				"Top-level items must start with ':' (for type definitions) or '@' (for routes)",
+				"Top-level items must start with ':', '@', '!', '*', '~', or '&'",
 			)
 		}
 	}
@@ -345,6 +377,18 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 	// Dispatch to WebSocket parser if needed
 	if routeKw == "ws" || routeKw == "websocket" {
 		return p.parseWebSocketRoute()
+	}
+
+	// Dispatch to new directive parsers
+	switch routeKw {
+	case "command", "cmd":
+		return p.parseCommand()
+	case "cron", "schedule":
+		return p.parseCronTask()
+	case "event", "on":
+		return p.parseEventHandler()
+	case "queue", "worker":
+		return p.parseQueueWorker()
 	}
 
 	// Check for HTTP method shorthand: @ GET /path
@@ -1923,4 +1967,483 @@ func (p *Parser) skipNewlines() {
 	for p.match(NEWLINE) {
 		// keep skipping
 	}
+}
+
+// parseCommand parses a CLI command: @ command name [params] { body }
+// Example: @ command hello name: str! --greeting: str = "Hello"
+func (p *Parser) parseCommand() (interpreter.Item, error) {
+	// Get command name
+	cmdName, err := p.expectIdent()
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse optional description string
+	var description string
+	if p.check(STRING) {
+		description = p.current().Literal
+		p.advance()
+	}
+
+	p.skipNewlines()
+
+	// Parse parameters
+	var params []interpreter.CommandParam
+
+	// Parameters can be positional (name: type) or flags (--name: type)
+	for !p.check(LBRACE) && !p.check(ARROW) && !p.isAtEnd() {
+		p.skipNewlines()
+		if p.check(LBRACE) || p.check(ARROW) {
+			break
+		}
+
+		var param interpreter.CommandParam
+
+		// Check for flag syntax: --name or -n
+		if p.check(MINUS) {
+			p.advance()
+			if p.check(MINUS) {
+				p.advance() // consume second -
+			}
+			param.IsFlag = true
+		}
+
+		// Get parameter name
+		paramName, err := p.expectIdent()
+		if err != nil {
+			break // No more params
+		}
+		param.Name = paramName
+
+		// Parse type annotation: name: type
+		if p.check(COLON) {
+			p.advance()
+			paramType, required, err := p.parseType()
+			if err != nil {
+				return nil, err
+			}
+			param.Type = paramType
+			param.Required = required
+		}
+
+		// Check for default value: = value
+		if p.check(EQUALS) {
+			p.advance()
+			defaultValue, err := p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+			param.Default = defaultValue
+		}
+
+		params = append(params, param)
+		p.skipNewlines()
+	}
+
+	// Parse optional return type -> Type
+	var returnType interpreter.Type
+	if p.check(ARROW) {
+		p.advance()
+		returnType, _, err = p.parseType()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	p.skipNewlines()
+
+	// Parse body
+	var body []interpreter.Statement
+	if p.check(LBRACE) {
+		p.advance()
+		p.skipNewlines()
+
+		for !p.check(RBRACE) && !p.isAtEnd() {
+			stmt, err := p.parseStatement()
+			if err != nil {
+				return nil, err
+			}
+			body = append(body, stmt)
+			p.skipNewlines()
+		}
+
+		if err := p.expect(RBRACE); err != nil {
+			return nil, err
+		}
+	} else {
+		// Inline body (same as route)
+		for !p.isAtEnd() && !p.check(AT) && !p.check(COLON) {
+			if p.check(NEWLINE) {
+				p.advance()
+				continue
+			}
+			if p.check(DOLLAR) || p.check(GREATER) {
+				stmt, err := p.parseStatement()
+				if err != nil {
+					return nil, err
+				}
+				body = append(body, stmt)
+				if _, ok := stmt.(interpreter.ReturnStatement); ok {
+					break
+				}
+			} else {
+				break
+			}
+			p.skipNewlines()
+		}
+	}
+
+	return &interpreter.Command{
+		Name:        cmdName,
+		Description: description,
+		Params:      params,
+		ReturnType:  returnType,
+		Body:        body,
+	}, nil
+}
+
+// parseCronTask parses a cron scheduled task: @ cron "schedule" [name] { body }
+// Example: @ cron "0 0 * * *" daily_cleanup { ... }
+func (p *Parser) parseCronTask() (interpreter.Item, error) {
+	// Get cron schedule (required)
+	if !p.check(STRING) {
+		return nil, p.errorWithHint(
+			"Expected cron schedule string",
+			p.current(),
+			"Example: @ cron \"0 0 * * *\" { ... }",
+		)
+	}
+	schedule := p.current().Literal
+	p.advance()
+
+	// Optional task name
+	var name string
+	if p.check(IDENT) {
+		name = p.current().Literal
+		p.advance()
+	}
+
+	// Optional timezone
+	var timezone string
+	if p.check(IDENT) && p.current().Literal == "tz" {
+		p.advance()
+		if p.check(STRING) {
+			timezone = p.current().Literal
+			p.advance()
+		}
+	}
+
+	p.skipNewlines()
+
+	// Parse injections and body
+	var injections []interpreter.Injection
+	var body []interpreter.Statement
+	var retries int
+
+	if p.check(LBRACE) {
+		p.advance()
+		p.skipNewlines()
+
+		for !p.check(RBRACE) && !p.isAtEnd() {
+			switch p.current().Type {
+			case PERCENT:
+				// Dependency injection: % db: Database
+				p.advance()
+				injName, err := p.expectIdent()
+				if err != nil {
+					return nil, err
+				}
+				if err := p.expect(COLON); err != nil {
+					return nil, err
+				}
+				injType, _, err := p.parseType()
+				if err != nil {
+					return nil, err
+				}
+				injections = append(injections, interpreter.Injection{
+					Name: injName,
+					Type: injType,
+				})
+
+			case PLUS:
+				// Middleware-like config: + retries(3)
+				p.advance()
+				configName, _ := p.expectIdent()
+				if configName == "retries" && p.check(LPAREN) {
+					p.advance()
+					if p.check(INTEGER) {
+						n, _ := strconv.Atoi(p.current().Literal)
+						retries = n
+						p.advance()
+					}
+					p.expect(RPAREN)
+				}
+
+			case DOLLAR, GREATER:
+				stmt, err := p.parseStatement()
+				if err != nil {
+					return nil, err
+				}
+				body = append(body, stmt)
+
+			case IDENT:
+				if p.current().Literal == "if" || p.current().Literal == "for" || p.current().Literal == "while" {
+					stmt, err := p.parseStatement()
+					if err != nil {
+						return nil, err
+					}
+					body = append(body, stmt)
+				} else {
+					goto endCronBody
+				}
+
+			default:
+				goto endCronBody
+			}
+			p.skipNewlines()
+		}
+	endCronBody:
+
+		if err := p.expect(RBRACE); err != nil {
+			return nil, err
+		}
+	}
+
+	return &interpreter.CronTask{
+		Name:       name,
+		Schedule:   schedule,
+		Timezone:   timezone,
+		Retries:    retries,
+		Injections: injections,
+		Body:       body,
+	}, nil
+}
+
+// parseEventHandler parses an event handler: @ event "event.type" { body }
+// Example: @ event "user.created" { ... }
+func (p *Parser) parseEventHandler() (interpreter.Item, error) {
+	// Get event type (required)
+	var eventType string
+	if p.check(STRING) {
+		eventType = p.current().Literal
+		p.advance()
+	} else if p.check(IDENT) {
+		// Allow unquoted event types like user.created
+		var builder strings.Builder
+		builder.WriteString(p.current().Literal)
+		p.advance()
+		for p.check(DOT) {
+			builder.WriteByte('.')
+			p.advance()
+			if p.check(IDENT) {
+				builder.WriteString(p.current().Literal)
+				p.advance()
+			}
+		}
+		eventType = builder.String()
+	} else {
+		return nil, p.errorWithHint(
+			"Expected event type",
+			p.current(),
+			"Example: @ event \"user.created\" { ... }",
+		)
+	}
+
+	// Check for async modifier
+	var async bool
+	if p.check(IDENT) && p.current().Literal == "async" {
+		async = true
+		p.advance()
+	}
+
+	p.skipNewlines()
+
+	// Parse injections and body
+	var injections []interpreter.Injection
+	var body []interpreter.Statement
+
+	if p.check(LBRACE) {
+		p.advance()
+		p.skipNewlines()
+
+		for !p.check(RBRACE) && !p.isAtEnd() {
+			switch p.current().Type {
+			case PERCENT:
+				// Dependency injection
+				p.advance()
+				injName, err := p.expectIdent()
+				if err != nil {
+					return nil, err
+				}
+				if err := p.expect(COLON); err != nil {
+					return nil, err
+				}
+				injType, _, err := p.parseType()
+				if err != nil {
+					return nil, err
+				}
+				injections = append(injections, interpreter.Injection{
+					Name: injName,
+					Type: injType,
+				})
+
+			case DOLLAR, GREATER:
+				stmt, err := p.parseStatement()
+				if err != nil {
+					return nil, err
+				}
+				body = append(body, stmt)
+
+			case IDENT:
+				if p.current().Literal == "if" || p.current().Literal == "for" || p.current().Literal == "while" {
+					stmt, err := p.parseStatement()
+					if err != nil {
+						return nil, err
+					}
+					body = append(body, stmt)
+				} else {
+					goto endEventBody
+				}
+
+			default:
+				goto endEventBody
+			}
+			p.skipNewlines()
+		}
+	endEventBody:
+
+		if err := p.expect(RBRACE); err != nil {
+			return nil, err
+		}
+	}
+
+	return &interpreter.EventHandler{
+		EventType:  eventType,
+		Async:      async,
+		Injections: injections,
+		Body:       body,
+	}, nil
+}
+
+// parseQueueWorker parses a queue worker: @ queue "queue.name" { body }
+// Example: @ queue "email.send" { ... }
+func (p *Parser) parseQueueWorker() (interpreter.Item, error) {
+	// Get queue name (required)
+	var queueName string
+	if p.check(STRING) {
+		queueName = p.current().Literal
+		p.advance()
+	} else if p.check(IDENT) {
+		// Allow unquoted queue names
+		var builder strings.Builder
+		builder.WriteString(p.current().Literal)
+		p.advance()
+		for p.check(DOT) {
+			builder.WriteByte('.')
+			p.advance()
+			if p.check(IDENT) {
+				builder.WriteString(p.current().Literal)
+				p.advance()
+			}
+		}
+		queueName = builder.String()
+	} else {
+		return nil, p.errorWithHint(
+			"Expected queue name",
+			p.current(),
+			"Example: @ queue \"email.send\" { ... }",
+		)
+	}
+
+	p.skipNewlines()
+
+	// Parse configuration and body
+	var injections []interpreter.Injection
+	var body []interpreter.Statement
+	var concurrency, maxRetries, timeout int
+
+	if p.check(LBRACE) {
+		p.advance()
+		p.skipNewlines()
+
+		for !p.check(RBRACE) && !p.isAtEnd() {
+			switch p.current().Type {
+			case PERCENT:
+				// Dependency injection
+				p.advance()
+				injName, err := p.expectIdent()
+				if err != nil {
+					return nil, err
+				}
+				if err := p.expect(COLON); err != nil {
+					return nil, err
+				}
+				injType, _, err := p.parseType()
+				if err != nil {
+					return nil, err
+				}
+				injections = append(injections, interpreter.Injection{
+					Name: injName,
+					Type: injType,
+				})
+
+			case PLUS:
+				// Configuration: + concurrency(5) + retries(3) + timeout(30)
+				p.advance()
+				configName, _ := p.expectIdent()
+				if p.check(LPAREN) {
+					p.advance()
+					if p.check(INTEGER) {
+						n, _ := strconv.Atoi(p.current().Literal)
+						switch configName {
+						case "concurrency":
+							concurrency = n
+						case "retries":
+							maxRetries = n
+						case "timeout":
+							timeout = n
+						}
+						p.advance()
+					}
+					p.expect(RPAREN)
+				}
+
+			case DOLLAR, GREATER:
+				stmt, err := p.parseStatement()
+				if err != nil {
+					return nil, err
+				}
+				body = append(body, stmt)
+
+			case IDENT:
+				if p.current().Literal == "if" || p.current().Literal == "for" || p.current().Literal == "while" {
+					stmt, err := p.parseStatement()
+					if err != nil {
+						return nil, err
+					}
+					body = append(body, stmt)
+				} else {
+					goto endQueueBody
+				}
+
+			default:
+				goto endQueueBody
+			}
+			p.skipNewlines()
+		}
+	endQueueBody:
+
+		if err := p.expect(RBRACE); err != nil {
+			return nil, err
+		}
+	}
+
+	return &interpreter.QueueWorker{
+		QueueName:   queueName,
+		Concurrency: concurrency,
+		MaxRetries:  maxRetries,
+		Timeout:     timeout,
+		Injections:  injections,
+		Body:        body,
+	}, nil
 }

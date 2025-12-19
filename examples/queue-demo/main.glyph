@@ -1,0 +1,59 @@
+# Queue Workers Demo
+# Using & symbol for queues (AI-optimized syntax)
+
+# Email sending worker
+& "email.send" {
+  + concurrency(5)
+  + retries(3)
+  + timeout(30)
+
+  $ to = message.to
+  $ subject = message.subject
+  $ body = message.body
+  $ message_id = message.id
+  > {sent: true, message_id: message_id, to: to}
+}
+
+# Image processing worker
+& "image.process" {
+  + concurrency(3)
+  + timeout(120)
+
+  $ image_id = message.image_id
+  $ operations = message.operations
+  > {processed: true, image_id: image_id}
+}
+
+# Report generation worker
+& "report.generate" {
+  + concurrency(2)
+  + retries(2)
+  + timeout(300)
+
+  $ report_type = message.type
+  $ user_id = message.requested_by
+  $ report_id = now()
+  > {report_id: report_id, type: report_type}
+}
+
+# Webhook delivery worker
+& "webhook.deliver" {
+  + concurrency(10)
+  + retries(5)
+  + timeout(15)
+
+  $ url = message.url
+  $ webhook_id = message.webhook_id
+  > {delivered: true, webhook_id: webhook_id}
+}
+
+# HTTP endpoints to enqueue jobs
+@ route /queue/email [POST]
+  + auth(jwt)
+  > {queued: "email.send", message_id: input.id}
+
+@ route /queue/status [GET]
+  > {
+    queues: ["email.send", "image.process", "report.generate", "webhook.deliver"],
+    status: "running"
+  }

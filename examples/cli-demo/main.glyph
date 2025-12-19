@@ -1,0 +1,39 @@
+# CLI Commands Demo
+# Using ! symbol for commands (AI-optimized syntax)
+
+# Simple hello command
+! hello name: str! {
+  $ greeting = "Hello, " + name + "!"
+  > {message: greeting}
+}
+
+# Math command with multiple arguments
+! add a: int! b: int! {
+  $ result = a + b
+  > {sum: result, a: a, b: b}
+}
+
+# Command with optional flag
+! greet name: str! --formal: bool = false {
+  if formal {
+    $ msg = "Good day, " + name + ". How may I assist you?"
+  } else {
+    $ msg = "Hey " + name + "!"
+  }
+  > {greeting: msg}
+}
+
+# Command that returns array
+! list_users {
+  $ users = ["alice", "bob", "charlie"]
+  > {users: users, count: length(users)}
+}
+
+# Command with description
+! version "Show version information" {
+  > {
+    name: "GlyphLang CLI Demo",
+    version: "1.0.0",
+    timestamp: now()
+  }
+}

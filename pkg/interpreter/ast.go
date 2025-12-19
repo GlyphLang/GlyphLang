@@ -449,3 +449,61 @@ type WebSocketRoute struct {
 }
 
 func (WebSocketRoute) isItem() {}
+
+// Command represents a CLI command definition
+// Example: @ command hello name: str! greeting: str = "Hello"
+type Command struct {
+	Name        string
+	Description string
+	Params      []CommandParam
+	ReturnType  Type
+	Body        []Statement
+}
+
+func (Command) isItem() {}
+
+// CommandParam represents a CLI command parameter with optional default
+type CommandParam struct {
+	Name     string
+	Type     Type
+	Required bool
+	Default  Expr // nil if no default
+	IsFlag   bool // true for --flag style args
+}
+
+// CronTask represents a scheduled task
+// Example: @ cron "0 0 * * *"
+type CronTask struct {
+	Name       string // optional name for the task
+	Schedule   string // cron expression
+	Timezone   string // optional timezone (default UTC)
+	Retries    int    // number of retries on failure
+	Injections []Injection
+	Body       []Statement
+}
+
+func (CronTask) isItem() {}
+
+// EventHandler represents an event handler
+// Example: @ event "user.created"
+type EventHandler struct {
+	EventType  string // e.g., "user.created", "order.paid"
+	Async      bool   // whether to handle asynchronously
+	Injections []Injection
+	Body       []Statement
+}
+
+func (EventHandler) isItem() {}
+
+// QueueWorker represents a message queue worker
+// Example: @ queue "email.send"
+type QueueWorker struct {
+	QueueName   string
+	Concurrency int // number of concurrent workers
+	MaxRetries  int
+	Timeout     int // timeout in seconds
+	Injections  []Injection
+	Body        []Statement
+}
+
+func (QueueWorker) isItem() {}
