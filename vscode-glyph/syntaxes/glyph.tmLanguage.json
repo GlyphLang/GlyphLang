@@ -22,6 +22,10 @@
         {
           "name": "comment.line.number-sign.glyph",
           "match": "#.*$"
+        },
+        {
+          "name": "comment.line.double-slash.glyph",
+          "match": "//.*$"
         }
       ]
     },
@@ -32,6 +36,19 @@
           "begin": "^\\s*(:)\\s+([A-Z][a-zA-Z0-9_]*)\\s*\\{",
           "beginCaptures": {
             "1": { "name": "keyword.operator.type.glyph" },
+            "2": { "name": "entity.name.type.glyph" }
+          },
+          "end": "\\}",
+          "patterns": [
+            { "include": "#field-definition" },
+            { "include": "#comments" }
+          ]
+        },
+        {
+          "name": "meta.type.glyph",
+          "begin": "^\\s*(type)\\s+([A-Z][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.other.type.glyph" },
             "2": { "name": "entity.name.type.glyph" }
           },
           "end": "\\}",
@@ -58,18 +75,80 @@
       "patterns": [
         {
           "name": "meta.route.glyph",
-          "begin": "^\\s*(@)\\s+(route)\\s+(/[a-zA-Z0-9_/:]*)",
+          "begin": "^\\s*(@)\\s+(route)\\s+(/[a-zA-Z0-9_/:-]*)",
           "beginCaptures": {
             "1": { "name": "keyword.operator.route.glyph" },
             "2": { "name": "keyword.control.route.glyph" },
             "3": { "name": "string.unquoted.path.glyph" }
           },
-          "end": "^(?=\\s*[@:])",
+          "end": "^(?=\\s*[@:!*~&]|^\\s*type\\b)",
           "patterns": [
             { "include": "#http-method" },
             { "include": "#middleware" },
             { "include": "#statements" },
             { "include": "#comments" }
+          ]
+        },
+        {
+          "name": "meta.route.shorthand.glyph",
+          "begin": "^\\s*(@)\\s+(GET|POST|PUT|DELETE|PATCH)\\s+(/[a-zA-Z0-9_/:-]*)",
+          "beginCaptures": {
+            "1": { "name": "keyword.operator.route.glyph" },
+            "2": { "name": "constant.language.http-method.glyph" },
+            "3": { "name": "string.unquoted.path.glyph" }
+          },
+          "end": "^(?=\\s*[@:!*~&]|^\\s*type\\b)",
+          "patterns": [
+            { "include": "#middleware" },
+            { "include": "#statements" },
+            { "include": "#comments" },
+            { "include": "#strings" },
+            { "include": "#keywords" },
+            { "include": "#numbers" },
+            { "include": "#operators" },
+            { "include": "#types" }
+          ]
+        },
+        {
+          "name": "meta.websocket.glyph",
+          "begin": "^\\s*(@)\\s+(ws)\\s+(/[a-zA-Z0-9_/:-]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.operator.route.glyph" },
+            "2": { "name": "keyword.control.websocket.glyph" },
+            "3": { "name": "string.unquoted.path.glyph" }
+          },
+          "end": "\\}",
+          "patterns": [
+            { "include": "#websocket-events" },
+            { "include": "#statements" },
+            { "include": "#comments" },
+            { "include": "#strings" },
+            { "include": "#keywords" },
+            { "include": "#numbers" },
+            { "include": "#operators" },
+            { "include": "#types" }
+          ]
+        }
+      ]
+    },
+    "websocket-events": {
+      "patterns": [
+        {
+          "name": "meta.websocket-event.glyph",
+          "begin": "\\b(on)\\s+(connect|message|disconnect)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.on.glyph" },
+            "2": { "name": "entity.name.function.event.glyph" }
+          },
+          "end": "\\}",
+          "patterns": [
+            { "include": "#statements" },
+            { "include": "#comments" },
+            { "include": "#strings" },
+            { "include": "#keywords" },
+            { "include": "#numbers" },
+            { "include": "#operators" },
+            { "include": "#types" }
           ]
         }
       ]
@@ -214,9 +293,22 @@
           }
         },
         {
+          "match": "\\b(let)\\s+([a-zA-Z][a-zA-Z0-9_]*)\\s*=",
+          "captures": {
+            "1": { "name": "keyword.other.let.glyph" },
+            "2": { "name": "variable.other.glyph" }
+          }
+        },
+        {
           "match": "^\\s*(>)\\s+",
           "captures": {
             "1": { "name": "keyword.operator.return.glyph" }
+          }
+        },
+        {
+          "match": "\\b(return)\\s+",
+          "captures": {
+            "1": { "name": "keyword.control.return.glyph" }
           }
         },
         {
