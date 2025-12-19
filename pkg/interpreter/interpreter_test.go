@@ -2625,3 +2625,1269 @@ func TestExecuteSwitch_NestedSwitch(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "matched", result)
 }
+
+// Test CLI Command Execution
+
+func TestInterpreter_ExecuteCommand_Simple(t *testing.T) {
+	interp := NewInterpreter()
+
+	cmd := &Command{
+		Name: "greet",
+		Params: []CommandParam{
+			{
+				Name:     "name",
+				Type:     StringType{},
+				Required: true,
+			},
+		},
+		Body: []Statement{
+			ReturnStatement{
+				Value: BinaryOpExpr{
+					Op:    Add,
+					Left:  LiteralExpr{Value: StringLiteral{Value: "Hello, "}},
+					Right: VariableExpr{Name: "name"},
+				},
+			},
+		},
+	}
+
+	args := map[string]interface{}{
+		"name": "World",
+	}
+
+	result, err := interp.ExecuteCommand(cmd, args)
+	require.NoError(t, err)
+	assert.Equal(t, "Hello, World", result)
+}
+
+func TestInterpreter_ExecuteCommand_WithDefaultValue(t *testing.T) {
+	interp := NewInterpreter()
+
+	cmd := &Command{
+		Name: "greet",
+		Params: []CommandParam{
+			{
+				Name:     "name",
+				Type:     StringType{},
+				Required: true,
+			},
+			{
+				Name:    "greeting",
+				Type:    StringType{},
+				Default: LiteralExpr{Value: StringLiteral{Value: "Hello"}},
+			},
+		},
+		Body: []Statement{
+			ReturnStatement{
+				Value: BinaryOpExpr{
+					Op: Add,
+					Left: BinaryOpExpr{
+						Op:    Add,
+						Left:  VariableExpr{Name: "greeting"},
+						Right: LiteralExpr{Value: StringLiteral{Value: ", "}},
+					},
+					Right: VariableExpr{Name: "name"},
+				},
+			},
+		},
+	}
+
+	// Test with explicit greeting
+	args := map[string]interface{}{
+		"name":     "Alice",
+		"greeting": "Hi",
+	}
+	result, err := interp.ExecuteCommand(cmd, args)
+	require.NoError(t, err)
+	assert.Equal(t, "Hi, Alice", result)
+
+	// Test with default greeting
+	args = map[string]interface{}{
+		"name": "Bob",
+	}
+	result, err = interp.ExecuteCommand(cmd, args)
+	require.NoError(t, err)
+	assert.Equal(t, "Hello, Bob", result)
+}
+
+func TestInterpreter_ExecuteCommand_MissingRequiredParam(t *testing.T) {
+	interp := NewInterpreter()
+
+	cmd := &Command{
+		Name: "greet",
+		Params: []CommandParam{
+			{
+				Name:     "name",
+				Type:     StringType{},
+				Required: true,
+			},
+		},
+		Body: []Statement{
+			ReturnStatement{
+				Value: LiteralExpr{Value: StringLiteral{Value: "Hello"}},
+			},
+		},
+	}
+
+	args := map[string]interface{}{}
+
+	_, err := interp.ExecuteCommand(cmd, args)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "missing required argument")
+}
+
+func TestInterpreter_ExecuteCommand_WithMultipleStatements(t *testing.T) {
+	interp := NewInterpreter()
+
+	cmd := &Command{
+		Name: "calculate",
+		Params: []CommandParam{
+			{Name: "x", Type: IntType{}, Required: true},
+			{Name: "y", Type: IntType{}, Required: true},
+		},
+		Body: []Statement{
+			AssignStatement{
+				Target: "sum",
+				Value: BinaryOpExpr{
+					Op:    Add,
+					Left:  VariableExpr{Name: "x"},
+					Right: VariableExpr{Name: "y"},
+				},
+			},
+			AssignStatement{
+				Target: "product",
+				Value: BinaryOpExpr{
+					Op:    Mul,
+					Left:  VariableExpr{Name: "x"},
+					Right: VariableExpr{Name: "y"},
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "sum", Value: VariableExpr{Name: "sum"}},
+						{Key: "product", Value: VariableExpr{Name: "product"}},
+					},
+				},
+			},
+		},
+	}
+
+	args := map[string]interface{}{
+		"x": int64(5),
+		"y": int64(3),
+	}
+
+	result, err := interp.ExecuteCommand(cmd, args)
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, int64(8), resultMap["sum"])
+	assert.Equal(t, int64(15), resultMap["product"])
+}
+
+// Test Cron Task Execution
+
+func TestInterpreter_ExecuteCronTask_Simple(t *testing.T) {
+	interp := NewInterpreter()
+
+	task := &CronTask{
+		Name:     "daily_cleanup",
+		Schedule: "0 0 * * *",
+		Body: []Statement{
+			AssignStatement{
+				Target: "count",
+				Value:  LiteralExpr{Value: IntLiteral{Value: 10}},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "deleted", Value: VariableExpr{Name: "count"}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteCronTask(task)
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, int64(10), resultMap["deleted"])
+}
+
+func TestInterpreter_ExecuteCronTask_WithInjections(t *testing.T) {
+	interp := NewInterpreter()
+
+	// Set up a mock database handler
+	mockDB := map[string]interface{}{
+		"recordCount": int64(42),
+	}
+	interp.SetDatabaseHandler(mockDB)
+
+	task := &CronTask{
+		Name:     "backup",
+		Schedule: "0 0 * * *",
+		Injections: []Injection{
+			{Name: "db", Type: DatabaseType{}},
+		},
+		Body: []Statement{
+			AssignStatement{
+				Target: "count",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "db"},
+					Field:  "recordCount",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "backed_up", Value: VariableExpr{Name: "count"}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteCronTask(task)
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, int64(42), resultMap["backed_up"])
+}
+
+func TestInterpreter_ExecuteCronTask_ComplexLogic(t *testing.T) {
+	interp := NewInterpreter()
+
+	task := &CronTask{
+		Name:     "hourly_sync",
+		Schedule: "0 */1 * * *",
+		Body: []Statement{
+			AssignStatement{
+				Target: "total",
+				Value:  LiteralExpr{Value: IntLiteral{Value: 0}},
+			},
+			AssignStatement{
+				Target: "i",
+				Value:  LiteralExpr{Value: IntLiteral{Value: 0}},
+			},
+			WhileStatement{
+				Condition: BinaryOpExpr{
+					Op:    Lt,
+					Left:  VariableExpr{Name: "i"},
+					Right: LiteralExpr{Value: IntLiteral{Value: 5}},
+				},
+				Body: []Statement{
+					AssignStatement{
+						Target: "total",
+						Value: BinaryOpExpr{
+							Op:    Add,
+							Left:  VariableExpr{Name: "total"},
+							Right: VariableExpr{Name: "i"},
+						},
+					},
+					AssignStatement{
+						Target: "i",
+						Value: BinaryOpExpr{
+							Op:    Add,
+							Left:  VariableExpr{Name: "i"},
+							Right: LiteralExpr{Value: IntLiteral{Value: 1}},
+						},
+					},
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "synced", Value: VariableExpr{Name: "total"}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteCronTask(task)
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, int64(10), resultMap["synced"]) // 0+1+2+3+4 = 10
+}
+
+// Test Event Handler Execution
+
+func TestInterpreter_ExecuteEventHandler_Simple(t *testing.T) {
+	interp := NewInterpreter()
+
+	handler := &EventHandler{
+		EventType: "user.created",
+		Body: []Statement{
+			AssignStatement{
+				Target: "userId",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "event"},
+					Field:  "userId",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "handled", Value: LiteralExpr{Value: BoolLiteral{Value: true}}},
+						{Key: "userId", Value: VariableExpr{Name: "userId"}},
+					},
+				},
+			},
+		},
+	}
+
+	eventData := map[string]interface{}{
+		"userId": int64(123),
+		"email":  "user@example.com",
+	}
+
+	result, err := interp.ExecuteEventHandler(handler, eventData)
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, true, resultMap["handled"])
+	assert.Equal(t, int64(123), resultMap["userId"])
+}
+
+func TestInterpreter_ExecuteEventHandler_WithInput(t *testing.T) {
+	interp := NewInterpreter()
+
+	handler := &EventHandler{
+		EventType: "order.paid",
+		Body: []Statement{
+			AssignStatement{
+				Target: "orderId",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "input"},
+					Field:  "orderId",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "orderId", Value: VariableExpr{Name: "orderId"}},
+					},
+				},
+			},
+		},
+	}
+
+	eventData := map[string]interface{}{
+		"orderId": int64(456),
+		"amount":  100.50,
+	}
+
+	result, err := interp.ExecuteEventHandler(handler, eventData)
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, int64(456), resultMap["orderId"])
+}
+
+func TestInterpreter_ExecuteEventHandler_WithInjections(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockDB := map[string]interface{}{
+		"connected": true,
+	}
+	interp.SetDatabaseHandler(mockDB)
+
+	handler := &EventHandler{
+		EventType: "notification.send",
+		Injections: []Injection{
+			{Name: "db", Type: DatabaseType{}},
+		},
+		Body: []Statement{
+			AssignStatement{
+				Target: "isConnected",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "db"},
+					Field:  "connected",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "sent", Value: VariableExpr{Name: "isConnected"}},
+					},
+				},
+			},
+		},
+	}
+
+	eventData := map[string]interface{}{
+		"message": "Hello",
+	}
+
+	result, err := interp.ExecuteEventHandler(handler, eventData)
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, true, resultMap["sent"])
+}
+
+func TestInterpreter_EmitEvent_SingleHandler(t *testing.T) {
+	interp := NewInterpreter()
+
+	// Register event handler
+	module := Module{
+		Items: []Item{
+			&EventHandler{
+				EventType: "test.event",
+				Body: []Statement{
+					ReturnStatement{
+						Value: LiteralExpr{Value: StringLiteral{Value: "handled"}},
+					},
+				},
+			},
+		},
+	}
+
+	err := interp.LoadModule(module)
+	require.NoError(t, err)
+
+	eventData := map[string]interface{}{
+		"data": "test",
+	}
+
+	err = interp.EmitEvent("test.event", eventData)
+	assert.NoError(t, err)
+}
+
+func TestInterpreter_EmitEvent_MultipleHandlers(t *testing.T) {
+	interp := NewInterpreter()
+
+	// Register multiple event handlers for the same event
+	module := Module{
+		Items: []Item{
+			&EventHandler{
+				EventType: "user.created",
+				Body: []Statement{
+					ReturnStatement{
+						Value: LiteralExpr{Value: StringLiteral{Value: "handler1"}},
+					},
+				},
+			},
+			&EventHandler{
+				EventType: "user.created",
+				Body: []Statement{
+					ReturnStatement{
+						Value: LiteralExpr{Value: StringLiteral{Value: "handler2"}},
+					},
+				},
+			},
+		},
+	}
+
+	err := interp.LoadModule(module)
+	require.NoError(t, err)
+
+	eventData := map[string]interface{}{
+		"userId": int64(1),
+	}
+
+	err = interp.EmitEvent("user.created", eventData)
+	assert.NoError(t, err)
+}
+
+// Test Queue Worker Execution
+
+func TestInterpreter_ExecuteQueueWorker_Simple(t *testing.T) {
+	interp := NewInterpreter()
+
+	worker := &QueueWorker{
+		QueueName: "email.send",
+		Body: []Statement{
+			AssignStatement{
+				Target: "to",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "message"},
+					Field:  "to",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "sent", Value: LiteralExpr{Value: BoolLiteral{Value: true}}},
+						{Key: "to", Value: VariableExpr{Name: "to"}},
+					},
+				},
+			},
+		},
+	}
+
+	message := map[string]interface{}{
+		"to":      "user@example.com",
+		"subject": "Hello",
+		"body":    "Test message",
+	}
+
+	result, err := interp.ExecuteQueueWorker(worker, message)
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, true, resultMap["sent"])
+	assert.Equal(t, "user@example.com", resultMap["to"])
+}
+
+func TestInterpreter_ExecuteQueueWorker_WithInput(t *testing.T) {
+	interp := NewInterpreter()
+
+	worker := &QueueWorker{
+		QueueName: "image.resize",
+		Body: []Statement{
+			AssignStatement{
+				Target: "imageId",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "input"},
+					Field:  "imageId",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "processed", Value: LiteralExpr{Value: BoolLiteral{Value: true}}},
+						{Key: "imageId", Value: VariableExpr{Name: "imageId"}},
+					},
+				},
+			},
+		},
+	}
+
+	message := map[string]interface{}{
+		"imageId": int64(789),
+		"width":   800,
+		"height":  600,
+	}
+
+	result, err := interp.ExecuteQueueWorker(worker, message)
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, true, resultMap["processed"])
+	assert.Equal(t, int64(789), resultMap["imageId"])
+}
+
+func TestInterpreter_ExecuteQueueWorker_WithInjections(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockDB := map[string]interface{}{
+		"status": "connected",
+	}
+	interp.SetDatabaseHandler(mockDB)
+
+	worker := &QueueWorker{
+		QueueName: "report.generate",
+		Injections: []Injection{
+			{Name: "db", Type: DatabaseType{}},
+		},
+		Body: []Statement{
+			AssignStatement{
+				Target: "dbStatus",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "db"},
+					Field:  "status",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "generated", Value: LiteralExpr{Value: BoolLiteral{Value: true}}},
+						{Key: "dbStatus", Value: VariableExpr{Name: "dbStatus"}},
+					},
+				},
+			},
+		},
+	}
+
+	message := map[string]interface{}{
+		"reportId": int64(100),
+	}
+
+	result, err := interp.ExecuteQueueWorker(worker, message)
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, true, resultMap["generated"])
+	assert.Equal(t, "connected", resultMap["dbStatus"])
+}
+
+func TestInterpreter_ExecuteQueueWorker_ComplexProcessing(t *testing.T) {
+	interp := NewInterpreter()
+
+	worker := &QueueWorker{
+		QueueName: "data.process",
+		Body: []Statement{
+			AssignStatement{
+				Target: "items",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "message"},
+					Field:  "items",
+				},
+			},
+			AssignStatement{
+				Target: "count",
+				Value:  LiteralExpr{Value: IntLiteral{Value: 0}},
+			},
+			ForStatement{
+				ValueVar: "item",
+				Iterable: VariableExpr{Name: "items"},
+				Body: []Statement{
+					AssignStatement{
+						Target: "count",
+						Value: BinaryOpExpr{
+							Op:    Add,
+							Left:  VariableExpr{Name: "count"},
+							Right: LiteralExpr{Value: IntLiteral{Value: 1}},
+						},
+					},
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "processed", Value: VariableExpr{Name: "count"}},
+					},
+				},
+			},
+		},
+	}
+
+	message := map[string]interface{}{
+		"items": []interface{}{
+			int64(1), int64(2), int64(3), int64(4), int64(5),
+		},
+	}
+
+	result, err := interp.ExecuteQueueWorker(worker, message)
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, int64(5), resultMap["processed"])
+}
+
+// Test GetCommand, GetCronTasks, GetEventHandlers, GetQueueWorker functions
+
+func TestInterpreter_GetCommand(t *testing.T) {
+	interp := NewInterpreter()
+
+	module := Module{
+		Items: []Item{
+			&Command{
+				Name: "test",
+				Body: []Statement{},
+			},
+		},
+	}
+
+	err := interp.LoadModule(module)
+	require.NoError(t, err)
+
+	cmd, ok := interp.GetCommand("test")
+	assert.True(t, ok)
+	assert.Equal(t, "test", cmd.Name)
+
+	_, ok = interp.GetCommand("nonexistent")
+	assert.False(t, ok)
+}
+
+func TestInterpreter_GetCronTasks(t *testing.T) {
+	interp := NewInterpreter()
+
+	module := Module{
+		Items: []Item{
+			&CronTask{
+				Name:     "task1",
+				Schedule: "0 0 * * *",
+			},
+			&CronTask{
+				Name:     "task2",
+				Schedule: "*/5 * * * *",
+			},
+		},
+	}
+
+	err := interp.LoadModule(module)
+	require.NoError(t, err)
+
+	tasks := interp.GetCronTasks()
+	assert.Len(t, tasks, 2)
+	assert.Equal(t, "task1", tasks[0].Name)
+	assert.Equal(t, "task2", tasks[1].Name)
+}
+
+func TestInterpreter_GetEventHandlers(t *testing.T) {
+	interp := NewInterpreter()
+
+	module := Module{
+		Items: []Item{
+			&EventHandler{
+				EventType: "user.created",
+				Body:      []Statement{},
+			},
+			&EventHandler{
+				EventType: "user.created",
+				Body:      []Statement{},
+			},
+			&EventHandler{
+				EventType: "order.paid",
+				Body:      []Statement{},
+			},
+		},
+	}
+
+	err := interp.LoadModule(module)
+	require.NoError(t, err)
+
+	handlers := interp.GetEventHandlers("user.created")
+	assert.Len(t, handlers, 2)
+
+	handlers = interp.GetEventHandlers("order.paid")
+	assert.Len(t, handlers, 1)
+
+	handlers = interp.GetEventHandlers("nonexistent")
+	assert.Len(t, handlers, 0)
+}
+
+func TestInterpreter_GetQueueWorker(t *testing.T) {
+	interp := NewInterpreter()
+
+	module := Module{
+		Items: []Item{
+			&QueueWorker{
+				QueueName: "email.send",
+				Body:      []Statement{},
+			},
+		},
+	}
+
+	err := interp.LoadModule(module)
+	require.NoError(t, err)
+
+	worker, ok := interp.GetQueueWorker("email.send")
+	assert.True(t, ok)
+	assert.Equal(t, "email.send", worker.QueueName)
+
+	_, ok = interp.GetQueueWorker("nonexistent")
+	assert.False(t, ok)
+}
+
+// Test built-in string functions
+
+func TestBuiltinFunction_Upper(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	expr := FunctionCallExpr{
+		Name: "upper",
+		Args: []Expr{
+			LiteralExpr{Value: StringLiteral{Value: "hello world"}},
+		},
+	}
+
+	result, err := interp.evaluateFunctionCall(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, "HELLO WORLD", result)
+}
+
+func TestBuiltinFunction_Lower(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	expr := FunctionCallExpr{
+		Name: "lower",
+		Args: []Expr{
+			LiteralExpr{Value: StringLiteral{Value: "HELLO WORLD"}},
+		},
+	}
+
+	result, err := interp.evaluateFunctionCall(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, "hello world", result)
+}
+
+func TestBuiltinFunction_Trim(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	expr := FunctionCallExpr{
+		Name: "trim",
+		Args: []Expr{
+			LiteralExpr{Value: StringLiteral{Value: "  hello world  "}},
+		},
+	}
+
+	result, err := interp.evaluateFunctionCall(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, "hello world", result)
+}
+
+func TestBuiltinFunction_Split(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	expr := FunctionCallExpr{
+		Name: "split",
+		Args: []Expr{
+			LiteralExpr{Value: StringLiteral{Value: "a,b,c"}},
+			LiteralExpr{Value: StringLiteral{Value: ","}},
+		},
+	}
+
+	result, err := interp.evaluateFunctionCall(expr, env)
+	require.NoError(t, err)
+
+	arr, ok := result.([]interface{})
+	require.True(t, ok)
+	assert.Len(t, arr, 3)
+	assert.Equal(t, "a", arr[0])
+	assert.Equal(t, "b", arr[1])
+	assert.Equal(t, "c", arr[2])
+}
+
+func TestBuiltinFunction_Join(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	expr := FunctionCallExpr{
+		Name: "join",
+		Args: []Expr{
+			ArrayExpr{
+				Elements: []Expr{
+					LiteralExpr{Value: StringLiteral{Value: "a"}},
+					LiteralExpr{Value: StringLiteral{Value: "b"}},
+					LiteralExpr{Value: StringLiteral{Value: "c"}},
+				},
+			},
+			LiteralExpr{Value: StringLiteral{Value: ","}},
+		},
+	}
+
+	result, err := interp.evaluateFunctionCall(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, "a,b,c", result)
+}
+
+func TestBuiltinFunction_Contains(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	tests := []struct {
+		name     string
+		str      string
+		substr   string
+		expected bool
+	}{
+		{"contains_yes", "hello world", "world", true},
+		{"contains_no", "hello world", "xyz", false},
+		{"contains_empty", "hello", "", true},
+		{"contains_exact", "test", "test", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expr := FunctionCallExpr{
+				Name: "contains",
+				Args: []Expr{
+					LiteralExpr{Value: StringLiteral{Value: tt.str}},
+					LiteralExpr{Value: StringLiteral{Value: tt.substr}},
+				},
+			}
+
+			result, err := interp.evaluateFunctionCall(expr, env)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestBuiltinFunction_Replace(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	expr := FunctionCallExpr{
+		Name: "replace",
+		Args: []Expr{
+			LiteralExpr{Value: StringLiteral{Value: "hello world world"}},
+			LiteralExpr{Value: StringLiteral{Value: "world"}},
+			LiteralExpr{Value: StringLiteral{Value: "universe"}},
+		},
+	}
+
+	result, err := interp.evaluateFunctionCall(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, "hello universe universe", result)
+}
+
+func TestBuiltinFunction_Substring(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	tests := []struct {
+		name     string
+		str      string
+		start    int64
+		end      int64
+		expected string
+	}{
+		{"normal_range", "hello world", 0, 5, "hello"},
+		{"middle_range", "hello world", 6, 11, "world"},
+		{"full_string", "test", 0, 4, "test"},
+		{"empty_string", "test", 2, 2, ""},
+		{"beyond_length", "test", 0, 10, "test"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expr := FunctionCallExpr{
+				Name: "substring",
+				Args: []Expr{
+					LiteralExpr{Value: StringLiteral{Value: tt.str}},
+					LiteralExpr{Value: IntLiteral{Value: tt.start}},
+					LiteralExpr{Value: IntLiteral{Value: tt.end}},
+				},
+			}
+
+			result, err := interp.evaluateFunctionCall(expr, env)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestBuiltinFunction_Length(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	t.Run("string_length", func(t *testing.T) {
+		expr := FunctionCallExpr{
+			Name: "length",
+			Args: []Expr{
+				LiteralExpr{Value: StringLiteral{Value: "hello"}},
+			},
+		}
+
+		result, err := interp.evaluateFunctionCall(expr, env)
+		require.NoError(t, err)
+		assert.Equal(t, int64(5), result)
+	})
+
+	t.Run("array_length", func(t *testing.T) {
+		expr := FunctionCallExpr{
+			Name: "length",
+			Args: []Expr{
+				ArrayExpr{
+					Elements: []Expr{
+						LiteralExpr{Value: IntLiteral{Value: 1}},
+						LiteralExpr{Value: IntLiteral{Value: 2}},
+						LiteralExpr{Value: IntLiteral{Value: 3}},
+					},
+				},
+			},
+		}
+
+		result, err := interp.evaluateFunctionCall(expr, env)
+		require.NoError(t, err)
+		assert.Equal(t, int64(3), result)
+	})
+}
+
+func TestBuiltinFunction_StartsWith(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	tests := []struct {
+		str      string
+		prefix   string
+		expected bool
+	}{
+		{"hello world", "hello", true},
+		{"hello world", "world", false},
+		{"hello", "hello", true},
+		{"hello", "h", true},
+		{"hello", "", true},
+	}
+
+	for _, tt := range tests {
+		expr := FunctionCallExpr{
+			Name: "startsWith",
+			Args: []Expr{
+				LiteralExpr{Value: StringLiteral{Value: tt.str}},
+				LiteralExpr{Value: StringLiteral{Value: tt.prefix}},
+			},
+		}
+
+		result, err := interp.evaluateFunctionCall(expr, env)
+		require.NoError(t, err)
+		assert.Equal(t, tt.expected, result)
+	}
+}
+
+func TestBuiltinFunction_EndsWith(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	tests := []struct {
+		str      string
+		suffix   string
+		expected bool
+	}{
+		{"hello world", "world", true},
+		{"hello world", "hello", false},
+		{"hello", "hello", true},
+		{"hello", "o", true},
+		{"hello", "", true},
+	}
+
+	for _, tt := range tests {
+		expr := FunctionCallExpr{
+			Name: "endsWith",
+			Args: []Expr{
+				LiteralExpr{Value: StringLiteral{Value: tt.str}},
+				LiteralExpr{Value: StringLiteral{Value: tt.suffix}},
+			},
+		}
+
+		result, err := interp.evaluateFunctionCall(expr, env)
+		require.NoError(t, err)
+		assert.Equal(t, tt.expected, result)
+	}
+}
+
+func TestBuiltinFunction_IndexOf(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	tests := []struct {
+		str      string
+		substr   string
+		expected int64
+	}{
+		{"hello world", "world", 6},
+		{"hello world", "hello", 0},
+		{"hello world", "not found", -1},
+		{"hello", "l", 2},
+	}
+
+	for _, tt := range tests {
+		expr := FunctionCallExpr{
+			Name: "indexOf",
+			Args: []Expr{
+				LiteralExpr{Value: StringLiteral{Value: tt.str}},
+				LiteralExpr{Value: StringLiteral{Value: tt.substr}},
+			},
+		}
+
+		result, err := interp.evaluateFunctionCall(expr, env)
+		require.NoError(t, err)
+		assert.Equal(t, tt.expected, result)
+	}
+}
+
+func TestBuiltinFunction_CharAt(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	expr := FunctionCallExpr{
+		Name: "charAt",
+		Args: []Expr{
+			LiteralExpr{Value: StringLiteral{Value: "hello"}},
+			LiteralExpr{Value: IntLiteral{Value: 1}},
+		},
+	}
+
+	result, err := interp.evaluateFunctionCall(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, "e", result)
+}
+
+func TestBuiltinFunction_ParseInt(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	tests := []struct {
+		input    string
+		expected int64
+	}{
+		{"42", 42},
+		{"-10", -10},
+		{"  123  ", 123},
+	}
+
+	for _, tt := range tests {
+		expr := FunctionCallExpr{
+			Name: "parseInt",
+			Args: []Expr{
+				LiteralExpr{Value: StringLiteral{Value: tt.input}},
+			},
+		}
+
+		result, err := interp.evaluateFunctionCall(expr, env)
+		require.NoError(t, err)
+		assert.Equal(t, tt.expected, result)
+	}
+}
+
+func TestBuiltinFunction_ParseFloat(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	expr := FunctionCallExpr{
+		Name: "parseFloat",
+		Args: []Expr{
+			LiteralExpr{Value: StringLiteral{Value: "3.14"}},
+		},
+	}
+
+	result, err := interp.evaluateFunctionCall(expr, env)
+	require.NoError(t, err)
+	assert.InDelta(t, 3.14, result.(float64), 0.001)
+}
+
+func TestBuiltinFunction_ToString(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	tests := []struct {
+		name     string
+		input    Literal
+		expected string
+	}{
+		{"int", IntLiteral{Value: 42}, "42"},
+		{"float", FloatLiteral{Value: 3.14}, "3.14"},
+		{"bool", BoolLiteral{Value: true}, "true"},
+		{"string", StringLiteral{Value: "hello"}, "hello"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expr := FunctionCallExpr{
+				Name: "toString",
+				Args: []Expr{
+					LiteralExpr{Value: tt.input},
+				},
+			}
+
+			result, err := interp.evaluateFunctionCall(expr, env)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestBuiltinFunction_Abs(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	t.Run("positive_int", func(t *testing.T) {
+		expr := FunctionCallExpr{
+			Name: "abs",
+			Args: []Expr{
+				LiteralExpr{Value: IntLiteral{Value: 42}},
+			},
+		}
+		result, err := interp.evaluateFunctionCall(expr, env)
+		require.NoError(t, err)
+		assert.Equal(t, int64(42), result)
+	})
+
+	t.Run("negative_int", func(t *testing.T) {
+		expr := FunctionCallExpr{
+			Name: "abs",
+			Args: []Expr{
+				LiteralExpr{Value: IntLiteral{Value: -42}},
+			},
+		}
+		result, err := interp.evaluateFunctionCall(expr, env)
+		require.NoError(t, err)
+		assert.Equal(t, int64(42), result)
+	})
+
+	t.Run("negative_float", func(t *testing.T) {
+		expr := FunctionCallExpr{
+			Name: "abs",
+			Args: []Expr{
+				LiteralExpr{Value: FloatLiteral{Value: -3.14}},
+			},
+		}
+		result, err := interp.evaluateFunctionCall(expr, env)
+		require.NoError(t, err)
+		assert.InDelta(t, 3.14, result.(float64), 0.001)
+	})
+}
+
+func TestBuiltinFunction_Min(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	t.Run("int_min", func(t *testing.T) {
+		expr := FunctionCallExpr{
+			Name: "min",
+			Args: []Expr{
+				LiteralExpr{Value: IntLiteral{Value: 5}},
+				LiteralExpr{Value: IntLiteral{Value: 3}},
+			},
+		}
+		result, err := interp.evaluateFunctionCall(expr, env)
+		require.NoError(t, err)
+		assert.Equal(t, int64(3), result)
+	})
+
+	t.Run("float_min", func(t *testing.T) {
+		expr := FunctionCallExpr{
+			Name: "min",
+			Args: []Expr{
+				LiteralExpr{Value: FloatLiteral{Value: 5.5}},
+				LiteralExpr{Value: FloatLiteral{Value: 3.3}},
+			},
+		}
+		result, err := interp.evaluateFunctionCall(expr, env)
+		require.NoError(t, err)
+		assert.InDelta(t, 3.3, result.(float64), 0.001)
+	})
+}
+
+func TestBuiltinFunction_Max(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	t.Run("int_max", func(t *testing.T) {
+		expr := FunctionCallExpr{
+			Name: "max",
+			Args: []Expr{
+				LiteralExpr{Value: IntLiteral{Value: 5}},
+				LiteralExpr{Value: IntLiteral{Value: 3}},
+			},
+		}
+		result, err := interp.evaluateFunctionCall(expr, env)
+		require.NoError(t, err)
+		assert.Equal(t, int64(5), result)
+	})
+
+	t.Run("float_max", func(t *testing.T) {
+		expr := FunctionCallExpr{
+			Name: "max",
+			Args: []Expr{
+				LiteralExpr{Value: FloatLiteral{Value: 5.5}},
+				LiteralExpr{Value: FloatLiteral{Value: 3.3}},
+			},
+		}
+		result, err := interp.evaluateFunctionCall(expr, env)
+		require.NoError(t, err)
+		assert.InDelta(t, 5.5, result.(float64), 0.001)
+	})
+}

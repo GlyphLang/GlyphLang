@@ -102,6 +102,98 @@ func GetHover(doc *Document, pos Position) *Hover {
 		}
 	}
 
+	// Check if it's a command (pointer or value type)
+	for _, item := range doc.AST.Items {
+		if cmd, ok := item.(*interpreter.Command); ok {
+			if cmd.Name == word {
+				return &Hover{
+					Contents: MarkupContent{
+						Kind:  "markdown",
+						Value: formatCommandHover(cmd),
+					},
+				}
+			}
+		} else if cmd, ok := item.(interpreter.Command); ok {
+			if cmd.Name == word {
+				return &Hover{
+					Contents: MarkupContent{
+						Kind:  "markdown",
+						Value: formatCommandHover(&cmd),
+					},
+				}
+			}
+		}
+	}
+
+	// Check if it's a cron task (pointer or value type)
+	for _, item := range doc.AST.Items {
+		if cron, ok := item.(*interpreter.CronTask); ok {
+			if cron.Name == word {
+				return &Hover{
+					Contents: MarkupContent{
+						Kind:  "markdown",
+						Value: formatCronTaskHover(cron),
+					},
+				}
+			}
+		} else if cron, ok := item.(interpreter.CronTask); ok {
+			if cron.Name == word {
+				return &Hover{
+					Contents: MarkupContent{
+						Kind:  "markdown",
+						Value: formatCronTaskHover(&cron),
+					},
+				}
+			}
+		}
+	}
+
+	// Check if it's an event handler (pointer or value type)
+	for _, item := range doc.AST.Items {
+		if event, ok := item.(*interpreter.EventHandler); ok {
+			if event.EventType == word {
+				return &Hover{
+					Contents: MarkupContent{
+						Kind:  "markdown",
+						Value: formatEventHandlerHover(event),
+					},
+				}
+			}
+		} else if event, ok := item.(interpreter.EventHandler); ok {
+			if event.EventType == word {
+				return &Hover{
+					Contents: MarkupContent{
+						Kind:  "markdown",
+						Value: formatEventHandlerHover(&event),
+					},
+				}
+			}
+		}
+	}
+
+	// Check if it's a queue worker (pointer or value type)
+	for _, item := range doc.AST.Items {
+		if queue, ok := item.(*interpreter.QueueWorker); ok {
+			if queue.QueueName == word {
+				return &Hover{
+					Contents: MarkupContent{
+						Kind:  "markdown",
+						Value: formatQueueWorkerHover(queue),
+					},
+				}
+			}
+		} else if queue, ok := item.(interpreter.QueueWorker); ok {
+			if queue.QueueName == word {
+				return &Hover{
+					Contents: MarkupContent{
+						Kind:  "markdown",
+						Value: formatQueueWorkerHover(&queue),
+					},
+				}
+			}
+		}
+	}
+
 	// Check if it's a built-in type
 	if info := getBuiltInTypeInfo(word); info != "" {
 		return &Hover{
@@ -180,6 +272,42 @@ func GetCompletion(doc *Document, pos Position) []CompletionItem {
 		Kind:             CompletionItemKindSnippet,
 		Detail:           "POST route",
 		InsertText:       "@ route /${1:path} [POST]\n  > {${2:response}}",
+		InsertTextFormat: 2,
+	})
+
+	// Add CLI command snippets
+	items = append(items, CompletionItem{
+		Label:            "command",
+		Kind:             CompletionItemKindSnippet,
+		Detail:           "CLI command",
+		InsertText:       "! command ${1:name} ${2:param}: ${3:str}!\n  > ${4:\"result\"}",
+		InsertTextFormat: 2,
+	})
+
+	// Add cron task snippets
+	items = append(items, CompletionItem{
+		Label:            "cron",
+		Kind:             CompletionItemKindSnippet,
+		Detail:           "Scheduled task",
+		InsertText:       "* cron \"${1:0 0 * * *}\"\n  > ${2:\"task executed\"}",
+		InsertTextFormat: 2,
+	})
+
+	// Add event handler snippets
+	items = append(items, CompletionItem{
+		Label:            "event",
+		Kind:             CompletionItemKindSnippet,
+		Detail:           "Event handler",
+		InsertText:       "~ event \"${1:event.type}\"\n  > ${2:\"event handled\"}",
+		InsertTextFormat: 2,
+	})
+
+	// Add queue worker snippets
+	items = append(items, CompletionItem{
+		Label:            "queue",
+		Kind:             CompletionItemKindSnippet,
+		Detail:           "Queue worker",
+		InsertText:       "& queue \"${1:queue.name}\"\n  > ${2:\"message processed\"}",
 		InsertTextFormat: 2,
 	})
 
@@ -278,6 +406,150 @@ func GetDocumentSymbols(doc *Document) []DocumentSymbol {
 				Name:   fmt.Sprintf("%s %s", v.Method, v.Path),
 				Kind:   SymbolKindMethod,
 				Detail: "Route handler",
+				Range: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 0},
+				},
+				SelectionRange: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 0},
+				},
+			}
+			symbols = append(symbols, symbol)
+
+		case *interpreter.Command:
+			// Create symbol for CLI command (pointer type)
+			symbol := DocumentSymbol{
+				Name:   fmt.Sprintf("! %s", v.Name),
+				Kind:   SymbolKindMethod,
+				Detail: "CLI command",
+				Range: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 0},
+				},
+				SelectionRange: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 0},
+				},
+			}
+			symbols = append(symbols, symbol)
+
+		case interpreter.Command:
+			// Create symbol for CLI command (value type for compatibility)
+			symbol := DocumentSymbol{
+				Name:   fmt.Sprintf("! %s", v.Name),
+				Kind:   SymbolKindMethod,
+				Detail: "CLI command",
+				Range: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 0},
+				},
+				SelectionRange: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 0},
+				},
+			}
+			symbols = append(symbols, symbol)
+
+		case *interpreter.CronTask:
+			// Create symbol for cron task (pointer type)
+			name := v.Name
+			if name == "" {
+				name = v.Schedule
+			}
+			symbol := DocumentSymbol{
+				Name:   fmt.Sprintf("* %s", name),
+				Kind:   SymbolKindMethod,
+				Detail: fmt.Sprintf("Cron task (%s)", v.Schedule),
+				Range: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 0},
+				},
+				SelectionRange: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 0},
+				},
+			}
+			symbols = append(symbols, symbol)
+
+		case interpreter.CronTask:
+			// Create symbol for cron task (value type for compatibility)
+			name := v.Name
+			if name == "" {
+				name = v.Schedule
+			}
+			symbol := DocumentSymbol{
+				Name:   fmt.Sprintf("* %s", name),
+				Kind:   SymbolKindMethod,
+				Detail: fmt.Sprintf("Cron task (%s)", v.Schedule),
+				Range: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 0},
+				},
+				SelectionRange: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 0},
+				},
+			}
+			symbols = append(symbols, symbol)
+
+		case *interpreter.EventHandler:
+			// Create symbol for event handler (pointer type)
+			symbol := DocumentSymbol{
+				Name:   fmt.Sprintf("~ %s", v.EventType),
+				Kind:   SymbolKindMethod,
+				Detail: "Event handler",
+				Range: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 0},
+				},
+				SelectionRange: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 0},
+				},
+			}
+			symbols = append(symbols, symbol)
+
+		case interpreter.EventHandler:
+			// Create symbol for event handler (value type for compatibility)
+			symbol := DocumentSymbol{
+				Name:   fmt.Sprintf("~ %s", v.EventType),
+				Kind:   SymbolKindMethod,
+				Detail: "Event handler",
+				Range: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 0},
+				},
+				SelectionRange: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 0},
+				},
+			}
+			symbols = append(symbols, symbol)
+
+		case *interpreter.QueueWorker:
+			// Create symbol for queue worker (pointer type)
+			symbol := DocumentSymbol{
+				Name:   fmt.Sprintf("& %s", v.QueueName),
+				Kind:   SymbolKindMethod,
+				Detail: "Queue worker",
+				Range: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 0},
+				},
+				SelectionRange: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 0},
+				},
+			}
+			symbols = append(symbols, symbol)
+
+		case interpreter.QueueWorker:
+			// Create symbol for queue worker
+			symbol := DocumentSymbol{
+				Name:   fmt.Sprintf("& %s", v.QueueName),
+				Kind:   SymbolKindMethod,
+				Detail: "Queue worker",
 				Range: Range{
 					Start: Position{Line: 0, Character: 0},
 					End:   Position{Line: 0, Character: 0},
@@ -583,6 +855,98 @@ func checkTypes(module *interpreter.Module) []Diagnostic {
 		}
 	}
 
+	// Validate cron tasks (pointer or value type)
+	for _, item := range module.Items {
+		var schedule string
+		if cron, ok := item.(*interpreter.CronTask); ok {
+			schedule = cron.Schedule
+		} else if cron, ok := item.(interpreter.CronTask); ok {
+			schedule = cron.Schedule
+		} else {
+			continue
+		}
+		if schedule == "" {
+			diagnostics = append(diagnostics, Diagnostic{
+				Range: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 0},
+				},
+				Severity: DiagnosticSeverityError,
+				Source:   "glyph",
+				Message:  "Cron task must have a schedule expression",
+			})
+		}
+	}
+
+	// Validate event handlers (pointer or value type)
+	for _, item := range module.Items {
+		var eventType string
+		if event, ok := item.(*interpreter.EventHandler); ok {
+			eventType = event.EventType
+		} else if event, ok := item.(interpreter.EventHandler); ok {
+			eventType = event.EventType
+		} else {
+			continue
+		}
+		if eventType == "" {
+			diagnostics = append(diagnostics, Diagnostic{
+				Range: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 0},
+				},
+				Severity: DiagnosticSeverityError,
+				Source:   "glyph",
+				Message:  "Event handler must specify an event type",
+			})
+		}
+	}
+
+	// Validate queue workers (pointer or value type)
+	for _, item := range module.Items {
+		var queueName string
+		if queue, ok := item.(*interpreter.QueueWorker); ok {
+			queueName = queue.QueueName
+		} else if queue, ok := item.(interpreter.QueueWorker); ok {
+			queueName = queue.QueueName
+		} else {
+			continue
+		}
+		if queueName == "" {
+			diagnostics = append(diagnostics, Diagnostic{
+				Range: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 0},
+				},
+				Severity: DiagnosticSeverityError,
+				Source:   "glyph",
+				Message:  "Queue worker must specify a queue name",
+			})
+		}
+	}
+
+	// Validate commands (pointer or value type)
+	for _, item := range module.Items {
+		var cmdName string
+		if cmd, ok := item.(*interpreter.Command); ok {
+			cmdName = cmd.Name
+		} else if cmd, ok := item.(interpreter.Command); ok {
+			cmdName = cmd.Name
+		} else {
+			continue
+		}
+		if cmdName == "" {
+			diagnostics = append(diagnostics, Diagnostic{
+				Range: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 0},
+				},
+				Severity: DiagnosticSeverityError,
+				Source:   "glyph",
+				Message:  "Command must have a name",
+			})
+		}
+	}
+
 	return diagnostics
 }
 
@@ -590,6 +954,10 @@ func checkTypes(module *interpreter.Module) []Diagnostic {
 func getKeywordInfo(keyword string) string {
 	keywordDocs := map[string]string{
 		"route":   "**route** - Defines an HTTP route handler\n\nExample:\n```glyph\n@ route /api/users [GET]\n  > {users: []}\n```",
+		"command": "**command** - Defines a CLI command\n\nExample:\n```glyph\n! command hello name: str!\n  > \"Hello \" + name\n```",
+		"cron":    "**cron** - Defines a scheduled task\n\nExample:\n```glyph\n* cron \"0 0 * * *\"\n  > \"Daily task executed\"\n```",
+		"event":   "**event** - Defines an event handler\n\nExample:\n```glyph\n~ event \"user.created\"\n  > \"Handle user creation\"\n```",
+		"queue":   "**queue** - Defines a message queue worker\n\nExample:\n```glyph\n& queue \"email.send\"\n  > \"Process email\"\n```",
 		"if":      "**if** - Conditional statement\n\nExample:\n```glyph\nif condition {\n  > {success: true}\n}\n```",
 		"else":    "**else** - Alternative branch for if statement",
 		"while":   "**while** - Loop that executes while condition is true\n\nExample:\n```glyph\nwhile count < 10 {\n  $ count = count + 1\n}\n```",
@@ -654,6 +1022,98 @@ func formatRouteHover(route *interpreter.Route) string {
 
 	if route.RateLimit != nil {
 		sb.WriteString(fmt.Sprintf("Rate Limit: `%d/%s`\n", route.RateLimit.Requests, route.RateLimit.Window))
+	}
+
+	return sb.String()
+}
+
+// formatCommandHover formats a CLI command for hover display
+func formatCommandHover(cmd *interpreter.Command) string {
+	var sb strings.Builder
+
+	sb.WriteString(fmt.Sprintf("**CLI Command: %s**\n\n", cmd.Name))
+
+	if cmd.Description != "" {
+		sb.WriteString(fmt.Sprintf("%s\n\n", cmd.Description))
+	}
+
+	if len(cmd.Params) > 0 {
+		sb.WriteString("Parameters:\n")
+		for _, param := range cmd.Params {
+			required := ""
+			if param.Required {
+				required = "!"
+			}
+			defaultVal := ""
+			if param.Default != nil {
+				defaultVal = " (optional)"
+			}
+			sb.WriteString(fmt.Sprintf("- `%s: %s%s`%s\n", param.Name, formatType(param.Type), required, defaultVal))
+		}
+		sb.WriteString("\n")
+	}
+
+	if cmd.ReturnType != nil {
+		sb.WriteString(fmt.Sprintf("Returns: `%s`\n", formatType(cmd.ReturnType)))
+	}
+
+	return sb.String()
+}
+
+// formatCronTaskHover formats a cron task for hover display
+func formatCronTaskHover(cron *interpreter.CronTask) string {
+	var sb strings.Builder
+
+	if cron.Name != "" {
+		sb.WriteString(fmt.Sprintf("**Cron Task: %s**\n\n", cron.Name))
+	} else {
+		sb.WriteString("**Cron Task**\n\n")
+	}
+
+	sb.WriteString(fmt.Sprintf("Schedule: `%s`\n", cron.Schedule))
+
+	if cron.Timezone != "" {
+		sb.WriteString(fmt.Sprintf("Timezone: `%s`\n", cron.Timezone))
+	}
+
+	if cron.Retries > 0 {
+		sb.WriteString(fmt.Sprintf("Retries: `%d`\n", cron.Retries))
+	}
+
+	return sb.String()
+}
+
+// formatEventHandlerHover formats an event handler for hover display
+func formatEventHandlerHover(event *interpreter.EventHandler) string {
+	var sb strings.Builder
+
+	sb.WriteString(fmt.Sprintf("**Event Handler: %s**\n\n", event.EventType))
+
+	if event.Async {
+		sb.WriteString("Mode: `async`\n")
+	} else {
+		sb.WriteString("Mode: `sync`\n")
+	}
+
+	return sb.String()
+}
+
+// formatQueueWorkerHover formats a queue worker for hover display
+func formatQueueWorkerHover(queue *interpreter.QueueWorker) string {
+	var sb strings.Builder
+
+	sb.WriteString(fmt.Sprintf("**Queue Worker: %s**\n\n", queue.QueueName))
+
+	if queue.Concurrency > 0 {
+		sb.WriteString(fmt.Sprintf("Concurrency: `%d`\n", queue.Concurrency))
+	}
+
+	if queue.MaxRetries > 0 {
+		sb.WriteString(fmt.Sprintf("Max Retries: `%d`\n", queue.MaxRetries))
+	}
+
+	if queue.Timeout > 0 {
+		sb.WriteString(fmt.Sprintf("Timeout: `%ds`\n", queue.Timeout))
 	}
 
 	return sb.String()
