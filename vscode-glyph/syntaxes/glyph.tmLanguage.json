@@ -218,6 +218,20 @@
           "captures": {
             "1": { "name": "keyword.operator.return.glyph" }
           }
+        },
+        {
+          "match": "^\\s*(%)\\s+([a-zA-Z][a-zA-Z0-9_]*)\\s*:\\s*([a-zA-Z][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.operator.injection.glyph" },
+            "2": { "name": "variable.other.injection.glyph" },
+            "3": { "name": "entity.name.type.glyph" }
+          }
+        },
+        {
+          "match": "^\\s*(\\?)\\s+",
+          "captures": {
+            "1": { "name": "keyword.operator.validation.glyph" }
+          }
         }
       ]
     },
