@@ -2212,3 +2212,656 @@ func TestCompileFunctionCallInCondition(t *testing.T) {
 		t.Errorf("Expected %v, got %v", expected, result)
 	}
 }
+
+// Test CompileCommand
+
+func TestCompileCommand_Simple(t *testing.T) {
+	cmd := &interpreter.Command{
+		Name: "greet",
+		Params: []interpreter.CommandParam{
+			{Name: "name", Type: interpreter.StringType{}, Required: true},
+		},
+		Body: []interpreter.Statement{
+			&interpreter.ReturnStatement{
+				Value: &interpreter.BinaryOpExpr{
+					Op:    interpreter.Add,
+					Left:  &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "Hello, "}},
+					Right: &interpreter.VariableExpr{Name: "name"},
+				},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	bytecode, err := c.CompileCommand(cmd)
+	if err != nil {
+		t.Fatalf("CompileCommand() error: %v", err)
+	}
+
+	if len(bytecode) == 0 {
+		t.Error("Expected non-empty bytecode")
+	}
+}
+
+func TestCompileCommand_WithMultipleParams(t *testing.T) {
+	cmd := &interpreter.Command{
+		Name: "add",
+		Params: []interpreter.CommandParam{
+			{Name: "x", Type: interpreter.IntType{}, Required: true},
+			{Name: "y", Type: interpreter.IntType{}, Required: true},
+		},
+		Body: []interpreter.Statement{
+			&interpreter.ReturnStatement{
+				Value: &interpreter.BinaryOpExpr{
+					Op:    interpreter.Add,
+					Left:  &interpreter.VariableExpr{Name: "x"},
+					Right: &interpreter.VariableExpr{Name: "y"},
+				},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	bytecode, err := c.CompileCommand(cmd)
+	if err != nil {
+		t.Fatalf("CompileCommand() error: %v", err)
+	}
+
+	// Verify bytecode structure
+	if len(bytecode) < 8 { // Magic(4) + Version(4)
+		t.Error("Bytecode too short")
+	}
+}
+
+func TestCompileCommand_WithComplexBody(t *testing.T) {
+	cmd := &interpreter.Command{
+		Name: "process",
+		Params: []interpreter.CommandParam{
+			{Name: "input", Type: interpreter.StringType{}, Required: true},
+		},
+		Body: []interpreter.Statement{
+			&interpreter.AssignStatement{
+				Target: "result",
+				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+			},
+			&interpreter.AssignStatement{
+				Target: "i",
+				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+			},
+			&interpreter.WhileStatement{
+				Condition: &interpreter.BinaryOpExpr{
+					Op:    interpreter.Lt,
+					Left:  &interpreter.VariableExpr{Name: "i"},
+					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
+				},
+				Body: []interpreter.Statement{
+					&interpreter.AssignStatement{
+						Target: "result",
+						Value: &interpreter.BinaryOpExpr{
+							Op:    interpreter.Add,
+							Left:  &interpreter.VariableExpr{Name: "result"},
+							Right: &interpreter.VariableExpr{Name: "i"},
+						},
+					},
+					&interpreter.AssignStatement{
+						Target: "i",
+						Value: &interpreter.BinaryOpExpr{
+							Op:    interpreter.Add,
+							Left:  &interpreter.VariableExpr{Name: "i"},
+							Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+						},
+					},
+				},
+			},
+			&interpreter.ReturnStatement{
+				Value: &interpreter.VariableExpr{Name: "result"},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	bytecode, err := c.CompileCommand(cmd)
+	if err != nil {
+		t.Fatalf("CompileCommand() error: %v", err)
+	}
+
+	if len(bytecode) == 0 {
+		t.Error("Expected non-empty bytecode")
+	}
+}
+
+// Test CompileCronTask
+
+func TestCompileCronTask_Simple(t *testing.T) {
+	task := &interpreter.CronTask{
+		Name:     "daily_cleanup",
+		Schedule: "0 0 * * *",
+		Body: []interpreter.Statement{
+			&interpreter.AssignStatement{
+				Target: "count",
+				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+			},
+			&interpreter.ReturnStatement{
+				Value: &interpreter.ObjectExpr{
+					Fields: []interpreter.ObjectField{
+						{Key: "deleted", Value: &interpreter.VariableExpr{Name: "count"}},
+					},
+				},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	bytecode, err := c.CompileCronTask(task)
+	if err != nil {
+		t.Fatalf("CompileCronTask() error: %v", err)
+	}
+
+	if len(bytecode) == 0 {
+		t.Error("Expected non-empty bytecode")
+	}
+}
+
+func TestCompileCronTask_WithInjections(t *testing.T) {
+	task := &interpreter.CronTask{
+		Name:     "backup",
+		Schedule: "0 0 * * *",
+		Injections: []interpreter.Injection{
+			{Name: "db", Type: interpreter.DatabaseType{}},
+		},
+		Body: []interpreter.Statement{
+			&interpreter.AssignStatement{
+				Target: "count",
+				Value: &interpreter.FieldAccessExpr{
+					Object: &interpreter.VariableExpr{Name: "db"},
+					Field:  "count",
+				},
+			},
+			&interpreter.ReturnStatement{
+				Value: &interpreter.VariableExpr{Name: "count"},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	bytecode, err := c.CompileCronTask(task)
+	if err != nil {
+		t.Fatalf("CompileCronTask() error: %v", err)
+	}
+
+	if len(bytecode) == 0 {
+		t.Error("Expected non-empty bytecode")
+	}
+}
+
+func TestCompileCronTask_ComplexLogic(t *testing.T) {
+	task := &interpreter.CronTask{
+		Name:     "hourly_sync",
+		Schedule: "0 */1 * * *",
+		Body: []interpreter.Statement{
+			&interpreter.AssignStatement{
+				Target: "total",
+				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+			},
+			&interpreter.AssignStatement{
+				Target: "i",
+				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+			},
+			&interpreter.WhileStatement{
+				Condition: &interpreter.BinaryOpExpr{
+					Op:    interpreter.Lt,
+					Left:  &interpreter.VariableExpr{Name: "i"},
+					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
+				},
+				Body: []interpreter.Statement{
+					&interpreter.AssignStatement{
+						Target: "total",
+						Value: &interpreter.BinaryOpExpr{
+							Op:    interpreter.Add,
+							Left:  &interpreter.VariableExpr{Name: "total"},
+							Right: &interpreter.VariableExpr{Name: "i"},
+						},
+					},
+					&interpreter.AssignStatement{
+						Target: "i",
+						Value: &interpreter.BinaryOpExpr{
+							Op:    interpreter.Add,
+							Left:  &interpreter.VariableExpr{Name: "i"},
+							Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+						},
+					},
+				},
+			},
+			&interpreter.ReturnStatement{
+				Value: &interpreter.VariableExpr{Name: "total"},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	bytecode, err := c.CompileCronTask(task)
+	if err != nil {
+		t.Fatalf("CompileCronTask() error: %v", err)
+	}
+
+	if len(bytecode) == 0 {
+		t.Error("Expected non-empty bytecode")
+	}
+}
+
+// Test CompileEventHandler
+
+func TestCompileEventHandler_Simple(t *testing.T) {
+	handler := &interpreter.EventHandler{
+		EventType: "user.created",
+		Body: []interpreter.Statement{
+			&interpreter.AssignStatement{
+				Target: "userId",
+				Value: &interpreter.FieldAccessExpr{
+					Object: &interpreter.VariableExpr{Name: "event"},
+					Field:  "userId",
+				},
+			},
+			&interpreter.ReturnStatement{
+				Value: &interpreter.ObjectExpr{
+					Fields: []interpreter.ObjectField{
+						{Key: "handled", Value: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}}},
+						{Key: "userId", Value: &interpreter.VariableExpr{Name: "userId"}},
+					},
+				},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	bytecode, err := c.CompileEventHandler(handler)
+	if err != nil {
+		t.Fatalf("CompileEventHandler() error: %v", err)
+	}
+
+	if len(bytecode) == 0 {
+		t.Error("Expected non-empty bytecode")
+	}
+}
+
+func TestCompileEventHandler_WithInput(t *testing.T) {
+	handler := &interpreter.EventHandler{
+		EventType: "order.paid",
+		Body: []interpreter.Statement{
+			&interpreter.AssignStatement{
+				Target: "orderId",
+				Value: &interpreter.FieldAccessExpr{
+					Object: &interpreter.VariableExpr{Name: "input"},
+					Field:  "orderId",
+				},
+			},
+			&interpreter.ReturnStatement{
+				Value: &interpreter.VariableExpr{Name: "orderId"},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	bytecode, err := c.CompileEventHandler(handler)
+	if err != nil {
+		t.Fatalf("CompileEventHandler() error: %v", err)
+	}
+
+	if len(bytecode) == 0 {
+		t.Error("Expected non-empty bytecode")
+	}
+}
+
+func TestCompileEventHandler_WithInjections(t *testing.T) {
+	handler := &interpreter.EventHandler{
+		EventType: "notification.send",
+		Injections: []interpreter.Injection{
+			{Name: "db", Type: interpreter.DatabaseType{}},
+		},
+		Body: []interpreter.Statement{
+			&interpreter.AssignStatement{
+				Target: "user",
+				Value: &interpreter.FieldAccessExpr{
+					Object: &interpreter.VariableExpr{Name: "db"},
+					Field:  "user",
+				},
+			},
+			&interpreter.ReturnStatement{
+				Value: &interpreter.VariableExpr{Name: "user"},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	bytecode, err := c.CompileEventHandler(handler)
+	if err != nil {
+		t.Fatalf("CompileEventHandler() error: %v", err)
+	}
+
+	if len(bytecode) == 0 {
+		t.Error("Expected non-empty bytecode")
+	}
+}
+
+func TestCompileEventHandler_ComplexProcessing(t *testing.T) {
+	handler := &interpreter.EventHandler{
+		EventType: "data.process",
+		Body: []interpreter.Statement{
+			&interpreter.AssignStatement{
+				Target: "data",
+				Value: &interpreter.FieldAccessExpr{
+					Object: &interpreter.VariableExpr{Name: "event"},
+					Field:  "data",
+				},
+			},
+			&interpreter.IfStatement{
+				Condition: &interpreter.BinaryOpExpr{
+					Op:    interpreter.Ne,
+					Left:  &interpreter.VariableExpr{Name: "data"},
+					Right: &interpreter.LiteralExpr{Value: interpreter.NullLiteral{}},
+				},
+				ThenBlock: []interpreter.Statement{
+					&interpreter.ReturnStatement{
+						Value: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
+					},
+				},
+				ElseBlock: []interpreter.Statement{
+					&interpreter.ReturnStatement{
+						Value: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: false}},
+					},
+				},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	bytecode, err := c.CompileEventHandler(handler)
+	if err != nil {
+		t.Fatalf("CompileEventHandler() error: %v", err)
+	}
+
+	if len(bytecode) == 0 {
+		t.Error("Expected non-empty bytecode")
+	}
+}
+
+// Test CompileQueueWorker
+
+func TestCompileQueueWorker_Simple(t *testing.T) {
+	worker := &interpreter.QueueWorker{
+		QueueName: "email.send",
+		Body: []interpreter.Statement{
+			&interpreter.AssignStatement{
+				Target: "to",
+				Value: &interpreter.FieldAccessExpr{
+					Object: &interpreter.VariableExpr{Name: "message"},
+					Field:  "to",
+				},
+			},
+			&interpreter.ReturnStatement{
+				Value: &interpreter.ObjectExpr{
+					Fields: []interpreter.ObjectField{
+						{Key: "sent", Value: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}}},
+						{Key: "to", Value: &interpreter.VariableExpr{Name: "to"}},
+					},
+				},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	bytecode, err := c.CompileQueueWorker(worker)
+	if err != nil {
+		t.Fatalf("CompileQueueWorker() error: %v", err)
+	}
+
+	if len(bytecode) == 0 {
+		t.Error("Expected non-empty bytecode")
+	}
+}
+
+func TestCompileQueueWorker_WithInput(t *testing.T) {
+	worker := &interpreter.QueueWorker{
+		QueueName: "image.resize",
+		Body: []interpreter.Statement{
+			&interpreter.AssignStatement{
+				Target: "imageId",
+				Value: &interpreter.FieldAccessExpr{
+					Object: &interpreter.VariableExpr{Name: "input"},
+					Field:  "imageId",
+				},
+			},
+			&interpreter.ReturnStatement{
+				Value: &interpreter.VariableExpr{Name: "imageId"},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	bytecode, err := c.CompileQueueWorker(worker)
+	if err != nil {
+		t.Fatalf("CompileQueueWorker() error: %v", err)
+	}
+
+	if len(bytecode) == 0 {
+		t.Error("Expected non-empty bytecode")
+	}
+}
+
+func TestCompileQueueWorker_WithInjections(t *testing.T) {
+	worker := &interpreter.QueueWorker{
+		QueueName: "report.generate",
+		Injections: []interpreter.Injection{
+			{Name: "db", Type: interpreter.DatabaseType{}},
+		},
+		Body: []interpreter.Statement{
+			&interpreter.AssignStatement{
+				Target: "data",
+				Value: &interpreter.FieldAccessExpr{
+					Object: &interpreter.VariableExpr{Name: "db"},
+					Field:  "data",
+				},
+			},
+			&interpreter.ReturnStatement{
+				Value: &interpreter.VariableExpr{Name: "data"},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	bytecode, err := c.CompileQueueWorker(worker)
+	if err != nil {
+		t.Fatalf("CompileQueueWorker() error: %v", err)
+	}
+
+	if len(bytecode) == 0 {
+		t.Error("Expected non-empty bytecode")
+	}
+}
+
+func TestCompileQueueWorker_ComplexProcessing(t *testing.T) {
+	worker := &interpreter.QueueWorker{
+		QueueName: "data.process",
+		Body: []interpreter.Statement{
+			&interpreter.AssignStatement{
+				Target: "items",
+				Value: &interpreter.FieldAccessExpr{
+					Object: &interpreter.VariableExpr{Name: "message"},
+					Field:  "items",
+				},
+			},
+			&interpreter.AssignStatement{
+				Target: "count",
+				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+			},
+			&interpreter.ForStatement{
+				ValueVar: "item",
+				Iterable: &interpreter.VariableExpr{Name: "items"},
+				Body: []interpreter.Statement{
+					&interpreter.AssignStatement{
+						Target: "count",
+						Value: &interpreter.BinaryOpExpr{
+							Op:    interpreter.Add,
+							Left:  &interpreter.VariableExpr{Name: "count"},
+							Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+						},
+					},
+				},
+			},
+			&interpreter.ReturnStatement{
+				Value: &interpreter.VariableExpr{Name: "count"},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	bytecode, err := c.CompileQueueWorker(worker)
+	if err != nil {
+		t.Fatalf("CompileQueueWorker() error: %v", err)
+	}
+
+	if len(bytecode) == 0 {
+		t.Error("Expected non-empty bytecode")
+	}
+}
+
+// Test compilation with multiple statement types
+
+func TestCompile_DirectiveWithIfStatement(t *testing.T) {
+	cmd := &interpreter.Command{
+		Name: "check",
+		Params: []interpreter.CommandParam{
+			{Name: "value", Type: interpreter.IntType{}, Required: true},
+		},
+		Body: []interpreter.Statement{
+			&interpreter.IfStatement{
+				Condition: &interpreter.BinaryOpExpr{
+					Op:    interpreter.Gt,
+					Left:  &interpreter.VariableExpr{Name: "value"},
+					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				},
+				ThenBlock: []interpreter.Statement{
+					&interpreter.ReturnStatement{
+						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "positive"}},
+					},
+				},
+				ElseBlock: []interpreter.Statement{
+					&interpreter.ReturnStatement{
+						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "negative"}},
+					},
+				},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	bytecode, err := c.CompileCommand(cmd)
+	if err != nil {
+		t.Fatalf("CompileCommand() error: %v", err)
+	}
+
+	if len(bytecode) == 0 {
+		t.Error("Expected non-empty bytecode")
+	}
+}
+
+func TestCompile_DirectiveWithForLoop(t *testing.T) {
+	task := &interpreter.CronTask{
+		Name:     "process_items",
+		Schedule: "0 * * * *",
+		Body: []interpreter.Statement{
+			&interpreter.AssignStatement{
+				Target: "items",
+				Value: &interpreter.ArrayExpr{
+					Elements: []interpreter.Expr{
+						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+					},
+				},
+			},
+			&interpreter.AssignStatement{
+				Target: "sum",
+				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+			},
+			&interpreter.ForStatement{
+				ValueVar: "item",
+				Iterable: &interpreter.VariableExpr{Name: "items"},
+				Body: []interpreter.Statement{
+					&interpreter.AssignStatement{
+						Target: "sum",
+						Value: &interpreter.BinaryOpExpr{
+							Op:    interpreter.Add,
+							Left:  &interpreter.VariableExpr{Name: "sum"},
+							Right: &interpreter.VariableExpr{Name: "item"},
+						},
+					},
+				},
+			},
+			&interpreter.ReturnStatement{
+				Value: &interpreter.VariableExpr{Name: "sum"},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	bytecode, err := c.CompileCronTask(task)
+	if err != nil {
+		t.Fatalf("CompileCronTask() error: %v", err)
+	}
+
+	if len(bytecode) == 0 {
+		t.Error("Expected non-empty bytecode")
+	}
+}
+
+func TestCompile_DirectiveWithSwitchStatement(t *testing.T) {
+	handler := &interpreter.EventHandler{
+		EventType: "status.changed",
+		Body: []interpreter.Statement{
+			&interpreter.AssignStatement{
+				Target: "status",
+				Value: &interpreter.FieldAccessExpr{
+					Object: &interpreter.VariableExpr{Name: "event"},
+					Field:  "status",
+				},
+			},
+			&interpreter.SwitchStatement{
+				Value: &interpreter.VariableExpr{Name: "status"},
+				Cases: []interpreter.SwitchCase{
+					{
+						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "pending"}},
+						Body: []interpreter.Statement{
+							&interpreter.ReturnStatement{
+								Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+							},
+						},
+					},
+					{
+						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "active"}},
+						Body: []interpreter.Statement{
+							&interpreter.ReturnStatement{
+								Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+							},
+						},
+					},
+				},
+				Default: []interpreter.Statement{
+					&interpreter.ReturnStatement{
+						Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+					},
+				},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	bytecode, err := c.CompileEventHandler(handler)
+	if err != nil {
+		t.Fatalf("CompileEventHandler() error: %v", err)
+	}
+
+	if len(bytecode) == 0 {
+		t.Error("Expected non-empty bytecode")
+	}
+}

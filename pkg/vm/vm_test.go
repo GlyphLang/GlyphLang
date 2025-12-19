@@ -960,3 +960,161 @@ func TestConditionalExpression(t *testing.T) {
 		t.Errorf("Expected BoolValue{true}, got %v", result)
 	}
 }
+
+// Test built-in string manipulation functions
+
+func TestBuiltinString_Upper(t *testing.T) {
+	vm := NewVM()
+	result, err := vm.builtins["upper"]([]Value{StringValue{Val: "hello world"}})
+	if err != nil {
+		t.Fatalf("upper() error: %v", err)
+	}
+	if strVal, ok := result.(StringValue); !ok || strVal.Val != "HELLO WORLD" {
+		t.Errorf("Expected 'HELLO WORLD', got %v", result)
+	}
+}
+
+func TestBuiltinString_Lower(t *testing.T) {
+	vm := NewVM()
+	result, err := vm.builtins["lower"]([]Value{StringValue{Val: "HELLO WORLD"}})
+	if err != nil {
+		t.Fatalf("lower() error: %v", err)
+	}
+	if strVal, ok := result.(StringValue); !ok || strVal.Val != "hello world" {
+		t.Errorf("Expected 'hello world', got %v", result)
+	}
+}
+
+func TestBuiltinString_Trim(t *testing.T) {
+	vm := NewVM()
+	result, err := vm.builtins["trim"]([]Value{StringValue{Val: "  hello world  "}})
+	if err != nil {
+		t.Fatalf("trim() error: %v", err)
+	}
+	if strVal, ok := result.(StringValue); !ok || strVal.Val != "hello world" {
+		t.Errorf("Expected 'hello world', got %v", result)
+	}
+}
+
+func TestBuiltinString_Split(t *testing.T) {
+	vm := NewVM()
+	result, err := vm.builtins["split"]([]Value{
+		StringValue{Val: "a,b,c"},
+		StringValue{Val: ","},
+	})
+	if err != nil {
+		t.Fatalf("split() error: %v", err)
+	}
+	arrVal, ok := result.(ArrayValue)
+	if !ok {
+		t.Fatalf("Expected ArrayValue, got %T", result)
+	}
+	if len(arrVal.Val) != 3 {
+		t.Errorf("Expected array length 3, got %d", len(arrVal.Val))
+	}
+	if arrVal.Val[0].(StringValue).Val != "a" {
+		t.Errorf("Expected 'a', got %v", arrVal.Val[0])
+	}
+	if arrVal.Val[1].(StringValue).Val != "b" {
+		t.Errorf("Expected 'b', got %v", arrVal.Val[1])
+	}
+	if arrVal.Val[2].(StringValue).Val != "c" {
+		t.Errorf("Expected 'c', got %v", arrVal.Val[2])
+	}
+}
+
+func TestBuiltinString_Join(t *testing.T) {
+	vm := NewVM()
+	result, err := vm.builtins["join"]([]Value{
+		ArrayValue{Val: []Value{
+			StringValue{Val: "a"},
+			StringValue{Val: "b"},
+			StringValue{Val: "c"},
+		}},
+		StringValue{Val: ","},
+	})
+	if err != nil {
+		t.Fatalf("join() error: %v", err)
+	}
+	if strVal, ok := result.(StringValue); !ok || strVal.Val != "a,b,c" {
+		t.Errorf("Expected 'a,b,c', got %v", result)
+	}
+}
+
+func TestBuiltinString_Contains(t *testing.T) {
+	tests := []struct {
+		name     string
+		str      string
+		substr   string
+		expected bool
+	}{
+		{"contains_yes", "hello world", "world", true},
+		{"contains_no", "hello world", "xyz", false},
+		{"contains_empty", "hello", "", true},
+		{"contains_exact", "test", "test", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vm := NewVM()
+			result, err := vm.builtins["contains"]([]Value{
+				StringValue{Val: tt.str},
+				StringValue{Val: tt.substr},
+			})
+			if err != nil {
+				t.Fatalf("contains() error: %v", err)
+			}
+			if boolVal, ok := result.(BoolValue); !ok || boolVal.Val != tt.expected {
+				t.Errorf("Expected %v, got %v", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestBuiltinString_Replace(t *testing.T) {
+	vm := NewVM()
+	result, err := vm.builtins["replace"]([]Value{
+		StringValue{Val: "hello world world"},
+		StringValue{Val: "world"},
+		StringValue{Val: "universe"},
+	})
+	if err != nil {
+		t.Fatalf("replace() error: %v", err)
+	}
+	if strVal, ok := result.(StringValue); !ok || strVal.Val != "hello universe universe" {
+		t.Errorf("Expected 'hello universe universe', got %v", result)
+	}
+}
+
+func TestBuiltinString_Substring(t *testing.T) {
+	tests := []struct {
+		name     string
+		str      string
+		start    int64
+		end      int64
+		expected string
+	}{
+		{"normal_range", "hello world", 0, 5, "hello"},
+		{"middle_range", "hello world", 6, 11, "world"},
+		{"full_string", "test", 0, 4, "test"},
+		{"empty_string", "test", 2, 2, ""},
+		{"beyond_length", "test", 0, 10, "test"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vm := NewVM()
+			result, err := vm.builtins["substring"]([]Value{
+				StringValue{Val: tt.str},
+				IntValue{Val: tt.start},
+				IntValue{Val: tt.end},
+			})
+			if err != nil {
+				t.Fatalf("substring() error: %v", err)
+			}
+			if strVal, ok := result.(StringValue); !ok || strVal.Val != tt.expected {
+				t.Errorf("Expected '%s', got %v", tt.expected, result)
+			}
+		})
+	}
+}

@@ -1286,6 +1286,353 @@ func (vm *VM) registerBuiltins() {
 			return nil, fmt.Errorf("length() requires array or string, got %T", val)
 		}
 	}
+
+	// upper() - convert string to uppercase
+	vm.builtins["upper"] = func(args []Value) (Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("upper() takes exactly 1 argument, got %d", len(args))
+		}
+		str, ok := args[0].(StringValue)
+		if !ok {
+			return nil, fmt.Errorf("upper() requires a string, got %T", args[0])
+		}
+		return StringValue{Val: toUpper(str.Val)}, nil
+	}
+
+	// lower() - convert string to lowercase
+	vm.builtins["lower"] = func(args []Value) (Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("lower() takes exactly 1 argument, got %d", len(args))
+		}
+		str, ok := args[0].(StringValue)
+		if !ok {
+			return nil, fmt.Errorf("lower() requires a string, got %T", args[0])
+		}
+		return StringValue{Val: toLower(str.Val)}, nil
+	}
+
+	// trim() - remove leading/trailing whitespace
+	vm.builtins["trim"] = func(args []Value) (Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("trim() takes exactly 1 argument, got %d", len(args))
+		}
+		str, ok := args[0].(StringValue)
+		if !ok {
+			return nil, fmt.Errorf("trim() requires a string, got %T", args[0])
+		}
+		return StringValue{Val: trimSpace(str.Val)}, nil
+	}
+
+	// split() - split string into array
+	vm.builtins["split"] = func(args []Value) (Value, error) {
+		if len(args) != 2 {
+			return nil, fmt.Errorf("split() takes exactly 2 arguments, got %d", len(args))
+		}
+		str, ok := args[0].(StringValue)
+		if !ok {
+			return nil, fmt.Errorf("split() first argument must be a string, got %T", args[0])
+		}
+		delim, ok := args[1].(StringValue)
+		if !ok {
+			return nil, fmt.Errorf("split() second argument must be a string, got %T", args[1])
+		}
+		parts := splitString(str.Val, delim.Val)
+		result := make([]Value, len(parts))
+		for i, part := range parts {
+			result[i] = StringValue{Val: part}
+		}
+		return ArrayValue{Val: result}, nil
+	}
+
+	// join() - join array into string
+	vm.builtins["join"] = func(args []Value) (Value, error) {
+		if len(args) != 2 {
+			return nil, fmt.Errorf("join() takes exactly 2 arguments, got %d", len(args))
+		}
+		arr, ok := args[0].(ArrayValue)
+		if !ok {
+			return nil, fmt.Errorf("join() first argument must be an array, got %T", args[0])
+		}
+		delim, ok := args[1].(StringValue)
+		if !ok {
+			return nil, fmt.Errorf("join() second argument must be a string, got %T", args[1])
+		}
+		strParts := make([]string, len(arr.Val))
+		for i, elem := range arr.Val {
+			strParts[i] = valueToString(elem)
+		}
+		return StringValue{Val: joinStrings(strParts, delim.Val)}, nil
+	}
+
+	// contains() - check if string contains substring
+	vm.builtins["contains"] = func(args []Value) (Value, error) {
+		if len(args) != 2 {
+			return nil, fmt.Errorf("contains() takes exactly 2 arguments, got %d", len(args))
+		}
+		str, ok := args[0].(StringValue)
+		if !ok {
+			return nil, fmt.Errorf("contains() first argument must be a string, got %T", args[0])
+		}
+		substr, ok := args[1].(StringValue)
+		if !ok {
+			return nil, fmt.Errorf("contains() second argument must be a string, got %T", args[1])
+		}
+		return BoolValue{Val: stringContains(str.Val, substr.Val)}, nil
+	}
+
+	// replace() - replace occurrences in string
+	vm.builtins["replace"] = func(args []Value) (Value, error) {
+		if len(args) != 3 {
+			return nil, fmt.Errorf("replace() takes exactly 3 arguments, got %d", len(args))
+		}
+		str, ok := args[0].(StringValue)
+		if !ok {
+			return nil, fmt.Errorf("replace() first argument must be a string, got %T", args[0])
+		}
+		old, ok := args[1].(StringValue)
+		if !ok {
+			return nil, fmt.Errorf("replace() second argument must be a string, got %T", args[1])
+		}
+		new, ok := args[2].(StringValue)
+		if !ok {
+			return nil, fmt.Errorf("replace() third argument must be a string, got %T", args[2])
+		}
+		return StringValue{Val: replaceAll(str.Val, old.Val, new.Val)}, nil
+	}
+
+	// substring() - get substring
+	vm.builtins["substring"] = func(args []Value) (Value, error) {
+		if len(args) != 3 {
+			return nil, fmt.Errorf("substring() takes exactly 3 arguments, got %d", len(args))
+		}
+		str, ok := args[0].(StringValue)
+		if !ok {
+			return nil, fmt.Errorf("substring() first argument must be a string, got %T", args[0])
+		}
+		start, ok := args[1].(IntValue)
+		if !ok {
+			return nil, fmt.Errorf("substring() second argument must be an integer, got %T", args[1])
+		}
+		end, ok := args[2].(IntValue)
+		if !ok {
+			return nil, fmt.Errorf("substring() third argument must be an integer, got %T", args[2])
+		}
+		if start.Val < 0 || end.Val < 0 {
+			return nil, fmt.Errorf("substring() indices must be non-negative")
+		}
+		if start.Val > end.Val {
+			return nil, fmt.Errorf("substring() start index must be less than or equal to end index")
+		}
+		strLen := int64(len(str.Val))
+		if end.Val > strLen {
+			end.Val = strLen
+		}
+		if start.Val > strLen {
+			start.Val = strLen
+		}
+		return StringValue{Val: str.Val[start.Val:end.Val]}, nil
+	}
+}
+
+// Helper functions for string manipulation
+
+// toUpper converts a string to uppercase
+func toUpper(s string) string {
+	result := make([]rune, len(s))
+	for i, r := range s {
+		if r >= 'a' && r <= 'z' {
+			result[i] = r - 32
+		} else {
+			result[i] = r
+		}
+	}
+	return string(result)
+}
+
+// toLower converts a string to lowercase
+func toLower(s string) string {
+	result := make([]rune, len(s))
+	for i, r := range s {
+		if r >= 'A' && r <= 'Z' {
+			result[i] = r + 32
+		} else {
+			result[i] = r
+		}
+	}
+	return string(result)
+}
+
+// trimSpace removes leading and trailing whitespace
+func trimSpace(s string) string {
+	start := 0
+	end := len(s)
+
+	// Trim leading whitespace
+	for start < end && isWhitespace(rune(s[start])) {
+		start++
+	}
+
+	// Trim trailing whitespace
+	for end > start && isWhitespace(rune(s[end-1])) {
+		end--
+	}
+
+	return s[start:end]
+}
+
+// isWhitespace checks if a rune is whitespace
+func isWhitespace(r rune) bool {
+	return r == ' ' || r == '\t' || r == '\n' || r == '\r'
+}
+
+// splitString splits a string by a delimiter
+func splitString(s, delim string) []string {
+	if delim == "" {
+		// Split into individual characters
+		result := make([]string, len(s))
+		for i := range s {
+			result[i] = string(s[i])
+		}
+		return result
+	}
+
+	var result []string
+	start := 0
+
+	for i := 0; i <= len(s)-len(delim); i++ {
+		if s[i:i+len(delim)] == delim {
+			result = append(result, s[start:i])
+			start = i + len(delim)
+			i += len(delim) - 1
+		}
+	}
+
+	// Add the last part
+	result = append(result, s[start:])
+
+	return result
+}
+
+// joinStrings joins strings with a delimiter
+func joinStrings(parts []string, delim string) string {
+	if len(parts) == 0 {
+		return ""
+	}
+	if len(parts) == 1 {
+		return parts[0]
+	}
+
+	// Calculate total length
+	totalLen := 0
+	for _, part := range parts {
+		totalLen += len(part)
+	}
+	totalLen += (len(parts) - 1) * len(delim)
+
+	// Build result
+	result := make([]byte, totalLen)
+	pos := 0
+
+	for i, part := range parts {
+		copy(result[pos:], part)
+		pos += len(part)
+
+		if i < len(parts)-1 {
+			copy(result[pos:], delim)
+			pos += len(delim)
+		}
+	}
+
+	return string(result)
+}
+
+// stringContains checks if a string contains a substring
+func stringContains(s, substr string) bool {
+	if len(substr) == 0 {
+		return true
+	}
+	if len(substr) > len(s) {
+		return false
+	}
+
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+
+	return false
+}
+
+// replaceAll replaces all occurrences of old with new in s
+func replaceAll(s, old, new string) string {
+	if old == "" {
+		return s
+	}
+
+	var result string
+	start := 0
+
+	for i := 0; i <= len(s)-len(old); i++ {
+		if s[i:i+len(old)] == old {
+			result += s[start:i] + new
+			start = i + len(old)
+			i += len(old) - 1
+		}
+	}
+
+	result += s[start:]
+	return result
+}
+
+// valueToString converts a Value to a string representation
+func valueToString(val Value) string {
+	switch v := val.(type) {
+	case StringValue:
+		return v.Val
+	case IntValue:
+		return intToString(v.Val)
+	case FloatValue:
+		return floatToString(v.Val)
+	case BoolValue:
+		if v.Val {
+			return "true"
+		}
+		return "false"
+	case NullValue:
+		return "null"
+	default:
+		return fmt.Sprintf("%v", val)
+	}
+}
+
+// intToString converts an int64 to string
+func intToString(n int64) string {
+	if n == 0 {
+		return "0"
+	}
+
+	negative := n < 0
+	if negative {
+		n = -n
+	}
+
+	var digits []byte
+	for n > 0 {
+		digits = append([]byte{byte('0' + n%10)}, digits...)
+		n /= 10
+	}
+
+	if negative {
+		digits = append([]byte{'-'}, digits...)
+	}
+
+	return string(digits)
+}
+
+// floatToString converts a float64 to string
+func floatToString(f float64) string {
+	return fmt.Sprintf("%g", f)
 }
 
 // SetWebSocketHandler sets the WebSocket handler for WS operations

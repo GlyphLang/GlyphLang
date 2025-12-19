@@ -245,7 +245,7 @@ func (s *Server) handleInitialize(params json.RawMessage) (*InitializeResult, er
 				},
 			},
 			CompletionProvider: &CompletionOptions{
-				TriggerCharacters: []string{".", ":", "@", "/"},
+				TriggerCharacters: []string{".", ":", "@", "/", "!", "*", "~", "&"},
 				ResolveProvider:   false,
 			},
 			HoverProvider:          true,

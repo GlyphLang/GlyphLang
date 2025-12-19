@@ -6,6 +6,10 @@
     { "include": "#comments" },
     { "include": "#type-definition" },
     { "include": "#route-definition" },
+    { "include": "#cli-command-definition" },
+    { "include": "#cron-task-definition" },
+    { "include": "#event-handler-definition" },
+    { "include": "#queue-worker-definition" },
     { "include": "#keywords" },
     { "include": "#strings" },
     { "include": "#numbers" },
@@ -66,6 +70,116 @@
             { "include": "#middleware" },
             { "include": "#statements" },
             { "include": "#comments" }
+          ]
+        }
+      ]
+    },
+    "cli-command-definition": {
+      "patterns": [
+        {
+          "name": "meta.cli-command.glyph",
+          "begin": "^\\s*(!)\\s+([a-z][a-zA-Z0-9_]*)\\s*",
+          "beginCaptures": {
+            "1": { "name": "keyword.operator.cli.glyph" },
+            "2": { "name": "entity.name.function.cli.glyph" }
+          },
+          "end": "(?<=\\})",
+          "patterns": [
+            { "include": "#cli-parameters" },
+            { "include": "#comments" },
+            { "include": "#strings" },
+            {
+              "begin": "\\{",
+              "end": "\\}",
+              "patterns": [
+                { "include": "#statements" },
+                { "include": "#comments" },
+                { "include": "#strings" },
+                { "include": "#keywords" },
+                { "include": "#numbers" },
+                { "include": "#operators" },
+                { "include": "#types" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "cli-parameters": {
+      "patterns": [
+        {
+          "match": "\\b([a-z][a-zA-Z0-9_]*)\\s*:\\s*([a-zA-Z][a-zA-Z0-9_]*)(!)?",
+          "captures": {
+            "1": { "name": "variable.parameter.glyph" },
+            "2": { "name": "entity.name.type.glyph" },
+            "3": { "name": "keyword.operator.required.glyph" }
+          }
+        }
+      ]
+    },
+    "cron-task-definition": {
+      "patterns": [
+        {
+          "name": "meta.cron-task.glyph",
+          "begin": "^\\s*(\\*)\\s+(\"[^\"]+\")\\s+([a-z][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.operator.cron.glyph" },
+            "2": { "name": "string.quoted.double.cron-expression.glyph" },
+            "3": { "name": "entity.name.function.cron.glyph" }
+          },
+          "end": "\\}",
+          "patterns": [
+            { "include": "#statements" },
+            { "include": "#comments" },
+            { "include": "#strings" },
+            { "include": "#keywords" },
+            { "include": "#numbers" },
+            { "include": "#operators" },
+            { "include": "#types" }
+          ]
+        }
+      ]
+    },
+    "event-handler-definition": {
+      "patterns": [
+        {
+          "name": "meta.event-handler.glyph",
+          "begin": "^\\s*(~)\\s+(\"[^\"]+\")\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.operator.event.glyph" },
+            "2": { "name": "string.quoted.double.event-name.glyph" }
+          },
+          "end": "\\}",
+          "patterns": [
+            { "include": "#statements" },
+            { "include": "#comments" },
+            { "include": "#strings" },
+            { "include": "#keywords" },
+            { "include": "#numbers" },
+            { "include": "#operators" },
+            { "include": "#types" }
+          ]
+        }
+      ]
+    },
+    "queue-worker-definition": {
+      "patterns": [
+        {
+          "name": "meta.queue-worker.glyph",
+          "begin": "^\\s*(&)\\s+(\"[^\"]+\")\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.operator.queue.glyph" },
+            "2": { "name": "string.quoted.double.queue-name.glyph" }
+          },
+          "end": "\\}",
+          "patterns": [
+            { "include": "#statements" },
+            { "include": "#comments" },
+            { "include": "#strings" },
+            { "include": "#keywords" },
+            { "include": "#numbers" },
+            { "include": "#operators" },
+            { "include": "#types" }
           ]
         }
       ]

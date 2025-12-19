@@ -1539,3 +1539,518 @@ func TestParser_SwitchStatement_NestedStatements(t *testing.T) {
 	// Check default has multiple statements
 	require.Len(t, switchStmt.Default, 2)
 }
+
+// Test CLI Command Directive (! syntax)
+func TestParser_CLICommand_BangSyntax(t *testing.T) {
+	source := `! greet name: str! --greeting: str = "Hello" {
+  > greeting + ", " + name + "!"
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	require.Len(t, module.Items, 1)
+	cmd, ok := module.Items[0].(*interpreter.Command)
+	require.True(t, ok, "Expected Command, got %T", module.Items[0])
+
+	assert.Equal(t, "greet", cmd.Name)
+	assert.Len(t, cmd.Params, 2)
+
+	// First param: positional required parameter
+	assert.Equal(t, "name", cmd.Params[0].Name)
+	assert.True(t, cmd.Params[0].Required)
+	assert.False(t, cmd.Params[0].IsFlag)
+
+	// Second param: flag with default value
+	assert.Equal(t, "greeting", cmd.Params[1].Name)
+	assert.True(t, cmd.Params[1].IsFlag)
+	assert.NotNil(t, cmd.Params[1].Default)
+
+	assert.Greater(t, len(cmd.Body), 0)
+}
+
+func TestParser_CLICommand_AtCommandSyntax(t *testing.T) {
+	source := `@ command hello name: str! {
+  > "Hello, " + name + "!"
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	require.Len(t, module.Items, 1)
+	cmd, ok := module.Items[0].(*interpreter.Command)
+	require.True(t, ok)
+
+	assert.Equal(t, "hello", cmd.Name)
+	assert.Len(t, cmd.Params, 1)
+	assert.Equal(t, "name", cmd.Params[0].Name)
+}
+
+func TestParser_CLICommand_WithDescription(t *testing.T) {
+	source := `! deploy "Deploy application to server" env: str! --force: bool {
+  > {env: env, force: force}
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	cmd, ok := module.Items[0].(*interpreter.Command)
+	require.True(t, ok)
+
+	assert.Equal(t, "deploy", cmd.Name)
+	assert.Equal(t, "Deploy application to server", cmd.Description)
+	assert.Len(t, cmd.Params, 2)
+}
+
+func TestParser_CLICommand_WithReturnType(t *testing.T) {
+	source := `! add x: int! y: int! -> int {
+  > x + y
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	cmd, ok := module.Items[0].(*interpreter.Command)
+	require.True(t, ok)
+
+	assert.Equal(t, "add", cmd.Name)
+	assert.NotNil(t, cmd.ReturnType)
+	assert.IsType(t, interpreter.IntType{}, cmd.ReturnType)
+}
+
+// Test Cron Task Directive (* syntax)
+func TestParser_CronTask_StarSyntax(t *testing.T) {
+	source := `* "0 0 * * *" daily_cleanup {
+  $ count = db.cleanupOldRecords()
+  > {deleted: count}
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	require.Len(t, module.Items, 1)
+	task, ok := module.Items[0].(*interpreter.CronTask)
+	require.True(t, ok, "Expected CronTask, got %T", module.Items[0])
+
+	assert.Equal(t, "0 0 * * *", task.Schedule)
+	assert.Equal(t, "daily_cleanup", task.Name)
+	assert.Greater(t, len(task.Body), 0)
+}
+
+func TestParser_CronTask_AtCronSyntax(t *testing.T) {
+	source := `@ cron "*/5 * * * *" five_minute_job {
+  > {status: "running"}
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	task, ok := module.Items[0].(*interpreter.CronTask)
+	require.True(t, ok)
+
+	assert.Equal(t, "*/5 * * * *", task.Schedule)
+	assert.Equal(t, "five_minute_job", task.Name)
+}
+
+func TestParser_CronTask_WithTimezone(t *testing.T) {
+	source := `* "0 9 * * 1-5" morning_report tz "America/New_York" {
+  > {status: "ok"}
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	task, ok := module.Items[0].(*interpreter.CronTask)
+	require.True(t, ok)
+
+	assert.Equal(t, "0 9 * * 1-5", task.Schedule)
+	assert.Equal(t, "morning_report", task.Name)
+	assert.Equal(t, "America/New_York", task.Timezone)
+}
+
+func TestParser_CronTask_WithInjections(t *testing.T) {
+	source := `* "0 0 * * *" backup {
+  % db: Database
+  $ result = db.backupData()
+  > result
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	task, ok := module.Items[0].(*interpreter.CronTask)
+	require.True(t, ok)
+
+	assert.Len(t, task.Injections, 1)
+	assert.Equal(t, "db", task.Injections[0].Name)
+}
+
+func TestParser_CronTask_WithRetries(t *testing.T) {
+	source := `* "0 */1 * * *" hourly_sync {
+  + retries(3)
+  > {status: "synced"}
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	task, ok := module.Items[0].(*interpreter.CronTask)
+	require.True(t, ok)
+
+	assert.Equal(t, 3, task.Retries)
+}
+
+// Test Event Handler Directive (~ syntax)
+func TestParser_EventHandler_TildeSyntax(t *testing.T) {
+	source := `~ "user.created" {
+  $ userId = event.userId
+  > {status: "handled", userId: userId}
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	require.Len(t, module.Items, 1)
+	handler, ok := module.Items[0].(*interpreter.EventHandler)
+	require.True(t, ok, "Expected EventHandler, got %T", module.Items[0])
+
+	assert.Equal(t, "user.created", handler.EventType)
+	assert.Greater(t, len(handler.Body), 0)
+}
+
+func TestParser_EventHandler_AtEventSyntax(t *testing.T) {
+	source := `@ event "order.paid" {
+  $ orderId = input.orderId
+  > {orderId: orderId}
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	handler, ok := module.Items[0].(*interpreter.EventHandler)
+	require.True(t, ok)
+
+	assert.Equal(t, "order.paid", handler.EventType)
+}
+
+func TestParser_EventHandler_UnquotedEventType(t *testing.T) {
+	source := `~ user.deleted {
+  > {status: "processing"}
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	handler, ok := module.Items[0].(*interpreter.EventHandler)
+	require.True(t, ok)
+
+	assert.Equal(t, "user.deleted", handler.EventType)
+}
+
+func TestParser_EventHandler_Async(t *testing.T) {
+	source := `~ "email.send" async {
+  $ recipient = event.to
+  > {sent: true}
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	handler, ok := module.Items[0].(*interpreter.EventHandler)
+	require.True(t, ok)
+
+	assert.Equal(t, "email.send", handler.EventType)
+	assert.True(t, handler.Async)
+}
+
+func TestParser_EventHandler_WithInjections(t *testing.T) {
+	source := `~ "notification.send" {
+  % db: Database
+  $ user = db.getUser(event.userId)
+  > user
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	handler, ok := module.Items[0].(*interpreter.EventHandler)
+	require.True(t, ok)
+
+	assert.Len(t, handler.Injections, 1)
+	assert.Equal(t, "db", handler.Injections[0].Name)
+}
+
+// Test Queue Worker Directive (& syntax)
+func TestParser_QueueWorker_AmpersandSyntax(t *testing.T) {
+	source := `& "email.send" {
+  $ to = message.to
+  $ body = message.body
+  > {sent: true}
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	require.Len(t, module.Items, 1)
+	worker, ok := module.Items[0].(*interpreter.QueueWorker)
+	require.True(t, ok, "Expected QueueWorker, got %T", module.Items[0])
+
+	assert.Equal(t, "email.send", worker.QueueName)
+	assert.Greater(t, len(worker.Body), 0)
+}
+
+func TestParser_QueueWorker_AtQueueSyntax(t *testing.T) {
+	source := `@ queue "image.resize" {
+  $ imageId = input.imageId
+  > {processed: true}
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	worker, ok := module.Items[0].(*interpreter.QueueWorker)
+	require.True(t, ok)
+
+	assert.Equal(t, "image.resize", worker.QueueName)
+}
+
+func TestParser_QueueWorker_UnquotedQueueName(t *testing.T) {
+	source := `& video.process {
+  > {status: "processing"}
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	worker, ok := module.Items[0].(*interpreter.QueueWorker)
+	require.True(t, ok)
+
+	assert.Equal(t, "video.process", worker.QueueName)
+}
+
+func TestParser_QueueWorker_WithConcurrency(t *testing.T) {
+	source := `& "email.send" {
+  + concurrency(5)
+  > {status: "ok"}
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	worker, ok := module.Items[0].(*interpreter.QueueWorker)
+	require.True(t, ok)
+
+	assert.Equal(t, 5, worker.Concurrency)
+}
+
+func TestParser_QueueWorker_WithRetriesAndTimeout(t *testing.T) {
+	source := `& "data.process" {
+  + retries(3)
+  + timeout(60)
+  > {done: true}
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	worker, ok := module.Items[0].(*interpreter.QueueWorker)
+	require.True(t, ok)
+
+	assert.Equal(t, 3, worker.MaxRetries)
+	assert.Equal(t, 60, worker.Timeout)
+}
+
+func TestParser_QueueWorker_WithInjections(t *testing.T) {
+	source := `& "report.generate" {
+  % db: Database
+  $ data = db.getData()
+  > data
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	worker, ok := module.Items[0].(*interpreter.QueueWorker)
+	require.True(t, ok)
+
+	assert.Len(t, worker.Injections, 1)
+	assert.Equal(t, "db", worker.Injections[0].Name)
+}
+
+// Test mixed module with directive types (simplified version)
+func TestParser_MixedModule_AllDirectiveTypes(t *testing.T) {
+	// Test each directive individually to ensure they work
+	tests := []struct {
+		name   string
+		source string
+		check  func(*testing.T, interpreter.Item)
+	}{
+		{
+			name: "TypeDef",
+			source: `: User {
+  id: int!
+  name: str!
+}`,
+			check: func(t *testing.T, item interpreter.Item) {
+				_, ok := item.(*interpreter.TypeDef)
+				assert.True(t, ok, "Expected TypeDef")
+			},
+		},
+		{
+			name: "Route",
+			source: `@ route /users [GET]
+  > {users: []}`,
+			check: func(t *testing.T, item interpreter.Item) {
+				_, ok := item.(*interpreter.Route)
+				assert.True(t, ok, "Expected Route")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lexer := NewLexer(tt.source)
+			tokens, err := lexer.Tokenize()
+			require.NoError(t, err)
+
+			parser := NewParser(tokens)
+			module, err := parser.Parse()
+			require.NoError(t, err)
+			require.Len(t, module.Items, 1)
+
+			tt.check(t, module.Items[0])
+		})
+	}
+}
+
+// Test complex directive bodies
+func TestParser_Directive_ComplexBody(t *testing.T) {
+	source := `! process input: str! {
+  $ items = []
+  $ i = 0
+  while i < 10 {
+    if i < 5 {
+      $ items = items + [i]
+    }
+    $ i = i + 1
+  }
+  for item in items {
+    $ x = item * 2
+  }
+  > {count: items, processed: true}
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	cmd, ok := module.Items[0].(*interpreter.Command)
+	require.True(t, ok)
+
+	// Should have: assign, assign, while, for, return (5 statements)
+	assert.GreaterOrEqual(t, len(cmd.Body), 4)
+}

@@ -91,6 +91,96 @@ $ glyph compile examples/hello-world/main.glyph -o build/hello.glybc -O 3
 [SUCCESS] Compiled successfully to build/hello.glybc (8 bytes)
 ```
 
+### `glyph exec <file> <command> [args...]`
+
+Execute a CLI command defined in a Glyph source file.
+
+```bash
+glyph exec main.glyph hello --name="Alice"
+
+# Arguments and flags:
+#   <file>        The Glyph source file containing commands
+#   <command>     The name of the command to execute
+#   [args...]     Command-specific arguments and flags
+```
+
+**Features:**
+- Execute CLI commands defined with `!` symbol
+- Pass arguments and optional flags
+- Returns JSON output from command
+- Validates required arguments
+
+**Example:**
+```bash
+# Execute simple command
+$ glyph exec examples/cli-demo/main.glyph hello --name="Alice"
+{
+  "message": "Hello, Alice!"
+}
+
+# Execute command with multiple arguments
+$ glyph exec examples/cli-demo/main.glyph add --a=5 --b=3
+{
+  "sum": 8,
+  "a": 5,
+  "b": 3
+}
+
+# Execute command with optional flags
+$ glyph exec examples/cli-demo/main.glyph greet --name="Bob" --formal
+{
+  "greeting": "Good day, Bob. How may I assist you?"
+}
+```
+
+**Command Definition:**
+```glyph
+! hello name: str! {
+  $ greeting = "Hello, " + name + "!"
+  > {message: greeting}
+}
+```
+
+### `glyph commands <file>`
+
+List all available CLI commands defined in a Glyph source file.
+
+```bash
+glyph commands main.glyph
+```
+
+**Features:**
+- Shows all commands defined with `!` symbol
+- Displays command names and descriptions
+- Lists required and optional parameters
+- Helps discover available commands
+
+**Example:**
+```bash
+$ glyph commands examples/cli-demo/main.glyph
+Available commands in examples/cli-demo/main.glyph:
+
+  hello         Execute: glyph exec main.glyph hello
+                Arguments:
+                  name: str! (required)
+
+  add           Execute: glyph exec main.glyph add
+                Arguments:
+                  a: int! (required)
+                  b: int! (required)
+
+  greet         Execute: glyph exec main.glyph greet
+                Arguments:
+                  name: str! (required)
+                  --formal: bool (optional, default: false)
+
+  list_users    Execute: glyph exec main.glyph list_users
+                No arguments required
+
+  version       Show version information
+                No arguments required
+```
+
 ### `glyph init <name>`
 
 Initialize a new Glyph project.
@@ -143,6 +233,8 @@ Available Commands:
   dev         Start development server with hot reload
   init        Initialize new project
   run         Run Glyph source file
+  exec        Execute a CLI command from a Glyph file
+  commands    List all CLI commands in a Glyph file
   help        Help about any command
   version     Display version
 
@@ -277,6 +369,22 @@ glyph dev main.glyph -p 8080
 
 # Test your API
 curl http://localhost:8080/api/users
+```
+
+### CLI Commands Workflow
+
+```bash
+# List available commands in a file
+glyph commands examples/cli-demo/main.glyph
+
+# Execute a command
+glyph exec examples/cli-demo/main.glyph hello --name="Alice"
+
+# Execute with multiple arguments
+glyph exec examples/cli-demo/main.glyph add --a=10 --b=20
+
+# Execute with optional flags
+glyph exec examples/cli-demo/main.glyph greet --name="Bob" --formal
 ```
 
 ### Production Build
