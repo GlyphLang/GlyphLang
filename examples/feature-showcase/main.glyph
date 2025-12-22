@@ -1,0 +1,1159 @@
+# ============================================================================
+# GlyphLang Feature Showcase
+# A comprehensive demonstration of all language features
+# ============================================================================
+
+# ============================================================================
+# SECTION 1: TYPE DEFINITIONS
+# ============================================================================
+
+# Basic type with required (!) and optional (no !) fields
+: User {
+  id: int!
+  username: str!
+  email: str!
+  role: str!
+  age: int
+  active: bool!
+  created_at: timestamp
+}
+
+# Type with collection fields
+: Team {
+  id: int!
+  name: str!
+  members: List[User]
+  tags: List[str]
+}
+
+# Type for API responses
+: ApiResponse {
+  success: bool!
+  message: str!
+  data: any
+  timestamp: timestamp
+}
+
+# Type for pagination
+: PaginatedResult {
+  items: List[any]
+  total: int!
+  page: int!
+  per_page: int!
+  has_more: bool!
+}
+
+# Type for order system
+: Order {
+  id: int!
+  user_id: int!
+  items: List[OrderItem]
+  status: str!
+  total: float!
+  created_at: timestamp
+}
+
+: OrderItem {
+  product_id: int!
+  name: str!
+  quantity: int!
+  price: float!
+  subtotal: float!
+}
+
+# Alternative type syntax using 'type' keyword
+type ChatMessage {
+  id: int
+  room: string
+  sender: string
+  text: string
+  timestamp: int
+}
+
+# ============================================================================
+# SECTION 2: HTTP ROUTES - GET REQUESTS
+# ============================================================================
+
+# Simple GET route - health check
+@ route /api/health [GET]
+  > {
+    success: true,
+    message: "Service is healthy",
+    timestamp: now()
+  }
+
+# GET with path parameter
+@ route /api/users/:id [GET]
+  + auth(jwt)
+  + ratelimit(100/min)
+  % db: Database
+
+  $ user = db.users.get(id)
+
+  if user == null {
+    > {success: false, message: "User not found"}
+  } else {
+    > user
+  }
+
+# GET with all users and pagination
+@ route /api/users [GET]
+  + auth(jwt)
+  + ratelimit(50/min)
+  % db: Database
+
+  $ all_users = db.users.all()
+  $ total = all_users.length()
+
+  > {
+    items: all_users,
+    total: total,
+    page: 1,
+    per_page: 20,
+    has_more: total > 20
+  }
+
+# GET with filtering
+@ route /api/users/active [GET]
+  + auth(jwt)
+  % db: Database
+
+  $ active_users = db.users.filter("active", true)
+  > {users: active_users, count: active_users.length()}
+
+# Alternative GET syntax using @ METHOD /path
+@ GET /health {
+  > {status: "ok", service: "Feature Showcase"}
+}
+
+# ============================================================================
+# SECTION 3: HTTP ROUTES - POST REQUESTS
+# ============================================================================
+
+# POST to create a new resource
+@ route /api/users [POST]
+  + auth(jwt, role: admin)
+  + ratelimit(10/min)
+  % db: Database
+
+  # Validate input
+  $ username = input.username
+  $ email = input.email
+
+  # Check username length
+  $ name_length = length(username)
+  if name_length < 3 {
+    > {success: false, message: "Username too short"}
+  } else {
+    # Check if user exists
+    $ existing = db.users.findOne("email", email)
+    if existing != null {
+      > {success: false, message: "Email already registered"}
+    } else {
+      # Create the user
+      $ new_user = db.users.create({
+        username: username,
+        email: email,
+        role: "user",
+        age: input.age,
+        active: true,
+        created_at: now()
+      })
+
+      > {success: true, message: "User created", data: new_user}
+    }
+  }
+
+# POST for authentication
+@ route /api/auth/login [POST]
+  + ratelimit(5/min)
+  % db: Database
+
+  $ email = input.email
+  $ password = input.password
+
+  $ user = db.users.findOne("email", email)
+
+  if user == null {
+    > {success: false, message: "Invalid credentials"}
+  } else {
+    # Verify password
+    $ valid = crypto.verify(password, user.password)
+    if valid == false {
+      > {success: false, message: "Invalid credentials"}
+    } else {
+      # Generate token
+      $ token = jwt.sign({user_id: user.id, role: user.role}, "24h")
+      > {success: true, message: "Login successful", token: token, user: user}
+    }
+  }
+
+# ============================================================================
+# SECTION 4: HTTP ROUTES - PUT/PATCH REQUESTS
+# ============================================================================
+
+# PUT to fully replace a resource
+@ route /api/users/:id [PUT]
+  + auth(jwt)
+  % db: Database
+
+  $ user = db.users.get(id)
+
+  if user == null {
+    > {success: false, message: "User not found"}
+  } else {
+    $ updated = db.users.update(id, {
+      username: input.username,
+      email: input.email,
+      role: input.role,
+      age: input.age,
+      active: input.active
+    })
+
+    > {success: true, message: "User updated", data: updated}
+  }
+
+# PATCH to partially update a resource
+@ route /api/users/:id [PATCH]
+  + auth(jwt)
+  % db: Database
+
+  $ user = db.users.get(id)
+
+  if user == null {
+    > {success: false, message: "User not found"}
+  } else {
+    # Only update provided fields
+    if input.username != null {
+      $ user.username = input.username
+    }
+
+    if input.email != null {
+      $ user.email = input.email
+    }
+
+    $ saved = db.users.update(id, user)
+    > {success: true, message: "User patched", data: saved}
+  }
+
+# ============================================================================
+# SECTION 5: HTTP ROUTES - DELETE REQUESTS
+# ============================================================================
+
+# DELETE a single resource
+@ route /api/users/:id [DELETE]
+  + auth(jwt, role: admin)
+  % db: Database
+
+  $ user = db.users.get(id)
+
+  if user == null {
+    > {success: false, message: "User not found"}
+  } else {
+    $ result = db.users.delete(id)
+    > {success: true, message: "User deleted"}
+  }
+
+# DELETE with batch operation
+@ route /api/users/inactive [DELETE]
+  + auth(jwt, role: admin)
+  % db: Database
+
+  $ result = db.users.deleteWhere("active", false)
+  > {success: true, message: "Inactive users deleted", count: result}
+
+# ============================================================================
+# SECTION 6: CONTROL FLOW - IF/ELSE
+# ============================================================================
+
+@ route /api/check-age [POST]
+  $ age = input.age
+  $ category = ""
+
+  if age < 0 {
+    > {success: false, message: "Invalid age"}
+  } else {
+    if age < 13 {
+      $ category = "child"
+    } else {
+      if age < 20 {
+        $ category = "teenager"
+      } else {
+        if age < 65 {
+          $ category = "adult"
+        } else {
+          $ category = "senior"
+        }
+      }
+    }
+
+    > {success: true, age: age, category: category}
+  }
+
+# Route with logical operators (AND/OR)
+@ route /api/access/:age/:premium [GET]
+  $ hasAccess = false
+  $ level = ""
+
+  # Complex logical expression
+  if age >= 18 && premium {
+    $ hasAccess = true
+    $ level = "premium-adult"
+  } else {
+    if age >= 18 || premium {
+      $ hasAccess = true
+      $ level = "partial-access"
+    } else {
+      $ level = "restricted"
+    }
+  }
+
+  > {hasAccess: hasAccess, accessLevel: level}
+
+# ============================================================================
+# SECTION 7: CONTROL FLOW - WHILE LOOPS
+# ============================================================================
+
+@ route /api/factorial/:n [GET]
+  $ n = parseInt(n)
+  $ result = 1
+  $ i = 1
+
+  while i <= n {
+    $ result = result * i
+    $ i = i + 1
+  }
+
+  > {n: n, factorial: result}
+
+@ route /api/fibonacci/:count [GET]
+  $ count = parseInt(count)
+  $ a = 0
+  $ b = 1
+  $ i = 0
+
+  while i < count {
+    $ temp = a + b
+    $ a = b
+    $ b = temp
+    $ i = i + 1
+  }
+
+  > {count: count, result: a}
+
+# Nested while loops
+@ route /api/nested-loops [GET]
+  $ i = 0
+  $ total = 0
+  while i < 3 {
+    $ j = 0
+    while j < 2 {
+      $ total = total + 1
+      $ j = j + 1
+    }
+    $ i = i + 1
+  }
+  > {total: total}
+
+# ============================================================================
+# SECTION 8: CONTROL FLOW - FOR LOOPS
+# ============================================================================
+
+@ route /api/process-items [POST]
+  $ items = input.items
+  $ total = 0
+  $ processed = []
+
+  # Simple for loop
+  for item in items {
+    $ total = total + item.value
+    $ processed = processed + [item.name]
+  }
+
+  > {total: total, processed: processed}
+
+@ route /api/analyze-data [POST]
+  $ data = input.data
+  $ results = []
+
+  # For loop with index
+  for index, item in data {
+    $ result = {position: index, value: item.value, doubled: item.value * 2}
+    $ results = results + [result]
+  }
+
+  > {results: results}
+
+# Object iteration (key-value pairs)
+@ route /api/config [GET]
+  $ config = {host: "localhost", port: "8080", debug: "true"}
+  $ settings = []
+
+  for key, value in config {
+    $ setting = {key: key, value: value}
+    $ settings = settings + [setting]
+  }
+
+  > {settings: settings}
+
+# Nested for loops
+@ route /api/matrix [GET]
+  $ matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+  $ sum = 0
+
+  for row in matrix {
+    for cell in row {
+      $ sum = sum + cell
+    }
+  }
+
+  > {total: sum}
+
+# ============================================================================
+# SECTION 9: CONTROL FLOW - SWITCH STATEMENTS
+# ============================================================================
+
+@ route /api/order-status/:status [GET]
+  $ status_message = ""
+  $ can_cancel = false
+
+  switch status {
+    case "pending" {
+      $ status_message = "Your order is awaiting processing"
+      $ can_cancel = true
+    }
+    case "processing" {
+      $ status_message = "Your order is being prepared"
+      $ can_cancel = true
+    }
+    case "shipped" {
+      $ status_message = "Your order is on its way"
+      $ can_cancel = false
+    }
+    case "delivered" {
+      $ status_message = "Your order has been delivered"
+      $ can_cancel = false
+    }
+    case "cancelled" {
+      $ status_message = "This order was cancelled"
+      $ can_cancel = false
+    }
+    default {
+      $ status_message = "Unknown status"
+      $ can_cancel = false
+    }
+  }
+
+  > {status: status, message: status_message, can_cancel: can_cancel}
+
+# Switch with numbers
+@ route /api/grade/:score [GET]
+  $ grade = ""
+  $ s = parseInt(score)
+
+  switch s {
+    case 90 {
+      $ grade = "A"
+    }
+    case 80 {
+      $ grade = "B"
+    }
+    case 70 {
+      $ grade = "C"
+    }
+    case 60 {
+      $ grade = "D"
+    }
+    default {
+      $ grade = "F"
+    }
+  }
+
+  > {score: s, grade: grade}
+
+# ============================================================================
+# SECTION 10: BUILTIN FUNCTIONS - STRING OPERATIONS
+# ============================================================================
+
+@ route /api/string-ops [POST]
+  $ text = input.text
+
+  # String length
+  $ len = length(text)
+
+  # Case conversion
+  $ upper_text = upper(text)
+  $ lower_text = lower(text)
+
+  # Whitespace handling
+  $ trimmed = trim(text)
+
+  # String search
+  $ has_hello = contains(text, "hello")
+  $ starts = startsWith(text, "Hello")
+  $ ends = endsWith(text, "!")
+  $ pos = indexOf(text, "o")
+
+  # String manipulation
+  $ replaced = replace(text, "hello", "hi")
+  $ sub = substring(text, 0, 5)
+  $ char = charAt(text, 0)
+
+  # Split and join
+  $ words = split(text, " ")
+  $ rejoined = join(words, "-")
+
+  > {
+    original: text,
+    length: len,
+    upper: upper_text,
+    lower: lower_text,
+    trimmed: trimmed,
+    contains_hello: has_hello,
+    starts_with_hello: starts,
+    ends_with_exclamation: ends,
+    first_o_position: pos,
+    replaced: replaced,
+    substring_result: sub,
+    first_char: char,
+    words: words,
+    rejoined: rejoined
+  }
+
+# ============================================================================
+# SECTION 11: BUILTIN FUNCTIONS - NUMERIC OPERATIONS
+# ============================================================================
+
+@ route /api/math-ops [POST]
+  $ a = input.a
+  $ b = input.b
+
+  # Basic operations
+  $ sum = a + b
+  $ diff = a - b
+  $ product = a * b
+  $ quotient = a / b
+
+  # Numeric functions
+  $ abs_diff = abs(a - b)
+  $ minimum = min(a, b)
+  $ maximum = max(a, b)
+
+  # Type conversion
+  $ str_num = "42"
+  $ parsed_int = parseInt(str_num)
+  $ float_str = "3.14"
+  $ parsed_float = parseFloat(float_str)
+  $ num_to_str = toString(a)
+
+  > {
+    sum: sum,
+    difference: diff,
+    product: product,
+    quotient: quotient,
+    absolute_difference: abs_diff,
+    minimum: minimum,
+    maximum: maximum,
+    parsed_int: parsed_int,
+    parsed_float: parsed_float,
+    number_as_string: num_to_str
+  }
+
+# ============================================================================
+# SECTION 12: OPERATORS - ALL TYPES
+# ============================================================================
+
+@ route /api/operators [POST]
+  $ a = input.a
+  $ b = input.b
+
+  # Arithmetic operators
+  $ add = a + b
+  $ sub = a - b
+  $ mul = a * b
+  $ div = a / b
+
+  # Comparison operators
+  $ is_equal = a == b
+  $ not_equal = a != b
+  $ less_than = a < b
+  $ less_eq = a <= b
+  $ greater_than = a > b
+  $ greater_eq = a >= b
+
+  # Logical operators
+  $ bool_a = a > 0
+  $ bool_b = b > 0
+  $ and_result = bool_a && bool_b
+  $ or_result = bool_a || bool_b
+
+  # String concatenation
+  $ str_a = toString(a)
+  $ str_b = toString(b)
+  $ concatenated = str_a + " and " + str_b
+
+  > {
+    arithmetic: {add: add, sub: sub, mul: mul, div: div},
+    comparison: {
+      equal: is_equal,
+      not_equal: not_equal,
+      less_than: less_than,
+      less_or_equal: less_eq,
+      greater_than: greater_than,
+      greater_or_equal: greater_eq
+    },
+    logical: {and: and_result, or: or_result},
+    string: {concatenated: concatenated}
+  }
+
+# ============================================================================
+# SECTION 13: COMPLEX EXPRESSIONS
+# ============================================================================
+
+@ route /api/expressions [POST]
+  # Object literals
+  $ person = {
+    name: "Alice",
+    age: 30,
+    active: true
+  }
+
+  # Array literals
+  $ numbers = [1, 2, 3, 4, 5]
+  $ mixed = ["hello", 42, true]
+
+  # Nested structures
+  $ nested = {
+    user: {
+      id: 1,
+      profile: {
+        bio: "Developer",
+        tags: ["go", "rust", "typescript"]
+      }
+    },
+    metadata: {
+      created: now()
+    }
+  }
+
+  # Field access
+  $ user_name = person.name
+  $ user_age = person.age
+
+  # Array indexing
+  $ first_num = numbers[0]
+  $ third_num = numbers[2]
+
+  # Complex expression
+  $ result = (person.age * 2) + (first_num * 10)
+
+  > {
+    person: person,
+    numbers: numbers,
+    mixed: mixed,
+    nested: nested,
+    field_access: {name: user_name, age: user_age},
+    array_index: {first: first_num, third: third_num},
+    computed: result
+  }
+
+# ============================================================================
+# SECTION 14: DATABASE OPERATIONS
+# ============================================================================
+
+@ route /api/db-demo [GET]
+  % db: Database
+
+  # Get all records
+  $ all_users = db.users.all()
+
+  # Count records
+  $ total_count = all_users.length()
+  $ active_count = db.users.count("active", true)
+
+  # Filter records
+  $ admins = db.users.filter("role", "admin")
+
+  # Get next ID
+  $ next_id = db.users.nextId()
+
+  > {
+    total_users: total_count,
+    active_users: active_count,
+    admin_count: admins.length(),
+    next_id: next_id
+  }
+
+# CRUD demonstration
+@ route /api/db-crud [POST]
+  % db: Database
+
+  $ operation = input.operation
+
+  switch operation {
+    case "create" {
+      $ new_record = db.users.create({
+        username: input.data.username,
+        email: input.data.email,
+        role: "user",
+        active: true,
+        created_at: now()
+      })
+      > {success: true, message: "Created", data: new_record}
+    }
+    case "read" {
+      $ record = db.users.get(input.id)
+      > {success: true, message: "Retrieved", data: record}
+    }
+    case "update" {
+      $ updated = db.users.update(input.id, input.data)
+      > {success: true, message: "Updated", data: updated}
+    }
+    case "delete" {
+      $ result = db.users.delete(input.id)
+      > {success: true, message: "Deleted", data: result}
+    }
+    default {
+      > {success: false, message: "Unknown operation"}
+    }
+  }
+
+# ============================================================================
+# SECTION 15: WEBSOCKET SUPPORT
+# ============================================================================
+
+@ ws /chat {
+  on connect {
+    ws.send({
+      type: "system",
+      message: "Welcome to the chat!"
+    })
+  }
+
+  on message {
+    $ data = input.data
+
+    if data.type == "join_room" {
+      ws.join(data.room)
+      ws.send({
+        type: "system",
+        message: "You joined room: " + data.room
+      })
+      ws.broadcast_to_room(data.room, {
+        type: "system",
+        message: data.username + " joined the room"
+      })
+    }
+    else if data.type == "leave_room" {
+      ws.broadcast_to_room(data.room, {
+        type: "system",
+        message: data.username + " left the room"
+      })
+      ws.leave(data.room)
+    }
+    else if data.type == "chat_message" {
+      if data.room != "" {
+        ws.broadcast_to_room(data.room, {
+          type: "chat",
+          username: data.username,
+          text: data.text,
+          room: data.room,
+          timestamp: now()
+        })
+      } else {
+        ws.broadcast({
+          type: "chat",
+          username: data.username,
+          text: data.text,
+          timestamp: now()
+        })
+      }
+    }
+    else if data.type == "ping" {
+      ws.send({
+        type: "pong",
+        timestamp: now()
+      })
+    }
+  }
+
+  on disconnect {
+    # Handle disconnect
+  }
+}
+
+# WebSocket status endpoint
+@ route /api/ws-status [GET]
+  > {
+    rooms: ws.get_rooms(),
+    room_count: ws.get_room_count(),
+    total_connections: ws.get_connection_count(),
+    uptime: ws.get_uptime()
+  }
+
+# ============================================================================
+# SECTION 16: SCHEDULED TASKS (CRON)
+# ============================================================================
+
+# Every minute health check
+* "* * * * *" health_monitor {
+  > {service: "feature-showcase", status: "healthy", timestamp: now()}
+}
+
+# Every 5 minutes - cleanup task
+* "*/5 * * * *" cleanup_sessions {
+  % db: Database
+  $ expired = db.sessions.deleteWhere("expired", true)
+  > {task: "cleanup_sessions", deleted: expired, timestamp: now()}
+}
+
+# Every hour - statistics gathering
+* "0 * * * *" hourly_stats {
+  % db: Database
+  $ users = db.users.all()
+  $ orders = db.orders.all()
+
+  > {
+    task: "hourly_stats",
+    user_count: users.length(),
+    order_count: orders.length(),
+    timestamp: now()
+  }
+}
+
+# Daily at midnight - full backup
+* "0 0 * * *" daily_backup {
+  % db: Database
+  $ backup_id = toString(now())
+
+  > {
+    task: "daily_backup",
+    backup_id: backup_id,
+    status: "completed",
+    timestamp: now()
+  }
+}
+
+# Weekly report - Sundays at 9am
+* "0 9 * * 0" weekly_report {
+  + retries(3)
+  % db: Database
+
+  $ users = db.users.all()
+
+  > {
+    task: "weekly_report",
+    total_users: users.length(),
+    week: "current",
+    timestamp: now()
+  }
+}
+
+# ============================================================================
+# SECTION 17: EVENT HANDLERS
+# ============================================================================
+
+# User registration event
+~ "user.created" {
+  $ user_id = event.id
+  $ email = event.email
+  $ username = event.username
+
+  > {event: "user.created", handled: true, user_id: user_id, email: email}
+}
+
+# User update event (async)
+~ "user.updated" async {
+  $ user_id = event.id
+  $ changes = event.changes
+
+  > {event: "user.updated", handled: true, user_id: user_id}
+}
+
+# Order events
+~ "order.created" {
+  $ order_id = event.order_id
+  $ user_id = event.user_id
+  $ total = event.total
+
+  > {event: "order.created", handled: true, order_id: order_id}
+}
+
+~ "order.completed" {
+  $ order_id = event.order_id
+  > {event: "order.completed", handled: true, order_id: order_id}
+}
+
+# Payment events
+~ "payment.success" {
+  $ payment_id = event.payment_id
+  $ amount = event.amount
+
+  > {event: "payment.success", handled: true, receipt_sent: true}
+}
+
+~ "payment.failed" {
+  $ payment_id = event.payment_id
+  $ reason = event.reason
+
+  > {event: "payment.failed", handled: true, retry_scheduled: true}
+}
+
+# ============================================================================
+# SECTION 18: QUEUE WORKERS
+# ============================================================================
+
+# Email sending queue
+& "email.send" {
+  + concurrency(5)
+  + retries(3)
+  + timeout(30)
+
+  $ to = message.to
+  $ subject = message.subject
+  $ body = message.body
+  $ message_id = message.id
+
+  > {sent: true, message_id: message_id, to: to}
+}
+
+# Image processing queue
+& "image.process" {
+  + concurrency(3)
+  + timeout(120)
+
+  $ image_id = message.image_id
+  $ operations = message.operations
+
+  > {processed: true, image_id: image_id}
+}
+
+# Report generation queue
+& "report.generate" {
+  + concurrency(2)
+  + retries(2)
+  + timeout(300)
+
+  $ report_type = message.type
+  $ user_id = message.requested_by
+  $ report_id = now()
+
+  > {report_id: report_id, type: report_type}
+}
+
+# Notification queue
+& "notification.push" {
+  + concurrency(10)
+  + retries(5)
+  + timeout(10)
+
+  $ user_id = message.user_id
+  $ title = message.title
+  $ body = message.body
+
+  > {user_id: user_id, title: title, delivered: true}
+}
+
+# Webhook delivery queue
+& "webhook.deliver" {
+  + concurrency(10)
+  + retries(5)
+  + timeout(15)
+
+  $ url = message.url
+  $ webhook_id = message.webhook_id
+
+  > {delivered: true, webhook_id: webhook_id}
+}
+
+# ============================================================================
+# SECTION 19: COMPLEX BUSINESS LOGIC - E-COMMERCE CHECKOUT
+# ============================================================================
+
+@ route /api/checkout [POST]
+  + auth(jwt)
+  + ratelimit(10/min)
+  % db: Database
+
+  $ cart_id = input.cart_id
+  $ payment_method = input.payment_method
+  $ shipping_address = input.shipping_address
+
+  # Get the cart
+  $ cart = db.carts.get(cart_id)
+
+  if cart == null {
+    > {success: false, message: "Cart not found"}
+  } else {
+    # Calculate totals using for loop
+    $ subtotal = 0.0
+    $ item_count = 0
+
+    for item in cart.items {
+      $ subtotal = subtotal + (item.price * item.quantity)
+      $ item_count = item_count + item.quantity
+    }
+
+    # Apply business rules
+    $ tax_rate = 0.08
+    $ tax = subtotal * tax_rate
+
+    # Shipping calculation
+    $ shipping = 0.0
+    if subtotal < 50 {
+      $ shipping = 9.99
+    } else {
+      if subtotal < 100 {
+        $ shipping = 4.99
+      } else {
+        $ shipping = 0.0
+      }
+    }
+
+    # Apply discount if provided
+    $ discount = 0.0
+    if input.discount_code != null {
+      $ code = input.discount_code
+      switch code {
+        case "SAVE10" {
+          $ discount = subtotal * 0.10
+        }
+        case "SAVE20" {
+          $ discount = subtotal * 0.20
+        }
+        case "FREESHIP" {
+          $ discount = shipping
+          $ shipping = 0.0
+        }
+        default {
+          $ discount = 0.0
+        }
+      }
+    }
+
+    # Calculate final total
+    $ total = subtotal + tax + shipping - discount
+
+    # Validate minimum order
+    if total < 1 {
+      > {success: false, message: "Order total too low"}
+    } else {
+      # Create the order
+      $ order = db.orders.create({
+        user_id: auth.user.id,
+        cart_id: cart_id,
+        items: cart.items,
+        subtotal: subtotal,
+        tax: tax,
+        shipping: shipping,
+        discount: discount,
+        total: total,
+        status: "pending",
+        payment_method: payment_method,
+        shipping_address: shipping_address,
+        created_at: now()
+      })
+
+      # Clear the cart
+      $ cart_cleared = db.carts.update(cart_id, {items: [], updated_at: now()})
+
+      > {
+        success: true,
+        message: "Order placed successfully",
+        order_id: order.id,
+        subtotal: subtotal,
+        tax: tax,
+        shipping: shipping,
+        discount: discount,
+        total: total,
+        item_count: item_count
+      }
+    }
+  }
+
+# ============================================================================
+# SECTION 20: ANALYTICS AND STATISTICS
+# ============================================================================
+
+@ route /api/analytics [GET]
+  + auth(jwt, role: admin)
+  + ratelimit(30/min)
+  % db: Database
+
+  # User statistics
+  $ all_users = db.users.all()
+  $ total_users = all_users.length()
+  $ active_users = db.users.count("active", true)
+  $ inactive_users = total_users - active_users
+
+  # Order statistics
+  $ all_orders = db.orders.all()
+  $ total_orders = all_orders.length()
+  $ pending_orders = db.orders.count("status", "pending")
+  $ completed_orders = db.orders.count("status", "completed")
+
+  # Calculate total revenue
+  $ total_revenue = 0.0
+  for order in all_orders {
+    if order.status == "completed" {
+      $ total_revenue = total_revenue + order.total
+    }
+  }
+
+  # Average order value
+  $ avg_order_value = 0.0
+  if completed_orders > 0 {
+    $ avg_order_value = total_revenue / completed_orders
+  }
+
+  > {
+    users: {
+      total: total_users,
+      active: active_users,
+      inactive: inactive_users
+    },
+    orders: {
+      total: total_orders,
+      pending: pending_orders,
+      completed: completed_orders
+    },
+    revenue: {
+      total: total_revenue,
+      average_order: avg_order_value
+    },
+    timestamp: now()
+  }
+
+# ============================================================================
+# SECTION 21: ALTERNATIVE SYNTAX EXAMPLES
+# ============================================================================
+
+// Using // comments (alternative to #)
+@ GET /api/info {
+  // This is a double-slash comment
+  $ info = {
+    language: "GlyphLang",
+    version: "1.0.0"
+  }
+  > info
+}
+
+// Using 'let' instead of '$'
+@ GET /api/letvar {
+  let name = "Alice"
+  let age = 30
+  let active = true
+
+  > {name: name, age: age, active: active}
+}
+
+// Using 'return' instead of '>'
+@ GET /api/returnval {
+  $ value = 42
+  return {value: value, doubled: value * 2}
+}
+
+# ============================================================================
+# End of Feature Showcase
+# Note: CLI commands (!) are demonstrated in cli-demo/main.glyph
+# ============================================================================

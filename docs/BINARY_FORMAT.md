@@ -169,6 +169,9 @@ glyph compile hello.glyph -o hello.glybc
 # Decompile AI to human format
 glyph decompile hello.glybc -o hello.glyph
 
+# Show disassembly only (no file output)
+glyph decompile --disasm hello.glybc
+
 # Run directly from binary
 glyph run hello.glybc
 
@@ -176,6 +179,35 @@ glyph run hello.glybc
 curl ai-api.com/generate > api.glybc
 glyph run api.glybc
 ```
+
+## Decompiler
+
+The decompiler (`pkg/decompiler`) provides full bytecode analysis:
+
+**Supported Constant Types:**
+- `0x00` - Null
+- `0x01` - Int (8 bytes, little-endian)
+- `0x02` - Float (8 bytes, IEEE 754)
+- `0x03` - Bool (1 byte)
+- `0x04` - String (4-byte length + UTF-8 data)
+
+**Supported Opcodes (37 total):**
+- Stack: PUSH, POP
+- Arithmetic: ADD, SUB, MUL, DIV
+- Comparison: EQ, NE, LT, GT, LE, GE
+- Logic: AND, OR, NOT, NEG
+- Variables: LOAD_VAR, STORE_VAR
+- Control Flow: JUMP, JUMP_IF_FALSE, JUMP_IF_TRUE
+- Iteration: GET_ITER, ITER_NEXT, ITER_HAS_NEXT, GET_INDEX
+- Functions: CALL, RETURN
+- Data: BUILD_OBJECT, BUILD_ARRAY, GET_FIELD
+- HTTP: HTTP_RETURN
+- WebSocket: WS_SEND, WS_BROADCAST, WS_BROADCAST_ROOM, WS_JOIN_ROOM, WS_LEAVE_ROOM, WS_CLOSE, WS_GET_ROOMS, WS_GET_CLIENTS, WS_GET_CONN_COUNT, WS_GET_UPTIME
+- Control: HALT
+
+**Output Formats:**
+- `Format()` - Pseudo-source reconstruction with route signatures
+- `FormatDisassembly()` - Detailed bytecode listing with constant pool and instruction comments
 
 ## Future Optimizations
 
@@ -195,10 +227,3 @@ For preserving comments, formatting, etc.:
 [Formatting hints: JSON object]
 ```
 
----
-
-**Next Steps:**
-1. Implement serializer in `glyph-core/src/binary.rs`
-2. Implement deserializer
-3. Create translator CLI
-4. Build editor tooling

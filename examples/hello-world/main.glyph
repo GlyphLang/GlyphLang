@@ -1,17 +1,27 @@
-# Hello World Example
-# This is a simple Glyph program
+# Decompiled GlyphLang Source
+# Version: 1
+# Constants: 7
+# Instructions: 7
 
-: Message {
-  text: str!
-  timestamp: int
-}
+@ route /
+  > ...
 
-@ route /hello
-  > {text: "Hello, World!", timestamp: 1234567890}
+# --- Bytecode Disassembly ---
 
-@ route /greet/:name -> Message
-  $ message = {
-    text: "Hello, " + name + "!",
-    timestamp: now()
-  }
-  > message
+# Constant Pool:
+#   [0] string: "query"
+#   [1] string: "input"
+#   [2] string: "ws"
+#   [3] string: "text"
+#   [4] string: "Hello, World!"
+#   [5] string: "timestamp"
+#   [6] int: 1234567890
+
+# Instructions:
+#   0000: PUSH            3  ; {text}
+#   0005: PUSH            4  ; {Hello, World!}
+#   0010: PUSH            5  ; {timestamp}
+#   0015: PUSH            6  ; {1234567890}
+#   0020: BUILD_OBJECT    2  ; 2 fields
+#   0025: RETURN         
+#   0026: HALT           

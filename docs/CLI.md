@@ -16,7 +16,7 @@ make install
 
 ### `glyph dev <file>`
 
-Start a development server with hot reload.
+Start a development server with hot reload and live browser refresh.
 
 ```bash
 glyph dev examples/hello-world/main.glyph
@@ -24,47 +24,82 @@ glyph dev examples/hello-world/main.glyph
 # Options:
 #   -p, --port <port>     Port to listen on (default: 3000)
 #   -w, --watch <bool>    Watch for file changes (default: true)
+#   -o, --open            Open browser automatically
 ```
 
 **Features:**
 - Starts HTTP server on specified port
-- Watches source file for changes
-- Automatically reloads on file save (pending full implementation)
+- Watches source file for changes with debounce (100ms)
+- Hot reload with automatic server restart on file save
+- Live reload via Server-Sent Events (SSE) at `/__livereload`
+- JavaScript injection endpoint at `/__livereload.js`
+- Browser auto-open with `--open` flag
+- Falls back to interpreter mode if compilation fails
 - Pretty colored output for requests and errors
 - Graceful shutdown with Ctrl+C
 
 **Example:**
 ```bash
-$ glyph dev examples/hello-world/main.glyph -p 8080
+$ glyph dev examples/hello-world/main.glyph -p 8080 --open
 [INFO] Starting development server on port 8080...
+[SUCCESS] Dev server listening on http://localhost:8080 (compiled mode)
+[INFO] Live reload enabled at /__livereload
 [INFO] Watching examples/hello-world/main.glyph for changes...
-[SUCCESS] Server listening on http://localhost:8080
+[INFO] Opened http://localhost:8080 in browser
 [INFO] Press Ctrl+C to stop
+```
+
+**Live Reload Integration:**
+
+Add the live reload script to your HTML for automatic browser refresh:
+```html
+<script src="/__livereload.js"></script>
+```
+
+When you save changes, you'll see:
+```
+[WARNING] File changed, reloading...
+[SUCCESS] Hot reload complete (45ms)
 ```
 
 ### `glyph run <file>`
 
-Run an Glyph source file once (production mode).
+Run a Glyph source file or bytecode (production mode).
 
 ```bash
 glyph run examples/rest-api/main.glyph
 
 # Options:
 #   -p, --port <port>     Port to listen on (default: 3000)
+#   --bytecode            Execute bytecode (.glybc) file directly
+#   --interpret           Use tree-walking interpreter instead of compiler
 ```
 
 **Features:**
-- Parses and runs Glyph source
+- Compiles and runs Glyph source using VM (default)
+- Falls back to interpreter if compilation fails
+- Supports direct bytecode execution with `--bytecode`
 - Starts HTTP server
 - Request logging
 - Graceful shutdown
 
 **Example:**
 ```bash
+# Run source file (compiles to bytecode first)
 $ glyph run examples/rest-api/main.glyph
-[INFO] Running examples/rest-api/main.glyph...
-[SUCCESS] Server listening on http://localhost:3000
+[INFO] Compiling and running examples/rest-api/main.glyph...
+[SUCCESS] Server listening on http://localhost:3000 (compiled mode)
 [INFO] Press Ctrl+C to stop
+
+# Run pre-compiled bytecode
+$ glyph run build/app.glybc --bytecode
+[INFO] Running bytecode build/app.glybc...
+[SUCCESS] Bytecode executed successfully
+
+# Force interpreter mode
+$ glyph run examples/rest-api/main.glyph --interpret
+[INFO] Running examples/rest-api/main.glyph with interpreter...
+[SUCCESS] Server listening on http://localhost:3000
 ```
 
 ### `glyph compile <file>`
@@ -89,6 +124,56 @@ glyph compile examples/hello-world/main.glyph
 $ glyph compile examples/hello-world/main.glyph -o build/hello.glybc -O 3
 [INFO] Compiling examples/hello-world/main.glyph (optimization level: 3)...
 [SUCCESS] Compiled successfully to build/hello.glybc (8 bytes)
+```
+
+### `glyph decompile <file>`
+
+Decompile bytecode back to readable format.
+
+```bash
+glyph decompile build/hello.glybc
+
+# Options:
+#   -o, --output <file>   Output file (default: source.glyph)
+#   -d, --disasm          Output disassembly only (no file generation)
+```
+
+**Features:**
+- Parses GLYP bytecode format
+- Extracts constant pool (null, int, float, bool, string)
+- Decodes all 37 VM opcodes
+- Generates pseudo-source reconstruction
+- Formatted disassembly with comments
+- Supports all WebSocket opcodes
+
+**Example:**
+```bash
+# Decompile to .glyph file with disassembly output
+$ glyph decompile build/hello.glybc
+[INFO] Decompiling build/hello.glybc...
+[INFO] Bytecode version: 1
+[INFO] Constants: 7
+[INFO] Instructions: 7
+[SUCCESS] Decompiled to build/hello.glyph
+
+GlyphLang Bytecode v1
+==================================================
+
+CONSTANT POOL:
+------------------------------
+  [  0] string   "text"
+  [  1] string   "Hello, World!"
+
+INSTRUCTIONS:
+------------------------------
+  0000: PUSH               0      ; {text}
+  0005: PUSH               1      ; {Hello, World!}
+  0010: BUILD_OBJECT       1      ; 1 fields
+  0015: RETURN
+  0016: HALT
+
+# Show only disassembly (no file output)
+$ glyph decompile --disasm build/hello.glybc
 ```
 
 ### `glyph exec <file> <command> [args...]`
@@ -230,13 +315,14 @@ Usage:
 
 Available Commands:
   compile     Compile source code to bytecode
+  decompile   Decompile bytecode to readable format
   dev         Start development server with hot reload
   init        Initialize new project
-  run         Run Glyph source file
+  run         Run Glyph source file or bytecode
   exec        Execute a CLI command from a Glyph file
   commands    List all CLI commands in a Glyph file
+  lsp         Start Language Server Protocol server
   help        Help about any command
-  version     Display version
 
 Flags:
   -h, --help      help for glyph
@@ -277,41 +363,42 @@ Servers handle Ctrl+C gracefully:
 [SUCCESS] Server stopped gracefully
 ```
 
-### File Watching
+### File Watching and Hot Reload
 
-In dev mode, the CLI watches your source file and notifies on changes:
+In dev mode, the CLI watches your source file and automatically restarts the server:
 
 ```
 [WARNING] File changed, reloading...
-[INFO] Hot reload triggered (server restart not yet implemented)
+[SUCCESS] Hot reload complete (45ms)
 ```
+
+Browsers connected via the live reload endpoint will automatically refresh.
 
 ## Integration Status
 
-### Currently Working
-- ✅ CLI command structure
-- ✅ File reading and parsing
-- ✅ HTTP server startup
-- ✅ Route registration
-- ✅ Request logging
-- ✅ Graceful shutdown
-- ✅ File watching
-- ✅ Pretty error messages
-- ✅ Project initialization
+### Complete
+- CLI command structure (compile, decompile, run, dev, init, exec, commands, lsp)
+- Go parser with full lexer and AST generation
+- Bytecode compiler with 3 optimization levels
+- Bytecode VM execution
+- Bytecode decompiler with full opcode support
+- HTTP server with route registration
+- Hot reload with live browser refresh (SSE)
+- File watching with debounce
+- WebSocket support
+- Request logging
+- Graceful shutdown
+- Pretty error messages
+- Project initialization
 
-### In Progress (Pending Other Components)
-- 🔄 Rust parser integration (FFI bridge)
-- 🔄 Full interpreter execution
-- 🔄 Hot reload server restart
-- 🔄 Database connections
-- 🔄 Middleware execution
-- 🔄 Authentication/authorization
-
-### Not Yet Implemented
-- ⏳ Bytecode VM execution
-- ⏳ Production deployment tools
-- ⏳ Debug mode
-- ⏳ Profiling tools
+### Available Features
+- Database connections (PostgreSQL)
+- Middleware execution
+- JWT authentication
+- Rate limiting
+- Caching (LRU, HTTP)
+- Metrics and tracing
+- LSP server for IDE integration
 
 ## Testing
 
@@ -445,17 +532,30 @@ The CLI orchestrates three main components:
 └───────┘ └─────┘ └──────────┘ └─────┘
 ```
 
-## Next Steps
+## LSP Command
 
-Once the parser and interpreter components are complete:
+### `glyph lsp`
 
-1. Replace `parseSource()` stub with Rust FFI calls
-2. Integrate full interpreter execution in route handlers
-3. Implement hot reload with server restart
-4. Add middleware execution
-5. Add database connection pooling
-6. Add request validation
-7. Add authentication/authorization
+Start the Language Server Protocol server for IDE integration.
+
+```bash
+glyph lsp
+
+# Options:
+#   -l, --log <file>    Log file for debugging (optional)
+```
+
+**Features:**
+- Full LSP protocol support
+- Syntax highlighting
+- Diagnostics and error reporting
+- Hover information
+- Go to definition
+- Code completion
+
+**VS Code Extension:**
+
+The VS Code extension (`vscode-glyph`) automatically starts the LSP server.
 
 ## Contributing
 
