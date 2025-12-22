@@ -59,7 +59,30 @@ func (c *Compiler) Compile(module *interpreter.Module) ([]byte, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("no route found to compile")
+	// Check if this is a type-only module (library module)
+	// Type-only modules are valid but don't produce executable bytecode
+	hasTypeDefs := false
+	for _, item := range module.Items {
+		if _, ok := item.(*interpreter.TypeDef); ok {
+			hasTypeDefs = true
+			break
+		}
+	}
+
+	if hasTypeDefs {
+		// Return minimal bytecode for type-only modules
+		// Types are compile-time only, so just return a halt instruction
+		c.Reset()
+		c.emit(vm.OpHalt)
+		return c.buildBytecode(), nil
+	}
+
+	// Empty module
+	if len(module.Items) == 0 {
+		return nil, fmt.Errorf("empty module: no items to compile")
+	}
+
+	return nil, fmt.Errorf("no route found to compile (module contains %d items but no routes)", len(module.Items))
 }
 
 // CompileRoute compiles a route to bytecode

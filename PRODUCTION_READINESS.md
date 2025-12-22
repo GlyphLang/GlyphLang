@@ -182,36 +182,43 @@ This document tracks all remaining work before GLYPHLANG can be safely used in p
   - ✅ Compiler compiles null to bytecode
   - File: `pkg/parser/token.go`, `pkg/interpreter/ast.go`
 
-### Previously Identified Issues
+### Previously Identified Issues (All Resolved 2025-12-22)
 
 ### Parser Issues
 
-- [ ] **Multiline Strings** - Strings can't span multiple lines
-  - Test: `TestParserEdgeCases/Very_long_string`
-  - Intentional or bug? Decide and document
+- [x] **Multiline Strings** - By Design ✅
+  - Strings intentionally cannot span multiple lines (prevents accidental unclosed strings)
+  - Use escape sequences for newlines: `"line1\nline2"`
+  - Lexer explicitly stops on newlines within string literals
+  - File: `pkg/parser/lexer.go` line 389
 
-- [ ] **Escape Sequences in Raw Strings** - Backslash handling in test strings
-  - Test failures show `\n` being interpreted as backslash-n instead of newline in test strings
-  - Clarify string literal behavior
+- [x] **Escape Sequences in Raw Strings** - Already Working ✅
+  - All standard escape sequences are supported: `\n`, `\t`, `\r`, `\"`, `\'`, `\\`
+  - Test coverage confirms correct behavior
+  - File: `pkg/parser/lexer.go` lines 382-434
 
 ### Compiler Issues
 
-- [ ] **Type-Only Modules** - Modules without routes fail compilation
-  - Error: "no route found to compile"
-  - Should support library modules without routes
-  - Or document that all Glyph files must have routes
+- [x] **Type-Only Modules** - Fixed ✅
+  - Modules with only TypeDefs (no routes) now compile successfully
+  - Returns minimal bytecode (just OpHalt) for type-only library modules
+  - Improved error messages for empty modules
+  - File: `pkg/compiler/compiler.go` lines 53-86
 
-- [ ] **Undefined Variable Errors** - Some examples have undefined vars
-  - `input` variable not auto-bound for POST requests
-  - `query` variable not available
-  - Need auto-injection system
+- [x] **Undefined Variable Errors** - Already Working ✅
+  - `input` variable is auto-injected for all routes (nil if no body)
+  - `query` variable contains parsed query parameters as a map
+  - Path parameters (e.g., `:id`) are auto-injected as variables
+  - `auth` variable available when auth middleware is applied
+  - File: `pkg/interpreter/interpreter.go` lines 101-128
 
 ### Runtime Issues
 
-- [ ] **VM Bytecode Validation** - Better bytecode format validation
-  - Error: "invalid bytecode: missing constant count"
-  - Test: `TestVMBasicFlow`
-  - Add bytecode version header
+- [x] **VM Bytecode Validation** - Already Comprehensive ✅
+  - Full validation in place: magic bytes ("GLYP"), version, constant count
+  - Bounds checking on all reads to prevent buffer overflows
+  - Clear error messages for malformed bytecode
+  - File: `pkg/vm/vm.go` lines 121-191
 
 ---
 
@@ -224,7 +231,7 @@ This document tracks all remaining work before GLYPHLANG can be safely used in p
 - [ ] **Security Guide** - Security best practices
 - [ ] **Performance Guide** - Performance tuning guide
 - [ ] **Migration Guide** - Upgrade between versions
-- [ ] **Contributing Guide** - Contribution guidelines
+- [x] **Contributing Guide** - Contribution guidelines ✅ (CONTRIBUTING.md with CLA)
 - [ ] **Architecture Documentation** - System design docs
 
 ---
@@ -337,6 +344,6 @@ For a production-ready v1.0, prioritize:
 
 ---
 
-**Last Updated**: 2025-12-14
+**Last Updated**: 2025-12-22
 **Maintained By**: Development Team
 **Status Review**: Weekly
