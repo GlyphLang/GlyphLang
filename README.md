@@ -4,7 +4,8 @@
 [![Tests](https://img.shields.io/badge/tests-1696%20passing-success)]()
 [![Performance](https://img.shields.io/badge/compilation-867ns-blue)]()
 [![AI Tokens](https://img.shields.io/badge/tokens-45%25%20fewer%20than%20Python-purple)]()
-[![License](https://img.shields.io/badge/license-MIT-green)]()
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+[![CLA Assistant](https://cla-assistant.io/readme/badge/glyph-lang/glyph)](https://cla-assistant.io/glyph-lang/glyph)
 
 **GlyphLang** is an AI-first backend language designed for LLM code generation. Symbol-based syntax uses **45% fewer tokens than Python** and **63% fewer than Java**, reducing AI costs by 56%. Sub-microsecond compilation, built-in security, production-grade performance.
 
@@ -193,7 +194,11 @@ Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidel
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+This project is licensed under the **Apache License 2.0** - see the [LICENSE](LICENSE) file for details.
+
+### Contributing
+
+By contributing to GlyphLang, you agree to the [Contributor License Agreement](CONTRIBUTING.md#contributor-license-agreement-cla). This allows us to ensure the project can continue to evolve while protecting both contributors and users.
 
 ## Links
 
