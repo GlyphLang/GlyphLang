@@ -1,0 +1,667 @@
+# Error Handling Demo API
+# Demonstrates error handling patterns, structured error responses,
+# and different error types using conditional checks
+
+# Define result types
+: User {
+  id: int!
+  username: str!
+  email: str!
+  role: str!
+  created_at: timestamp
+}
+
+: Order {
+  id: int!
+  user_id: int!
+  items: List[OrderItem]
+  total: float!
+  status: str!
+  created_at: timestamp
+}
+
+: OrderItem {
+  product_id: int!
+  name: str!
+  quantity: int!
+  price: float!
+}
+
+# Error types for different scenarios
+: NotFoundError {
+  code: str!
+  message: str!
+  resource: str!
+  resource_id: any
+}
+
+: ValidationError {
+  code: str!
+  message: str!
+  field: str
+  details: List[str]
+}
+
+: AuthorizationError {
+  code: str!
+  message: str!
+  required_role: str
+  action: str
+}
+
+: DatabaseError {
+  code: str!
+  message: str!
+  operation: str!
+  retry_after: int
+}
+
+: ApiResponse {
+  success: bool!
+  data: any
+  error: any
+  timestamp: timestamp!
+}
+
+# Get user with proper error handling
+@ route /api/users/:id -> ApiResponse
+  + ratelimit(100/min)
+  % db: Database
+
+  $ user = db.users.get(id)
+
+  if user == null {
+    > {
+      success: false,
+      data: null,
+      error: {
+        code: "NOT_FOUND",
+        message: "User not found",
+        resource: "user",
+        resource_id: id
+      },
+      timestamp: now()
+    }
+  } else {
+    > {
+      success: true,
+      data: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        created_at: user.created_at
+      },
+      error: null,
+      timestamp: now()
+    }
+  }
+
+# Get order with authorization check
+@ route /api/orders/:id -> ApiResponse
+  + auth(jwt)
+  + ratelimit(50/min)
+  % db: Database
+
+  $ order = db.orders.get(id)
+
+  if order == null {
+    > {
+      success: false,
+      data: null,
+      error: {
+        code: "NOT_FOUND",
+        message: "Order not found",
+        resource: "order",
+        resource_id: id
+      },
+      timestamp: now()
+    }
+  } else {
+    # Check if user owns the order or is admin
+    $ userId = auth.user.id
+    $ userRole = auth.user.role
+
+    if order.user_id != userId && userRole != "admin" {
+      > {
+        success: false,
+        data: null,
+        error: {
+          code: "FORBIDDEN",
+          message: "You do not have permission to view this order",
+          required_role: "owner or admin",
+          action: "view_order"
+        },
+        timestamp: now()
+      }
+    } else {
+      > {
+        success: true,
+        data: order,
+        error: null,
+        timestamp: now()
+      }
+    }
+  }
+
+# Create order with multiple potential errors
+@ route /api/orders [POST] -> ApiResponse
+  + auth(jwt)
+  + ratelimit(20/min)
+  % db: Database
+
+  $ userId = auth.user.id
+
+  # Validate order has items
+  if input.items == null || input.items.length() == 0 {
+    > {
+      success: false,
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Order must have at least one item",
+        field: "items",
+        details: ["Items array is required and cannot be empty"]
+      },
+      timestamp: now()
+    }
+  } else {
+    # Validate each item and check inventory
+    $ total = 0.0
+    $ validatedItems = []
+    $ hasError = false
+    $ errorDetails = []
+
+    for item in input.items {
+      if item.product_id == null {
+        $ hasError = true
+        $ errorDetails = errorDetails + ["Product ID is required for each item"]
+      } else {
+        if item.quantity == null || item.quantity < 1 {
+          $ hasError = true
+          $ errorDetails = errorDetails + ["Quantity must be at least 1"]
+        } else {
+          # Check product exists and has inventory
+          $ product = db.products.get(item.product_id)
+
+          if product == null {
+            $ hasError = true
+            $ errorDetails = errorDetails + ["Product not found"]
+          } else {
+            if product.inventory < item.quantity {
+              $ hasError = true
+              $ errorDetails = errorDetails + ["Insufficient inventory for product"]
+            } else {
+              $ itemTotal = product.price * item.quantity
+              $ total = total + itemTotal
+              $ validatedItems = validatedItems + [{
+                product_id: product.id,
+                name: product.name,
+                quantity: item.quantity,
+                price: product.price
+              }]
+            }
+          }
+        }
+      }
+    }
+
+    if hasError == true {
+      > {
+        success: false,
+        data: null,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Order validation failed",
+          field: "items",
+          details: errorDetails
+        },
+        timestamp: now()
+      }
+    } else {
+      # Create the order
+      $ newOrder = db.orders.create({
+        user_id: userId,
+        items: validatedItems,
+        total: total,
+        status: "pending",
+        created_at: now()
+      })
+
+      # Update inventory for each item
+      for item in validatedItems {
+        $ product = db.products.get(item.product_id)
+        $ product.inventory = product.inventory - item.quantity
+        $ updated = db.products.update(item.product_id, product)
+      }
+
+      > {
+        success: true,
+        data: newOrder,
+        error: null,
+        timestamp: now()
+      }
+    }
+  }
+
+# Delete resource with cascading error handling
+@ route /api/users/:id [DELETE] -> ApiResponse
+  + auth(jwt, role: admin)
+  + ratelimit(10/min)
+  % db: Database
+
+  $ user = db.users.get(id)
+
+  if user == null {
+    > {
+      success: false,
+      data: null,
+      error: {
+        code: "NOT_FOUND",
+        message: "User not found",
+        resource: "user",
+        resource_id: id
+      },
+      timestamp: now()
+    }
+  } else {
+    # Prevent deleting yourself
+    if user.id == auth.user.id {
+      > {
+        success: false,
+        data: null,
+        error: {
+          code: "FORBIDDEN",
+          message: "Cannot delete your own account",
+          required_role: null,
+          action: "delete_self"
+        },
+        timestamp: now()
+      }
+    } else {
+      # Check for pending orders
+      $ pendingOrders = db.orders.findWhere("user_id", id, "status", "pending")
+
+      if pendingOrders.length() > 0 {
+        > {
+          success: false,
+          data: null,
+          error: {
+            code: "CONFLICT",
+            message: "Cannot delete user with pending orders",
+            resource: "user",
+            resource_id: id
+          },
+          timestamp: now()
+        }
+      } else {
+        # Delete related data first
+        $ profileDeleted = db.profiles.deleteWhere("user_id", id)
+        $ sessionsDeleted = db.sessions.deleteWhere("user_id", id)
+
+        # Then delete user
+        $ deleted = db.users.delete(id)
+
+        > {
+          success: true,
+          data: {
+            deleted_user_id: id,
+            deleted_profiles: profileDeleted,
+            deleted_sessions: sessionsDeleted
+          },
+          error: null,
+          timestamp: now()
+        }
+      }
+    }
+  }
+
+# Process payment with multiple failure modes
+@ route /api/payments [POST] -> ApiResponse
+  + auth(jwt)
+  + ratelimit(10/min)
+  % db: Database
+
+  $ userId = auth.user.id
+
+  # Validate payment data
+  if input.order_id == null {
+    > {
+      success: false,
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Order ID is required",
+        field: "order_id",
+        details: []
+      },
+      timestamp: now()
+    }
+  } else {
+    if input.payment_method == null {
+      > {
+        success: false,
+        data: null,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Payment method is required",
+          field: "payment_method",
+          details: ["Accepted methods: credit_card, debit_card, paypal"]
+        },
+        timestamp: now()
+      }
+    } else {
+      # Check order exists
+      $ order = db.orders.get(input.order_id)
+
+      if order == null {
+        > {
+          success: false,
+          data: null,
+          error: {
+            code: "NOT_FOUND",
+            message: "Order not found",
+            resource: "order",
+            resource_id: input.order_id
+          },
+          timestamp: now()
+        }
+      } else {
+        # Check order belongs to user
+        if order.user_id != userId {
+          > {
+            success: false,
+            data: null,
+            error: {
+              code: "FORBIDDEN",
+              message: "Order does not belong to you",
+              required_role: "order_owner",
+              action: "pay_order"
+            },
+            timestamp: now()
+          }
+        } else {
+          # Check order is not already paid
+          if order.status == "paid" {
+            > {
+              success: false,
+              data: null,
+              error: {
+                code: "CONFLICT",
+                message: "Order has already been paid",
+                resource: "order",
+                resource_id: input.order_id
+              },
+              timestamp: now()
+            }
+          } else {
+            if order.status == "cancelled" {
+              > {
+                success: false,
+                data: null,
+                error: {
+                  code: "CONFLICT",
+                  message: "Cannot pay for a cancelled order",
+                  resource: "order",
+                  resource_id: input.order_id
+                },
+                timestamp: now()
+              }
+            } else {
+              # Process payment (simulated)
+              $ payment = db.payments.create({
+                order_id: order.id,
+                user_id: userId,
+                amount: order.total,
+                method: input.payment_method,
+                status: "completed",
+                processed_at: now()
+              })
+
+              # Update order status
+              $ order.status = "paid"
+              $ updatedOrder = db.orders.update(order.id, order)
+
+              > {
+                success: true,
+                data: {
+                  payment_id: payment.id,
+                  order_id: order.id,
+                  amount: payment.amount,
+                  status: "completed"
+                },
+                error: null,
+                timestamp: now()
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+# Bulk operation with partial failure handling
+@ route /api/products/bulk-update [PUT] -> ApiResponse
+  + auth(jwt, role: admin)
+  + ratelimit(5/min)
+  % db: Database
+
+  if input.updates == null || input.updates.length() == 0 {
+    > {
+      success: false,
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Updates array is required",
+        field: "updates",
+        details: []
+      },
+      timestamp: now()
+    }
+  } else {
+    $ successCount = 0
+    $ failureCount = 0
+    $ failures = []
+    $ successes = []
+
+    for update in input.updates {
+      if update.id == null {
+        $ failureCount = failureCount + 1
+        $ failures = failures + [{
+          id: null,
+          error: "Product ID is required"
+        }]
+      } else {
+        $ product = db.products.get(update.id)
+
+        if product == null {
+          $ failureCount = failureCount + 1
+          $ failures = failures + [{
+            id: update.id,
+            error: "Product not found"
+          }]
+        } else {
+          # Update product fields
+          if update.price != null {
+            $ product.price = update.price
+          }
+          if update.quantity != null {
+            $ product.quantity = update.quantity
+          }
+          if update.name != null {
+            $ product.name = update.name
+          }
+
+          $ updated = db.products.update(update.id, product)
+          $ successCount = successCount + 1
+          $ successes = successes + [update.id]
+        }
+      }
+    }
+
+    # Return partial success result
+    if failureCount > 0 && successCount > 0 {
+      > {
+        success: true,
+        data: {
+          status: "partial",
+          total: input.updates.length(),
+          succeeded: successCount,
+          failed: failureCount,
+          success_ids: successes,
+          failures: failures
+        },
+        error: null,
+        timestamp: now()
+      }
+    } else {
+      if failureCount > 0 {
+        > {
+          success: false,
+          data: null,
+          error: {
+            code: "BULK_OPERATION_FAILED",
+            message: "All updates failed",
+            field: "updates",
+            details: failures
+          },
+          timestamp: now()
+        }
+      } else {
+        > {
+          success: true,
+          data: {
+            status: "complete",
+            total: input.updates.length(),
+            succeeded: successCount,
+            failed: 0,
+            success_ids: successes
+          },
+          error: null,
+          timestamp: now()
+        }
+      }
+    }
+  }
+
+# Refund request with state validation
+@ route /api/orders/:id/refund [POST] -> ApiResponse
+  + auth(jwt)
+  + ratelimit(5/min)
+  % db: Database
+
+  $ userId = auth.user.id
+  $ order = db.orders.get(id)
+
+  if order == null {
+    > {
+      success: false,
+      data: null,
+      error: {
+        code: "NOT_FOUND",
+        message: "Order not found",
+        resource: "order",
+        resource_id: id
+      },
+      timestamp: now()
+    }
+  } else {
+    # Verify ownership
+    if order.user_id != userId && auth.user.role != "admin" {
+      > {
+        success: false,
+        data: null,
+        error: {
+          code: "FORBIDDEN",
+          message: "Cannot request refund for another user's order",
+          required_role: "owner or admin",
+          action: "request_refund"
+        },
+        timestamp: now()
+      }
+    } else {
+      # Check order status
+      if order.status != "paid" && order.status != "delivered" {
+        > {
+          success: false,
+          data: null,
+          error: {
+            code: "INVALID_STATE",
+            message: "Can only refund paid or delivered orders",
+            resource: "order",
+            resource_id: id
+          },
+          timestamp: now()
+        }
+      } else {
+        # Check if already refunded
+        $ existingRefund = db.refunds.findOne("order_id", id)
+        if existingRefund != null {
+          > {
+            success: false,
+            data: null,
+            error: {
+              code: "DUPLICATE",
+              message: "Refund already requested for this order",
+              resource: "refund",
+              resource_id: existingRefund.id
+            },
+            timestamp: now()
+          }
+        } else {
+          # Validate refund reason
+          if input.reason == null || input.reason == "" {
+            > {
+              success: false,
+              data: null,
+              error: {
+                code: "VALIDATION_ERROR",
+                message: "Refund reason is required",
+                field: "reason",
+                details: []
+              },
+              timestamp: now()
+            }
+          } else {
+            # Create refund request
+            $ refund = db.refunds.create({
+              order_id: order.id,
+              user_id: userId,
+              amount: order.total,
+              reason: input.reason,
+              status: "pending",
+              created_at: now()
+            })
+
+            # Update order status
+            $ order.status = "refund_pending"
+            $ updatedOrder = db.orders.update(order.id, order)
+
+            > {
+              success: true,
+              data: {
+                refund_id: refund.id,
+                order_id: order.id,
+                amount: refund.amount,
+                status: "pending"
+              },
+              error: null,
+              timestamp: now()
+            }
+          }
+        }
+      }
+    }
+  }
+
+# Health check endpoint
+@ route /health
+  > {
+    success: true,
+    data: {
+      status: "ok",
+      service: "error-handling-demo"
+    },
+    error: null,
+    timestamp: now()
+  }

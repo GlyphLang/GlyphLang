@@ -1,0 +1,551 @@
+# Validation Demo API
+# Demonstrates input validation patterns including required fields,
+# format validation, range checks, and custom validation rules
+
+# Define request/response types
+: CreateUserRequest {
+  username: str!
+  email: str!
+  password: str!
+  age: int
+  phone: str
+}
+
+: UpdateUserRequest {
+  email: str
+  age: int
+  phone: str
+  bio: str
+}
+
+: ProductRequest {
+  name: str!
+  price: float!
+  quantity: int!
+  category: str!
+  sku: str
+}
+
+: ValidationError {
+  field: str!
+  message: str!
+  code: str!
+}
+
+: ApiResponse {
+  success: bool!
+  message: str!
+  data: any
+  errors: List[ValidationError]
+}
+
+# Create user with comprehensive validation
+@ route /api/users [POST] -> ApiResponse
+  + ratelimit(20/min)
+  % db: Database
+
+  $ errors = []
+  $ hasErrors = false
+
+  # Validate username - required, length between 3-50 chars
+  if input.username == null || input.username == "" {
+    $ errors = errors + [{
+      field: "username",
+      message: "Username is required",
+      code: "REQUIRED"
+    }]
+    $ hasErrors = true
+  } else {
+    if input.username.length() < 3 {
+      $ errors = errors + [{
+        field: "username",
+        message: "Username must be at least 3 characters",
+        code: "MIN_LENGTH"
+      }]
+      $ hasErrors = true
+    } else {
+      if input.username.length() > 50 {
+        $ errors = errors + [{
+          field: "username",
+          message: "Username must be at most 50 characters",
+          code: "MAX_LENGTH"
+        }]
+        $ hasErrors = true
+      }
+    }
+  }
+
+  # Validate email - required, valid format, unique
+  if input.email == null || input.email == "" {
+    $ errors = errors + [{
+      field: "email",
+      message: "Email is required",
+      code: "REQUIRED"
+    }]
+    $ hasErrors = true
+  } else {
+    # Check basic email format (contains @ and .)
+    $ emailValid = input.email.contains("@")
+    if emailValid == false {
+      $ errors = errors + [{
+        field: "email",
+        message: "Invalid email format",
+        code: "INVALID_FORMAT"
+      }]
+      $ hasErrors = true
+    } else {
+      # Check uniqueness
+      $ existingEmail = db.users.findOne("email", input.email)
+      if existingEmail != null {
+        $ errors = errors + [{
+          field: "email",
+          message: "Email already registered",
+          code: "ALREADY_EXISTS"
+        }]
+        $ hasErrors = true
+      }
+    }
+  }
+
+  # Validate password - required, minimum 8 chars
+  if input.password == null || input.password == "" {
+    $ errors = errors + [{
+      field: "password",
+      message: "Password is required",
+      code: "REQUIRED"
+    }]
+    $ hasErrors = true
+  } else {
+    if input.password.length() < 8 {
+      $ errors = errors + [{
+        field: "password",
+        message: "Password must be at least 8 characters",
+        code: "MIN_LENGTH"
+      }]
+      $ hasErrors = true
+    }
+  }
+
+  # Validate age - optional, but if provided must be 0-150
+  if input.age != null {
+    if input.age < 0 {
+      $ errors = errors + [{
+        field: "age",
+        message: "Age cannot be negative",
+        code: "MIN_VALUE"
+      }]
+      $ hasErrors = true
+    } else {
+      if input.age > 150 {
+        $ errors = errors + [{
+          field: "age",
+          message: "Age cannot exceed 150",
+          code: "MAX_VALUE"
+        }]
+        $ hasErrors = true
+      }
+    }
+  }
+
+  # Validate phone - optional, but if provided must be valid format
+  if input.phone != null && input.phone != "" {
+    if input.phone.length() < 10 || input.phone.length() > 15 {
+      $ errors = errors + [{
+        field: "phone",
+        message: "Phone must be 10-15 digits",
+        code: "INVALID_FORMAT"
+      }]
+      $ hasErrors = true
+    }
+  }
+
+  # Return errors if validation failed
+  if hasErrors == true {
+    > {
+      success: false,
+      message: "Validation failed",
+      data: null,
+      errors: errors
+    }
+  } else {
+    # Create user
+    $ hashedPassword = crypto.hash(input.password)
+    $ newUser = db.users.create({
+      username: input.username,
+      email: input.email,
+      password: hashedPassword,
+      age: input.age,
+      phone: input.phone,
+      created_at: now()
+    })
+
+    > {
+      success: true,
+      message: "User created successfully",
+      data: {
+        id: newUser.id,
+        username: newUser.username,
+        email: newUser.email
+      },
+      errors: []
+    }
+  }
+
+# Update user with partial validation
+@ route /api/users/:id [PUT] -> ApiResponse
+  + auth(jwt)
+  + ratelimit(30/min)
+  % db: Database
+
+  $ errors = []
+  $ hasErrors = false
+
+  # Check user exists
+  $ existingUser = db.users.get(id)
+  if existingUser == null {
+    > {
+      success: false,
+      message: "User not found",
+      data: null,
+      errors: [{
+        field: "id",
+        message: "User with this ID does not exist",
+        code: "NOT_FOUND"
+      }]
+    }
+  } else {
+    # Validate email if provided
+    if input.email != null && input.email != "" {
+      $ emailValid = input.email.contains("@")
+      if emailValid == false {
+        $ errors = errors + [{
+          field: "email",
+          message: "Invalid email format",
+          code: "INVALID_FORMAT"
+        }]
+        $ hasErrors = true
+      } else {
+        # Check uniqueness (excluding current user)
+        $ existingEmail = db.users.findOne("email", input.email)
+        if existingEmail != null && existingEmail.id != id {
+          $ errors = errors + [{
+            field: "email",
+            message: "Email already registered to another user",
+            code: "ALREADY_EXISTS"
+          }]
+          $ hasErrors = true
+        }
+      }
+    }
+
+    # Validate age if provided
+    if input.age != null {
+      if input.age < 0 || input.age > 150 {
+        $ errors = errors + [{
+          field: "age",
+          message: "Age must be between 0 and 150",
+          code: "OUT_OF_RANGE"
+        }]
+        $ hasErrors = true
+      }
+    }
+
+    # Validate phone if provided
+    if input.phone != null && input.phone != "" {
+      if input.phone.length() < 10 || input.phone.length() > 15 {
+        $ errors = errors + [{
+          field: "phone",
+          message: "Phone must be 10-15 digits",
+          code: "INVALID_FORMAT"
+        }]
+        $ hasErrors = true
+      }
+    }
+
+    # Validate bio length if provided
+    if input.bio != null && input.bio.length() > 500 {
+      $ errors = errors + [{
+        field: "bio",
+        message: "Bio cannot exceed 500 characters",
+        code: "MAX_LENGTH"
+      }]
+      $ hasErrors = true
+    }
+
+    if hasErrors == true {
+      > {
+        success: false,
+        message: "Validation failed",
+        data: null,
+        errors: errors
+      }
+    } else {
+      # Update only provided fields
+      if input.email != null {
+        $ existingUser.email = input.email
+      }
+      if input.age != null {
+        $ existingUser.age = input.age
+      }
+      if input.phone != null {
+        $ existingUser.phone = input.phone
+      }
+      if input.bio != null {
+        $ existingUser.bio = input.bio
+      }
+
+      $ updated = db.users.update(id, existingUser)
+
+      > {
+        success: true,
+        message: "User updated successfully",
+        data: updated,
+        errors: []
+      }
+    }
+  }
+
+# Create product with business rule validation
+@ route /api/products [POST] -> ApiResponse
+  + auth(jwt, role: admin)
+  + ratelimit(50/min)
+  % db: Database
+
+  $ errors = []
+  $ hasErrors = false
+
+  # Validate name - required, 2-100 chars
+  if input.name == null || input.name == "" {
+    $ errors = errors + [{
+      field: "name",
+      message: "Product name is required",
+      code: "REQUIRED"
+    }]
+    $ hasErrors = true
+  } else {
+    if input.name.length() < 2 || input.name.length() > 100 {
+      $ errors = errors + [{
+        field: "name",
+        message: "Product name must be 2-100 characters",
+        code: "LENGTH_ERROR"
+      }]
+      $ hasErrors = true
+    }
+  }
+
+  # Validate price - required, must be positive
+  if input.price == null {
+    $ errors = errors + [{
+      field: "price",
+      message: "Price is required",
+      code: "REQUIRED"
+    }]
+    $ hasErrors = true
+  } else {
+    if input.price <= 0 {
+      $ errors = errors + [{
+        field: "price",
+        message: "Price must be greater than 0",
+        code: "MIN_VALUE"
+      }]
+      $ hasErrors = true
+    } else {
+      if input.price > 999999.99 {
+        $ errors = errors + [{
+          field: "price",
+          message: "Price cannot exceed 999999.99",
+          code: "MAX_VALUE"
+        }]
+        $ hasErrors = true
+      }
+    }
+  }
+
+  # Validate quantity - required, non-negative integer
+  if input.quantity == null {
+    $ errors = errors + [{
+      field: "quantity",
+      message: "Quantity is required",
+      code: "REQUIRED"
+    }]
+    $ hasErrors = true
+  } else {
+    if input.quantity < 0 {
+      $ errors = errors + [{
+        field: "quantity",
+        message: "Quantity cannot be negative",
+        code: "MIN_VALUE"
+      }]
+      $ hasErrors = true
+    }
+  }
+
+  # Validate category - required, must be from allowed list
+  $ categoryValid = false
+
+  if input.category == null || input.category == "" {
+    $ errors = errors + [{
+      field: "category",
+      message: "Category is required",
+      code: "REQUIRED"
+    }]
+    $ hasErrors = true
+  } else {
+    if input.category == "electronics" || input.category == "clothing" || input.category == "food" || input.category == "home" || input.category == "other" {
+      $ categoryValid = true
+    }
+
+    if categoryValid == false {
+      $ errors = errors + [{
+        field: "category",
+        message: "Invalid category. Must be: electronics, clothing, food, home, or other",
+        code: "INVALID_VALUE"
+      }]
+      $ hasErrors = true
+    }
+  }
+
+  # Validate SKU if provided - must be alphanumeric and 8-20 chars
+  if input.sku != null && input.sku != "" {
+    if input.sku.length() < 8 || input.sku.length() > 20 {
+      $ errors = errors + [{
+        field: "sku",
+        message: "SKU must be 8-20 characters",
+        code: "LENGTH_ERROR"
+      }]
+      $ hasErrors = true
+    } else {
+      # Check uniqueness
+      $ existingSku = db.products.findOne("sku", input.sku)
+      if existingSku != null {
+        $ errors = errors + [{
+          field: "sku",
+          message: "SKU already exists",
+          code: "ALREADY_EXISTS"
+        }]
+        $ hasErrors = true
+      }
+    }
+  }
+
+  if hasErrors == true {
+    > {
+      success: false,
+      message: "Validation failed",
+      data: null,
+      errors: errors
+    }
+  } else {
+    $ newProduct = db.products.create({
+      name: input.name,
+      price: input.price,
+      quantity: input.quantity,
+      category: input.category,
+      sku: input.sku,
+      created_at: now()
+    })
+
+    > {
+      success: true,
+      message: "Product created successfully",
+      data: newProduct,
+      errors: []
+    }
+  }
+
+# Validate search query parameters
+@ route /api/search [GET] -> ApiResponse
+  + ratelimit(100/min)
+  % db: Database
+
+  $ errors = []
+  $ hasErrors = false
+
+  # Query parameter validation
+  if input.q == null || input.q == "" {
+    $ errors = errors + [{
+      field: "q",
+      message: "Search query is required",
+      code: "REQUIRED"
+    }]
+    $ hasErrors = true
+  } else {
+    if input.q.length() < 2 {
+      $ errors = errors + [{
+        field: "q",
+        message: "Search query must be at least 2 characters",
+        code: "MIN_LENGTH"
+      }]
+      $ hasErrors = true
+    } else {
+      if input.q.length() > 100 {
+        $ errors = errors + [{
+          field: "q",
+          message: "Search query cannot exceed 100 characters",
+          code: "MAX_LENGTH"
+        }]
+        $ hasErrors = true
+      }
+    }
+  }
+
+  # Validate page number if provided
+  if input.page != null {
+    if input.page < 1 {
+      $ errors = errors + [{
+        field: "page",
+        message: "Page number must be at least 1",
+        code: "MIN_VALUE"
+      }]
+      $ hasErrors = true
+    }
+  }
+
+  # Validate limit if provided
+  if input.limit != null {
+    if input.limit < 1 || input.limit > 100 {
+      $ errors = errors + [{
+        field: "limit",
+        message: "Limit must be between 1 and 100",
+        code: "OUT_OF_RANGE"
+      }]
+      $ hasErrors = true
+    }
+  }
+
+  if hasErrors == true {
+    > {
+      success: false,
+      message: "Invalid search parameters",
+      data: null,
+      errors: errors
+    }
+  } else {
+    $ page = input.page
+    if page == null {
+      $ page = 1
+    }
+
+    $ limit = input.limit
+    if limit == null {
+      $ limit = 20
+    }
+
+    $ results = db.products.search(input.q, page, limit)
+
+    > {
+      success: true,
+      message: "Search completed",
+      data: {
+        query: input.q,
+        page: page,
+        limit: limit,
+        results: results
+      },
+      errors: []
+    }
+  }
+
+# Health check endpoint
+@ route /health
+  > {status: "ok", service: "validation-demo", timestamp: now()}

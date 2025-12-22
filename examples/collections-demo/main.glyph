@@ -1,0 +1,681 @@
+# Collections Demo API
+# Demonstrates working with arrays, objects, iteration patterns,
+# and collection manipulation including filtering, mapping, and aggregation
+
+# Define types for collection examples
+: Product {
+  id: int!
+  name: str!
+  price: float!
+  category: str!
+  tags: List[str]
+  inventory: int!
+  active: bool!
+}
+
+: CartItem {
+  product_id: int!
+  product_name: str!
+  quantity: int!
+  unit_price: float!
+  subtotal: float!
+}
+
+: ShoppingCart {
+  id: int!
+  user_id: int!
+  items: List[CartItem]
+  item_count: int!
+  total: float!
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+: Category {
+  name: str!
+  count: int!
+  total_value: float!
+}
+
+: ProductStats {
+  total_products: int!
+  active_products: int!
+  total_inventory: int!
+  total_value: float!
+  average_price: float!
+  categories: List[Category]
+}
+
+: ApiResponse {
+  success: bool!
+  data: any
+  message: str
+}
+
+# Get all products with filtering and pagination
+@ route /api/products [GET] -> ApiResponse
+  + ratelimit(100/min)
+  % db: Database
+
+  $ allProducts = db.products.all()
+
+  # Apply category filter if provided
+  $ filtered = []
+  if input.category != null && input.category != "" {
+    for product in allProducts {
+      if product.category == input.category {
+        $ filtered = filtered + [product]
+      }
+    }
+  } else {
+    $ filtered = allProducts
+  }
+
+  # Apply active filter if provided
+  $ activeFiltered = []
+  if input.active != null {
+    for product in filtered {
+      if product.active == input.active {
+        $ activeFiltered = activeFiltered + [product]
+      }
+    }
+  } else {
+    $ activeFiltered = filtered
+  }
+
+  # Apply price range filter
+  $ priceFiltered = []
+  $ minPrice = input.min_price
+  $ maxPrice = input.max_price
+
+  if minPrice == null {
+    $ minPrice = 0
+  }
+  if maxPrice == null {
+    $ maxPrice = 999999999
+  }
+
+  for product in activeFiltered {
+    if product.price >= minPrice && product.price <= maxPrice {
+      $ priceFiltered = priceFiltered + [product]
+    }
+  }
+
+  # Apply tag filter if provided
+  $ tagFiltered = []
+  if input.tag != null && input.tag != "" {
+    for product in priceFiltered {
+      $ hasTag = false
+      for tag in product.tags {
+        if tag == input.tag {
+          $ hasTag = true
+        }
+      }
+      if hasTag == true {
+        $ tagFiltered = tagFiltered + [product]
+      }
+    }
+  } else {
+    $ tagFiltered = priceFiltered
+  }
+
+  # Pagination
+  $ page = input.page
+  $ limit = input.limit
+
+  if page == null || page < 1 {
+    $ page = 1
+  }
+  if limit == null || limit < 1 {
+    $ limit = 20
+  }
+  if limit > 100 {
+    $ limit = 100
+  }
+
+  $ startIndex = (page - 1) * limit
+  $ endIndex = startIndex + limit
+  $ totalItems = tagFiltered.length()
+  $ totalPages = (totalItems + limit - 1) / limit
+
+  # Extract page items
+  $ pageItems = []
+  $ currentIndex = 0
+  for product in tagFiltered {
+    if currentIndex >= startIndex && currentIndex < endIndex {
+      $ pageItems = pageItems + [product]
+    }
+    $ currentIndex = currentIndex + 1
+  }
+
+  > {
+    success: true,
+    data: {
+      items: pageItems,
+      pagination: {
+        page: page,
+        limit: limit,
+        total_items: totalItems,
+        total_pages: totalPages,
+        has_next: page < totalPages,
+        has_prev: page > 1
+      }
+    },
+    message: null
+  }
+
+# Get product statistics with aggregation
+@ route /api/products/stats [GET] -> ApiResponse
+  + auth(jwt)
+  + ratelimit(50/min)
+  % db: Database
+
+  $ allProducts = db.products.all()
+
+  $ totalProducts = 0
+  $ activeProducts = 0
+  $ totalInventory = 0
+  $ totalValue = 0.0
+  $ priceSum = 0.0
+  $ minPrice = 999999999.0
+  $ maxPrice = 0.0
+
+  # Category counts
+  $ electronicsCount = 0
+  $ electronicsValue = 0.0
+  $ clothingCount = 0
+  $ clothingValue = 0.0
+  $ foodCount = 0
+  $ foodValue = 0.0
+  $ homeCount = 0
+  $ homeValue = 0.0
+  $ otherCount = 0
+  $ otherValue = 0.0
+
+  for product in allProducts {
+    $ totalProducts = totalProducts + 1
+    $ priceSum = priceSum + product.price
+    $ totalInventory = totalInventory + product.inventory
+    $ totalValue = totalValue + (product.price * product.inventory)
+
+    if product.active == true {
+      $ activeProducts = activeProducts + 1
+    }
+
+    if product.price < minPrice {
+      $ minPrice = product.price
+    }
+    if product.price > maxPrice {
+      $ maxPrice = product.price
+    }
+
+    # Aggregate by category
+    $ itemValue = product.price * product.inventory
+    if product.category == "electronics" {
+      $ electronicsCount = electronicsCount + 1
+      $ electronicsValue = electronicsValue + itemValue
+    } else {
+      if product.category == "clothing" {
+        $ clothingCount = clothingCount + 1
+        $ clothingValue = clothingValue + itemValue
+      } else {
+        if product.category == "food" {
+          $ foodCount = foodCount + 1
+          $ foodValue = foodValue + itemValue
+        } else {
+          if product.category == "home" {
+            $ homeCount = homeCount + 1
+            $ homeValue = homeValue + itemValue
+          } else {
+            $ otherCount = otherCount + 1
+            $ otherValue = otherValue + itemValue
+          }
+        }
+      }
+    }
+  }
+
+  # Calculate average price
+  $ averagePrice = 0.0
+  if totalProducts > 0 {
+    $ averagePrice = priceSum / totalProducts
+  }
+
+  # Build category list
+  $ categoryList = []
+  if electronicsCount > 0 {
+    $ categoryList = categoryList + [{name: "electronics", count: electronicsCount, total_value: electronicsValue}]
+  }
+  if clothingCount > 0 {
+    $ categoryList = categoryList + [{name: "clothing", count: clothingCount, total_value: clothingValue}]
+  }
+  if foodCount > 0 {
+    $ categoryList = categoryList + [{name: "food", count: foodCount, total_value: foodValue}]
+  }
+  if homeCount > 0 {
+    $ categoryList = categoryList + [{name: "home", count: homeCount, total_value: homeValue}]
+  }
+  if otherCount > 0 {
+    $ categoryList = categoryList + [{name: "other", count: otherCount, total_value: otherValue}]
+  }
+
+  > {
+    success: true,
+    data: {
+      total_products: totalProducts,
+      active_products: activeProducts,
+      total_inventory: totalInventory,
+      total_value: totalValue,
+      average_price: averagePrice,
+      categories: categoryList,
+      price_range: {
+        min: minPrice,
+        max: maxPrice
+      }
+    },
+    message: null
+  }
+
+# Get shopping cart with calculated totals
+@ route /api/cart [GET] -> ApiResponse
+  + auth(jwt)
+  + ratelimit(100/min)
+  % db: Database
+
+  $ userId = auth.user.id
+  $ cart = db.carts.findOne("user_id", userId)
+
+  if cart == null {
+    > {
+      success: true,
+      data: {
+        id: null,
+        user_id: userId,
+        items: [],
+        item_count: 0,
+        total: 0.0
+      },
+      message: "Cart is empty"
+    }
+  } else {
+    # Enrich cart items with current product info
+    $ enrichedItems = []
+    $ total = 0.0
+    $ itemCount = 0
+
+    for item in cart.items {
+      $ product = db.products.get(item.product_id)
+
+      if product != null && product.active == true {
+        $ subtotal = product.price * item.quantity
+        $ enrichedItems = enrichedItems + [{
+          product_id: product.id,
+          product_name: product.name,
+          quantity: item.quantity,
+          unit_price: product.price,
+          subtotal: subtotal,
+          in_stock: product.inventory >= item.quantity
+        }]
+        $ total = total + subtotal
+        $ itemCount = itemCount + item.quantity
+      }
+    }
+
+    > {
+      success: true,
+      data: {
+        id: cart.id,
+        user_id: userId,
+        items: enrichedItems,
+        item_count: itemCount,
+        total: total,
+        updated_at: cart.updated_at
+      },
+      message: null
+    }
+  }
+
+# Add item to cart with quantity handling
+@ route /api/cart/items [POST] -> ApiResponse
+  + auth(jwt)
+  + ratelimit(50/min)
+  % db: Database
+
+  $ userId = auth.user.id
+
+  # Validate input
+  if input.product_id == null {
+    > {
+      success: false,
+      data: null,
+      message: "Product ID is required"
+    }
+  } else {
+    $ quantity = input.quantity
+    if quantity == null || quantity < 1 {
+      $ quantity = 1
+    }
+
+    # Check product exists and is active
+    $ product = db.products.get(input.product_id)
+
+    if product == null {
+      > {
+        success: false,
+        data: null,
+        message: "Product not found"
+      }
+    } else {
+      if product.active == false {
+        > {
+          success: false,
+          data: null,
+          message: "Product is not available"
+        }
+      } else {
+        if product.inventory < quantity {
+          > {
+            success: false,
+            data: null,
+            message: "Insufficient inventory"
+          }
+        } else {
+          # Get or create cart
+          $ cart = db.carts.findOne("user_id", userId)
+
+          if cart == null {
+            $ cart = db.carts.create({
+              user_id: userId,
+              items: [],
+              created_at: now(),
+              updated_at: now()
+            })
+          }
+
+          # Check if product already in cart
+          $ existingIndex = -1
+          $ currentIndex = 0
+          for item in cart.items {
+            if item.product_id == input.product_id {
+              $ existingIndex = currentIndex
+            }
+            $ currentIndex = currentIndex + 1
+          }
+
+          if existingIndex >= 0 {
+            # Update quantity of existing item
+            $ newItems = []
+            $ itemIndex = 0
+            for item in cart.items {
+              if itemIndex == existingIndex {
+                $ newQuantity = item.quantity + quantity
+                if newQuantity > product.inventory {
+                  $ newQuantity = product.inventory
+                }
+                $ newItems = newItems + [{
+                  product_id: item.product_id,
+                  quantity: newQuantity
+                }]
+              } else {
+                $ newItems = newItems + [item]
+              }
+              $ itemIndex = itemIndex + 1
+            }
+            $ cart.items = newItems
+          } else {
+            # Add new item
+            $ cart.items = cart.items + [{
+              product_id: input.product_id,
+              quantity: quantity
+            }]
+          }
+
+          $ cart.updated_at = now()
+          $ updated = db.carts.update(cart.id, cart)
+
+          # Calculate totals
+          $ total = 0.0
+          $ itemCount = 0
+          for item in cart.items {
+            $ prod = db.products.get(item.product_id)
+            if prod != null {
+              $ total = total + (prod.price * item.quantity)
+              $ itemCount = itemCount + item.quantity
+            }
+          }
+
+          > {
+            success: true,
+            data: {
+              cart_id: cart.id,
+              item_count: itemCount,
+              total: total,
+              added_product: product.name,
+              added_quantity: quantity
+            },
+            message: "Item added to cart"
+          }
+        }
+      }
+    }
+  }
+
+# Get products by multiple IDs (batch lookup)
+@ route /api/products/batch [POST] -> ApiResponse
+  + ratelimit(50/min)
+  % db: Database
+
+  if input.ids == null || input.ids.length() == 0 {
+    > {
+      success: false,
+      data: null,
+      message: "Product IDs array is required"
+    }
+  } else {
+    $ results = []
+    $ found = []
+    $ notFound = []
+
+    for id in input.ids {
+      $ product = db.products.get(id)
+
+      if product != null {
+        $ results = results + [product]
+        $ found = found + [id]
+      } else {
+        $ notFound = notFound + [id]
+      }
+    }
+
+    > {
+      success: true,
+      data: {
+        products: results,
+        found_count: found.length(),
+        not_found_count: notFound.length(),
+        not_found_ids: notFound
+      },
+      message: null
+    }
+  }
+
+# Search products with complex filtering
+@ route /api/products/search [POST] -> ApiResponse
+  + ratelimit(30/min)
+  % db: Database
+
+  $ allProducts = db.products.all()
+  $ results = []
+
+  # Build search criteria
+  $ searchTerm = input.query
+  $ categories = input.categories
+  $ tags = input.tags
+  $ inStockOnly = input.in_stock_only
+
+  # Filter products
+  for product in allProducts {
+    $ matches = true
+
+    # Text search in name
+    if searchTerm != null && searchTerm != "" {
+      if product.name.contains(searchTerm) == false {
+        $ matches = false
+      }
+    }
+
+    # Category filter (any match)
+    if matches == true && categories != null && categories.length() > 0 {
+      $ categoryMatch = false
+      for cat in categories {
+        if product.category == cat {
+          $ categoryMatch = true
+        }
+      }
+      if categoryMatch == false {
+        $ matches = false
+      }
+    }
+
+    # Tag filter (any match)
+    if matches == true && tags != null && tags.length() > 0 {
+      $ tagMatch = false
+      for searchTag in tags {
+        for productTag in product.tags {
+          if productTag == searchTag {
+            $ tagMatch = true
+          }
+        }
+      }
+      if tagMatch == false {
+        $ matches = false
+      }
+    }
+
+    # In stock filter
+    if matches == true && inStockOnly == true {
+      if product.inventory < 1 || product.active == false {
+        $ matches = false
+      }
+    }
+
+    if matches == true {
+      $ results = results + [product]
+    }
+  }
+
+  > {
+    success: true,
+    data: {
+      results: results,
+      total: results.length(),
+      filters_applied: {
+        query: searchTerm,
+        categories: categories,
+        tags: tags,
+        in_stock_only: inStockOnly
+      }
+    },
+    message: null
+  }
+
+# Get related products based on category and tags
+@ route /api/products/:id/related [GET] -> ApiResponse
+  + ratelimit(100/min)
+  % db: Database
+
+  $ product = db.products.get(id)
+
+  if product == null {
+    > {
+      success: false,
+      data: null,
+      message: "Product not found"
+    }
+  } else {
+    $ allProducts = db.products.all()
+    $ related = []
+    $ count = 0
+
+    # Find related products by category
+    for candidate in allProducts {
+      if candidate.id != id && candidate.active == true && count < 5 {
+        $ isRelated = false
+
+        # Same category
+        if candidate.category == product.category {
+          $ isRelated = true
+        }
+
+        # Matching tags
+        if isRelated == false {
+          for prodTag in product.tags {
+            for candTag in candidate.tags {
+              if prodTag == candTag {
+                $ isRelated = true
+              }
+            }
+          }
+        }
+
+        if isRelated == true {
+          $ related = related + [candidate]
+          $ count = count + 1
+        }
+      }
+    }
+
+    > {
+      success: true,
+      data: {
+        product_id: id,
+        product_name: product.name,
+        related_products: related,
+        related_count: related.length()
+      },
+      message: null
+    }
+  }
+
+# Clear cart (remove all items)
+@ route /api/cart [DELETE] -> ApiResponse
+  + auth(jwt)
+  + ratelimit(20/min)
+  % db: Database
+
+  $ userId = auth.user.id
+  $ cart = db.carts.findOne("user_id", userId)
+
+  if cart == null {
+    > {
+      success: true,
+      data: {
+        items_removed: 0
+      },
+      message: "Cart was already empty"
+    }
+  } else {
+    $ itemCount = cart.items.length()
+    $ cart.items = []
+    $ cart.updated_at = now()
+    $ updated = db.carts.update(cart.id, cart)
+
+    > {
+      success: true,
+      data: {
+        items_removed: itemCount
+      },
+      message: "Cart cleared"
+    }
+  }
+
+# Health check endpoint
+@ route /health
+  > {
+    success: true,
+    data: {
+      status: "ok",
+      service: "collections-demo"
+    },
+    message: null
+  }

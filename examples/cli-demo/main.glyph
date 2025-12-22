@@ -1,6 +1,11 @@
 # CLI Commands Demo
 # Using ! symbol for commands (AI-optimized syntax)
 
+# API endpoint for CLI status
+@ route /cli/status {
+  > {status: "CLI Demo running", version: "1.0.0"}
+}
+
 # Simple hello command
 ! hello name: str! {
   $ greeting = "Hello, " + name + "!"
@@ -26,14 +31,13 @@
 # Command that returns array
 ! list_users {
   $ users = ["alice", "bob", "charlie"]
-  > {users: users, count: length(users)}
+  > {users: users, count: 3}
 }
 
 # Command with description
 ! version "Show version information" {
   > {
     name: "GlyphLang CLI Demo",
-    version: "1.0.0",
-    timestamp: now()
+    version: "1.0.0"
   }
 }

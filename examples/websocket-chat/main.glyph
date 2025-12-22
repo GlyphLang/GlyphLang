@@ -1,28 +1,44 @@
-# Decompiled GlyphLang Source
-# Version: 1
-# Constants: 6
-# Instructions: 9
+# WebSocket Chat Example
+# Real-time chat using WebSocket routes
 
-@ route /
-  > ...
+# Status endpoint for monitoring
+@ route /status {
+  > {
+    status: "WebSocket Chat Server",
+    version: "1.0.0"
+  }
+}
 
-# --- Bytecode Disassembly ---
+# WebSocket chat endpoint
+@ ws /chat {
+  on connect {
+    ws.join("lobby")
+    ws.broadcast("User joined the chat")
+  }
 
-# Constant Pool:
-#   [0] string: "query"
-#   [1] string: "input"
-#   [2] string: "ws"
-#   [3] string: "rooms"
-#   [4] string: "count"
-#   [5] string: "length"
+  on message {
+    ws.broadcast(input)
+  }
 
-# Instructions:
-#   0000: PUSH            3  ; {rooms}
-#   0005: WS_GET_ROOMS   
-#   0006: PUSH            4  ; {count}
-#   0011: PUSH            5  ; {length}
-#   0016: WS_GET_ROOMS   
-#   0017: CALL            1  ; 1 args
-#   0022: BUILD_OBJECT    2  ; 2 fields
-#   0027: RETURN         
-#   0028: HALT           
+  on disconnect {
+    ws.broadcast("User left the chat")
+    ws.leave("lobby")
+  }
+}
+
+# WebSocket with room parameter
+@ ws /chat/:room {
+  on connect {
+    ws.join(room)
+    ws.broadcast_to_room(room, "User joined")
+  }
+
+  on message {
+    ws.broadcast_to_room(room, input)
+  }
+
+  on disconnect {
+    ws.broadcast_to_room(room, "User left")
+    ws.leave(room)
+  }
+}
