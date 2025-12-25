@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"errors"
 	"testing"
 	"time"
 )
@@ -580,4 +581,405 @@ func TestQueueStrategies(t *testing.T) {
 			t.Error("Expected message in queue")
 		}
 	})
+}
+
+// TestVMStatsHandler tests the VMStatsHandler
+func TestVMStatsHandler(t *testing.T) {
+	server := NewServer()
+	hub := server.GetHub()
+	go hub.Run()
+	defer server.Shutdown()
+
+	handler := NewVMStatsHandler(hub)
+
+	t.Run("Send returns error", func(t *testing.T) {
+		err := handler.Send("test")
+		if err == nil {
+			t.Error("Expected error from Send")
+		}
+	})
+
+	t.Run("Broadcast returns error", func(t *testing.T) {
+		err := handler.Broadcast("test")
+		if err == nil {
+			t.Error("Expected error from Broadcast")
+		}
+	})
+
+	t.Run("BroadcastToRoom returns error", func(t *testing.T) {
+		err := handler.BroadcastToRoom("room", "test")
+		if err == nil {
+			t.Error("Expected error from BroadcastToRoom")
+		}
+	})
+
+	t.Run("JoinRoom returns error", func(t *testing.T) {
+		err := handler.JoinRoom("room")
+		if err == nil {
+			t.Error("Expected error from JoinRoom")
+		}
+	})
+
+	t.Run("LeaveRoom returns error", func(t *testing.T) {
+		err := handler.LeaveRoom("room")
+		if err == nil {
+			t.Error("Expected error from LeaveRoom")
+		}
+	})
+
+	t.Run("Close returns error", func(t *testing.T) {
+		err := handler.Close("reason")
+		if err == nil {
+			t.Error("Expected error from Close")
+		}
+	})
+
+	t.Run("GetRooms returns list", func(t *testing.T) {
+		rooms := handler.GetRooms()
+		if rooms == nil {
+			t.Error("Expected rooms list, got nil")
+		}
+	})
+
+	t.Run("GetRoomClients returns empty for non-existent room", func(t *testing.T) {
+		clients := handler.GetRoomClients("nonexistent")
+		if len(clients) != 0 {
+			t.Errorf("Expected empty list, got %d clients", len(clients))
+		}
+	})
+
+	t.Run("GetConnectionID returns empty string", func(t *testing.T) {
+		id := handler.GetConnectionID()
+		if id != "" {
+			t.Errorf("Expected empty string, got %s", id)
+		}
+	})
+
+	t.Run("GetConnectionCount returns count", func(t *testing.T) {
+		count := handler.GetConnectionCount()
+		if count < 0 {
+			t.Errorf("Expected non-negative count, got %d", count)
+		}
+	})
+
+	t.Run("GetUptime returns uptime", func(t *testing.T) {
+		uptime := handler.GetUptime()
+		if uptime < 0 {
+			t.Errorf("Expected non-negative uptime, got %d", uptime)
+		}
+	})
+}
+
+// TestNewBinaryMessage tests NewBinaryMessage
+func TestNewBinaryMessage(t *testing.T) {
+	data := []byte{0x01, 0x02, 0x03}
+	msg := NewBinaryMessage(data)
+
+	if msg.Type != MessageTypeBinary {
+		t.Errorf("Expected MessageTypeBinary, got %s", msg.Type)
+	}
+
+	payload, ok := msg.Data.([]byte)
+	if !ok || string(payload) != string(data) {
+		t.Error("Data mismatch")
+	}
+}
+
+// TestNewErrorMessage tests NewErrorMessage
+func TestNewErrorMessage(t *testing.T) {
+	err := errors.New("test error")
+	msg := NewErrorMessage(err)
+
+	if msg.Type != MessageTypeError {
+		t.Errorf("Expected MessageTypeError, got %s", msg.Type)
+	}
+
+	// NewErrorMessage wraps error in a map
+	dataMap, ok := msg.Data.(map[string]interface{})
+	if !ok {
+		t.Error("Expected Data to be a map")
+		return
+	}
+	if dataMap["error"] != "test error" {
+		t.Errorf("Expected 'test error', got %v", dataMap["error"])
+	}
+}
+
+// TestMessageMetadata tests SetMetadata and GetMetadata
+func TestMessageMetadata(t *testing.T) {
+	msg := NewMessage(MessageTypeText, "test")
+
+	msg.SetMetadata("key1", "value1")
+	msg.SetMetadata("key2", 42)
+
+	val, ok := msg.GetMetadata("key1")
+	if !ok || val != "value1" {
+		t.Error("Failed to get key1 metadata")
+	}
+
+	val2, ok := msg.GetMetadata("key2")
+	if !ok || val2 != 42 {
+		t.Error("Failed to get key2 metadata")
+	}
+
+	_, ok = msg.GetMetadata("nonexistent")
+	if ok {
+		t.Error("Expected false for nonexistent key")
+	}
+}
+
+// TestFromJSONMessage tests FromJSON function
+func TestFromJSONMessage(t *testing.T) {
+	jsonData := []byte(`{"type":"text","data":"hello"}`)
+	msg, err := FromJSON(jsonData)
+	if err != nil {
+		t.Fatalf("FromJSON failed: %v", err)
+	}
+
+	if msg.Type != MessageTypeText {
+		t.Errorf("Expected MessageTypeText, got %s", msg.Type)
+	}
+}
+
+// TestMetricsFunctions tests additional metrics functions
+func TestMetricsFunctions(t *testing.T) {
+	t.Run("IncrementRejectedConnections", func(t *testing.T) {
+		metrics := NewMetrics()
+		metrics.IncrementRejectedConnections()
+		// Just verify no panic
+	})
+
+	t.Run("IncrementMessagesFailed", func(t *testing.T) {
+		metrics := NewMetrics()
+		metrics.IncrementMessagesFailed()
+		// Just verify no panic
+	})
+
+	t.Run("IncrementRooms and DecrementRooms", func(t *testing.T) {
+		metrics := NewMetrics()
+		metrics.IncrementRooms()
+		metrics.DecrementRooms()
+		// Just verify no panic
+	})
+
+	t.Run("GetLastMessageTime", func(t *testing.T) {
+		metrics := NewMetrics()
+		metrics.IncrementMessagesSent(10)
+		lastTime := metrics.GetLastMessageTime()
+		if lastTime.IsZero() {
+			t.Error("Expected non-zero last message time")
+		}
+	})
+
+	t.Run("GetAllConnectionMetrics", func(t *testing.T) {
+		metrics := NewMetrics()
+		metrics.RegisterConnection("conn1")
+		metrics.RegisterConnection("conn2")
+
+		allMetrics := metrics.GetAllConnectionMetrics()
+		if len(allMetrics) != 2 {
+			t.Errorf("Expected 2 connection metrics, got %d", len(allMetrics))
+		}
+	})
+}
+
+// TestHubGetConnections tests GetConnections
+func TestHubGetConnections(t *testing.T) {
+	config := DefaultConfig()
+	hub := NewHubWithConfig(config)
+	go hub.Run()
+	defer hub.Shutdown()
+
+	// Initially no connections
+	conns := hub.GetConnections()
+	if len(conns) != 0 {
+		t.Errorf("Expected 0 connections, got %d", len(conns))
+	}
+}
+
+// TestHubRoomBroadcast tests BroadcastToRoom on Hub
+func TestHubRoomBroadcast(t *testing.T) {
+	config := DefaultConfig()
+	hub := NewHubWithConfig(config)
+	go hub.Run()
+	defer hub.Shutdown()
+
+	// Create a room and broadcast to it
+	hub.roomManager.CreateRoom("test-room")
+	hub.BroadcastToRoom("test-room", []byte("hello"), nil)
+	// Just verify no panic
+}
+
+// TestVMHandler tests the VMHandler
+func TestVMHandler(t *testing.T) {
+	config := DefaultConfig()
+	hub := NewHubWithConfig(config)
+	go hub.Run()
+	defer hub.Shutdown()
+
+	// Create a mock connection
+	conn := &Connection{
+		ID:    "test-conn",
+		hub:   hub,
+		send:  make(chan []byte, 256),
+		Data:  make(map[string]interface{}),
+		rooms: make(map[string]bool),
+	}
+
+	handler := NewVMHandler(conn, hub)
+
+	t.Run("Send", func(t *testing.T) {
+		err := handler.Send(map[string]string{"test": "data"})
+		if err != nil {
+			t.Errorf("Send failed: %v", err)
+		}
+	})
+
+	t.Run("Broadcast", func(t *testing.T) {
+		err := handler.Broadcast(map[string]string{"test": "data"})
+		if err != nil {
+			t.Errorf("Broadcast failed: %v", err)
+		}
+	})
+
+	t.Run("BroadcastToRoom", func(t *testing.T) {
+		hub.roomManager.CreateRoom("test-room")
+		err := handler.BroadcastToRoom("test-room", map[string]string{"test": "data"})
+		if err != nil {
+			t.Errorf("BroadcastToRoom failed: %v", err)
+		}
+	})
+
+	t.Run("JoinRoom", func(t *testing.T) {
+		err := handler.JoinRoom("test-room")
+		if err != nil {
+			t.Errorf("JoinRoom failed: %v", err)
+		}
+	})
+
+	t.Run("LeaveRoom", func(t *testing.T) {
+		err := handler.LeaveRoom("test-room")
+		if err != nil {
+			t.Errorf("LeaveRoom failed: %v", err)
+		}
+	})
+
+	t.Run("GetRooms", func(t *testing.T) {
+		rooms := handler.GetRooms()
+		if rooms == nil {
+			t.Error("GetRooms returned nil")
+		}
+	})
+
+	t.Run("GetRoomClients", func(t *testing.T) {
+		clients := handler.GetRoomClients("test-room")
+		// May be empty but should not panic
+		_ = clients
+	})
+
+	t.Run("GetConnectionID", func(t *testing.T) {
+		id := handler.GetConnectionID()
+		if id != "test-conn" {
+			t.Errorf("Expected test-conn, got %s", id)
+		}
+	})
+
+	t.Run("GetConnectionCount", func(t *testing.T) {
+		count := handler.GetConnectionCount()
+		if count < 0 {
+			t.Errorf("Expected non-negative count, got %d", count)
+		}
+	})
+
+	t.Run("GetUptime", func(t *testing.T) {
+		uptime := handler.GetUptime()
+		if uptime < 0 {
+			t.Errorf("Expected non-negative uptime, got %d", uptime)
+		}
+	})
+}
+
+// TestConnectionHealthMethods tests health-related connection methods
+func TestConnectionHealthMethods(t *testing.T) {
+	config := DefaultConfig()
+	hub := NewHubWithConfig(config)
+	go hub.Run()
+	defer hub.Shutdown()
+
+	conn := &Connection{
+		ID:           "test-conn",
+		hub:          hub,
+		send:         make(chan []byte, 256),
+		Data:         make(map[string]interface{}),
+		rooms:        make(map[string]bool),
+		missedPongs:  0,
+		lastPongTime: time.Now(),
+	}
+
+	t.Run("GetMissedPongs", func(t *testing.T) {
+		pongs := conn.GetMissedPongs()
+		if pongs != 0 {
+			t.Errorf("Expected 0, got %d", pongs)
+		}
+	})
+
+	t.Run("GetLastPongTime", func(t *testing.T) {
+		pongTime := conn.GetLastPongTime()
+		if pongTime.IsZero() {
+			t.Error("Expected non-zero time")
+		}
+	})
+
+	t.Run("IsHealthy", func(t *testing.T) {
+		healthy := conn.IsHealthy()
+		if !healthy {
+			t.Error("Expected connection to be healthy")
+		}
+	})
+}
+
+// TestOnMessage tests the OnMessage callback
+func TestOnMessage(t *testing.T) {
+	config := DefaultConfig()
+	hub := NewHubWithConfig(config)
+	go hub.Run()
+	defer hub.Shutdown()
+
+	called := false
+	hub.OnMessage(MessageTypeText, func(ctx *MessageContext) error {
+		called = true
+		return nil
+	})
+
+	// Just verify handler is set (we can't easily trigger the callback)
+	_ = called
+}
+
+// TestServerOnMessage tests Server.OnMessage
+func TestServerOnMessage(t *testing.T) {
+	server := NewServer()
+	hub := server.GetHub()
+	go hub.Run()
+	defer server.Shutdown()
+
+	called := false
+	server.OnMessage(MessageTypeText, func(ctx *MessageContext) error {
+		called = true
+		return nil
+	})
+
+	// Just verify handler is set
+	_ = called
+}
+
+// TestRoomManagerBroadcastToRoom tests RoomManager.BroadcastToRoom
+func TestRoomManagerBroadcastToRoom(t *testing.T) {
+	rm := NewRoomManager()
+	rm.CreateRoom("test")
+
+	// BroadcastToRoom to existing room
+	rm.BroadcastToRoom("test", []byte("hello"), nil)
+
+	// BroadcastToRoom to non-existing room
+	rm.BroadcastToRoom("nonexistent", []byte("hello"), nil)
 }

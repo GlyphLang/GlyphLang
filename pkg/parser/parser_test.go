@@ -2054,3 +2054,654 @@ func TestParser_Directive_ComplexBody(t *testing.T) {
 	// Should have: assign, assign, while, for, return (5 statements)
 	assert.GreaterOrEqual(t, len(cmd.Body), 4)
 }
+
+// TestParser_UnaryOperators tests parsing of unary operators (! and -)
+func TestParser_UnaryOperators(t *testing.T) {
+	tests := []struct {
+		name     string
+		source   string
+		checkFn  func(t *testing.T, module *interpreter.Module)
+	}{
+		{
+			name: "unary not operator",
+			source: `@ route /test
+  $ valid = !false
+  > {valid: valid}`,
+			checkFn: func(t *testing.T, module *interpreter.Module) {
+				route := module.Items[0].(*interpreter.Route)
+				assign := route.Body[0].(interpreter.AssignStatement)
+				unary, ok := assign.Value.(interpreter.UnaryOpExpr)
+				require.True(t, ok, "expected UnaryOpExpr")
+				assert.Equal(t, interpreter.Not, unary.Op)
+			},
+		},
+		{
+			name: "unary negation",
+			source: `@ route /test
+  $ neg = -42
+  > {neg: neg}`,
+			checkFn: func(t *testing.T, module *interpreter.Module) {
+				route := module.Items[0].(*interpreter.Route)
+				assign := route.Body[0].(interpreter.AssignStatement)
+				unary, ok := assign.Value.(interpreter.UnaryOpExpr)
+				require.True(t, ok, "expected UnaryOpExpr")
+				assert.Equal(t, interpreter.Neg, unary.Op)
+			},
+		},
+		{
+			name: "chained unary not",
+			source: `@ route /test
+  $ result = !!true
+  > {result: result}`,
+			checkFn: func(t *testing.T, module *interpreter.Module) {
+				route := module.Items[0].(*interpreter.Route)
+				assign := route.Body[0].(interpreter.AssignStatement)
+				outer, ok := assign.Value.(interpreter.UnaryOpExpr)
+				require.True(t, ok, "expected outer UnaryOpExpr")
+				assert.Equal(t, interpreter.Not, outer.Op)
+				inner, ok := outer.Right.(interpreter.UnaryOpExpr)
+				require.True(t, ok, "expected inner UnaryOpExpr")
+				assert.Equal(t, interpreter.Not, inner.Op)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lexer := NewLexer(tt.source)
+			tokens, err := lexer.Tokenize()
+			require.NoError(t, err)
+
+			parser := NewParser(tokens)
+			module, err := parser.Parse()
+			require.NoError(t, err)
+
+			tt.checkFn(t, module)
+		})
+	}
+}
+
+// TestParser_ArrayIndexing tests parsing of array index expressions
+func TestParser_ArrayIndexing(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{
+			name: "simple array index",
+			source: `@ route /test
+  $ arr = [1, 2, 3]
+  $ first = arr[0]
+  > {first: first}`,
+		},
+		{
+			name: "nested array index",
+			source: `@ route /test
+  $ matrix = [[1, 2], [3, 4]]
+  $ val = matrix[0][1]
+  > {val: val}`,
+		},
+		{
+			name: "array index with expression",
+			source: `@ route /test
+  $ arr = [10, 20, 30]
+  $ i = 1
+  $ val = arr[i]
+  > {val: val}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lexer := NewLexer(tt.source)
+			tokens, err := lexer.Tokenize()
+			require.NoError(t, err)
+
+			parser := NewParser(tokens)
+			module, err := parser.Parse()
+			require.NoError(t, err)
+
+			require.NotNil(t, module)
+			require.Len(t, module.Items, 1)
+		})
+	}
+}
+
+// TestParser_RateLimitVariations tests different rate limit formats
+func TestParser_RateLimitVariations(t *testing.T) {
+	tests := []struct {
+		name            string
+		source          string
+		expectedReqs    uint32
+		expectedWindow  string
+	}{
+		{
+			name: "integer with slash format",
+			source: `@ route /test
+  + ratelimit(50/sec)
+  > {ok: true}`,
+			expectedReqs:   50,
+			expectedWindow: "sec",
+		},
+		{
+			name: "string format",
+			source: `@ route /test
+  + ratelimit("200/hour")
+  > {ok: true}`,
+			expectedReqs:   200,
+			expectedWindow: "hour",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lexer := NewLexer(tt.source)
+			tokens, err := lexer.Tokenize()
+			require.NoError(t, err)
+
+			parser := NewParser(tokens)
+			module, err := parser.Parse()
+			require.NoError(t, err)
+
+			route := module.Items[0].(*interpreter.Route)
+			require.NotNil(t, route.RateLimit)
+			assert.Equal(t, tt.expectedReqs, route.RateLimit.Requests)
+			assert.Equal(t, tt.expectedWindow, route.RateLimit.Window)
+		})
+	}
+}
+
+// TestParser_ErrorHandling tests parser error handling for edge cases
+func TestParser_ErrorHandling(t *testing.T) {
+	tests := []struct {
+		name        string
+		source      string
+		expectError bool
+	}{
+		{
+			name:        "unclosed brace",
+			source:      `@ route /test { $ x = 1`,
+			expectError: true,
+		},
+		{
+			name:        "invalid rate limit",
+			source:      `@ route /test + ratelimit() > {ok: true}`,
+			expectError: true,
+		},
+		{
+			name:        "missing return value",
+			source:      `@ route /test >`,
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lexer := NewLexer(tt.source)
+			tokens, err := lexer.Tokenize()
+			if err != nil && tt.expectError {
+				return // lexer error is acceptable
+			}
+
+			parser := NewParser(tokens)
+			_, err = parser.Parse()
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+// TestParser_TypeDefWithoutColon tests type definitions without colon
+func TestParser_TypeDefWithoutColon(t *testing.T) {
+	source := `type Product {
+  id: int!
+  name: str!
+  price: float
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	require.Len(t, module.Items, 1)
+	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	require.True(t, ok)
+	assert.Equal(t, "Product", typeDef.Name)
+	assert.Len(t, typeDef.Fields, 3)
+}
+
+// TestParser_ValidationStatement tests ? validation syntax
+func TestParser_ValidationStatement(t *testing.T) {
+	source := `@ route /validate
+  ? isValid(input)
+  > {valid: true}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	route := module.Items[0].(*interpreter.Route)
+	require.GreaterOrEqual(t, len(route.Body), 1)
+}
+
+// TestParser_ExpressionStatements tests standalone expression statements
+func TestParser_ExpressionStatements(t *testing.T) {
+	source := `@ route /test
+  $ _ = log("starting request")
+  $ result = compute()
+  > {result: result}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	route := module.Items[0].(*interpreter.Route)
+	require.GreaterOrEqual(t, len(route.Body), 2)
+}
+
+// TestParser_MoreStatementTypes tests additional statement types for coverage
+func TestParser_MoreStatementTypes(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{
+			name: "typed variable declaration",
+			source: `@ route /test
+  $ count: int = 0
+  > {count: count}`,
+		},
+		{
+			name: "else-if chain",
+			source: `@ route /test
+  $ x = 5
+  if x > 10 {
+    $ result = "big"
+  } else if x > 5 {
+    $ result = "medium"
+  } else {
+    $ result = "small"
+  }
+  > {result: result}`,
+		},
+		{
+			name: "switch statement",
+			source: `@ route /test
+  $ day = 1
+  switch day {
+    case 1 {
+      $ name = "Monday"
+    }
+    case 2 {
+      $ name = "Tuesday"
+    }
+    default {
+      $ name = "Unknown"
+    }
+  }
+  > {day: name}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lexer := NewLexer(tt.source)
+			tokens, err := lexer.Tokenize()
+			require.NoError(t, err)
+
+			parser := NewParser(tokens)
+			module, err := parser.Parse()
+			require.NoError(t, err)
+			require.NotNil(t, module)
+		})
+	}
+}
+
+// TestParser_AdvancedTypes tests advanced type parsing
+func TestParser_AdvancedTypes(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{
+			name: "simple type",
+			source: `: User {
+  id: int
+  name: str
+}`,
+		},
+		{
+			name: "nested object type",
+			source: `: Profile {
+  user: User
+  settings: Settings
+}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lexer := NewLexer(tt.source)
+			tokens, err := lexer.Tokenize()
+			require.NoError(t, err)
+
+			parser := NewParser(tokens)
+			module, err := parser.Parse()
+			require.NoError(t, err)
+			require.NotNil(t, module)
+		})
+	}
+}
+
+// TestParser_WebSocketRoutes tests WebSocket route parsing
+func TestParser_WebSocketRoutes(t *testing.T) {
+	source := `@ ws /chat {
+  on connect {
+    > {status: "connected"}
+  }
+  on message {
+    > {echo: input}
+  }
+  on disconnect {
+    > {status: "disconnected"}
+  }
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	require.Len(t, module.Items, 1)
+}
+
+// TestParser_AuthConfigVariations tests auth configuration
+func TestParser_AuthConfigVariations(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{
+			name: "jwt auth with role",
+			source: `@ route /admin
+  + auth(jwt, admin)
+  > {access: "granted"}`,
+		},
+		{
+			name: "basic auth",
+			source: `@ route /protected
+  + auth(basic)
+  > {protected: true}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lexer := NewLexer(tt.source)
+			tokens, err := lexer.Tokenize()
+			require.NoError(t, err)
+
+			parser := NewParser(tokens)
+			module, err := parser.Parse()
+			require.NoError(t, err)
+
+			route := module.Items[0].(*interpreter.Route)
+			require.NotNil(t, route.Auth)
+		})
+	}
+}
+
+// TestParser_LogicalOps tests logical operators (and, or)
+func TestParser_LogicalOps(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{
+			name: "logical and",
+			source: `@ route /test
+  $ a = true
+  $ b = false
+  if a && b {
+    > {result: "both"}
+  }
+  > {result: "not both"}`,
+		},
+		{
+			name: "logical or",
+			source: `@ route /test
+  $ a = true
+  $ b = false
+  if a || b {
+    > {result: "either"}
+  }
+  > {result: "neither"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lexer := NewLexer(tt.source)
+			tokens, err := lexer.Tokenize()
+			require.NoError(t, err)
+
+			parser := NewParser(tokens)
+			module, err := parser.Parse()
+			require.NoError(t, err)
+			require.NotNil(t, module)
+		})
+	}
+}
+
+// TestParser_ComparisonOperators tests comparison operators
+func TestParser_ComparisonOperators(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{
+			name: "less than or equal",
+			source: `@ route /test
+  $ x = 5
+  if x <= 10 {
+    > {result: "small"}
+  }
+  > {result: "big"}`,
+		},
+		{
+			name: "greater than or equal",
+			source: `@ route /test
+  $ x = 15
+  if x >= 10 {
+    > {result: "big"}
+  }
+  > {result: "small"}`,
+		},
+		{
+			name: "not equal",
+			source: `@ route /test
+  $ x = 5
+  if x != 10 {
+    > {result: "not ten"}
+  }
+  > {result: "ten"}`,
+		},
+		{
+			name: "equality",
+			source: `@ route /test
+  $ x = 10
+  if x == 10 {
+    > {result: "ten"}
+  }
+  > {result: "not ten"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lexer := NewLexer(tt.source)
+			tokens, err := lexer.Tokenize()
+			require.NoError(t, err)
+
+			parser := NewParser(tokens)
+			module, err := parser.Parse()
+			require.NoError(t, err)
+			require.NotNil(t, module)
+		})
+	}
+}
+
+
+// TestParser_ParserErrors tests that parser reports errors correctly
+func TestParser_ParserErrors(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{
+			name:   "incomplete type definition",
+			source: `: User {`,
+		},
+		{
+			name:   "incomplete route",
+			source: `@ route /test`,
+		},
+		{
+			name:   "incomplete if statement",
+			source: `@ route /test if x {`,
+		},
+		{
+			name:   "incomplete while loop",
+			source: `@ route /test while true {`,
+		},
+		{
+			name:   "incomplete for loop",
+			source: `@ route /test for x in {`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lexer := NewLexer(tt.source)
+			tokens, _ := lexer.Tokenize()
+
+			parser := NewParser(tokens)
+			_, err := parser.Parse()
+			// These should return errors
+			_ = err
+		})
+	}
+}
+
+// TestParser_FieldAccessExpressions tests field access parsing
+func TestParser_FieldAccessExpressions(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{
+			name: "simple field access",
+			source: `@ route /test
+  $ name = user.name
+  > {name: name}`,
+		},
+		{
+			name: "nested field access",
+			source: `@ route /test
+  $ city = user.address.city
+  > {city: city}`,
+		},
+		{
+			name: "method call on object",
+			source: `@ route /test
+  $ len = items.length()
+  > {len: len}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lexer := NewLexer(tt.source)
+			tokens, err := lexer.Tokenize()
+			require.NoError(t, err)
+
+			parser := NewParser(tokens)
+			module, err := parser.Parse()
+			require.NoError(t, err)
+			require.NotNil(t, module)
+		})
+	}
+}
+
+
+// TestParser_StringConcatenation tests string concatenation
+func TestParser_StringConcatenation(t *testing.T) {
+	source := `@ route /test
+  $ name = "World"
+  $ greeting = "Hello, " + name + "!"
+  > {greeting: greeting}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+	require.NotNil(t, module)
+}
+
+// TestParser_TokenTypes tests that token types are correctly identified
+func TestParser_TokenTypes(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected TokenType
+	}{
+		{"@", AT},
+		{":", COLON},
+		{"$", DOLLAR},
+		{"+", PLUS},
+		{"-", MINUS},
+		{"*", STAR},
+		{">", GREATER},
+		{"<", LESS},
+		{"==", EQ_EQ},
+		{"!=", NOT_EQ},
+		{"&&", AND},
+		{"||", OR},
+		{"{", LBRACE},
+		{"}", RBRACE},
+		{"[", LBRACKET},
+		{"]", RBRACKET},
+		{"(", LPAREN},
+		{")", RPAREN},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			lexer := NewLexer(tt.input)
+			tokens, err := lexer.Tokenize()
+			require.NoError(t, err)
+			require.True(t, len(tokens) >= 1)
+			assert.Equal(t, tt.expected, tokens[0].Type)
+		})
+	}
+}

@@ -415,3 +415,470 @@ func TestIsSafeQuery(t *testing.T) {
 		})
 	}
 }
+
+// TestXSSDetector_FunctionCall tests XSS detection in function calls
+func TestXSSDetector_FunctionCall(t *testing.T) {
+	tests := []struct {
+		name        string
+		expr        interpreter.Expr
+		expectWarning bool
+	}{
+		{
+			name: "HTML rendering function with user input",
+			expr: interpreter.FunctionCallExpr{
+				Name: "renderHTML",
+				Args: []interpreter.Expr{
+					interpreter.VariableExpr{Name: "request"},
+				},
+			},
+			expectWarning: true,
+		},
+		{
+			name: "Safe escape function",
+			expr: interpreter.FunctionCallExpr{
+				Name: "escapeHTML",
+				Args: []interpreter.Expr{
+					interpreter.VariableExpr{Name: "request"},
+				},
+			},
+			expectWarning: false,
+		},
+		{
+			name: "innerHTML function",
+			expr: interpreter.FunctionCallExpr{
+				Name: "innerHTML",
+				Args: []interpreter.Expr{
+					interpreter.VariableExpr{Name: "input"},
+				},
+			},
+			expectWarning: true,
+		},
+		{
+			name: "Regular function with literal",
+			expr: interpreter.FunctionCallExpr{
+				Name: "process",
+				Args: []interpreter.Expr{
+					interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "safe"}},
+				},
+			},
+			expectWarning: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			warnings := DetectXSS(tt.expr)
+			if tt.expectWarning && len(warnings) == 0 {
+				t.Error("Expected warning but got none")
+			}
+			if !tt.expectWarning && len(warnings) > 0 {
+				t.Errorf("Expected no warnings but got %d", len(warnings))
+			}
+		})
+	}
+}
+
+// TestXSSDetector_ObjectExpr tests XSS detection in object expressions
+func TestXSSDetector_ObjectExpr(t *testing.T) {
+	tests := []struct {
+		name          string
+		expr          interpreter.Expr
+		expectWarning bool
+	}{
+		{
+			name: "Object with HTML content type",
+			expr: interpreter.ObjectExpr{
+				Fields: []interpreter.ObjectField{
+					{Key: "content-type", Value: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "text/html"}}},
+				},
+			},
+			expectWarning: true,
+		},
+		{
+			name: "Object with body field and user input",
+			expr: interpreter.ObjectExpr{
+				Fields: []interpreter.ObjectField{
+					{Key: "body", Value: interpreter.VariableExpr{Name: "request"}},
+				},
+			},
+			expectWarning: true,
+		},
+		{
+			name: "Object with html field and user input",
+			expr: interpreter.ObjectExpr{
+				Fields: []interpreter.ObjectField{
+					{Key: "html", Value: interpreter.VariableExpr{Name: "input"}},
+				},
+			},
+			expectWarning: true,
+		},
+		{
+			name: "Safe object with JSON content type",
+			expr: interpreter.ObjectExpr{
+				Fields: []interpreter.ObjectField{
+					{Key: "content-type", Value: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "application/json"}}},
+				},
+			},
+			expectWarning: false,
+		},
+		{
+			name: "Object with safe literal values",
+			expr: interpreter.ObjectExpr{
+				Fields: []interpreter.ObjectField{
+					{Key: "status", Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 200}}},
+					{Key: "message", Value: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "success"}}},
+				},
+			},
+			expectWarning: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			warnings := DetectXSS(tt.expr)
+			if tt.expectWarning && len(warnings) == 0 {
+				t.Error("Expected warning but got none")
+			}
+			if !tt.expectWarning && len(warnings) > 0 {
+				t.Errorf("Expected no warnings but got %d", len(warnings))
+			}
+		})
+	}
+}
+
+// TestIsHTMLContentField tests HTML content field detection
+func TestIsHTMLContentField(t *testing.T) {
+	htmlFields := []string{"body", "html", "content", "message", "innerHTML", "outerHTML"}
+	nonHTMLFields := []string{"id", "name", "status", "count", "data"}
+
+	for _, field := range htmlFields {
+		if !isHTMLContentField(field) {
+			t.Errorf("Expected %s to be detected as HTML content field", field)
+		}
+	}
+
+	for _, field := range nonHTMLFields {
+		if isHTMLContentField(field) {
+			t.Errorf("Expected %s NOT to be detected as HTML content field", field)
+		}
+	}
+}
+
+// TestAnalyzeVariable tests variable analysis for XSS via HTML concatenation
+func TestAnalyzeVariable(t *testing.T) {
+	// Variables alone won't trigger warnings - they need to be in HTML context
+	// Test by concatenating user input with HTML tags
+	tests := []struct {
+		name          string
+		expr          interpreter.Expr
+		expectWarning bool
+	}{
+		{
+			name: "User input concatenated with HTML",
+			expr: interpreter.BinaryOpExpr{
+				Left:  interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "<div>"}},
+				Op:    interpreter.Add,
+				Right: interpreter.VariableExpr{Name: "request"},
+			},
+			expectWarning: true,
+		},
+		{
+			name: "Input concatenated with HTML",
+			expr: interpreter.BinaryOpExpr{
+				Left:  interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "<span>"}},
+				Op:    interpreter.Add,
+				Right: interpreter.VariableExpr{Name: "input"},
+			},
+			expectWarning: true,
+		},
+		{
+			name: "Any variable concatenated with HTML triggers warning",
+			expr: interpreter.BinaryOpExpr{
+				Left:  interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "<p>"}},
+				Op:    interpreter.Add,
+				Right: interpreter.VariableExpr{Name: "config"},
+			},
+			expectWarning: true, // HTML + any variable is flagged
+		},
+		{
+			name: "Safe string concatenation without HTML",
+			expr: interpreter.BinaryOpExpr{
+				Left:  interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "Hello "}},
+				Op:    interpreter.Add,
+				Right: interpreter.VariableExpr{Name: "request"},
+			},
+			expectWarning: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			warnings := DetectXSS(tt.expr)
+			if tt.expectWarning && len(warnings) == 0 {
+				t.Error("Expected warning but got none")
+			}
+			if !tt.expectWarning && len(warnings) > 0 {
+				t.Errorf("Expected no warning but got %d", len(warnings))
+			}
+		})
+	}
+}
+
+// TestRequiresHTMLEscapeAdvanced tests various expression types
+func TestRequiresHTMLEscapeAdvanced(t *testing.T) {
+	tests := []struct {
+		name     string
+		expr     interpreter.Expr
+		expected bool
+	}{
+		{
+			name:     "Nil expression",
+			expr:     nil,
+			expected: false,
+		},
+		{
+			name:     "User input variable",
+			expr:     interpreter.VariableExpr{Name: "request"},
+			expected: true,
+		},
+		{
+			name:     "Safe variable",
+			expr:     interpreter.VariableExpr{Name: "config"},
+			expected: false,
+		},
+		{
+			name: "Field access on user input",
+			expr: interpreter.FieldAccessExpr{
+				Object: interpreter.VariableExpr{Name: "request"},
+				Field:  "body",
+			},
+			expected: true,
+		},
+		{
+			name: "Nested field access on user input",
+			expr: interpreter.FieldAccessExpr{
+				Object: interpreter.FieldAccessExpr{
+					Object: interpreter.VariableExpr{Name: "request"},
+					Field:  "data",
+				},
+				Field: "value",
+			},
+			expected: true,
+		},
+		{
+			name: "Binary op with user input on left",
+			expr: interpreter.BinaryOpExpr{
+				Left:  interpreter.VariableExpr{Name: "input"},
+				Op:    interpreter.Add,
+				Right: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "suffix"}},
+			},
+			expected: true,
+		},
+		{
+			name: "Binary op with user input on right",
+			expr: interpreter.BinaryOpExpr{
+				Left:  interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "prefix"}},
+				Op:    interpreter.Add,
+				Right: interpreter.VariableExpr{Name: "query"},
+			},
+			expected: true,
+		},
+		{
+			name: "Safe escape function",
+			expr: interpreter.FunctionCallExpr{
+				Name: "escapeHTML",
+				Args: []interpreter.Expr{interpreter.VariableExpr{Name: "request"}},
+			},
+			expected: false,
+		},
+		{
+			name: "Sanitize function",
+			expr: interpreter.FunctionCallExpr{
+				Name: "sanitize",
+				Args: []interpreter.Expr{interpreter.VariableExpr{Name: "input"}},
+			},
+			expected: false,
+		},
+		{
+			name: "Unsafe function with user input arg",
+			expr: interpreter.FunctionCallExpr{
+				Name: "render",
+				Args: []interpreter.Expr{interpreter.VariableExpr{Name: "request"}},
+			},
+			expected: true,
+		},
+		{
+			name: "Function with no unsafe args",
+			expr: interpreter.FunctionCallExpr{
+				Name: "render",
+				Args: []interpreter.Expr{interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "safe"}}},
+			},
+			expected: false,
+		},
+		{
+			name: "Array with user input element",
+			expr: interpreter.ArrayExpr{
+				Elements: []interpreter.Expr{
+					interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "safe"}},
+					interpreter.VariableExpr{Name: "request"},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Array with all safe elements",
+			expr: interpreter.ArrayExpr{
+				Elements: []interpreter.Expr{
+					interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "a"}},
+					interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "b"}},
+				},
+			},
+			expected: false,
+		},
+		{
+			name:     "Literal expression",
+			expr:     interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "safe"}},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := RequiresHTMLEscape(tt.expr)
+			if result != tt.expected {
+				t.Errorf("Expected %v, got %v", tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestExprToString tests expression to string conversion
+func TestExprToString(t *testing.T) {
+	tests := []struct {
+		name     string
+		expr     interpreter.Expr
+		contains string
+	}{
+		{
+			name:     "Nil expression",
+			expr:     nil,
+			contains: "nil",
+		},
+		{
+			name:     "String literal",
+			expr:     interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "hello"}},
+			contains: "hello",
+		},
+		{
+			name:     "Int literal",
+			expr:     interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+			contains: "42",
+		},
+		{
+			name:     "Bool literal",
+			expr:     interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
+			contains: "true",
+		},
+		{
+			name:     "Float literal",
+			expr:     interpreter.LiteralExpr{Value: interpreter.FloatLiteral{Value: 3.14}},
+			contains: "3.14",
+		},
+		{
+			name:     "Variable expression",
+			expr:     interpreter.VariableExpr{Name: "myVar"},
+			contains: "myVar",
+		},
+		{
+			name: "Field access",
+			expr: interpreter.FieldAccessExpr{
+				Object: interpreter.VariableExpr{Name: "obj"},
+				Field:  "field",
+			},
+			contains: "obj.field",
+		},
+		{
+			name: "Binary operation",
+			expr: interpreter.BinaryOpExpr{
+				Left:  interpreter.VariableExpr{Name: "a"},
+				Op:    interpreter.Add,
+				Right: interpreter.VariableExpr{Name: "b"},
+			},
+			contains: "a",
+		},
+		{
+			name: "Function call",
+			expr: interpreter.FunctionCallExpr{
+				Name: "myFunc",
+				Args: []interpreter.Expr{interpreter.VariableExpr{Name: "arg1"}},
+			},
+			contains: "myFunc",
+		},
+		{
+			name: "Array expression",
+			expr: interpreter.ArrayExpr{
+				Elements: []interpreter.Expr{
+					interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+					interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+				},
+			},
+			contains: "1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := SuggestHTMLEscape(tt.expr) // Uses exprToString internally
+			if !strings.Contains(result, tt.contains) {
+				t.Errorf("Expected result to contain %q, got %q", tt.contains, result)
+			}
+		})
+	}
+}
+
+// TestContainsUserInputViaXSS tests containsUserInput through the XSS detector
+func TestContainsUserInputViaXSS(t *testing.T) {
+	tests := []struct {
+		name          string
+		expr          interpreter.Expr
+		expectWarning bool
+	}{
+		{
+			name: "Nested field access with user input",
+			expr: interpreter.BinaryOpExpr{
+				Left: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "<div>"}},
+				Op:   interpreter.Add,
+				Right: interpreter.FieldAccessExpr{
+					Object: interpreter.FieldAccessExpr{
+						Object: interpreter.VariableExpr{Name: "request"},
+						Field:  "body",
+					},
+					Field: "username",
+				},
+			},
+			expectWarning: true,
+		},
+		{
+			name: "Deep binary expression with user input",
+			expr: interpreter.BinaryOpExpr{
+				Left: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "<p>"}},
+				Op:   interpreter.Add,
+				Right: interpreter.BinaryOpExpr{
+					Left:  interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "Hello "}},
+					Op:    interpreter.Add,
+					Right: interpreter.VariableExpr{Name: "input"},
+				},
+			},
+			expectWarning: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			warnings := DetectXSS(tt.expr)
+			if tt.expectWarning && len(warnings) == 0 {
+				t.Error("Expected warning but got none")
+			}
+		})
+	}
+}

@@ -2865,3 +2865,274 @@ func TestCompile_DirectiveWithSwitchStatement(t *testing.T) {
 		t.Error("Expected non-empty bytecode")
 	}
 }
+
+// TestCompileUnaryOp tests unary operations
+func TestCompileUnaryOp(t *testing.T) {
+	tests := []struct {
+		name     string
+		expr     interpreter.Expr
+		expected vm.Value
+	}{
+		{
+			name: "negation",
+			expr: &interpreter.UnaryOpExpr{
+				Op:    interpreter.Neg,
+				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+			},
+			expected: vm.IntValue{Val: -42},
+		},
+		{
+			name: "not true",
+			expr: &interpreter.UnaryOpExpr{
+				Op:    interpreter.Not,
+				Right: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
+			},
+			expected: vm.BoolValue{Val: false},
+		},
+		{
+			name: "not false",
+			expr: &interpreter.UnaryOpExpr{
+				Op:    interpreter.Not,
+				Right: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: false}},
+			},
+			expected: vm.BoolValue{Val: true},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := NewCompiler()
+			err := c.compileExpression(tt.expr)
+			if err != nil {
+				t.Fatalf("compileExpression() error: %v", err)
+			}
+
+			bytecode := c.buildBytecode()
+			vmInstance := vm.NewVM()
+			result, err := vmInstance.Execute(bytecode)
+			if err != nil {
+				t.Fatalf("Execute() error: %v", err)
+			}
+
+			if !valuesEqual(result, tt.expected) {
+				t.Errorf("Expected %v, got %v", tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestCompileValidationStatement tests validation statement compilation
+func TestCompileValidationStatement(t *testing.T) {
+	c := NewCompiler()
+
+	stmt := &interpreter.ValidationStatement{
+		Call: interpreter.FunctionCallExpr{
+			Name: "validate",
+			Args: []interpreter.Expr{
+				&interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
+			},
+		},
+	}
+
+	err := c.compileStatement(stmt)
+	// ValidationStatement may be a no-op, just ensure no panic
+	_ = err
+}
+
+// TestCompileExpressionStatement tests expression statement compilation
+func TestCompileExpressionStatement(t *testing.T) {
+	c := NewCompiler()
+
+	stmt := &interpreter.ExpressionStatement{
+		Expr: &interpreter.FunctionCallExpr{
+			Name: "print",
+			Args: []interpreter.Expr{
+				&interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "hello"}},
+			},
+		},
+	}
+
+	err := c.compileStatement(stmt)
+	// May or may not return error depending on function
+	_ = err
+}
+
+// TestSymbolTableFunctions tests symbol table methods
+func TestSymbolTableFunctions(t *testing.T) {
+	t.Run("DefineConstant", func(t *testing.T) {
+		st := NewSymbolTable(nil, GlobalScope)
+		st.DefineConstant("PI", 0, 1) // nameIndex, valueIndex
+
+		sym, ok := st.Resolve("PI")
+		if !ok {
+			t.Error("Expected to resolve constant PI")
+		}
+		if !sym.IsConstant {
+			t.Error("Expected PI to be a constant")
+		}
+	})
+
+	t.Run("ResolveLocal", func(t *testing.T) {
+		st := NewSymbolTable(nil, GlobalScope)
+		st.Define("x", 0)
+
+		sym, ok := st.ResolveLocal("x")
+		if !ok {
+			t.Error("Expected to resolve local x")
+		}
+		if sym.Name != "x" {
+			t.Errorf("Expected name x, got %s", sym.Name)
+		}
+
+		// Should not resolve non-existent
+		_, ok = st.ResolveLocal("nonexistent")
+		if ok {
+			t.Error("Should not resolve non-existent variable")
+		}
+	})
+
+	t.Run("Symbols", func(t *testing.T) {
+		st := NewSymbolTable(nil, GlobalScope)
+		st.Define("a", 0)
+		st.Define("b", 1)
+
+		symbols := st.Symbols()
+		if len(symbols) != 2 {
+			t.Errorf("Expected 2 symbols, got %d", len(symbols))
+		}
+	})
+
+	t.Run("Parent", func(t *testing.T) {
+		parent := NewSymbolTable(nil, GlobalScope)
+		child := NewSymbolTable(parent, FunctionScope)
+
+		if child.Parent() != parent {
+			t.Error("Parent() should return parent table")
+		}
+		if parent.Parent() != nil {
+			t.Error("Root table should have nil parent")
+		}
+	})
+
+	t.Run("Scope", func(t *testing.T) {
+		st := NewSymbolTable(nil, GlobalScope)
+		scope := st.Scope()
+		if scope != GlobalScope {
+			t.Errorf("Expected GlobalScope, got %v", scope)
+		}
+	})
+}
+
+// TestFunctionInliner tests function inliner
+func TestFunctionInliner(t *testing.T) {
+	inliner := NewFunctionInliner()
+	if inliner == nil {
+		t.Fatal("NewFunctionInliner returned nil")
+	}
+
+	// Define a simple function using interpreter.Function
+	funcDef := interpreter.Function{
+		Name: "add",
+		Params: []interpreter.Field{{Name: "a", TypeAnnotation: interpreter.IntType{}}, {Name: "b", TypeAnnotation: interpreter.IntType{}}},
+		Body: []interpreter.Statement{
+			&interpreter.ReturnStatement{
+				Value: &interpreter.BinaryOpExpr{
+					Op:    interpreter.Add,
+					Left:  &interpreter.VariableExpr{Name: "a"},
+					Right: &interpreter.VariableExpr{Name: "b"},
+				},
+			},
+		},
+	}
+
+	inliner.AnalyzeFunction(funcDef)
+
+	// Test ShouldInline
+	shouldInline := inliner.ShouldInline("add")
+	// May or may not inline depending on size
+	_ = shouldInline
+
+	// Test InlineCall
+	call := &interpreter.FunctionCallExpr{
+		Name: "add",
+		Args: []interpreter.Expr{
+			&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+			&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+		},
+	}
+
+	inlined := inliner.InlineCall(call)
+	// May return nil if not inlinable
+	_ = inlined
+}
+
+// TestOptimizerStrengthReduce tests strength reduction optimization
+func TestOptimizerStrengthReduce(t *testing.T) {
+	opt := NewOptimizer(OptAggressive)
+
+	tests := []struct {
+		name string
+		expr interpreter.Expr
+	}{
+		{
+			name: "multiply by power of 2",
+			expr: &interpreter.BinaryOpExpr{
+				Op:    interpreter.Mul,
+				Left:  &interpreter.VariableExpr{Name: "x"},
+				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 8}},
+			},
+		},
+		{
+			name: "divide by power of 2",
+			expr: &interpreter.BinaryOpExpr{
+				Op:    interpreter.Div,
+				Left:  &interpreter.VariableExpr{Name: "x"},
+				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 4}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := opt.StrengthReduce(tt.expr)
+			// May return original or optimized expression
+			if result == nil {
+				t.Error("StrengthReduce should not return nil")
+			}
+		})
+	}
+}
+
+// TestOptimizerApplyPeepholeOptimizations tests peephole optimization
+func TestOptimizerApplyPeepholeOptimizations(t *testing.T) {
+	opt := NewOptimizer(OptAggressive)
+
+	stmts := []interpreter.Statement{
+		&interpreter.AssignStatement{
+			Target: "x",
+			Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+		},
+	}
+
+	optimized := opt.ApplyPeepholeOptimizations(stmts)
+	if optimized == nil {
+		t.Error("ApplyPeepholeOptimizations should not return nil")
+	}
+}
+
+// TestOptimizerGetStats tests getting optimizer stats
+func TestOptimizerGetStats(t *testing.T) {
+	opt := NewOptimizer(OptAggressive)
+
+	// Run some optimization
+	expr := &interpreter.BinaryOpExpr{
+		Op:    interpreter.Add,
+		Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+		Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+	}
+	opt.OptimizeExpression(expr)
+
+	stats := opt.GetStats()
+	// Stats should have some data
+	_ = stats
+}

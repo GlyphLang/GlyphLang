@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestRecoveryMiddleware_PanicRecovery tests that panics are caught and converted to 500 errors
@@ -331,4 +332,334 @@ func TestChainMiddlewares(t *testing.T) {
 			t.Errorf("Call order[%d] = %s, want %s", i, callOrder[i], expected)
 		}
 	}
+}
+
+// TestCORSMiddleware tests CORS header handling
+func TestCORSMiddleware(t *testing.T) {
+	tests := []struct {
+		name           string
+		allowedOrigins []string
+		requestOrigin  string
+		expectAllow    bool
+	}{
+		{
+			name:           "allowed origin",
+			allowedOrigins: []string{"http://localhost:3000"},
+			requestOrigin:  "http://localhost:3000",
+			expectAllow:    true,
+		},
+		{
+			name:           "wildcard allows all",
+			allowedOrigins: []string{"*"},
+			requestOrigin:  "http://example.com",
+			expectAllow:    true,
+		},
+		{
+			name:           "disallowed origin",
+			allowedOrigins: []string{"http://localhost:3000"},
+			requestOrigin:  "http://evil.com",
+			expectAllow:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			middleware := CORSMiddleware(tt.allowedOrigins)
+			handler := func(ctx *Context) error {
+				return nil
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			req.Header.Set("Origin", tt.requestOrigin)
+			w := httptest.NewRecorder()
+			ctx := &Context{
+				Request:        req,
+				ResponseWriter: w,
+				StatusCode:     http.StatusOK,
+			}
+
+			wrappedHandler := middleware(handler)
+			wrappedHandler(ctx)
+
+			corsHeader := w.Header().Get("Access-Control-Allow-Origin")
+			if tt.expectAllow && corsHeader == "" {
+				t.Error("Expected CORS header to be set")
+			}
+		})
+	}
+}
+
+// TestCORSMiddleware_Preflight tests CORS preflight handling
+func TestCORSMiddleware_Preflight(t *testing.T) {
+	middleware := CORSMiddleware([]string{"*"})
+	handler := func(ctx *Context) error {
+		return nil
+	}
+
+	req := httptest.NewRequest(http.MethodOptions, "/test", nil)
+	req.Header.Set("Origin", "http://localhost:3000")
+	w := httptest.NewRecorder()
+	ctx := &Context{
+		Request:        req,
+		ResponseWriter: w,
+		StatusCode:     http.StatusOK,
+	}
+
+	wrappedHandler := middleware(handler)
+	wrappedHandler(ctx)
+
+	if ctx.StatusCode != 204 {
+		t.Errorf("Expected status 204 for preflight, got %d", ctx.StatusCode)
+	}
+}
+
+// TestHeaderMiddleware tests custom header injection
+func TestHeaderMiddleware(t *testing.T) {
+	headers := map[string]string{
+		"X-Custom-Header": "custom-value",
+		"X-Another":       "another-value",
+	}
+
+	middleware := HeaderMiddleware(headers)
+	handler := func(ctx *Context) error {
+		return nil
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	w := httptest.NewRecorder()
+	ctx := &Context{
+		Request:        req,
+		ResponseWriter: w,
+		StatusCode:     http.StatusOK,
+	}
+
+	wrappedHandler := middleware(handler)
+	wrappedHandler(ctx)
+
+	for key, expected := range headers {
+		got := w.Header().Get(key)
+		if got != expected {
+			t.Errorf("Header %s = %s, want %s", key, got, expected)
+		}
+	}
+}
+
+// TestAuthMiddleware tests authentication middleware
+func TestAuthMiddleware(t *testing.T) {
+	tests := []struct {
+		name         string
+		authHeader   string
+		validFunc    func(*Context) (bool, error)
+		expectStatus int
+	}{
+		{
+			name:         "missing auth header",
+			authHeader:   "",
+			validFunc:    nil,
+			expectStatus: 401,
+		},
+		{
+			name:       "valid token",
+			authHeader: "Bearer valid-token",
+			validFunc: func(ctx *Context) (bool, error) {
+				return true, nil
+			},
+			expectStatus: 200,
+		},
+		{
+			name:       "invalid token",
+			authHeader: "Bearer invalid-token",
+			validFunc: func(ctx *Context) (bool, error) {
+				return false, nil
+			},
+			expectStatus: 401,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			middleware := AuthMiddleware(tt.validFunc)
+			handler := func(ctx *Context) error {
+				ctx.StatusCode = 200
+				return nil
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			if tt.authHeader != "" {
+				req.Header.Set("Authorization", tt.authHeader)
+			}
+			w := httptest.NewRecorder()
+			ctx := &Context{
+				Request:        req,
+				ResponseWriter: w,
+				StatusCode:     http.StatusOK,
+			}
+
+			wrappedHandler := middleware(handler)
+			wrappedHandler(ctx)
+
+			if w.Code != tt.expectStatus && ctx.StatusCode != tt.expectStatus {
+				t.Errorf("Expected status %d, got response %d / ctx %d", tt.expectStatus, w.Code, ctx.StatusCode)
+			}
+		})
+	}
+}
+
+// TestBasicAuthMiddleware tests basic token authentication
+func TestBasicAuthMiddleware(t *testing.T) {
+	validTokens := map[string]bool{
+		"valid-token":   true,
+		"another-token": true,
+	}
+
+	tests := []struct {
+		name         string
+		authHeader   string
+		expectStatus int
+	}{
+		{
+			name:         "missing header",
+			authHeader:   "",
+			expectStatus: 401,
+		},
+		{
+			name:         "valid bearer token",
+			authHeader:   "Bearer valid-token",
+			expectStatus: 200,
+		},
+		{
+			name:         "valid raw token",
+			authHeader:   "valid-token",
+			expectStatus: 200,
+		},
+		{
+			name:         "invalid token",
+			authHeader:   "Bearer invalid-token",
+			expectStatus: 401,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			middleware := BasicAuthMiddleware(validTokens)
+			handler := func(ctx *Context) error {
+				ctx.StatusCode = 200
+				return nil
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			if tt.authHeader != "" {
+				req.Header.Set("Authorization", tt.authHeader)
+			}
+			w := httptest.NewRecorder()
+			ctx := &Context{
+				Request:        req,
+				ResponseWriter: w,
+				StatusCode:     http.StatusOK,
+			}
+
+			wrappedHandler := middleware(handler)
+			wrappedHandler(ctx)
+
+			if w.Code != tt.expectStatus && ctx.StatusCode != tt.expectStatus {
+				t.Errorf("Expected status %d, got response %d / ctx %d", tt.expectStatus, w.Code, ctx.StatusCode)
+			}
+		})
+	}
+}
+
+// TestRateLimitMiddleware tests rate limiting
+func TestRateLimitMiddleware(t *testing.T) {
+	config := RateLimiterConfig{
+		RequestsPerMinute: 60,
+		BurstSize:         5,
+	}
+
+	middleware := RateLimitMiddleware(config)
+	handler := func(ctx *Context) error {
+		ctx.StatusCode = 200
+		return nil
+	}
+
+	// Make requests within burst limit
+	for i := 0; i < 5; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.RemoteAddr = "127.0.0.1:12345"
+		w := httptest.NewRecorder()
+		ctx := &Context{
+			Request:        req,
+			ResponseWriter: w,
+			StatusCode:     http.StatusOK,
+		}
+
+		wrappedHandler := middleware(handler)
+		wrappedHandler(ctx)
+		if w.Code == 429 || ctx.StatusCode == 429 {
+			t.Errorf("Request %d should succeed within burst, got rate limited", i)
+		}
+	}
+
+	// Next request should be rate limited
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.RemoteAddr = "127.0.0.1:12345"
+	w := httptest.NewRecorder()
+	ctx := &Context{
+		Request:        req,
+		ResponseWriter: w,
+		StatusCode:     http.StatusOK,
+	}
+
+	wrappedHandler := middleware(handler)
+	wrappedHandler(ctx)
+	if w.Code != 429 && ctx.StatusCode != 429 {
+		t.Errorf("Expected status 429, got response %d / ctx %d", w.Code, ctx.StatusCode)
+	}
+}
+
+// TestTimeoutMiddleware tests request timeout
+func TestTimeoutMiddleware(t *testing.T) {
+	middleware := TimeoutMiddleware(100 * time.Millisecond)
+
+	t.Run("fast handler", func(t *testing.T) {
+		handler := func(ctx *Context) error {
+			ctx.StatusCode = 200
+			return nil
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		w := httptest.NewRecorder()
+		ctx := &Context{
+			Request:        req,
+			ResponseWriter: w,
+			StatusCode:     http.StatusOK,
+		}
+
+		wrappedHandler := middleware(handler)
+		wrappedHandler(ctx)
+		if w.Code == 504 || ctx.StatusCode == 504 {
+			t.Error("Fast handler should succeed, got timeout")
+		}
+	})
+
+	t.Run("slow handler", func(t *testing.T) {
+		handler := func(ctx *Context) error {
+			time.Sleep(200 * time.Millisecond)
+			ctx.StatusCode = 200
+			return nil
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		w := httptest.NewRecorder()
+		ctx := &Context{
+			Request:        req,
+			ResponseWriter: w,
+			StatusCode:     http.StatusOK,
+		}
+
+		wrappedHandler := middleware(handler)
+		wrappedHandler(ctx)
+		if w.Code != 504 && ctx.StatusCode != 504 {
+			t.Errorf("Expected status 504, got response %d / ctx %d", w.Code, ctx.StatusCode)
+		}
+	})
 }
