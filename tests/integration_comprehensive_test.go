@@ -19,7 +19,7 @@ func TestHelloWorldIntegration(t *testing.T) {
 	helper := NewTestHelper(t)
 
 	// 1. Load the hello-world example
-	examplePath := filepath.Join("..", "examples", "hello-world", "main.abc")
+	examplePath := filepath.Join("..", "examples", "hello-world", "main.glyph")
 	source, err := os.ReadFile(examplePath)
 	if err != nil {
 		t.Skipf("Skipping - hello-world example not found: %v", err)
@@ -94,7 +94,7 @@ func TestRestAPIIntegration(t *testing.T) {
 	helper := NewTestHelper(t)
 
 	// Load rest-api example
-	examplePath := filepath.Join("..", "examples", "rest-api", "main.abc")
+	examplePath := filepath.Join("..", "examples", "rest-api", "main.glyph")
 	source, err := os.ReadFile(examplePath)
 	if err != nil {
 		t.Skipf("Skipping - rest-api example not found: %v", err)

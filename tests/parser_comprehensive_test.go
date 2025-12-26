@@ -18,8 +18,8 @@ func TestParserAllExamples(t *testing.T) {
 		name string
 		path string
 	}{
-		{"hello-world", "../examples/hello-world/main.abc"},
-		{"rest-api", "../examples/rest-api/main.abc"},
+		{"hello-world", "../examples/hello-world/main.glyph"},
+		{"rest-api", "../examples/rest-api/main.glyph"},
 	}
 
 	for _, example := range examples {

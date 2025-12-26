@@ -263,8 +263,8 @@ func BenchmarkRouterPerformance(b *testing.B) {
 	}
 }
 
-// BenchmarkJSONSerialization benchmarks JSON response serialization
-func BenchmarkJSONSerialization(b *testing.B) {
+// BenchmarkJSONSerializationE2E benchmarks JSON response serialization end-to-end
+func BenchmarkJSONSerializationE2E(b *testing.B) {
 	// Large response object
 	response := map[string]interface{}{
 		"users": []map[string]interface{}{
