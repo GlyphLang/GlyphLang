@@ -32,9 +32,119 @@ func (i *Interpreter) EvaluateExpression(expr Expr, env *Environment) (interface
 	case ArrayExpr:
 		return i.evaluateArrayExpr(e, env)
 
+	case AsyncExpr:
+		return i.evaluateAsyncExpr(e, env)
+
+	case AwaitExpr:
+		return i.evaluateAwaitExpr(e, env)
+
+	case ArrayIndexExpr:
+		return i.evaluateArrayIndexExpr(e, env)
+
+	case MatchExpr:
+		return i.evaluateMatchExpr(e, env)
+
 	default:
 		return nil, fmt.Errorf("unsupported expression type: %T", expr)
 	}
+}
+
+// evaluateAsyncExpr executes an async block in a goroutine and returns a Future
+func (i *Interpreter) evaluateAsyncExpr(expr AsyncExpr, env *Environment) (interface{}, error) {
+	// Create a new Future to represent the pending result
+	future := NewFuture()
+
+	// Create a child environment for the async block
+	// This captures the current scope for use in the goroutine
+	asyncEnv := NewChildEnvironment(env)
+
+	// Execute the async block in a separate goroutine
+	go func() {
+		// Execute the statements in the async block
+		result, err := i.executeStatements(expr.Body, asyncEnv)
+
+		if err != nil {
+			// Check if it's a return value (which is normal for returning from async blocks)
+			if retErr, ok := err.(*returnValue); ok {
+				future.Resolve(retErr.value)
+			} else {
+				future.Reject(err)
+			}
+		} else {
+			future.Resolve(result)
+		}
+	}()
+
+	// Return the Future immediately (non-blocking)
+	return future, nil
+}
+
+// evaluateAwaitExpr waits for a Future to complete and returns its value
+func (i *Interpreter) evaluateAwaitExpr(expr AwaitExpr, env *Environment) (interface{}, error) {
+	// Evaluate the expression to get the Future
+	val, err := i.EvaluateExpression(expr.Expr, env)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if the value is a Future
+	future, ok := val.(*Future)
+	if !ok {
+		return nil, fmt.Errorf("await requires a Future, got %T", val)
+	}
+
+	// Wait for the Future to complete and return its value
+	return future.Await()
+}
+
+// evaluateArrayIndexExpr evaluates array indexing: array[index]
+func (i *Interpreter) evaluateArrayIndexExpr(expr ArrayIndexExpr, env *Environment) (interface{}, error) {
+	// Evaluate the array expression
+	arrayVal, err := i.EvaluateExpression(expr.Array, env)
+	if err != nil {
+		return nil, err
+	}
+
+	// Evaluate the index expression
+	indexVal, err := i.EvaluateExpression(expr.Index, env)
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle array indexing
+	if arr, ok := arrayVal.([]interface{}); ok {
+		// Get the index as int64
+		var index int64
+		switch idx := indexVal.(type) {
+		case int64:
+			index = idx
+		case int:
+			index = int64(idx)
+		default:
+			return nil, fmt.Errorf("array index must be an integer, got %T", indexVal)
+		}
+
+		// Check bounds
+		if index < 0 || int(index) >= len(arr) {
+			return nil, fmt.Errorf("array index out of bounds: %d (length: %d)", index, len(arr))
+		}
+
+		return arr[index], nil
+	}
+
+	// Handle map/object indexing with string key
+	if obj, ok := arrayVal.(map[string]interface{}); ok {
+		keyStr, ok := indexVal.(string)
+		if !ok {
+			return nil, fmt.Errorf("map key must be a string, got %T", indexVal)
+		}
+		if val, exists := obj[keyStr]; exists {
+			return val, nil
+		}
+		return nil, fmt.Errorf("key '%s' not found in object", keyStr)
+	}
+
+	return nil, fmt.Errorf("cannot index %T", arrayVal)
 }
 
 // evaluateLiteral converts a literal AST node to a runtime value
@@ -973,6 +1083,20 @@ func (i *Interpreter) evaluateFunctionCall(expr FunctionCallExpr, env *Environme
 			}
 		}
 
+		// Check if obj is a map (module namespace) and methodName is a function
+		if objMap, ok := obj.(map[string]interface{}); ok {
+			if fn, exists := objMap[methodName]; exists {
+				// If it's a Function, execute it
+				if fnDef, ok := fn.(*Function); ok {
+					return i.executeFunction(*fnDef, expr.Args, env)
+				}
+				if fnDef, ok := fn.(Function); ok {
+					return i.executeFunction(fnDef, expr.Args, env)
+				}
+				// If it's something else callable, continue to reflection
+			}
+		}
+
 		// Call the method using reflection
 		return CallMethod(obj, strings.Title(methodName), args...)
 	}
@@ -985,6 +1109,10 @@ func (i *Interpreter) evaluateFunctionCall(expr FunctionCallExpr, env *Environme
 
 	// If it's a Function AST node, execute it
 	if fnDef, ok := fn.(Function); ok {
+		// Check if this is a generic function
+		if len(fnDef.TypeParams) > 0 {
+			return i.executeGenericFunction(fnDef, expr.TypeArgs, expr.Args, env)
+		}
 		return i.executeFunction(fnDef, expr.Args, env)
 	}
 
@@ -1069,6 +1197,94 @@ func (i *Interpreter) executeFunction(fn Function, args []Expr, env *Environment
 	return result, nil
 }
 
+// executeGenericFunction executes a generic function with type arguments
+func (i *Interpreter) executeGenericFunction(fn Function, typeArgs []Type, args []Expr, env *Environment) (interface{}, error) {
+	// Evaluate all arguments first (we need values for type inference)
+	argValues := make([]interface{}, len(args))
+	for idx, arg := range args {
+		val, err := i.EvaluateExpression(arg, env)
+		if err != nil {
+			return nil, err
+		}
+		argValues[idx] = val
+	}
+
+	// If type arguments are not provided, try to infer them
+	var resolvedTypeArgs []Type
+	if len(typeArgs) == 0 {
+		inferred, err := i.typeChecker.InferTypeArguments(fn, argValues)
+		if err != nil {
+			return nil, fmt.Errorf("cannot infer type arguments for generic function %s: %v", fn.Name, err)
+		}
+		resolvedTypeArgs = inferred
+	} else {
+		// Validate that the correct number of type arguments were provided
+		if len(typeArgs) != len(fn.TypeParams) {
+			return nil, fmt.Errorf("generic function %s expects %d type arguments, got %d",
+				fn.Name, len(fn.TypeParams), len(typeArgs))
+		}
+		resolvedTypeArgs = typeArgs
+	}
+
+	// Instantiate the generic function with resolved type arguments
+	instantiatedFn, typeBindings, err := i.typeChecker.InstantiateGenericFunction(fn, resolvedTypeArgs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate generic function %s: %v", fn.Name, err)
+	}
+
+	// Push type bindings onto the type scope for nested generic type resolution
+	i.typeChecker.PushTypeScope(typeBindings)
+	defer func() {
+		names := make([]string, 0, len(typeBindings))
+		for name := range typeBindings {
+			names = append(names, name)
+		}
+		i.typeChecker.PopTypeScope(names)
+	}()
+
+	// Create a new environment for the function
+	fnEnv := NewChildEnvironment(env)
+
+	// Validate argument count
+	if len(argValues) != len(instantiatedFn.Params) {
+		return nil, fmt.Errorf("function %s expects %d arguments, got %d",
+			fn.Name, len(instantiatedFn.Params), len(argValues))
+	}
+
+	// Bind arguments to parameters with type checking
+	for idx, param := range instantiatedFn.Params {
+		argVal := argValues[idx]
+
+		// Validate argument type matches the instantiated parameter type
+		if param.TypeAnnotation != nil {
+			if err := i.typeChecker.CheckType(argVal, param.TypeAnnotation); err != nil {
+				return nil, fmt.Errorf("argument %d (%s): %v", idx+1, param.Name, err)
+			}
+		}
+
+		fnEnv.Define(param.Name, argVal)
+	}
+
+	// Execute function body
+	result, err := i.executeStatements(fn.Body, fnEnv)
+	if err != nil {
+		if retErr, ok := err.(*returnValue); ok {
+			result = retErr.value
+		} else {
+			return nil, err
+		}
+	}
+
+	// Validate return value matches the instantiated return type
+	if instantiatedFn.ReturnType != nil {
+		if err := i.typeChecker.CheckType(result, instantiatedFn.ReturnType); err != nil {
+			return nil, fmt.Errorf("return type mismatch in function %s: %v", fn.Name, err)
+		}
+	}
+
+	return result, nil
+}
+
 // extractPathParams extracts path parameters from a route path
 func extractPathParams(path string, actualPath string) (map[string]string, error) {
 	// Remove query string from actualPath if present
@@ -1099,3 +1315,173 @@ func extractPathParams(path string, actualPath string) (map[string]string, error
 
 // extractQueryParams is deprecated - use ExtractRawQueryParams and ProcessQueryParams instead.
 // Kept for backward compatibility with any code that may still reference it.
+
+// evaluateMatchExpr evaluates a match expression
+func (i *Interpreter) evaluateMatchExpr(expr MatchExpr, env *Environment) (interface{}, error) {
+	// Evaluate the value to match against
+	value, err := i.EvaluateExpression(expr.Value, env)
+	if err != nil {
+		return nil, err
+	}
+
+	// Try each case in order
+	for _, matchCase := range expr.Cases {
+		// Create a new environment for pattern bindings
+		caseEnv := NewChildEnvironment(env)
+
+		// Try to match the pattern
+		matched, err := i.matchPattern(matchCase.Pattern, value, caseEnv)
+		if err != nil {
+			return nil, err
+		}
+
+		if matched {
+			// Check guard condition if present
+			if matchCase.Guard != nil {
+				guardResult, err := i.EvaluateExpression(matchCase.Guard, caseEnv)
+				if err != nil {
+					return nil, err
+				}
+
+				guardBool, ok := guardResult.(bool)
+				if !ok {
+					return nil, fmt.Errorf("match guard must evaluate to boolean, got %T", guardResult)
+				}
+
+				if !guardBool {
+					// Guard failed, try next case
+					continue
+				}
+			}
+
+			// Pattern matched (and guard passed if present), evaluate body
+			return i.EvaluateExpression(matchCase.Body, caseEnv)
+		}
+	}
+
+	// No pattern matched - return nil (non-exhaustive match)
+	return nil, nil
+}
+
+// matchPattern attempts to match a value against a pattern
+// Returns true if matched, and binds any pattern variables to the environment
+func (i *Interpreter) matchPattern(pattern Pattern, value interface{}, env *Environment) (bool, error) {
+	switch p := pattern.(type) {
+	case LiteralPattern:
+		return i.matchLiteralPattern(p, value)
+
+	case VariablePattern:
+		// Variable pattern always matches and binds the value
+		env.Define(p.Name, value)
+		return true, nil
+
+	case WildcardPattern:
+		// Wildcard always matches
+		return true, nil
+
+	case ObjectPattern:
+		return i.matchObjectPattern(p, value, env)
+
+	case ArrayPattern:
+		return i.matchArrayPattern(p, value, env)
+
+	default:
+		return false, fmt.Errorf("unsupported pattern type: %T", pattern)
+	}
+}
+
+// matchLiteralPattern matches a value against a literal pattern
+func (i *Interpreter) matchLiteralPattern(pattern LiteralPattern, value interface{}) (bool, error) {
+	// Get the literal value from the pattern
+	patternValue, err := i.evaluateLiteral(pattern.Value)
+	if err != nil {
+		return false, err
+	}
+
+	// Compare values (using the same equality logic as ==)
+	result, err := i.evaluateEq(patternValue, value)
+	if err != nil {
+		return false, nil // Type mismatch means no match
+	}
+
+	matched, ok := result.(bool)
+	if !ok {
+		return false, nil
+	}
+
+	return matched, nil
+}
+
+// matchObjectPattern matches a value against an object destructuring pattern
+func (i *Interpreter) matchObjectPattern(pattern ObjectPattern, value interface{}, env *Environment) (bool, error) {
+	// Value must be a map
+	objMap, ok := value.(map[string]interface{})
+	if !ok {
+		return false, nil
+	}
+
+	// Match each field in the pattern
+	for _, field := range pattern.Fields {
+		// Check if the field exists in the object
+		fieldValue, exists := objMap[field.Key]
+		if !exists {
+			return false, nil
+		}
+
+		if field.Pattern != nil {
+			// Match the nested pattern
+			matched, err := i.matchPattern(field.Pattern, fieldValue, env)
+			if err != nil {
+				return false, err
+			}
+			if !matched {
+				return false, nil
+			}
+		} else {
+			// No nested pattern, bind field name as variable
+			env.Define(field.Key, fieldValue)
+		}
+	}
+
+	return true, nil
+}
+
+// matchArrayPattern matches a value against an array destructuring pattern
+func (i *Interpreter) matchArrayPattern(pattern ArrayPattern, value interface{}, env *Environment) (bool, error) {
+	// Value must be a slice
+	arr, ok := value.([]interface{})
+	if !ok {
+		return false, nil
+	}
+
+	// If there's a rest pattern, we need at least len(Elements) elements
+	// Otherwise, we need exactly len(Elements) elements
+	if pattern.Rest != nil {
+		if len(arr) < len(pattern.Elements) {
+			return false, nil
+		}
+	} else {
+		if len(arr) != len(pattern.Elements) {
+			return false, nil
+		}
+	}
+
+	// Match each element pattern
+	for idx, elemPattern := range pattern.Elements {
+		matched, err := i.matchPattern(elemPattern, arr[idx], env)
+		if err != nil {
+			return false, err
+		}
+		if !matched {
+			return false, nil
+		}
+	}
+
+	// If there's a rest pattern, bind the remaining elements
+	if pattern.Rest != nil {
+		rest := arr[len(pattern.Elements):]
+		env.Define(*pattern.Rest, rest)
+	}
+
+	return true, nil
+}

@@ -1,0 +1,42 @@
+# models.glyph - Data model definitions
+module "models"
+
+# User model
+: User {
+  id: int!
+  email: str!
+  firstName: str!
+  lastName: str!
+  age: int
+  role: str = "user"
+  createdAt: int
+}
+
+# UserResponse for API responses
+: UserResponse {
+  id: int!
+  email: str!
+  displayName: str!
+  isAdult: bool
+}
+
+# UserListResponse for paginated lists
+: UserListResponse {
+  users: [UserResponse]!
+  total: int!
+  page: int!
+  pageSize: int!
+}
+
+# Order model
+: Order {
+  id: int!
+  userId: int!
+  total: float!
+  status: str!
+  createdAt: int
+}
+
+# Validation helper function
+! isValidEmail(email: str): bool
+  > contains(email, "@")

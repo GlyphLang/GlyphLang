@@ -1,0 +1,71 @@
+# main.glyph - Main application file demonstrating module imports
+
+# Import the entire utils module
+import "./utils"
+
+# Import models module with alias
+import "./models" as m
+
+# Selective import - import specific functions
+from "./utils" import { formatDisplayName, isAdult }
+
+# GET all users endpoint
+@ GET /users
+  ~ db: Database
+  $ users = utils.getAllUsers(db)
+  $ total = length(users)
+  > {users: users, count: total}
+
+# GET single user by ID with formatted response
+@ GET /users/:id -> m.UserResponse
+  ~ db: Database
+  $ user = utils.getUserById(db, parseInt(id))
+
+  if user == null {
+    > {error: "User not found"}
+  }
+
+  # Use the directly imported function
+  $ displayName = formatDisplayName(user.firstName, user.lastName)
+  $ adult = isAdult(user.age)
+
+  > {
+    id: user.id,
+    email: user.email,
+    displayName: displayName,
+    isAdult: adult
+  }
+
+# POST create new user with validation
+@ POST /users -> m.User
+  ~ db: Database
+
+  # Validate email using models module function
+  if m.isValidEmail(input.email) == false {
+    > {error: "Invalid email format"}
+  }
+
+  $ newUser = db.users.create({
+    email: input.email,
+    firstName: input.firstName,
+    lastName: input.lastName,
+    age: input.age,
+    role: "user"
+  })
+
+  > newUser
+
+# GET user stats - demonstrating multiple module usage
+@ GET /users/:id/stats
+  ~ db: Database
+  $ user = utils.getUserById(db, parseInt(id))
+  $ currentYear = 2024
+  $ age = utils.calculateAge(user.birthYear, currentYear)
+  $ adult = isAdult(age)
+
+  > {
+    userId: user.id,
+    age: age,
+    isAdult: adult,
+    displayName: formatDisplayName(user.firstName, user.lastName)
+  }

@@ -259,10 +259,13 @@ func TestParser_GenericType_ListOfString(t *testing.T) {
 	// First field should be List[str]
 	assert.Equal(t, "names", typeDef.Fields[0].Name)
 	assert.True(t, typeDef.Fields[0].Required)
-	// The type should be parsed as NamedType "List" (generic params are handled separately)
-	namedType, ok := typeDef.Fields[0].TypeAnnotation.(interpreter.NamedType)
-	require.True(t, ok, "Expected NamedType, got %T", typeDef.Fields[0].TypeAnnotation)
+	// The type should be parsed as GenericType with List base and str type argument
+	genericType, ok := typeDef.Fields[0].TypeAnnotation.(interpreter.GenericType)
+	require.True(t, ok, "Expected GenericType, got %T", typeDef.Fields[0].TypeAnnotation)
+	namedType, ok := genericType.BaseType.(interpreter.NamedType)
+	require.True(t, ok)
 	assert.Equal(t, "List", namedType.Name)
+	require.Len(t, genericType.TypeArgs, 1)
 }
 
 // Test 10: Generic type Map[str, int]
@@ -287,9 +290,12 @@ func TestParser_GenericType_MapOfStringInt(t *testing.T) {
 	require.Len(t, typeDef.Fields, 1)
 
 	assert.Equal(t, "playerScores", typeDef.Fields[0].Name)
-	namedType, ok := typeDef.Fields[0].TypeAnnotation.(interpreter.NamedType)
+	genericType, ok := typeDef.Fields[0].TypeAnnotation.(interpreter.GenericType)
+	require.True(t, ok, "Expected GenericType, got %T", typeDef.Fields[0].TypeAnnotation)
+	namedType, ok := genericType.BaseType.(interpreter.NamedType)
 	require.True(t, ok)
 	assert.Equal(t, "Map", namedType.Name)
+	require.Len(t, genericType.TypeArgs, 2)
 }
 
 // Test 11: Nested generic types
@@ -634,9 +640,12 @@ func TestParser_TypeDef_MixedGenericAndUnion(t *testing.T) {
 
 	// Second field: Map[str, str] (generic)
 	assert.Equal(t, "metadata", typeDef.Fields[1].Name)
-	namedType, ok := typeDef.Fields[1].TypeAnnotation.(interpreter.NamedType)
+	genericType, ok := typeDef.Fields[1].TypeAnnotation.(interpreter.GenericType)
+	require.True(t, ok, "Expected GenericType, got %T", typeDef.Fields[1].TypeAnnotation)
+	namedType, ok := genericType.BaseType.(interpreter.NamedType)
 	require.True(t, ok)
 	assert.Equal(t, "Map", namedType.Name)
+	require.Len(t, genericType.TypeArgs, 2)
 
 	// Third field: Pagination | int (union with named and primitive)
 	assert.Equal(t, "pagination", typeDef.Fields[2].Name)

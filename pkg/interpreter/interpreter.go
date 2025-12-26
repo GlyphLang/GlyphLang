@@ -6,30 +6,44 @@ import (
 
 // Interpreter is the main interpreter struct
 type Interpreter struct {
-	globalEnv     *Environment
-	functions     map[string]Function
-	typeDefs      map[string]TypeDef
-	commands      map[string]Command
-	cronTasks     []CronTask
-	eventHandlers map[string][]EventHandler
-	queueWorkers  map[string]QueueWorker
-	typeChecker   *TypeChecker
-	dbHandler     interface{} // Database handler for dependency injection
+	globalEnv      *Environment
+	functions      map[string]Function
+	typeDefs       map[string]TypeDef
+	commands       map[string]Command
+	cronTasks      []CronTask
+	eventHandlers  map[string][]EventHandler
+	queueWorkers   map[string]QueueWorker
+	typeChecker    *TypeChecker
+	dbHandler      interface{}       // Database handler for dependency injection
+	moduleResolver *ModuleResolver   // Module resolver for handling imports
+	importedModules map[string]*LoadedModule // Imported modules by alias/name
 }
 
 // NewInterpreter creates a new interpreter instance
 func NewInterpreter() *Interpreter {
 	typeChecker := NewTypeChecker()
 	return &Interpreter{
-		globalEnv:     NewEnvironment(),
-		functions:     make(map[string]Function),
-		typeDefs:      make(map[string]TypeDef),
-		commands:      make(map[string]Command),
-		cronTasks:     []CronTask{},
-		eventHandlers: make(map[string][]EventHandler),
-		queueWorkers:  make(map[string]QueueWorker),
-		typeChecker:   typeChecker,
+		globalEnv:       NewEnvironment(),
+		functions:       make(map[string]Function),
+		typeDefs:        make(map[string]TypeDef),
+		commands:        make(map[string]Command),
+		cronTasks:       []CronTask{},
+		eventHandlers:   make(map[string][]EventHandler),
+		queueWorkers:    make(map[string]QueueWorker),
+		typeChecker:     typeChecker,
+		moduleResolver:  NewModuleResolver(),
+		importedModules: make(map[string]*LoadedModule),
 	}
+}
+
+// SetModuleResolver sets a custom module resolver
+func (i *Interpreter) SetModuleResolver(resolver *ModuleResolver) {
+	i.moduleResolver = resolver
+}
+
+// GetModuleResolver returns the module resolver
+func (i *Interpreter) GetModuleResolver() *ModuleResolver {
+	return i.moduleResolver
 }
 
 // Request represents an HTTP request
@@ -51,8 +65,23 @@ type Response struct {
 
 // LoadModule loads a module into the interpreter
 func (i *Interpreter) LoadModule(module Module) error {
+	return i.LoadModuleWithPath(module, ".")
+}
+
+// LoadModuleWithPath loads a module into the interpreter with a base path for imports
+func (i *Interpreter) LoadModuleWithPath(module Module, basePath string) error {
 	for _, item := range module.Items {
 		switch it := item.(type) {
+		case *ImportStatement:
+			// Handle import statements
+			if err := i.processImport(it, basePath); err != nil {
+				return err
+			}
+
+		case *ModuleDecl:
+			// Module declaration - just store it for now
+			continue
+
 		case *TypeDef:
 			i.typeDefs[it.Name] = *it
 
@@ -91,6 +120,94 @@ func (i *Interpreter) LoadModule(module Module) error {
 	i.typeChecker.SetFunctions(i.functions)
 
 	return nil
+}
+
+// processImport handles an import statement
+func (i *Interpreter) processImport(importStmt *ImportStatement, basePath string) error {
+	// Check if module resolver has a parse function set
+	if i.moduleResolver.ParseFunc == nil {
+		return fmt.Errorf("cannot process imports: no parser function set on module resolver")
+	}
+
+	// Resolve and load the module
+	loadedModule, err := i.moduleResolver.ResolveModule(importStmt.Path, basePath)
+	if err != nil {
+		return fmt.Errorf("failed to import '%s': %w", importStmt.Path, err)
+	}
+
+	if importStmt.Selective {
+		// Selective import: from "path" import { name1, name2 }
+		for _, name := range importStmt.Names {
+			exported, exists := loadedModule.Exports[name.Name]
+			if !exists {
+				return fmt.Errorf("'%s' is not exported from module '%s'", name.Name, importStmt.Path)
+			}
+
+			// Determine the name to use in the current scope
+			importName := name.Name
+			if name.Alias != "" {
+				importName = name.Alias
+			}
+
+			// Add to global environment based on type
+			switch exp := exported.(type) {
+			case *Function:
+				i.functions[importName] = *exp
+				i.globalEnv.Define(importName, *exp)
+			case *TypeDef:
+				i.typeDefs[importName] = *exp
+			case *Command:
+				i.commands[importName] = *exp
+			default:
+				i.globalEnv.Define(importName, exp)
+			}
+		}
+	} else {
+		// Full module import: import "path" or import "path" as alias
+		// Determine the namespace name
+		namespace := importStmt.Alias
+		if namespace == "" {
+			// Extract name from path (e.g., "./utils" -> "utils")
+			namespace = extractModuleName(importStmt.Path)
+		}
+
+		// Store the loaded module
+		i.importedModules[namespace] = loadedModule
+
+		// Create a namespace object with all exports
+		moduleObj := make(map[string]interface{})
+		for name, exported := range loadedModule.Exports {
+			moduleObj[name] = exported
+		}
+
+		// Add the module namespace to the global environment
+		i.globalEnv.Define(namespace, moduleObj)
+	}
+
+	return nil
+}
+
+// extractModuleName extracts the module name from an import path
+func extractModuleName(path string) string {
+	// Remove .glyph extension if present
+	name := path
+	if len(name) > 6 && name[len(name)-6:] == ".glyph" {
+		name = name[:len(name)-6]
+	}
+
+	// Get the last component of the path
+	for i := len(name) - 1; i >= 0; i-- {
+		if name[i] == '/' || name[i] == '\\' {
+			return name[i+1:]
+		}
+	}
+
+	// Remove leading ./ if present
+	if len(name) > 2 && name[:2] == "./" {
+		return name[2:]
+	}
+
+	return name
 }
 
 // SetDatabaseHandler sets the database handler for dependency injection

@@ -2790,3 +2790,211 @@ func TestParser_TokenTypes(t *testing.T) {
 		})
 	}
 }
+
+// Test Pattern Matching Parsing
+
+func TestParser_MatchExpr_LiteralPatterns(t *testing.T) {
+	input := `@route /test [GET]
+  $ result = match code {
+    200 => "OK"
+    404 => "Not Found"
+    _ => "Unknown"
+  }
+  > result`
+
+	lexer := NewLexer(input)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+	require.NotNil(t, module)
+	require.Len(t, module.Items, 1)
+
+	route, ok := module.Items[0].(*interpreter.Route)
+	require.True(t, ok)
+	require.Len(t, route.Body, 2)
+
+	// First statement is the assignment with match expression
+	// Try both pointer and value types
+	var assignStmt interpreter.AssignStatement
+	if ptr, ok := route.Body[0].(*interpreter.AssignStatement); ok {
+		assignStmt = *ptr
+	} else if val, ok := route.Body[0].(interpreter.AssignStatement); ok {
+		assignStmt = val
+	} else {
+		t.Fatalf("expected AssignStatement, got %T", route.Body[0])
+	}
+	assert.Equal(t, "result", assignStmt.Target)
+
+	matchExpr, ok := assignStmt.Value.(interpreter.MatchExpr)
+	require.True(t, ok)
+	require.Len(t, matchExpr.Cases, 3)
+
+	// Check first case: 200 => "OK"
+	lit1, ok := matchExpr.Cases[0].Pattern.(interpreter.LiteralPattern)
+	require.True(t, ok)
+	intLit, ok := lit1.Value.(interpreter.IntLiteral)
+	require.True(t, ok)
+	assert.Equal(t, int64(200), intLit.Value)
+
+	// Check wildcard case
+	_, ok = matchExpr.Cases[2].Pattern.(interpreter.WildcardPattern)
+	assert.True(t, ok)
+}
+
+func TestParser_MatchExpr_WithGuard(t *testing.T) {
+	input := `@route /test [GET]
+  $ result = match n {
+    x when x > 10 => "big"
+    x => "small"
+  }
+  > result`
+
+	lexer := NewLexer(input)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+	require.NotNil(t, module)
+
+	route, ok := module.Items[0].(*interpreter.Route)
+	require.True(t, ok)
+
+	var assignStmt interpreter.AssignStatement
+	if ptr, ok := route.Body[0].(*interpreter.AssignStatement); ok {
+		assignStmt = *ptr
+	} else if val, ok := route.Body[0].(interpreter.AssignStatement); ok {
+		assignStmt = val
+	} else {
+		t.Fatalf("expected AssignStatement, got %T", route.Body[0])
+	}
+
+	matchExpr, ok := assignStmt.Value.(interpreter.MatchExpr)
+	require.True(t, ok)
+	require.Len(t, matchExpr.Cases, 2)
+
+	// First case should have a guard
+	assert.NotNil(t, matchExpr.Cases[0].Guard)
+	// Second case should not have a guard
+	assert.Nil(t, matchExpr.Cases[1].Guard)
+}
+
+func TestParser_MatchExpr_ObjectPattern(t *testing.T) {
+	input := `@route /test [GET]
+  $ result = match obj {
+    {name, age} => name
+    _ => "unknown"
+  }
+  > result`
+
+	lexer := NewLexer(input)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+	require.NotNil(t, module)
+
+	route, ok := module.Items[0].(*interpreter.Route)
+	require.True(t, ok)
+
+	var assignStmt interpreter.AssignStatement
+	if ptr, ok := route.Body[0].(*interpreter.AssignStatement); ok {
+		assignStmt = *ptr
+	} else if val, ok := route.Body[0].(interpreter.AssignStatement); ok {
+		assignStmt = val
+	} else {
+		t.Fatalf("expected AssignStatement, got %T", route.Body[0])
+	}
+
+	matchExpr, ok := assignStmt.Value.(interpreter.MatchExpr)
+	require.True(t, ok)
+	require.Len(t, matchExpr.Cases, 2)
+
+	// First case should be an object pattern
+	objPattern, ok := matchExpr.Cases[0].Pattern.(interpreter.ObjectPattern)
+	require.True(t, ok)
+	require.Len(t, objPattern.Fields, 2)
+	assert.Equal(t, "name", objPattern.Fields[0].Key)
+	assert.Equal(t, "age", objPattern.Fields[1].Key)
+}
+
+func TestParser_MatchExpr_ArrayPattern(t *testing.T) {
+	input := `@route /test [GET]
+  $ result = match arr {
+    [first, second] => first
+    [head, ...rest] => head
+    _ => null
+  }
+  > result`
+
+	lexer := NewLexer(input)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+	require.NotNil(t, module)
+
+	route, ok := module.Items[0].(*interpreter.Route)
+	require.True(t, ok)
+
+	var assignStmt interpreter.AssignStatement
+	if ptr, ok := route.Body[0].(*interpreter.AssignStatement); ok {
+		assignStmt = *ptr
+	} else if val, ok := route.Body[0].(interpreter.AssignStatement); ok {
+		assignStmt = val
+	} else {
+		t.Fatalf("expected AssignStatement, got %T", route.Body[0])
+	}
+
+	matchExpr, ok := assignStmt.Value.(interpreter.MatchExpr)
+	require.True(t, ok)
+	require.Len(t, matchExpr.Cases, 3)
+
+	// First case: [first, second]
+	arrPattern1, ok := matchExpr.Cases[0].Pattern.(interpreter.ArrayPattern)
+	require.True(t, ok)
+	require.Len(t, arrPattern1.Elements, 2)
+	assert.Nil(t, arrPattern1.Rest)
+
+	// Second case: [head, ...rest]
+	arrPattern2, ok := matchExpr.Cases[1].Pattern.(interpreter.ArrayPattern)
+	require.True(t, ok)
+	require.Len(t, arrPattern2.Elements, 1)
+	require.NotNil(t, arrPattern2.Rest)
+	assert.Equal(t, "rest", *arrPattern2.Rest)
+}
+
+func TestLexer_MatchTokens(t *testing.T) {
+	input := `match when =>`
+	lexer := NewLexer(input)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	// Should have: MATCH, WHEN, FATARROW, EOF
+	require.Len(t, tokens, 4)
+	assert.Equal(t, MATCH, tokens[0].Type)
+	assert.Equal(t, WHEN, tokens[1].Type)
+	assert.Equal(t, FATARROW, tokens[2].Type)
+	assert.Equal(t, EOF, tokens[3].Type)
+}
+
+func TestLexer_DotDotDot(t *testing.T) {
+	input := `...rest`
+	lexer := NewLexer(input)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	// Should have: DOTDOTDOT, IDENT, EOF
+	require.Len(t, tokens, 3)
+	assert.Equal(t, DOTDOTDOT, tokens[0].Type)
+	assert.Equal(t, IDENT, tokens[1].Type)
+	assert.Equal(t, "rest", tokens[1].Literal)
+}

@@ -200,9 +200,28 @@ func (l *Lexer) nextToken() Token {
 		tok.Literal = string(l.ch)
 		l.readChar()
 	case '.':
-		tok.Type = DOT
-		tok.Literal = string(l.ch)
-		l.readChar()
+		// Check for ... (three dots)
+		if l.peekChar() == '.' {
+			// Save position to check for third dot
+			l.readChar() // consume first dot, now on second dot
+			if l.peekChar() == '.' {
+				// We have three dots
+				l.readChar() // consume second dot
+				tok.Type = DOTDOTDOT
+				tok.Literal = "..."
+				l.readChar() // consume third dot
+			} else {
+				// Just two dots - rare case, return first as DOT
+				// The second dot is already consumed but we'll return DOT
+				// This is a simplification - two dots isn't a valid token anyway
+				tok.Type = DOT
+				tok.Literal = "."
+			}
+		} else {
+			tok.Type = DOT
+			tok.Literal = string(l.ch)
+			l.readChar()
+		}
 	case '>':
 		if l.peekChar() == '=' {
 			ch := l.ch
@@ -272,6 +291,12 @@ func (l *Lexer) nextToken() Token {
 			ch := l.ch
 			l.readChar()
 			tok.Type = EQ_EQ
+			tok.Literal = string(ch) + string(l.ch)
+			l.readChar()
+		} else if l.peekChar() == '>' {
+			ch := l.ch
+			l.readChar()
+			tok.Type = FATARROW
 			tok.Literal = string(ch) + string(l.ch)
 			l.readChar()
 		} else {
@@ -346,6 +371,26 @@ func (l *Lexer) readIdentifier() Token {
 		tok.Type = FOR
 	case "in":
 		tok.Type = IN
+	case "macro":
+		tok.Type = MACRO
+	case "quote":
+		tok.Type = QUOTE
+	case "match":
+		tok.Type = MATCH
+	case "when":
+		tok.Type = WHEN
+	case "async":
+		tok.Type = ASYNC
+	case "await":
+		tok.Type = AWAIT
+	case "import":
+		tok.Type = IMPORT
+	case "from":
+		tok.Type = FROM
+	case "as":
+		tok.Type = AS
+	case "module":
+		tok.Type = MODULE
 	default:
 		tok.Type = IDENT
 	}

@@ -159,12 +159,12 @@ func TestTypeToString(t *testing.T) {
 		{
 			name:     "array of int",
 			typ:      ArrayType{ElementType: IntType{}},
-			expected: "List[int]",
+			expected: "[int]",
 		},
 		{
 			name:     "array of string",
 			typ:      ArrayType{ElementType: StringType{}},
-			expected: "List[string]",
+			expected: "[string]",
 		},
 		{
 			name:     "named type",

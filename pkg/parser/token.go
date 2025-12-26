@@ -55,11 +55,23 @@ const (
 	WHILE   // while
 
 	// Keywords
-	SWITCH  // switch
-	CASE    // case
-	DEFAULT // default
-	FOR     // for
-	IN      // in
+	SWITCH   // switch
+	CASE     // case
+	DEFAULT  // default
+	FOR      // for
+	IN       // in
+	MACRO    // macro
+	QUOTE    // quote
+	MATCH     // match
+	WHEN      // when (for guards in match)
+	FATARROW  // =>
+	DOTDOTDOT // ...
+	ASYNC     // async
+	AWAIT     // await
+	IMPORT    // import
+	FROM      // from
+	AS        // as
+	MODULE    // module
 )
 
 // Token represents a lexical token
@@ -167,6 +179,30 @@ func (t TokenType) String() string {
 		return "FOR"
 	case IN:
 		return "IN"
+	case MACRO:
+		return "MACRO"
+	case QUOTE:
+		return "QUOTE"
+	case MATCH:
+		return "MATCH"
+	case WHEN:
+		return "WHEN"
+	case FATARROW:
+		return "=>"
+	case DOTDOTDOT:
+		return "..."
+	case ASYNC:
+		return "ASYNC"
+	case AWAIT:
+		return "AWAIT"
+	case IMPORT:
+		return "IMPORT"
+	case FROM:
+		return "FROM"
+	case AS:
+		return "AS"
+	case MODULE:
+		return "MODULE"
 	default:
 		return "UNKNOWN"
 	}

@@ -1,0 +1,122 @@
+# Generics Demo
+# Demonstrates generic functions and type parameters in GlyphLang
+
+# Generic identity function - returns the same value regardless of type
+! identity<T>(x: T): T {
+  > x
+}
+
+# Generic pair function - creates a pair from two different types
+! pair<T, U>(first: T, second: U): object {
+  > {first: first, second: second}
+}
+
+# Generic first function - returns the first of two values
+! first<T>(a: T, b: T): T {
+  > a
+}
+
+# Generic swap function - swaps two values
+! swap<T, U>(a: T, b: U): object {
+  > {first: b, second: a}
+}
+
+# Generic with Numeric constraint - only accepts numeric types
+! double<T: Numeric>(x: T): T {
+  > x
+}
+
+# Generic with Comparable constraint - works with any comparable type
+! compare<T: Comparable>(a: T, b: T): bool {
+  > a == b
+}
+
+# Route demonstrating generic function usage
+@route /identity/:value [GET]
+  $ result = identity<string>(value)
+  > {input: value, output: result, type: "string"}
+
+# Route demonstrating type inference
+@route /identity-infer/:value [GET]
+  # Type argument is inferred from the argument type
+  $ result = identity(value)
+  > {input: value, output: result, message: "Type inferred automatically"}
+
+# Route demonstrating pair with explicit types
+@route /pair/:a/:b [GET]
+  $ result = pair<string, string>(a, b)
+  > result
+
+# Route demonstrating generic first function
+@route /first/:x/:y [GET]
+  $ result = first(x, y)
+  > {first: result, values: [x, y]}
+
+# Route demonstrating swap
+@route /swap/:a/:b [GET]
+  $ original = {first: a, second: b}
+  $ swapped = swap(a, b)
+  > {original: original, swapped: swapped}
+
+# Route demonstrating numeric constraint
+@route /double/:num [GET]
+  $ result = double<int>(num)
+  > {input: num, doubled: result}
+
+# Route demonstrating comparison with Comparable constraint
+@route /compare/:a/:b [GET]
+  $ result = compare(a, b)
+  > {a: a, b: b, equal: result}
+
+# Generic type definition for Result
+: Result<T, E> {
+  value: T?
+  error: E?
+  success: bool!
+}
+
+# Generic type definition for Option
+: Option<T> {
+  value: T?
+  hasValue: bool!
+}
+
+# Generic type definition for Pair
+: Pair<T, U> {
+  first: T!
+  second: U!
+}
+
+# Function returning a generic Result type
+! createSuccess<T>(value: T): object {
+  > {value: value, error: null, success: true}
+}
+
+! createError<E>(error: E): object {
+  > {value: null, error: error, success: false}
+}
+
+# Route demonstrating Result type
+@route /result/success/:value [GET]
+  $ result = createSuccess(value)
+  > result
+
+@route /result/error/:message [GET]
+  $ result = createError(message)
+  > result
+
+# Function with multiple type parameters and constraints
+! safeCompare<T: Comparable, U: Comparable>(a: T, b: U): object {
+  > {a: a, b: b, sameType: false}
+}
+
+# Route demonstrating safe comparison
+@route /safe-compare/:a/:b [GET]
+  $ result = safeCompare(a, b)
+  > result
+
+# Nested generic function calls
+@route /nested/:value [GET]
+  # Call identity inside identity
+  $ result = identity(identity(value))
+  > {input: value, output: result, nestedCalls: 2}

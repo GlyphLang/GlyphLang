@@ -575,7 +575,7 @@ func TestTypeToStringExtra(t *testing.T) {
 		{StringType{}, "string"},
 		{BoolType{}, "bool"},
 		{FloatType{}, "float"},
-		{ArrayType{ElementType: IntType{}}, "List[int]"},
+		{ArrayType{ElementType: IntType{}}, "[int]"},
 		{OptionalType{InnerType: StringType{}}, "string?"},
 		{NamedType{Name: "User"}, "User"},
 		{UnionType{Types: []Type{IntType{}, StringType{}}}, "int | string"},

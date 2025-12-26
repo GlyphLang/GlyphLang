@@ -11,9 +11,11 @@ type Item interface {
 }
 
 // TypeDef represents a type definition
+// Example: : Result<T, E> { ok: T?, error: E? }
 type TypeDef struct {
-	Name   string
-	Fields []Field
+	Name       string
+	TypeParams []TypeParameter // Generic type parameters (e.g., T, E)
+	Fields     []Field
 }
 
 func (TypeDef) isItem() {}
@@ -33,8 +35,10 @@ type Route struct {
 func (Route) isItem() {}
 
 // Function represents a function definition
+// Example: ! map<T, U>(arr: [T], fn: (T) -> U): [U]
 type Function struct {
 	Name       string
+	TypeParams []TypeParameter // Generic type parameters (e.g., T, U)
 	Params     []Field
 	ReturnType Type
 	Body       []Statement
@@ -77,15 +81,45 @@ type UnionType struct {
 	Types []Type
 }
 
-func (IntType) isType()      {}
-func (StringType) isType()   {}
-func (BoolType) isType()     {}
-func (FloatType) isType()    {}
-func (ArrayType) isType()    {}
-func (OptionalType) isType() {}
-func (NamedType) isType()    {}
-func (DatabaseType) isType() {}
-func (UnionType) isType()    {}
+// TypeParameter represents a generic type parameter with optional constraint
+// Example: T, T: Comparable, T extends Numeric
+type TypeParameter struct {
+	Name       string // The type parameter name (e.g., "T", "U")
+	Constraint Type   // Optional constraint (trait bound), nil if unconstrained
+}
+
+// GenericType represents a generic type instantiation
+// Example: List<int>, Map<string, User>, Result<T, E>
+type GenericType struct {
+	BaseType Type   // The base type (usually NamedType like "List" or "Map")
+	TypeArgs []Type // The type arguments (e.g., [int] for List<int>)
+}
+
+// TypeParameterType represents a reference to a type parameter
+// Used inside generic definitions to refer to type parameters
+type TypeParameterType struct {
+	Name string // The type parameter name (e.g., "T")
+}
+
+// FunctionType represents a function type signature
+// Example: (T) -> U, (int, string) -> bool
+type FunctionType struct {
+	ParamTypes []Type // Parameter types
+	ReturnType Type   // Return type
+}
+
+func (IntType) isType()           {}
+func (StringType) isType()        {}
+func (BoolType) isType()          {}
+func (FloatType) isType()         {}
+func (ArrayType) isType()         {}
+func (OptionalType) isType()      {}
+func (NamedType) isType()         {}
+func (DatabaseType) isType()      {}
+func (UnionType) isType()         {}
+func (GenericType) isType()       {}
+func (TypeParameterType) isType() {}
+func (FunctionType) isType()      {}
 
 // HttpMethod represents HTTP methods
 type HttpMethod int
@@ -148,6 +182,7 @@ type QueryParamDecl struct {
 // Statement represents a statement in the AST
 type Statement interface {
 	isStatement()
+	isNode()
 }
 
 // AssignStatement represents variable assignment
@@ -309,9 +344,11 @@ type ArrayIndexExpr struct {
 func (ArrayIndexExpr) isExpr() {}
 
 // FunctionCallExpr represents a function call
+// Example: map<int, string>(arr, fn)
 type FunctionCallExpr struct {
-	Name string
-	Args []Expr
+	Name     string
+	TypeArgs []Type // Type arguments for generic function calls (e.g., <int, string>)
+	Args     []Expr
 }
 
 func (FunctionCallExpr) isExpr() {}
@@ -335,6 +372,16 @@ type ArrayExpr struct {
 }
 
 func (ArrayExpr) isExpr() {}
+
+// LambdaExpr represents an anonymous function (lambda/arrow function)
+// Example: (x) => x * 2, (a, b) => a + b
+type LambdaExpr struct {
+	Params []Field    // Parameter list
+	Body   Expr       // Single expression body (for short lambdas)
+	Block  []Statement // Statement body (for multi-line lambdas), mutually exclusive with Body
+}
+
+func (LambdaExpr) isExpr() {}
 
 // Literal represents a literal value
 type Literal interface {
@@ -517,3 +564,206 @@ type QueueWorker struct {
 }
 
 func (QueueWorker) isItem() {}
+
+// ImportStatement represents an import declaration
+// Syntax forms:
+//   import "path/to/file"
+//   import "path/to/file" as alias
+//   from "path/to/file" import { name1, name2 }
+//   from "path/to/file" import { name1 as alias1, name2 }
+type ImportStatement struct {
+	Path      string       // The import path (relative or package name)
+	Alias     string       // Optional alias for the entire module
+	Selective bool         // True if using selective imports (from ... import { ... })
+	Names     []ImportName // For selective imports: the names to import
+}
+
+func (ImportStatement) isItem() {}
+
+// ImportName represents a single name in a selective import
+type ImportName struct {
+	Name  string // The original name in the module
+	Alias string // Optional alias (empty if not aliased)
+}
+
+// ModuleDecl represents a module namespace declaration
+// Syntax: module "name"
+type ModuleDecl struct {
+	Name string // The module namespace name
+}
+
+func (ModuleDecl) isItem() {}
+
+// AsyncExpr represents an async block expression: async { ... }
+// The block is executed asynchronously and returns a Future
+type AsyncExpr struct {
+	Body []Statement
+}
+
+func (AsyncExpr) isExpr() {}
+
+// AwaitExpr represents awaiting a Future: await future
+type AwaitExpr struct {
+	Expr Expr // Expression that evaluates to a Future
+}
+
+func (AwaitExpr) isExpr() {}
+
+// FutureType represents the type of a Future value
+type FutureType struct {
+	ResultType Type // The type of value the future will resolve to
+}
+
+func (FutureType) isType() {}
+
+// MatchExpr represents a pattern matching expression
+// Example: match value { pattern => result, _ => default }
+type MatchExpr struct {
+	Value Expr
+	Cases []MatchCase
+}
+
+func (MatchExpr) isExpr() {}
+
+// MatchCase represents a single case in a match expression
+type MatchCase struct {
+	Pattern Pattern
+	Guard   Expr // Optional guard condition (when clause)
+	Body    Expr // The result expression
+}
+
+// Pattern represents a pattern for matching
+type Pattern interface {
+	isPattern()
+}
+
+// LiteralPattern matches a literal value (int, string, bool, etc.)
+type LiteralPattern struct {
+	Value Literal
+}
+
+func (LiteralPattern) isPattern() {}
+
+// VariablePattern binds the matched value to a variable
+type VariablePattern struct {
+	Name string
+}
+
+func (VariablePattern) isPattern() {}
+
+// WildcardPattern matches anything (underscore _)
+type WildcardPattern struct{}
+
+func (WildcardPattern) isPattern() {}
+
+// ObjectPattern matches and destructures an object
+// Example: {name, age} or {name: n, age: a}
+type ObjectPattern struct {
+	Fields []ObjectPatternField
+}
+
+func (ObjectPattern) isPattern() {}
+
+// ObjectPatternField represents a field in an object pattern
+type ObjectPatternField struct {
+	Key     string  // The key to match in the object
+	Pattern Pattern // The pattern to bind (nil means use Key as variable name)
+}
+
+// ArrayPattern matches and destructures an array
+// Example: [first, second] or [head, ...rest]
+type ArrayPattern struct {
+	Elements []Pattern
+	Rest     *string // Optional rest variable name for [...rest] syntax
+}
+
+func (ArrayPattern) isPattern() {}
+
+// MacroDef represents a macro definition
+// Example: macro! log(level, msg) { ... }
+type MacroDef struct {
+	Name   string   // Macro name
+	Params []string // Parameter names
+	Body   []Node   // Body is a template of AST nodes
+}
+
+func (MacroDef) isItem() {}
+
+// MacroInvocation represents a macro call
+// Example: log!("INFO", "message")
+type MacroInvocation struct {
+	Name string // Macro name (without !)
+	Args []Expr // Arguments to substitute
+}
+
+func (MacroInvocation) isItem()      {}
+func (MacroInvocation) isStatement() {}
+func (MacroInvocation) isExpr()      {}
+
+// QuoteExpr represents an unevaluated AST fragment
+// Example: quote { if x > 0 { return x } }
+type QuoteExpr struct {
+	Body []Node // The AST nodes being quoted
+}
+
+func (QuoteExpr) isExpr() {}
+
+// UnquoteExpr represents a value to be spliced into quoted AST
+// Example: $expr (inside a quote block)
+type UnquoteExpr struct {
+	Expr Expr // Expression to evaluate and splice
+}
+
+func (UnquoteExpr) isExpr() {}
+
+// Node is a generic AST node interface that can be Item, Statement, or Expr
+type Node interface {
+	isNode()
+}
+
+// Make existing types implement Node
+func (TypeDef) isNode()             {}
+func (Route) isNode()               {}
+func (Function) isNode()            {}
+func (WebSocketRoute) isNode()      {}
+func (Command) isNode()             {}
+func (CronTask) isNode()            {}
+func (EventHandler) isNode()        {}
+func (QueueWorker) isNode()         {}
+func (ImportStatement) isNode()     {}
+func (ModuleDecl) isNode()          {}
+func (MacroDef) isNode()            {}
+func (MacroInvocation) isNode()     {}
+func (AssignStatement) isNode()     {}
+func (DbQueryStatement) isNode()    {}
+func (ReturnStatement) isNode()     {}
+func (IfStatement) isNode()         {}
+func (WhileStatement) isNode()      {}
+func (SwitchStatement) isNode()     {}
+func (ForStatement) isNode()        {}
+func (WsSendStatement) isNode()     {}
+func (WsBroadcastStatement) isNode(){}
+func (WsCloseStatement) isNode()    {}
+func (ValidationStatement) isNode() {}
+func (ExpressionStatement) isNode() {}
+func (WebSocketEvent) isNode()      {}
+func (LiteralExpr) isNode()         {}
+func (VariableExpr) isNode()        {}
+func (BinaryOpExpr) isNode()        {}
+func (UnaryOpExpr) isNode()         {}
+func (FieldAccessExpr) isNode()     {}
+func (ArrayIndexExpr) isNode()      {}
+func (FunctionCallExpr) isNode()    {}
+func (ObjectExpr) isNode()          {}
+func (ArrayExpr) isNode()           {}
+func (QuoteExpr) isNode()           {}
+func (UnquoteExpr) isNode()         {}
+func (MatchExpr) isNode()           {}
+func (LiteralPattern) isNode()      {}
+func (VariablePattern) isNode()     {}
+func (WildcardPattern) isNode()     {}
+func (ObjectPattern) isNode()       {}
+func (ArrayPattern) isNode()        {}
+func (AsyncExpr) isNode()           {}
+func (AwaitExpr) isNode()           {}
+func (LambdaExpr) isNode()          {}

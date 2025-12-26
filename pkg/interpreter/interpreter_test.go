@@ -3891,3 +3891,340 @@ func TestBuiltinFunction_Max(t *testing.T) {
 		assert.InDelta(t, 5.5, result.(float64), 0.001)
 	})
 }
+
+// Test Pattern Matching
+
+func TestMatchExpr_LiteralPattern_Int(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	// match 42 { 42 => "found", _ => "not found" }
+	expr := MatchExpr{
+		Value: LiteralExpr{Value: IntLiteral{Value: 42}},
+		Cases: []MatchCase{
+			{
+				Pattern: LiteralPattern{Value: IntLiteral{Value: 42}},
+				Body:    LiteralExpr{Value: StringLiteral{Value: "found"}},
+			},
+			{
+				Pattern: WildcardPattern{},
+				Body:    LiteralExpr{Value: StringLiteral{Value: "not found"}},
+			},
+		},
+	}
+
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, "found", result)
+}
+
+func TestMatchExpr_LiteralPattern_String(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	// match "hello" { "hello" => "greeting", "bye" => "farewell", _ => "unknown" }
+	expr := MatchExpr{
+		Value: LiteralExpr{Value: StringLiteral{Value: "hello"}},
+		Cases: []MatchCase{
+			{
+				Pattern: LiteralPattern{Value: StringLiteral{Value: "hello"}},
+				Body:    LiteralExpr{Value: StringLiteral{Value: "greeting"}},
+			},
+			{
+				Pattern: LiteralPattern{Value: StringLiteral{Value: "bye"}},
+				Body:    LiteralExpr{Value: StringLiteral{Value: "farewell"}},
+			},
+			{
+				Pattern: WildcardPattern{},
+				Body:    LiteralExpr{Value: StringLiteral{Value: "unknown"}},
+			},
+		},
+	}
+
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, "greeting", result)
+}
+
+func TestMatchExpr_WildcardPattern(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	// match 99 { 1 => "one", 2 => "two", _ => "other" }
+	expr := MatchExpr{
+		Value: LiteralExpr{Value: IntLiteral{Value: 99}},
+		Cases: []MatchCase{
+			{
+				Pattern: LiteralPattern{Value: IntLiteral{Value: 1}},
+				Body:    LiteralExpr{Value: StringLiteral{Value: "one"}},
+			},
+			{
+				Pattern: LiteralPattern{Value: IntLiteral{Value: 2}},
+				Body:    LiteralExpr{Value: StringLiteral{Value: "two"}},
+			},
+			{
+				Pattern: WildcardPattern{},
+				Body:    LiteralExpr{Value: StringLiteral{Value: "other"}},
+			},
+		},
+	}
+
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, "other", result)
+}
+
+func TestMatchExpr_VariablePattern(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	// match 42 { x => x + 10 }
+	expr := MatchExpr{
+		Value: LiteralExpr{Value: IntLiteral{Value: 42}},
+		Cases: []MatchCase{
+			{
+				Pattern: VariablePattern{Name: "x"},
+				Body: BinaryOpExpr{
+					Op:    Add,
+					Left:  VariableExpr{Name: "x"},
+					Right: LiteralExpr{Value: IntLiteral{Value: 10}},
+				},
+			},
+		},
+	}
+
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, int64(52), result)
+}
+
+func TestMatchExpr_WithGuard(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	// match 10 { x when x > 5 => "big", x => "small" }
+	expr := MatchExpr{
+		Value: LiteralExpr{Value: IntLiteral{Value: 10}},
+		Cases: []MatchCase{
+			{
+				Pattern: VariablePattern{Name: "x"},
+				Guard: BinaryOpExpr{
+					Op:    Gt,
+					Left:  VariableExpr{Name: "x"},
+					Right: LiteralExpr{Value: IntLiteral{Value: 5}},
+				},
+				Body: LiteralExpr{Value: StringLiteral{Value: "big"}},
+			},
+			{
+				Pattern: VariablePattern{Name: "x"},
+				Body:    LiteralExpr{Value: StringLiteral{Value: "small"}},
+			},
+		},
+	}
+
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, "big", result)
+}
+
+func TestMatchExpr_WithGuard_NotMatching(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	// match 3 { x when x > 5 => "big", x => "small" }
+	expr := MatchExpr{
+		Value: LiteralExpr{Value: IntLiteral{Value: 3}},
+		Cases: []MatchCase{
+			{
+				Pattern: VariablePattern{Name: "x"},
+				Guard: BinaryOpExpr{
+					Op:    Gt,
+					Left:  VariableExpr{Name: "x"},
+					Right: LiteralExpr{Value: IntLiteral{Value: 5}},
+				},
+				Body: LiteralExpr{Value: StringLiteral{Value: "big"}},
+			},
+			{
+				Pattern: VariablePattern{Name: "x"},
+				Body:    LiteralExpr{Value: StringLiteral{Value: "small"}},
+			},
+		},
+	}
+
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, "small", result)
+}
+
+func TestMatchExpr_ObjectPattern(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+	env.Define("person", map[string]interface{}{
+		"name": "Alice",
+		"age":  int64(30),
+	})
+
+	// match person { {name, age} => name }
+	expr := MatchExpr{
+		Value: VariableExpr{Name: "person"},
+		Cases: []MatchCase{
+			{
+				Pattern: ObjectPattern{
+					Fields: []ObjectPatternField{
+						{Key: "name"},
+						{Key: "age"},
+					},
+				},
+				Body: VariableExpr{Name: "name"},
+			},
+		},
+	}
+
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, "Alice", result)
+}
+
+func TestMatchExpr_ObjectPattern_NoMatch(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+	env.Define("person", map[string]interface{}{
+		"name": "Alice",
+	})
+
+	// match person { {name, age} => name, _ => "no match" }
+	// Should fall through to wildcard since "age" is missing
+	expr := MatchExpr{
+		Value: VariableExpr{Name: "person"},
+		Cases: []MatchCase{
+			{
+				Pattern: ObjectPattern{
+					Fields: []ObjectPatternField{
+						{Key: "name"},
+						{Key: "age"},
+					},
+				},
+				Body: VariableExpr{Name: "name"},
+			},
+			{
+				Pattern: WildcardPattern{},
+				Body:    LiteralExpr{Value: StringLiteral{Value: "no match"}},
+			},
+		},
+	}
+
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, "no match", result)
+}
+
+func TestMatchExpr_ArrayPattern(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+	env.Define("numbers", []interface{}{int64(1), int64(2), int64(3)})
+
+	// match numbers { [first, second, third] => first + second + third }
+	expr := MatchExpr{
+		Value: VariableExpr{Name: "numbers"},
+		Cases: []MatchCase{
+			{
+				Pattern: ArrayPattern{
+					Elements: []Pattern{
+						VariablePattern{Name: "first"},
+						VariablePattern{Name: "second"},
+						VariablePattern{Name: "third"},
+					},
+				},
+				Body: BinaryOpExpr{
+					Op: Add,
+					Left: BinaryOpExpr{
+						Op:    Add,
+						Left:  VariableExpr{Name: "first"},
+						Right: VariableExpr{Name: "second"},
+					},
+					Right: VariableExpr{Name: "third"},
+				},
+			},
+		},
+	}
+
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, int64(6), result)
+}
+
+func TestMatchExpr_ArrayPattern_WithRest(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+	env.Define("numbers", []interface{}{int64(1), int64(2), int64(3), int64(4), int64(5)})
+
+	rest := "rest"
+	// match numbers { [first, ...rest] => first }
+	expr := MatchExpr{
+		Value: VariableExpr{Name: "numbers"},
+		Cases: []MatchCase{
+			{
+				Pattern: ArrayPattern{
+					Elements: []Pattern{
+						VariablePattern{Name: "first"},
+					},
+					Rest: &rest,
+				},
+				Body: VariableExpr{Name: "first"},
+			},
+		},
+	}
+
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), result)
+}
+
+func TestMatchExpr_BooleanPattern(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	// match true { true => "yes", false => "no" }
+	expr := MatchExpr{
+		Value: LiteralExpr{Value: BoolLiteral{Value: true}},
+		Cases: []MatchCase{
+			{
+				Pattern: LiteralPattern{Value: BoolLiteral{Value: true}},
+				Body:    LiteralExpr{Value: StringLiteral{Value: "yes"}},
+			},
+			{
+				Pattern: LiteralPattern{Value: BoolLiteral{Value: false}},
+				Body:    LiteralExpr{Value: StringLiteral{Value: "no"}},
+			},
+		},
+	}
+
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, "yes", result)
+}
+
+func TestMatchExpr_NoMatch_ReturnsNil(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	// match 5 { 1 => "one", 2 => "two" }
+	// No wildcard, no match, returns nil
+	expr := MatchExpr{
+		Value: LiteralExpr{Value: IntLiteral{Value: 5}},
+		Cases: []MatchCase{
+			{
+				Pattern: LiteralPattern{Value: IntLiteral{Value: 1}},
+				Body:    LiteralExpr{Value: StringLiteral{Value: "one"}},
+			},
+			{
+				Pattern: LiteralPattern{Value: IntLiteral{Value: 2}},
+				Body:    LiteralExpr{Value: StringLiteral{Value: "two"}},
+			},
+		},
+	}
+
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Nil(t, result)
+}

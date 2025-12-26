@@ -48,6 +48,27 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 		}
 
 		switch p.current().Type {
+		case IMPORT:
+			// import "path" or import "path" as alias
+			item, err := p.parseImport()
+			if err != nil {
+				return nil, err
+			}
+			items = append(items, item)
+		case FROM:
+			// from "path" import { name1, name2 }
+			item, err := p.parseFromImport()
+			if err != nil {
+				return nil, err
+			}
+			items = append(items, item)
+		case MODULE:
+			// module "name"
+			item, err := p.parseModuleDecl()
+			if err != nil {
+				return nil, err
+			}
+			items = append(items, item)
 		case COLON:
 			item, err := p.parseTypeDef()
 			if err != nil {
@@ -92,6 +113,13 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 				return nil, err
 			}
 			items = append(items, item)
+		case MACRO:
+			// macro! name(params) { body }
+			item, err := p.parseMacroDef()
+			if err != nil {
+				return nil, err
+			}
+			items = append(items, item)
 		case IDENT:
 			// Check for "type" keyword as alternative syntax
 			if p.current().Literal == "type" {
@@ -101,11 +129,18 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 					return nil, err
 				}
 				items = append(items, item)
+			} else if p.peek(1).Type == BANG {
+				// Macro invocation at top level: name!(args)
+				item, err := p.parseMacroInvocation()
+				if err != nil {
+					return nil, err
+				}
+				items = append(items, item)
 			} else {
 				return nil, p.errorWithHint(
 					fmt.Sprintf("Unexpected token %s", p.current().Type),
 					p.current(),
-					"Top-level items must start with ':', '@', '!', '*', '~', or '&'",
+					"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'import', 'from', or 'module'",
 				)
 			}
 		case EOF:
@@ -114,7 +149,7 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 			return nil, p.errorWithHint(
 				fmt.Sprintf("Unexpected token %s", p.current().Type),
 				p.current(),
-				"Top-level items must start with ':', '@', '!', '*', '~', or '&'",
+				"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'import', 'from', or 'module'",
 			)
 		}
 	}
@@ -122,7 +157,7 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 	return &interpreter.Module{Items: items}, nil
 }
 
-// parseTypeDef parses a type definition: : TypeName { fields }
+// parseTypeDef parses a type definition: : TypeName { fields } or : TypeName<T, U> { fields }
 func (p *Parser) parseTypeDef() (interpreter.Item, error) {
 	if err := p.expect(COLON); err != nil {
 		return nil, err
@@ -133,6 +168,18 @@ func (p *Parser) parseTypeDef() (interpreter.Item, error) {
 		return nil, err
 	}
 
+	// Parse optional generic type parameters
+	typeParams, err := p.parseTypeParameters()
+	if err != nil {
+		return nil, err
+	}
+
+	// Get type parameter names for field parsing context
+	var typeParamNames []string
+	for _, tp := range typeParams {
+		typeParamNames = append(typeParamNames, tp.Name)
+	}
+
 	if err := p.expect(LBRACE); err != nil {
 		return nil, err
 	}
@@ -148,7 +195,7 @@ func (p *Parser) parseTypeDef() (interpreter.Item, error) {
 			break
 		}
 
-		field, err := p.parseField()
+		field, err := p.parseFieldWithContext(typeParamNames)
 		if err != nil {
 			return nil, err
 		}
@@ -162,8 +209,9 @@ func (p *Parser) parseTypeDef() (interpreter.Item, error) {
 	}
 
 	return &interpreter.TypeDef{
-		Name:   name,
-		Fields: fields,
+		Name:       name,
+		TypeParams: typeParams,
+		Fields:     fields,
 	}, nil
 }
 
@@ -174,6 +222,18 @@ func (p *Parser) parseTypeDefWithoutColon() (interpreter.Item, error) {
 		return nil, err
 	}
 
+	// Parse optional generic type parameters
+	typeParams, err := p.parseTypeParameters()
+	if err != nil {
+		return nil, err
+	}
+
+	// Get type parameter names for field parsing context
+	var typeParamNames []string
+	for _, tp := range typeParams {
+		typeParamNames = append(typeParamNames, tp.Name)
+	}
+
 	if err := p.expect(LBRACE); err != nil {
 		return nil, err
 	}
@@ -189,7 +249,7 @@ func (p *Parser) parseTypeDefWithoutColon() (interpreter.Item, error) {
 			break
 		}
 
-		field, err := p.parseField()
+		field, err := p.parseFieldWithContext(typeParamNames)
 		if err != nil {
 			return nil, err
 		}
@@ -203,13 +263,19 @@ func (p *Parser) parseTypeDefWithoutColon() (interpreter.Item, error) {
 	}
 
 	return &interpreter.TypeDef{
-		Name:   name,
-		Fields: fields,
+		Name:       name,
+		TypeParams: typeParams,
+		Fields:     fields,
 	}, nil
 }
 
 // parseField parses a field: name: type!
 func (p *Parser) parseField() (interpreter.Field, error) {
+	return p.parseFieldWithContext(nil)
+}
+
+// parseFieldWithContext parses a field with type parameter context: name: type!
+func (p *Parser) parseFieldWithContext(typeParamNames []string) (interpreter.Field, error) {
 	name, err := p.expectIdent()
 	if err != nil {
 		return interpreter.Field{}, err
@@ -219,7 +285,7 @@ func (p *Parser) parseField() (interpreter.Field, error) {
 		return interpreter.Field{}, err
 	}
 
-	typeAnnotation, required, err := p.parseType()
+	typeAnnotation, required, err := p.parseTypeWithContext(typeParamNames)
 	if err != nil {
 		return interpreter.Field{}, err
 	}
@@ -360,6 +426,398 @@ func (p *Parser) parseType() (interpreter.Type, bool, error) {
 	}
 
 	return baseType, required, nil
+}
+
+// parseSingleType parses a single type (without union handling) with optional type parameter context
+// This is used within union type parsing to avoid nested unions
+func (p *Parser) parseSingleType(typeParamNames []string) (interpreter.Type, error) {
+	var baseType interpreter.Type
+
+	// Check for function type: (T) -> U or (int, string) -> bool
+	if p.check(LPAREN) {
+		fnType, err := p.parseFunctionType(typeParamNames)
+		if err != nil {
+			return nil, err
+		}
+		baseType = fnType
+	} else if p.check(LBRACKET) {
+		// Array type: [T] or [int]
+		p.advance() // consume [
+		elemType, _, err := p.parseTypeWithContext(typeParamNames)
+		if err != nil {
+			return nil, err
+		}
+		if err := p.expect(RBRACKET); err != nil {
+			return nil, err
+		}
+		baseType = interpreter.ArrayType{ElementType: elemType}
+	} else if !p.check(IDENT) {
+		return nil, p.typeError(
+			fmt.Sprintf("Expected type name, but found %s", p.current().Type),
+			p.current(),
+		)
+	} else {
+		typeName := p.current().Literal
+		p.advance()
+
+		// Check if this is a type parameter reference
+		isTypeParam := false
+		for _, param := range typeParamNames {
+			if param == typeName {
+				isTypeParam = true
+				break
+			}
+		}
+
+		if isTypeParam {
+			baseType = interpreter.TypeParameterType{Name: typeName}
+		} else {
+			switch typeName {
+			case "int":
+				baseType = interpreter.IntType{}
+			case "str", "string":
+				baseType = interpreter.StringType{}
+			case "bool":
+				baseType = interpreter.BoolType{}
+			case "float":
+				baseType = interpreter.FloatType{}
+			default:
+				baseType = interpreter.NamedType{Name: typeName}
+			}
+		}
+
+		// Check for generic type arguments with angle brackets: List<int>, Map<string, User>
+		if p.check(LESS) {
+			typeArgs, err := p.parseTypeArguments(typeParamNames)
+			if err != nil {
+				return nil, err
+			}
+			baseType = interpreter.GenericType{
+				BaseType: baseType,
+				TypeArgs: typeArgs,
+			}
+		}
+
+		// Check for generic type parameters with square brackets (e.g., List[str] or Map[str, str])
+		if p.check(LBRACKET) {
+			p.advance()
+
+			// If there's a type inside brackets, it's a generic type with parameters
+			if !p.check(RBRACKET) {
+				var typeArgs []interpreter.Type
+				for {
+					argType, _, err := p.parseTypeWithContext(typeParamNames)
+					if err != nil {
+						return nil, err
+					}
+					typeArgs = append(typeArgs, argType)
+
+					if !p.match(COMMA) {
+						break
+					}
+				}
+
+				if err := p.expect(RBRACKET); err != nil {
+					return nil, err
+				}
+
+				baseType = interpreter.GenericType{
+					BaseType: baseType,
+					TypeArgs: typeArgs,
+				}
+			} else {
+				// Empty brackets like int[] - treat as array type
+				p.advance() // consume ]
+				baseType = interpreter.ArrayType{ElementType: baseType}
+			}
+		}
+	}
+
+	// Check for optional marker (?)
+	if p.check(QUESTION) {
+		p.advance()
+		baseType = interpreter.OptionalType{InnerType: baseType}
+	}
+
+	// Note: No union type handling here - that's handled in parseTypeWithContext
+
+	return baseType, nil
+}
+
+// parseTypeWithContext parses a type annotation with optional type parameter context
+// The typeParamNames parameter contains names of type parameters in scope (for generic definitions)
+func (p *Parser) parseTypeWithContext(typeParamNames []string) (interpreter.Type, bool, error) {
+	var baseType interpreter.Type
+	required := false
+
+	// Check for function type: (T) -> U or (int, string) -> bool
+	if p.check(LPAREN) {
+		fnType, err := p.parseFunctionType(typeParamNames)
+		if err != nil {
+			return nil, false, err
+		}
+		baseType = fnType
+	} else if p.check(LBRACKET) {
+		// Array type: [T] or [int]
+		p.advance() // consume [
+		elemType, _, err := p.parseTypeWithContext(typeParamNames)
+		if err != nil {
+			return nil, false, err
+		}
+		if err := p.expect(RBRACKET); err != nil {
+			return nil, false, err
+		}
+		baseType = interpreter.ArrayType{ElementType: elemType}
+	} else if !p.check(IDENT) {
+		return nil, false, p.typeError(
+			fmt.Sprintf("Expected type name, but found %s", p.current().Type),
+			p.current(),
+		)
+	} else {
+		typeName := p.current().Literal
+		p.advance()
+
+		// Check if this is a type parameter reference
+		isTypeParam := false
+		for _, param := range typeParamNames {
+			if param == typeName {
+				isTypeParam = true
+				break
+			}
+		}
+
+		if isTypeParam {
+			baseType = interpreter.TypeParameterType{Name: typeName}
+		} else {
+			switch typeName {
+			case "int":
+				baseType = interpreter.IntType{}
+			case "str", "string":
+				baseType = interpreter.StringType{}
+			case "bool":
+				baseType = interpreter.BoolType{}
+			case "float":
+				baseType = interpreter.FloatType{}
+			default:
+				baseType = interpreter.NamedType{Name: typeName}
+			}
+		}
+
+		// Check for generic type arguments with angle brackets: List<int>, Map<string, User>
+		if p.check(LESS) {
+			typeArgs, err := p.parseTypeArguments(typeParamNames)
+			if err != nil {
+				return nil, false, err
+			}
+			baseType = interpreter.GenericType{
+				BaseType: baseType,
+				TypeArgs: typeArgs,
+			}
+		}
+
+		// Check for generic type parameters with square brackets (e.g., List[str] or Map[str, str])
+		if p.check(LBRACKET) {
+			p.advance()
+
+			// If there's a type inside brackets, it's a generic type with parameters
+			if !p.check(RBRACKET) {
+				var typeArgs []interpreter.Type
+				for {
+					argType, _, err := p.parseTypeWithContext(typeParamNames)
+					if err != nil {
+						return nil, false, err
+					}
+					typeArgs = append(typeArgs, argType)
+
+					if !p.match(COMMA) {
+						break
+					}
+				}
+
+				if err := p.expect(RBRACKET); err != nil {
+					return nil, false, err
+				}
+
+				baseType = interpreter.GenericType{
+					BaseType: baseType,
+					TypeArgs: typeArgs,
+				}
+			} else {
+				// Empty brackets like int[] - treat as array type
+				p.advance() // consume ]
+				baseType = interpreter.ArrayType{ElementType: baseType}
+			}
+		}
+	}
+
+	// Check for optional marker (?)
+	if p.check(QUESTION) {
+		p.advance()
+		baseType = interpreter.OptionalType{InnerType: baseType}
+	}
+
+	// Check for union types (e.g., User | Error)
+	if p.check(PIPE) {
+		types := []interpreter.Type{baseType}
+		for p.check(PIPE) {
+			p.advance() // consume |
+			// Parse single type without union handling to avoid nested unions
+			nextType, err := p.parseSingleType(typeParamNames)
+			if err != nil {
+				return nil, false, err
+			}
+			types = append(types, nextType)
+		}
+		baseType = interpreter.UnionType{Types: types}
+	}
+
+	// Check for required marker
+	if p.check(BANG) {
+		p.advance()
+		required = true
+	}
+
+	return baseType, required, nil
+}
+
+// parseTypeArguments parses generic type arguments: <int, string>
+func (p *Parser) parseTypeArguments(typeParamNames []string) ([]interpreter.Type, error) {
+	if !p.check(LESS) {
+		return nil, nil
+	}
+	p.advance() // consume <
+
+	var typeArgs []interpreter.Type
+	for {
+		argType, _, err := p.parseTypeWithContext(typeParamNames)
+		if err != nil {
+			return nil, err
+		}
+		typeArgs = append(typeArgs, argType)
+
+		if !p.match(COMMA) {
+			break
+		}
+	}
+
+	if err := p.expect(GREATER); err != nil {
+		return nil, err
+	}
+
+	return typeArgs, nil
+}
+
+// parseTypeParameters parses generic type parameter declarations: <T, U: Constraint>
+func (p *Parser) parseTypeParameters() ([]interpreter.TypeParameter, error) {
+	if !p.check(LESS) {
+		return nil, nil
+	}
+	p.advance() // consume <
+
+	var params []interpreter.TypeParameter
+	for {
+		if !p.check(IDENT) {
+			return nil, p.typeError(
+				fmt.Sprintf("Expected type parameter name, but found %s", p.current().Type),
+				p.current(),
+			)
+		}
+
+		paramName := p.current().Literal
+		p.advance()
+
+		var constraint interpreter.Type
+
+		// Check for constraint: T: Comparable or T extends Comparable
+		if p.check(COLON) {
+			p.advance()
+			// Get the names of already-parsed type parameters for context
+			paramNames := make([]string, len(params)+1)
+			for i, tp := range params {
+				paramNames[i] = tp.Name
+			}
+			paramNames[len(params)] = paramName
+
+			constraintType, _, err := p.parseTypeWithContext(paramNames)
+			if err != nil {
+				return nil, err
+			}
+			constraint = constraintType
+		} else if p.check(IDENT) && p.current().Literal == "extends" {
+			p.advance()
+			// Get the names of already-parsed type parameters for context
+			paramNames := make([]string, len(params)+1)
+			for i, tp := range params {
+				paramNames[i] = tp.Name
+			}
+			paramNames[len(params)] = paramName
+
+			constraintType, _, err := p.parseTypeWithContext(paramNames)
+			if err != nil {
+				return nil, err
+			}
+			constraint = constraintType
+		}
+
+		params = append(params, interpreter.TypeParameter{
+			Name:       paramName,
+			Constraint: constraint,
+		})
+
+		if !p.match(COMMA) {
+			break
+		}
+	}
+
+	if err := p.expect(GREATER); err != nil {
+		return nil, err
+	}
+
+	return params, nil
+}
+
+// parseFunctionType parses a function type signature: (T) -> U or (int, string) -> bool
+func (p *Parser) parseFunctionType(typeParamNames []string) (interpreter.Type, error) {
+	if err := p.expect(LPAREN); err != nil {
+		return nil, err
+	}
+
+	var paramTypes []interpreter.Type
+
+	// Parse parameter types
+	if !p.check(RPAREN) {
+		for {
+			paramType, _, err := p.parseTypeWithContext(typeParamNames)
+			if err != nil {
+				return nil, err
+			}
+			paramTypes = append(paramTypes, paramType)
+
+			if !p.match(COMMA) {
+				break
+			}
+		}
+	}
+
+	if err := p.expect(RPAREN); err != nil {
+		return nil, err
+	}
+
+	// Expect arrow
+	if err := p.expect(ARROW); err != nil {
+		return nil, err
+	}
+
+	// Parse return type
+	returnType, _, err := p.parseTypeWithContext(typeParamNames)
+	if err != nil {
+		return nil, err
+	}
+
+	return interpreter.FunctionType{
+		ParamTypes: paramTypes,
+		ReturnType: returnType,
+	}, nil
 }
 
 // parseRoute parses a route definition or WebSocket route
@@ -1867,12 +2325,76 @@ func (p *Parser) parsePrimary() (interpreter.Expr, error) {
 
 		return interpreter.ArrayExpr{Elements: elements}, nil
 
+	case MATCH:
+		return p.parseMatchExpr()
+
+	case ASYNC:
+		return p.parseAsyncExpr()
+
+	case AWAIT:
+		return p.parseAwaitExpr()
+
 	default:
 		return nil, p.expressionError(
 			fmt.Sprintf("Unexpected token in expression: %s", p.current().Type),
 			p.current(),
 		)
 	}
+}
+
+// parseAsyncExpr parses an async block: async { statements }
+func (p *Parser) parseAsyncExpr() (interpreter.Expr, error) {
+	// Consume "async" keyword
+	if err := p.expect(ASYNC); err != nil {
+		return nil, err
+	}
+
+	p.skipNewlines()
+
+	// Expect opening brace
+	if err := p.expect(LBRACE); err != nil {
+		return nil, p.errorWithHint(
+			"Expected '{' after 'async'",
+			p.current(),
+			"async blocks must have a body: async { ... }",
+		)
+	}
+
+	p.skipNewlines()
+
+	// Parse statements in the async block
+	var body []interpreter.Statement
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		stmt, err := p.parseStatement()
+		if err != nil {
+			return nil, err
+		}
+		body = append(body, stmt)
+		p.skipNewlines()
+	}
+
+	// Expect closing brace
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
+	}
+
+	return interpreter.AsyncExpr{Body: body}, nil
+}
+
+// parseAwaitExpr parses an await expression: await expr
+func (p *Parser) parseAwaitExpr() (interpreter.Expr, error) {
+	// Consume "await" keyword
+	if err := p.expect(AWAIT); err != nil {
+		return nil, err
+	}
+
+	// Parse the expression to await
+	expr, err := p.parseExpr()
+	if err != nil {
+		return nil, err
+	}
+
+	return interpreter.AwaitExpr{Expr: expr}, nil
 }
 
 // parseFieldAccess parses field access: obj.field or obj.field.subfield
@@ -2036,16 +2558,30 @@ func (p *Parser) skipNewlines() {
 	}
 }
 
-// parseCommand parses a CLI command: @ command name [params] { body }
-// Example: @ command hello name: str! --greeting: str = "Hello"
+// parseCommand parses a CLI command or generic function: ! name<T>(params): ReturnType { body }
+// If generic type parameters or parentheses are present, it's a function. Otherwise, it's a CLI command.
+// Examples:
+//   ! hello name: str! --greeting: str = "Hello"  (command)
+//   ! map<T, U>(arr: [T], fn: (T) -> U): [U] { body }  (generic function)
+//   ! double(x: int): int { ... }  (regular function)
 func (p *Parser) parseCommand() (interpreter.Item, error) {
-	// Get command name
+	// Get name
 	cmdName, err := p.expectIdent()
 	if err != nil {
 		return nil, err
 	}
 
-	// Parse optional description string
+	// Check for generic type parameters - if present, this is a generic function
+	if p.check(LESS) {
+		return p.parseGenericFunction(cmdName)
+	}
+
+	// Also check for parenthesized parameters (non-generic function syntax)
+	if p.check(LPAREN) {
+		return p.parseRegularFunction(cmdName)
+	}
+
+	// Parse optional description string (for commands)
 	var description string
 	if p.check(STRING) {
 		description = p.current().Literal
@@ -2166,6 +2702,194 @@ func (p *Parser) parseCommand() (interpreter.Item, error) {
 		Params:      params,
 		ReturnType:  returnType,
 		Body:        body,
+	}, nil
+}
+
+// parseGenericFunction parses a generic function: ! name<T, U>(params): ReturnType { body }
+func (p *Parser) parseGenericFunction(name string) (interpreter.Item, error) {
+	// Parse type parameters
+	typeParams, err := p.parseTypeParameters()
+	if err != nil {
+		return nil, err
+	}
+
+	// Get type parameter names for parsing context
+	var typeParamNames []string
+	for _, tp := range typeParams {
+		typeParamNames = append(typeParamNames, tp.Name)
+	}
+
+	// Parse parameter list
+	if err := p.expect(LPAREN); err != nil {
+		return nil, err
+	}
+
+	var params []interpreter.Field
+	if !p.check(RPAREN) {
+		for {
+			field, err := p.parseFieldWithContext(typeParamNames)
+			if err != nil {
+				return nil, err
+			}
+			params = append(params, field)
+
+			if !p.match(COMMA) {
+				break
+			}
+		}
+	}
+
+	if err := p.expect(RPAREN); err != nil {
+		return nil, err
+	}
+
+	// Parse optional return type : Type or -> Type
+	var returnType interpreter.Type
+	if p.check(COLON) || p.check(ARROW) {
+		p.advance()
+		returnType, _, err = p.parseTypeWithContext(typeParamNames)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	p.skipNewlines()
+
+	// Parse body
+	var body []interpreter.Statement
+	if p.check(LBRACE) {
+		p.advance()
+		p.skipNewlines()
+
+		for !p.check(RBRACE) && !p.isAtEnd() {
+			stmt, err := p.parseStatement()
+			if err != nil {
+				return nil, err
+			}
+			body = append(body, stmt)
+			p.skipNewlines()
+		}
+
+		if err := p.expect(RBRACE); err != nil {
+			return nil, err
+		}
+	} else {
+		// Inline body
+		for !p.isAtEnd() && !p.check(AT) && !p.check(COLON) && !p.check(BANG) {
+			if p.check(NEWLINE) {
+				p.advance()
+				continue
+			}
+			if p.check(DOLLAR) || p.check(GREATER) {
+				stmt, err := p.parseStatement()
+				if err != nil {
+					return nil, err
+				}
+				body = append(body, stmt)
+				if _, ok := stmt.(interpreter.ReturnStatement); ok {
+					break
+				}
+			} else {
+				break
+			}
+			p.skipNewlines()
+		}
+	}
+
+	return &interpreter.Function{
+		Name:       name,
+		TypeParams: typeParams,
+		Params:     params,
+		ReturnType: returnType,
+		Body:       body,
+	}, nil
+}
+
+// parseRegularFunction parses a non-generic function: ! name(params): ReturnType { body }
+func (p *Parser) parseRegularFunction(name string) (interpreter.Item, error) {
+	// Parse parameter list
+	if err := p.expect(LPAREN); err != nil {
+		return nil, err
+	}
+
+	var params []interpreter.Field
+	if !p.check(RPAREN) {
+		for {
+			field, err := p.parseField()
+			if err != nil {
+				return nil, err
+			}
+			params = append(params, field)
+
+			if !p.match(COMMA) {
+				break
+			}
+		}
+	}
+
+	if err := p.expect(RPAREN); err != nil {
+		return nil, err
+	}
+
+	// Parse optional return type : Type or -> Type
+	var returnType interpreter.Type
+	var err error
+	if p.check(COLON) || p.check(ARROW) {
+		p.advance()
+		returnType, _, err = p.parseType()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	p.skipNewlines()
+
+	// Parse body
+	var body []interpreter.Statement
+	if p.check(LBRACE) {
+		p.advance()
+		p.skipNewlines()
+
+		for !p.check(RBRACE) && !p.isAtEnd() {
+			stmt, err := p.parseStatement()
+			if err != nil {
+				return nil, err
+			}
+			body = append(body, stmt)
+			p.skipNewlines()
+		}
+
+		if err := p.expect(RBRACE); err != nil {
+			return nil, err
+		}
+	} else {
+		// Inline body
+		for !p.isAtEnd() && !p.check(AT) && !p.check(COLON) && !p.check(BANG) {
+			if p.check(NEWLINE) {
+				p.advance()
+				continue
+			}
+			if p.check(DOLLAR) || p.check(GREATER) {
+				stmt, err := p.parseStatement()
+				if err != nil {
+					return nil, err
+				}
+				body = append(body, stmt)
+				if _, ok := stmt.(interpreter.ReturnStatement); ok {
+					break
+				}
+			} else {
+				break
+			}
+			p.skipNewlines()
+		}
+	}
+
+	return &interpreter.Function{
+		Name:       name,
+		Params:     params,
+		ReturnType: returnType,
+		Body:       body,
 	}, nil
 }
 
@@ -2316,9 +3040,9 @@ func (p *Parser) parseEventHandler() (interpreter.Item, error) {
 		)
 	}
 
-	// Check for async modifier
+	// Check for async modifier (can be ASYNC token or IDENT with "async")
 	var async bool
-	if p.check(IDENT) && p.current().Literal == "async" {
+	if p.check(ASYNC) || (p.check(IDENT) && p.current().Literal == "async") {
 		async = true
 		p.advance()
 	}
@@ -2512,5 +3236,739 @@ func (p *Parser) parseQueueWorker() (interpreter.Item, error) {
 		Timeout:     timeout,
 		Injections:  injections,
 		Body:        body,
+	}, nil
+}
+
+// parseImport parses an import statement: import "path" or import "path" as alias
+// Examples:
+//   import "./utils"
+//   import "./models" as m
+//   import "github.com/some/package"
+func (p *Parser) parseImport() (interpreter.Item, error) {
+	// Consume "import" keyword
+	if err := p.expect(IMPORT); err != nil {
+		return nil, err
+	}
+
+	// Expect import path string
+	if !p.check(STRING) {
+		return nil, p.errorWithHint(
+			"Expected import path string",
+			p.current(),
+			"Example: import \"./utils\" or import \"./models\" as m",
+		)
+	}
+	path := p.current().Literal
+	p.advance()
+
+	// Check for optional alias: as name
+	var alias string
+	if p.check(AS) {
+		p.advance() // consume "as"
+		aliasName, err := p.expectIdent()
+		if err != nil {
+			return nil, p.errorWithHint(
+				"Expected alias name after 'as'",
+				p.current(),
+				"Example: import \"./utils\" as u",
+			)
+		}
+		alias = aliasName
+	}
+
+	return &interpreter.ImportStatement{
+		Path:      path,
+		Alias:     alias,
+		Selective: false,
+		Names:     nil,
+	}, nil
+}
+
+// parseFromImport parses a selective import: from "path" import { name1, name2 as alias, ... }
+// Examples:
+//   from "./utils" import { getAllUsers }
+//   from "./models" import { User, Order as Ord }
+func (p *Parser) parseFromImport() (interpreter.Item, error) {
+	// Consume "from" keyword
+	if err := p.expect(FROM); err != nil {
+		return nil, err
+	}
+
+	// Expect import path string
+	if !p.check(STRING) {
+		return nil, p.errorWithHint(
+			"Expected import path string",
+			p.current(),
+			"Example: from \"./utils\" import { funcName }",
+		)
+	}
+	path := p.current().Literal
+	p.advance()
+
+	// Expect "import" keyword
+	if err := p.expect(IMPORT); err != nil {
+		return nil, p.errorWithHint(
+			"Expected 'import' after path",
+			p.current(),
+			"Example: from \"./utils\" import { funcName }",
+		)
+	}
+
+	// Expect opening brace
+	if err := p.expect(LBRACE); err != nil {
+		return nil, p.errorWithHint(
+			"Expected '{' after 'import'",
+			p.current(),
+			"Example: from \"./utils\" import { funcName, other as o }",
+		)
+	}
+
+	p.skipNewlines()
+
+	// Parse import names
+	var names []interpreter.ImportName
+
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		p.skipNewlines()
+
+		if p.check(RBRACE) {
+			break
+		}
+
+		// Get the name
+		name, err := p.expectIdent()
+		if err != nil {
+			return nil, err
+		}
+
+		importName := interpreter.ImportName{
+			Name:  name,
+			Alias: "",
+		}
+
+		// Check for alias: name as alias
+		if p.check(AS) {
+			p.advance() // consume "as"
+			aliasName, err := p.expectIdent()
+			if err != nil {
+				return nil, p.errorWithHint(
+					"Expected alias name after 'as'",
+					p.current(),
+					"Example: from \"./utils\" import { funcName as f }",
+				)
+			}
+			importName.Alias = aliasName
+		}
+
+		names = append(names, importName)
+
+		// Check for comma
+		if !p.match(COMMA) {
+			break
+		}
+
+		p.skipNewlines()
+	}
+
+	p.skipNewlines()
+
+	// Expect closing brace
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
+	}
+
+	return &interpreter.ImportStatement{
+		Path:      path,
+		Alias:     "",
+		Selective: true,
+		Names:     names,
+	}, nil
+}
+
+// parseModuleDecl parses a module declaration: module "name"
+// Example: module "myapp/utils"
+func (p *Parser) parseModuleDecl() (interpreter.Item, error) {
+	// Consume "module" keyword
+	if err := p.expect(MODULE); err != nil {
+		return nil, err
+	}
+
+	// Expect module name string
+	if !p.check(STRING) {
+		return nil, p.errorWithHint(
+			"Expected module name string",
+			p.current(),
+			"Example: module \"myapp/utils\"",
+		)
+	}
+	name := p.current().Literal
+	p.advance()
+
+	return &interpreter.ModuleDecl{
+		Name: name,
+	}, nil
+}
+
+// parseMacroDef parses a macro definition: macro! name(params) { body }
+// Example: macro! log(level, msg) { if level >= logLevel { print(msg) } }
+func (p *Parser) parseMacroDef() (interpreter.Item, error) {
+	// Consume "macro" keyword
+	if err := p.expect(MACRO); err != nil {
+		return nil, err
+	}
+
+	// Expect "!" after macro
+	if err := p.expect(BANG); err != nil {
+		return nil, p.errorWithHint(
+			"Expected '!' after 'macro'",
+			p.current(),
+			"Macro definitions use syntax: macro! name(params) { body }",
+		)
+	}
+
+	// Get macro name
+	name, err := p.expectIdent()
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse parameters
+	if err := p.expect(LPAREN); err != nil {
+		return nil, p.errorWithHint(
+			"Expected '(' after macro name",
+			p.current(),
+			"Example: macro! log(level, msg) { ... }",
+		)
+	}
+
+	var params []string
+	for !p.check(RPAREN) && !p.isAtEnd() {
+		paramName, err := p.expectIdent()
+		if err != nil {
+			return nil, err
+		}
+		params = append(params, paramName)
+
+		if !p.match(COMMA) {
+			break
+		}
+	}
+
+	if err := p.expect(RPAREN); err != nil {
+		return nil, err
+	}
+
+	p.skipNewlines()
+
+	// Parse body
+	if err := p.expect(LBRACE); err != nil {
+		return nil, p.errorWithHint(
+			"Expected '{' for macro body",
+			p.current(),
+			"Macro body must be enclosed in braces",
+		)
+	}
+
+	p.skipNewlines()
+
+	// Parse macro body as a list of nodes (statements and items)
+	var body []interpreter.Node
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		node, err := p.parseMacroBodyNode()
+		if err != nil {
+			return nil, err
+		}
+		if node != nil {
+			body = append(body, node)
+		}
+		p.skipNewlines()
+	}
+
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
+	}
+
+	return &interpreter.MacroDef{
+		Name:   name,
+		Params: params,
+		Body:   body,
+	}, nil
+}
+
+// parseMacroBodyNode parses a single node in a macro body
+func (p *Parser) parseMacroBodyNode() (interpreter.Node, error) {
+	switch p.current().Type {
+	case AT:
+		// Route definition inside macro
+		item, err := p.parseRoute()
+		if err != nil {
+			return nil, err
+		}
+		return item.(*interpreter.Route), nil
+
+	case COLON:
+		// Type definition inside macro
+		item, err := p.parseTypeDef()
+		if err != nil {
+			return nil, err
+		}
+		return item.(*interpreter.TypeDef), nil
+
+	case DOLLAR, GREATER, QUESTION:
+		// Statement
+		stmt, err := p.parseStatement()
+		if err != nil {
+			return nil, err
+		}
+		return statementToNode(stmt), nil
+
+	case IDENT:
+		// Could be if, for, while, let, return, or macro invocation
+		switch p.current().Literal {
+		case "if", "for", "while", "let", "return":
+			stmt, err := p.parseStatement()
+			if err != nil {
+				return nil, err
+			}
+			return statementToNode(stmt), nil
+		default:
+			// Check for macro invocation: name!(args)
+			if p.peek(1).Type == BANG {
+				inv, err := p.parseMacroInvocation()
+				if err != nil {
+					return nil, err
+				}
+				return inv.(*interpreter.MacroInvocation), nil
+			}
+			// Try as expression statement
+			stmt, err := p.parseStatement()
+			if err != nil {
+				return nil, err
+			}
+			return statementToNode(stmt), nil
+		}
+
+	case WHILE, FOR, SWITCH:
+		stmt, err := p.parseStatement()
+		if err != nil {
+			return nil, err
+		}
+		return statementToNode(stmt), nil
+
+	case NEWLINE:
+		p.advance()
+		return nil, nil
+
+	default:
+		return nil, p.errorWithHint(
+			fmt.Sprintf("Unexpected token in macro body: %s", p.current().Type),
+			p.current(),
+			"Macro body can contain routes, type definitions, and statements",
+		)
+	}
+}
+
+// statementToNode converts a Statement interface to a Node interface
+// This is needed because Statement and Node are separate interfaces
+func statementToNode(stmt interpreter.Statement) interpreter.Node {
+	switch s := stmt.(type) {
+	case interpreter.AssignStatement:
+		return s
+	case interpreter.ReturnStatement:
+		return s
+	case interpreter.IfStatement:
+		return s
+	case interpreter.WhileStatement:
+		return s
+	case interpreter.ForStatement:
+		return s
+	case interpreter.SwitchStatement:
+		return s
+	case interpreter.ExpressionStatement:
+		return s
+	case interpreter.ValidationStatement:
+		return s
+	case interpreter.DbQueryStatement:
+		return s
+	case interpreter.WsSendStatement:
+		return s
+	case interpreter.WsBroadcastStatement:
+		return s
+	case interpreter.WsCloseStatement:
+		return s
+	case interpreter.WebSocketEvent:
+		return s
+	case interpreter.MacroInvocation:
+		return s
+	default:
+		// Return the statement as-is, concrete types implement Node
+		return stmt.(interpreter.Node)
+	}
+}
+
+// parseMacroInvocation parses a macro invocation: name!(args)
+// Example: log!("INFO", "Server starting")
+func (p *Parser) parseMacroInvocation() (interpreter.Item, error) {
+	// Get macro name
+	name, err := p.expectIdent()
+	if err != nil {
+		return nil, err
+	}
+
+	// Expect "!"
+	if err := p.expect(BANG); err != nil {
+		return nil, err
+	}
+
+	// Parse arguments
+	if err := p.expect(LPAREN); err != nil {
+		return nil, p.errorWithHint(
+			"Expected '(' after macro name",
+			p.current(),
+			"Example: log!(\"INFO\", \"message\")",
+		)
+	}
+
+	var args []interpreter.Expr
+	for !p.check(RPAREN) && !p.isAtEnd() {
+		arg, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, arg)
+
+		if !p.match(COMMA) {
+			break
+		}
+	}
+
+	if err := p.expect(RPAREN); err != nil {
+		return nil, err
+	}
+
+	return &interpreter.MacroInvocation{
+		Name: name,
+		Args: args,
+	}, nil
+}
+
+// parseQuoteExpr parses a quote expression: quote { ... }
+// Example: quote { if x > 0 { return x } }
+func (p *Parser) parseQuoteExpr() (interpreter.Expr, error) {
+	// Consume "quote" keyword
+	if err := p.expect(QUOTE); err != nil {
+		return nil, err
+	}
+
+	// Expect opening brace
+	if err := p.expect(LBRACE); err != nil {
+		return nil, p.errorWithHint(
+			"Expected '{' after 'quote'",
+			p.current(),
+			"Quote expressions use syntax: quote { ... }",
+		)
+	}
+
+	p.skipNewlines()
+
+	// Parse quoted body
+	var body []interpreter.Node
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		node, err := p.parseMacroBodyNode()
+		if err != nil {
+			return nil, err
+		}
+		if node != nil {
+			body = append(body, node)
+		}
+		p.skipNewlines()
+	}
+
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
+	}
+
+	return interpreter.QuoteExpr{Body: body}, nil
+}
+
+// parseMatchExpr parses a match expression
+// Syntax: match value { pattern => result, pattern when guard => result, _ => default }
+func (p *Parser) parseMatchExpr() (interpreter.Expr, error) {
+	if err := p.expect(MATCH); err != nil {
+		return nil, err
+	}
+
+	// Parse the value to match on
+	value, err := p.parseExpr()
+	if err != nil {
+		return nil, err
+	}
+
+	p.skipNewlines()
+
+	// Expect opening brace
+	if err := p.expect(LBRACE); err != nil {
+		return nil, p.errorWithHint(
+			"Expected '{' after match value",
+			p.current(),
+			"Match expressions require a block with cases: match x { ... }",
+		)
+	}
+
+	p.skipNewlines()
+
+	var cases []interpreter.MatchCase
+	hasWildcard := false
+
+	// Parse cases
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		p.skipNewlines()
+
+		if p.check(RBRACE) {
+			break
+		}
+
+		// Parse pattern
+		pattern, err := p.parsePattern()
+		if err != nil {
+			return nil, err
+		}
+
+		// Check if this is a wildcard pattern for exhaustiveness
+		if _, ok := pattern.(interpreter.WildcardPattern); ok {
+			hasWildcard = true
+		}
+
+		// Parse optional guard: when condition
+		var guard interpreter.Expr
+		if p.check(WHEN) {
+			p.advance()
+			guard, err = p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// Expect =>
+		if err := p.expect(FATARROW); err != nil {
+			return nil, p.errorWithHint(
+				"Expected '=>' after pattern",
+				p.current(),
+				"Match cases use => to separate pattern from result: pattern => result",
+			)
+		}
+
+		// Parse body expression
+		body, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+
+		cases = append(cases, interpreter.MatchCase{
+			Pattern: pattern,
+			Guard:   guard,
+			Body:    body,
+		})
+
+		// Optional comma between cases
+		p.match(COMMA)
+		p.skipNewlines()
+	}
+
+	// Exhaustiveness warning (log if no wildcard/default case)
+	if !hasWildcard && len(cases) > 0 {
+		// In a production setting, this would emit a warning
+		// For now, we'll just allow non-exhaustive matches
+	}
+
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
+	}
+
+	return interpreter.MatchExpr{
+		Value: value,
+		Cases: cases,
+	}, nil
+}
+
+// parsePattern parses a pattern for match expressions
+func (p *Parser) parsePattern() (interpreter.Pattern, error) {
+	switch p.current().Type {
+	case INTEGER:
+		// Literal integer pattern
+		n, err := strconv.ParseInt(p.current().Literal, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		p.advance()
+		return interpreter.LiteralPattern{Value: interpreter.IntLiteral{Value: n}}, nil
+
+	case FLOAT:
+		// Literal float pattern
+		f, err := strconv.ParseFloat(p.current().Literal, 64)
+		if err != nil {
+			return nil, err
+		}
+		p.advance()
+		return interpreter.LiteralPattern{Value: interpreter.FloatLiteral{Value: f}}, nil
+
+	case STRING:
+		// Literal string pattern
+		s := p.current().Literal
+		p.advance()
+		return interpreter.LiteralPattern{Value: interpreter.StringLiteral{Value: s}}, nil
+
+	case TRUE:
+		p.advance()
+		return interpreter.LiteralPattern{Value: interpreter.BoolLiteral{Value: true}}, nil
+
+	case FALSE:
+		p.advance()
+		return interpreter.LiteralPattern{Value: interpreter.BoolLiteral{Value: false}}, nil
+
+	case NULL:
+		p.advance()
+		return interpreter.LiteralPattern{Value: interpreter.NullLiteral{}}, nil
+
+	case IDENT:
+		name := p.current().Literal
+		// Check for underscore wildcard
+		if name == "_" {
+			p.advance()
+			return interpreter.WildcardPattern{}, nil
+		}
+		// Variable binding pattern
+		p.advance()
+		return interpreter.VariablePattern{Name: name}, nil
+
+	case LBRACE:
+		// Object destructuring pattern: {name, age} or {name: n, age: a}
+		return p.parseObjectPattern()
+
+	case LBRACKET:
+		// Array destructuring pattern: [first, second] or [head, ...rest]
+		return p.parseArrayPattern()
+
+	default:
+		return nil, p.errorWithHint(
+			fmt.Sprintf("Unexpected token in pattern: %s", p.current().Type),
+			p.current(),
+			"Patterns can be literals, variables, _ (wildcard), {fields}, or [elements]",
+		)
+	}
+}
+
+// parseObjectPattern parses an object destructuring pattern: {name, age} or {name: n}
+func (p *Parser) parseObjectPattern() (interpreter.Pattern, error) {
+	if err := p.expect(LBRACE); err != nil {
+		return nil, err
+	}
+
+	p.skipNewlines()
+
+	var fields []interpreter.ObjectPatternField
+
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		p.skipNewlines()
+
+		if p.check(RBRACE) {
+			break
+		}
+
+		// Get field name
+		fieldName, err := p.expectIdent()
+		if err != nil {
+			return nil, err
+		}
+
+		var fieldPattern interpreter.Pattern
+
+		// Check for binding: fieldName: bindingName
+		if p.check(COLON) {
+			p.advance()
+			fieldPattern, err = p.parsePattern()
+			if err != nil {
+				return nil, err
+			}
+		}
+		// If no colon, fieldPattern stays nil and the field name is used as variable
+
+		fields = append(fields, interpreter.ObjectPatternField{
+			Key:     fieldName,
+			Pattern: fieldPattern,
+		})
+
+		if !p.match(COMMA) {
+			break
+		}
+
+		p.skipNewlines()
+	}
+
+	p.skipNewlines()
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
+	}
+
+	return interpreter.ObjectPattern{Fields: fields}, nil
+}
+
+// parseArrayPattern parses an array destructuring pattern: [first, second] or [head, ...rest]
+func (p *Parser) parseArrayPattern() (interpreter.Pattern, error) {
+	if err := p.expect(LBRACKET); err != nil {
+		return nil, err
+	}
+
+	p.skipNewlines()
+
+	var elements []interpreter.Pattern
+	var rest *string
+
+	for !p.check(RBRACKET) && !p.isAtEnd() {
+		p.skipNewlines()
+
+		if p.check(RBRACKET) {
+			break
+		}
+
+		// Check for rest pattern: ...rest
+		if p.check(DOTDOTDOT) {
+			p.advance()
+			restName, err := p.expectIdent()
+			if err != nil {
+				return nil, p.errorWithHint(
+					"Expected identifier after ...",
+					p.current(),
+					"Rest patterns require a variable name: [...rest]",
+				)
+			}
+			rest = &restName
+			// Rest must be last element
+			p.skipNewlines()
+			break
+		}
+
+		// Parse regular element pattern
+		elem, err := p.parsePattern()
+		if err != nil {
+			return nil, err
+		}
+		elements = append(elements, elem)
+
+		if !p.match(COMMA) {
+			break
+		}
+
+		p.skipNewlines()
+	}
+
+	p.skipNewlines()
+	if err := p.expect(RBRACKET); err != nil {
+		return nil, err
+	}
+
+	return interpreter.ArrayPattern{
+		Elements: elements,
+		Rest:     rest,
 	}, nil
 }

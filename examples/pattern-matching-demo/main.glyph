@@ -1,0 +1,85 @@
+# Pattern Matching Demo
+# Demonstrates the pattern matching feature in GlyphLang
+
+# Simple literal pattern matching with HTTP status codes
+@route /status/:code [GET]
+  $ result = match code {
+    200 => "OK"
+    201 => "Created"
+    400 => "Bad Request"
+    404 => "Not Found"
+    500 => "Internal Server Error"
+    _ => "Unknown Status"
+  }
+  > {status: code, message: result}
+
+# Pattern matching with guards
+@route /grade/:score [GET]
+  $ grade = match score {
+    n when n >= 90 => "A"
+    n when n >= 80 => "B"
+    n when n >= 70 => "C"
+    n when n >= 60 => "D"
+    _ => "F"
+  }
+  > {score: score, grade: grade}
+
+# Object destructuring pattern matching
+@route /user/:id [GET]
+  $ user = {name: "Alice", age: 30, role: "admin"}
+  $ greeting = match user {
+    {name, role} when role == "admin" => "Welcome Administrator " + name
+    {name} => "Hello " + name
+    _ => "Hello Guest"
+  }
+  > {greeting: greeting}
+
+# Array destructuring pattern matching
+@route /first-element [POST]
+  $ items = input.items
+  $ result = match items {
+    [first] => {count: 1, first: first}
+    [first, second] => {count: 2, first: first, second: second}
+    [first, second, third] => {count: 3, first: first, second: second, third: third}
+    _ => {count: 0, message: "Empty or too many items"}
+  }
+  > result
+
+# Boolean pattern matching
+@route /toggle/:state [GET]
+  $ isEnabled = state == "on"
+  $ result = match isEnabled {
+    true => {enabled: true, message: "Feature is ON"}
+    false => {enabled: false, message: "Feature is OFF"}
+  }
+  > result
+
+# HTTP method pattern matching
+@route /method-info/:method [GET]
+  $ info = match method {
+    "GET" => {safe: true, idempotent: true, description: "Retrieve a resource"}
+    "POST" => {safe: false, idempotent: false, description: "Create a resource"}
+    "PUT" => {safe: false, idempotent: true, description: "Update a resource"}
+    "DELETE" => {safe: false, idempotent: true, description: "Delete a resource"}
+    "PATCH" => {safe: false, idempotent: false, description: "Partially update a resource"}
+    _ => {safe: false, idempotent: false, description: "Unknown method"}
+  }
+  > info
+
+# Variable binding pattern
+@route /double/:num [GET]
+  $ result = match num {
+    x => x + x
+  }
+  > {original: num, doubled: result}
+
+# Nested object pattern matching
+@route /shipping [POST]
+  $ order = input
+  $ shippingCost = match order {
+    {priority, weight} when priority == "express" => weight * 2
+    {weight} when weight > 10 => weight * 0.5
+    {weight} => weight * 0.25
+    _ => 0
+  }
+  > {orderId: order.id, shippingCost: shippingCost}

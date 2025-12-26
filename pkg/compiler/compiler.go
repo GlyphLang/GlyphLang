@@ -12,32 +12,35 @@ import (
 
 // Compiler compiles AST to bytecode
 type Compiler struct {
-	constants    []vm.Value
-	code         []byte
-	symbolTable  *SymbolTable
-	labelCounter int
-	optimizer    *Optimizer
+	constants     []vm.Value
+	code          []byte
+	symbolTable   *SymbolTable
+	labelCounter  int
+	optimizer     *Optimizer
+	macroExpander *MacroExpander
 }
 
 // NewCompiler creates a new compiler instance
 func NewCompiler() *Compiler {
 	return &Compiler{
-		constants:    make([]vm.Value, 0),
-		code:         make([]byte, 0),
-		symbolTable:  NewGlobalSymbolTable(),
-		labelCounter: 0,
-		optimizer:    NewOptimizer(OptBasic), // Default to basic optimization
+		constants:     make([]vm.Value, 0),
+		code:          make([]byte, 0),
+		symbolTable:   NewGlobalSymbolTable(),
+		labelCounter:  0,
+		optimizer:     NewOptimizer(OptBasic), // Default to basic optimization
+		macroExpander: NewMacroExpander(),
 	}
 }
 
 // NewCompilerWithOptLevel creates a new compiler with specified optimization level
 func NewCompilerWithOptLevel(level OptimizationLevel) *Compiler {
 	return &Compiler{
-		constants:    make([]vm.Value, 0),
-		code:         make([]byte, 0),
-		symbolTable:  NewGlobalSymbolTable(),
-		labelCounter: 0,
-		optimizer:    NewOptimizer(level),
+		constants:     make([]vm.Value, 0),
+		code:          make([]byte, 0),
+		symbolTable:   NewGlobalSymbolTable(),
+		labelCounter:  0,
+		optimizer:     NewOptimizer(level),
+		macroExpander: NewMacroExpander(),
 	}
 }
 
@@ -52,8 +55,14 @@ func (c *Compiler) Reset() {
 
 // Compile compiles an AST module to bytecode
 func (c *Compiler) Compile(module *interpreter.Module) ([]byte, error) {
+	// First, expand all macros in the module
+	expandedModule, err := c.macroExpander.ExpandModule(module)
+	if err != nil {
+		return nil, fmt.Errorf("macro expansion failed: %w", err)
+	}
+
 	// For now, compile the first route we find
-	for _, item := range module.Items {
+	for _, item := range expandedModule.Items {
 		if route, ok := item.(*interpreter.Route); ok {
 			return c.CompileRoute(route)
 		}
@@ -62,7 +71,7 @@ func (c *Compiler) Compile(module *interpreter.Module) ([]byte, error) {
 	// Check if this is a type-only module (library module)
 	// Type-only modules are valid but don't produce executable bytecode
 	hasTypeDefs := false
-	for _, item := range module.Items {
+	for _, item := range expandedModule.Items {
 		if _, ok := item.(*interpreter.TypeDef); ok {
 			hasTypeDefs = true
 			break
@@ -78,11 +87,11 @@ func (c *Compiler) Compile(module *interpreter.Module) ([]byte, error) {
 	}
 
 	// Empty module
-	if len(module.Items) == 0 {
+	if len(expandedModule.Items) == 0 {
 		return nil, fmt.Errorf("empty module: no items to compile")
 	}
 
-	return nil, fmt.Errorf("no route found to compile (module contains %d items but no routes)", len(module.Items))
+	return nil, fmt.Errorf("no route found to compile (module contains %d items but no routes)", len(expandedModule.Items))
 }
 
 // CompileRoute compiles a route to bytecode
@@ -622,6 +631,10 @@ func (c *Compiler) compileExpression(expr interpreter.Expr) error {
 		return c.compileUnaryOp(e)
 	case interpreter.UnaryOpExpr:
 		return c.compileUnaryOp(&e)
+	case *interpreter.MatchExpr:
+		return c.compileMatchExpr(e)
+	case interpreter.MatchExpr:
+		return c.compileMatchExpr(&e)
 	default:
 		return fmt.Errorf("unsupported expression type: %T", expr)
 	}
@@ -1046,4 +1059,201 @@ func valuesEqual(a, b vm.Value) bool {
 		return ok
 	}
 	return false
+}
+
+// compileMatchExpr compiles a match expression
+// Match expressions are compiled as a series of conditional jumps similar to switch
+func (c *Compiler) compileMatchExpr(expr *interpreter.MatchExpr) error {
+	// Create a temporary variable to store the match value
+	matchVarName := fmt.Sprintf("__match_%d", c.labelCounter)
+	c.labelCounter++
+	matchVarIdx := c.addConstant(vm.StringValue{Val: matchVarName})
+	c.symbolTable.Define(matchVarName, matchVarIdx)
+
+	// Compile and store the match value
+	if err := c.compileExpression(expr.Value); err != nil {
+		return err
+	}
+	c.emitWithOperand(vm.OpStoreVar, uint32(matchVarIdx))
+
+	// Track jump locations for each case to jump to end
+	var jumpToEnd []int
+
+	// Compile each case
+	for _, matchCase := range expr.Cases {
+		// Compile pattern matching for this case
+		jumpToNextCase, err := c.compilePatternMatch(matchCase.Pattern, matchVarIdx)
+		if err != nil {
+			return err
+		}
+
+		// If there's a guard, compile it as an additional condition
+		if matchCase.Guard != nil {
+			// Compile guard expression
+			if err := c.compileExpression(matchCase.Guard); err != nil {
+				return err
+			}
+			// Jump to next case if guard is false
+			guardJump := len(c.code)
+			c.emitWithOperand(vm.OpJumpIfFalse, 0) // Placeholder
+			jumpToNextCase = append(jumpToNextCase, guardJump)
+		}
+
+		// Compile case body (this pushes the result onto the stack)
+		if err := c.compileExpression(matchCase.Body); err != nil {
+			return err
+		}
+
+		// Jump to end after executing case
+		jumpToEnd = append(jumpToEnd, len(c.code))
+		c.emitWithOperand(vm.OpJump, 0) // Placeholder
+
+		// Patch all jumps to next case
+		nextCaseOffset := uint32(len(c.code))
+		for _, jumpLoc := range jumpToNextCase {
+			c.patchJump(jumpLoc, nextCaseOffset)
+		}
+	}
+
+	// If no case matched, push null
+	nullIdx := c.addConstant(vm.NullValue{})
+	c.emitWithOperand(vm.OpPush, uint32(nullIdx))
+
+	// Patch all jumps to end
+	endOffset := uint32(len(c.code))
+	for _, jumpLoc := range jumpToEnd {
+		c.patchJump(jumpLoc, endOffset)
+	}
+
+	return nil
+}
+
+// compilePatternMatch compiles pattern matching logic
+// Returns a slice of jump locations that should jump to the next case
+func (c *Compiler) compilePatternMatch(pattern interpreter.Pattern, matchVarIdx int) ([]int, error) {
+	var jumpToNextCase []int
+
+	switch p := pattern.(type) {
+	case interpreter.LiteralPattern:
+		// Load match value
+		c.emitWithOperand(vm.OpLoadVar, uint32(matchVarIdx))
+		// Push the literal
+		if err := c.compileLiteralValue(p.Value); err != nil {
+			return nil, err
+		}
+		// Compare
+		c.emit(vm.OpEq)
+		// Jump to next case if false
+		jumpLoc := len(c.code)
+		c.emitWithOperand(vm.OpJumpIfFalse, 0)
+		jumpToNextCase = append(jumpToNextCase, jumpLoc)
+
+	case interpreter.VariablePattern:
+		// Variable pattern always matches, just bind the value
+		c.emitWithOperand(vm.OpLoadVar, uint32(matchVarIdx))
+		varIdx := c.addConstant(vm.StringValue{Val: p.Name})
+		c.symbolTable.Define(p.Name, varIdx)
+		c.emitWithOperand(vm.OpStoreVar, uint32(varIdx))
+
+	case interpreter.WildcardPattern:
+		// Wildcard always matches, no code needed
+
+	case interpreter.ObjectPattern:
+		// For object patterns, we need to check if the value is an object
+		// and if it has all the required fields
+		for _, field := range p.Fields {
+			// Load match value
+			c.emitWithOperand(vm.OpLoadVar, uint32(matchVarIdx))
+			// Push field name
+			fieldIdx := c.addConstant(vm.StringValue{Val: field.Key})
+			c.emitWithOperand(vm.OpPush, uint32(fieldIdx))
+			// Get field (this will push null if field doesn't exist)
+			c.emit(vm.OpGetField)
+
+			if field.Pattern != nil {
+				// Store in temp var and match nested pattern
+				tempVarName := fmt.Sprintf("__field_%s_%d", field.Key, c.labelCounter)
+				c.labelCounter++
+				tempVarIdx := c.addConstant(vm.StringValue{Val: tempVarName})
+				c.symbolTable.Define(tempVarName, tempVarIdx)
+				c.emitWithOperand(vm.OpStoreVar, uint32(tempVarIdx))
+
+				nestedJumps, err := c.compilePatternMatch(field.Pattern, tempVarIdx)
+				if err != nil {
+					return nil, err
+				}
+				jumpToNextCase = append(jumpToNextCase, nestedJumps...)
+			} else {
+				// Bind field value to field name as variable
+				varIdx := c.addConstant(vm.StringValue{Val: field.Key})
+				c.symbolTable.Define(field.Key, varIdx)
+				c.emitWithOperand(vm.OpStoreVar, uint32(varIdx))
+			}
+		}
+
+	case interpreter.ArrayPattern:
+		// For array patterns, check length and match elements
+		// This is a simplified implementation
+		for idx, elemPattern := range p.Elements {
+			// Load match value
+			c.emitWithOperand(vm.OpLoadVar, uint32(matchVarIdx))
+			// Push index
+			idxConstIdx := c.addConstant(vm.IntValue{Val: int64(idx)})
+			c.emitWithOperand(vm.OpPush, uint32(idxConstIdx))
+			// Get element
+			c.emit(vm.OpGetIndex)
+
+			// Store in temp var and match nested pattern
+			tempVarName := fmt.Sprintf("__elem_%d_%d", idx, c.labelCounter)
+			c.labelCounter++
+			tempVarIdx := c.addConstant(vm.StringValue{Val: tempVarName})
+			c.symbolTable.Define(tempVarName, tempVarIdx)
+			c.emitWithOperand(vm.OpStoreVar, uint32(tempVarIdx))
+
+			nestedJumps, err := c.compilePatternMatch(elemPattern, tempVarIdx)
+			if err != nil {
+				return nil, err
+			}
+			jumpToNextCase = append(jumpToNextCase, nestedJumps...)
+		}
+
+		// Handle rest pattern (simplified - just binds remaining elements)
+		if p.Rest != nil {
+			// For simplicity, we'll just bind the whole array to rest
+			// A full implementation would slice the array
+			c.emitWithOperand(vm.OpLoadVar, uint32(matchVarIdx))
+			restIdx := c.addConstant(vm.StringValue{Val: *p.Rest})
+			c.symbolTable.Define(*p.Rest, restIdx)
+			c.emitWithOperand(vm.OpStoreVar, uint32(restIdx))
+		}
+
+	default:
+		return nil, fmt.Errorf("unsupported pattern type: %T", pattern)
+	}
+
+	return jumpToNextCase, nil
+}
+
+// compileLiteralValue compiles a literal value from a pattern
+func (c *Compiler) compileLiteralValue(lit interpreter.Literal) error {
+	var val vm.Value
+
+	switch l := lit.(type) {
+	case interpreter.IntLiteral:
+		val = vm.IntValue{Val: l.Value}
+	case interpreter.FloatLiteral:
+		val = vm.FloatValue{Val: l.Value}
+	case interpreter.StringLiteral:
+		val = vm.StringValue{Val: l.Value}
+	case interpreter.BoolLiteral:
+		val = vm.BoolValue{Val: l.Value}
+	case interpreter.NullLiteral:
+		val = vm.NullValue{}
+	default:
+		return fmt.Errorf("unsupported literal type in pattern: %T", lit)
+	}
+
+	idx := c.addConstant(val)
+	c.emitWithOperand(vm.OpPush, uint32(idx))
+	return nil
 }
