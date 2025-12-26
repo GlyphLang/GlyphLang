@@ -7,7 +7,6 @@
 *.test
 *.out
 go.work
-go.sum
 
 # Rust
 /glyph-core/target/
