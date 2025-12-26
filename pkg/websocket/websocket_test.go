@@ -399,6 +399,7 @@ func TestConnectionState(t *testing.T) {
 			EnableReconnection:  true,
 			PreserveClientState: true,
 			ReconnectionTimeout: 5 * time.Second,
+			MaxReconnectionTime: 5 * time.Minute,
 		}
 
 		hub := NewHubWithConfig(config)
