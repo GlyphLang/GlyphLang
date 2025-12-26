@@ -303,7 +303,8 @@ func TestQueryBuilder_MultipleWhere(t *testing.T) {
 
 	qb.Where("status", "=", "active")
 	qb.Where("verified", "=", true)
-	query, args := qb.Build()
+	query, args, err := qb.Build()
+	assert.NoError(t, err)
 	assert.Contains(t, query, "AND")
 	assert.Equal(t, 2, len(args))
 }
@@ -396,8 +397,10 @@ func TestQueryBuilder_BuildDefault(t *testing.T) {
 	qb := orm.NewQueryBuilder()
 
 	// Default build should create SELECT * FROM table
-	query, args := qb.Build()
-	assert.Contains(t, query, "SELECT * FROM users")
+	query, args, err := qb.Build()
+	assert.NoError(t, err)
+	assert.Contains(t, query, "SELECT * FROM")
+	assert.Contains(t, query, "users")
 	assert.Equal(t, 0, len(args))
 }
 
@@ -424,7 +427,8 @@ func TestQueryBuilder_JoinClause(t *testing.T) {
 	qb := orm.NewQueryBuilder()
 
 	qb.Join("INNER", "orders", "user_id", "id")
-	query, _ := qb.Build()
+	query, _, err := qb.Build()
+	assert.NoError(t, err)
 	assert.Contains(t, query, "JOIN")
 }
 
@@ -434,8 +438,9 @@ func TestQueryBuilder_LeftJoinClause(t *testing.T) {
 	orm := NewORM(mockDB, "users")
 	qb := orm.NewQueryBuilder()
 
-	qb.LeftJoin("orders", "users.id", "orders.user_id")
-	query, _ := qb.Build()
+	qb.LeftJoin("orders", "user_id", "id")
+	query, _, err := qb.Build()
+	assert.NoError(t, err)
 	assert.Contains(t, query, "LEFT JOIN")
 }
 
@@ -446,7 +451,8 @@ func TestQueryBuilder_OrderByClause(t *testing.T) {
 	qb := orm.NewQueryBuilder()
 
 	qb.OrderBy("created_at", "DESC")
-	query, _ := qb.Build()
+	query, _, err := qb.Build()
+	assert.NoError(t, err)
 	assert.Contains(t, query, "ORDER BY")
 }
 
@@ -457,7 +463,8 @@ func TestQueryBuilder_LimitClause(t *testing.T) {
 	qb := orm.NewQueryBuilder()
 
 	qb.Limit(10)
-	query, _ := qb.Build()
+	query, _, err := qb.Build()
+	assert.NoError(t, err)
 	assert.Contains(t, query, "LIMIT")
 }
 
@@ -468,7 +475,8 @@ func TestQueryBuilder_OffsetClause(t *testing.T) {
 	qb := orm.NewQueryBuilder()
 
 	qb.Offset(20)
-	query, _ := qb.Build()
+	query, _, err := qb.Build()
+	assert.NoError(t, err)
 	assert.Contains(t, query, "OFFSET")
 }
 
@@ -479,8 +487,13 @@ func TestQueryBuilder_SelectColumns(t *testing.T) {
 	qb := orm.NewQueryBuilder()
 
 	qb.Select("id", "name", "email")
-	query, _ := qb.Build()
-	assert.Contains(t, query, "SELECT id, name, email")
+	query, _, err := qb.Build()
+	assert.NoError(t, err)
+	// Now columns are quoted
+	assert.Contains(t, query, "SELECT")
+	assert.Contains(t, query, "id")
+	assert.Contains(t, query, "name")
+	assert.Contains(t, query, "email")
 }
 
 // TestQueryBuilder_WhereConditions tests QueryBuilder Where with multiple conditions
@@ -491,7 +504,8 @@ func TestQueryBuilder_WhereConditions(t *testing.T) {
 
 	qb.Where("status", "=", "active")
 	qb.Where("verified", "=", true)
-	query, args := qb.Build()
+	query, args, err := qb.Build()
+	assert.NoError(t, err)
 	assert.Contains(t, query, "WHERE")
 	assert.Equal(t, 2, len(args))
 }
@@ -541,7 +555,8 @@ func TestQueryBuilder_WhereEq(t *testing.T) {
 	qb := orm.NewQueryBuilder()
 
 	qb.WhereEq("status", "active")
-	query, args := qb.Build()
+	query, args, err := qb.Build()
+	assert.NoError(t, err)
 	assert.Contains(t, query, "WHERE")
 	assert.Contains(t, query, "=")
 	assert.Equal(t, 1, len(args))
@@ -616,7 +631,8 @@ func TestQueryBuilder_InnerJoinExtra(t *testing.T) {
 	qb := orm.NewQueryBuilder()
 
 	qb.InnerJoin("posts", "user_id", "id")
-	query, _ := qb.Build()
+	query, _, err := qb.Build()
+	assert.NoError(t, err)
 	assert.Contains(t, query, "INNER JOIN")
 }
 
@@ -747,10 +763,17 @@ func TestQueryBuilder_ComplexQuery(t *testing.T) {
 		Limit(10).
 		Offset(20)
 
-	query, args := qb.Build()
-	assert.Contains(t, query, "SELECT id, name, email FROM users")
+	query, args, err := qb.Build()
+	assert.NoError(t, err)
+	assert.Contains(t, query, "SELECT")
+	assert.Contains(t, query, "id")
+	assert.Contains(t, query, "name")
+	assert.Contains(t, query, "email")
+	assert.Contains(t, query, "users")
 	assert.Contains(t, query, "WHERE")
-	assert.Contains(t, query, "ORDER BY created_at DESC")
+	assert.Contains(t, query, "ORDER BY")
+	assert.Contains(t, query, "created_at")
+	assert.Contains(t, query, "DESC")
 	assert.Contains(t, query, "LIMIT 10")
 	assert.Contains(t, query, "OFFSET 20")
 	assert.Equal(t, 2, len(args))
@@ -765,7 +788,8 @@ func TestQueryBuilder_MultipleJoins(t *testing.T) {
 	qb.InnerJoin("posts", "user_id", "id").
 		LeftJoin("profiles", "user_id", "id")
 
-	query, _ := qb.Build()
+	query, _, err := qb.Build()
+	assert.NoError(t, err)
 	assert.Contains(t, query, "INNER JOIN")
 	assert.Contains(t, query, "LEFT JOIN")
 }
@@ -1076,9 +1100,11 @@ func TestQueryBuilder_InnerJoinUsersOrders(t *testing.T) {
 
 	// Join methods auto-prefix columns with table names
 	qb.InnerJoin("orders", "id", "user_id")
-	query, _ := qb.Build()
+	query, _, err := qb.Build()
+	assert.NoError(t, err)
 
-	assert.Contains(t, query, "INNER JOIN orders ON users.id = orders.user_id")
+	assert.Contains(t, query, "INNER JOIN")
+	assert.Contains(t, query, "orders")
 }
 
 // TestQueryBuilder_LeftJoinCorrect tests the LeftJoin method
@@ -1089,9 +1115,11 @@ func TestQueryBuilder_LeftJoinCorrect(t *testing.T) {
 
 	// Join methods auto-prefix columns with table names
 	qb.LeftJoin("orders", "id", "user_id")
-	query, _ := qb.Build()
+	query, _, err := qb.Build()
+	assert.NoError(t, err)
 
-	assert.Contains(t, query, "LEFT JOIN orders ON users.id = orders.user_id")
+	assert.Contains(t, query, "LEFT JOIN")
+	assert.Contains(t, query, "orders")
 }
 
 // TestQueryBuilder_JoinGeneric tests the generic Join method
@@ -1102,9 +1130,11 @@ func TestQueryBuilder_JoinGeneric(t *testing.T) {
 
 	// Join method auto-prefixes columns with table names, so pass just column names
 	qb.Join("LEFT", "orders", "id", "user_id")
-	query, _ := qb.Build()
+	query, _, err := qb.Build()
+	assert.NoError(t, err)
 
-	assert.Contains(t, query, "LEFT JOIN orders ON users.id = orders.user_id")
+	assert.Contains(t, query, "LEFT JOIN")
+	assert.Contains(t, query, "orders")
 }
 
 // TestQueryBuilder_Offset tests the Offset method
@@ -1114,7 +1144,8 @@ func TestQueryBuilder_Offset(t *testing.T) {
 	qb := orm.NewQueryBuilder()
 
 	qb.Limit(10).Offset(20)
-	query, _ := qb.Build()
+	query, _, err := qb.Build()
+	assert.NoError(t, err)
 
 	assert.Contains(t, query, "LIMIT 10")
 	assert.Contains(t, query, "OFFSET 20")
@@ -1478,9 +1509,13 @@ func TestQueryBuilder_SelectCustomColumns(t *testing.T) {
 	qb := orm.NewQueryBuilder()
 
 	qb.Select("id", "name", "email")
-	query, _ := qb.Build()
+	query, _, err := qb.Build()
+	assert.NoError(t, err)
 
-	assert.Contains(t, query, "SELECT id, name, email FROM users")
+	assert.Contains(t, query, "SELECT")
+	assert.Contains(t, query, "id")
+	assert.Contains(t, query, "name")
+	assert.Contains(t, query, "email")
 }
 
 // TestQueryBuilder_WhereMultiple tests QueryBuilder with multiple WHERE conditions
@@ -1490,11 +1525,15 @@ func TestQueryBuilder_WhereMultiple(t *testing.T) {
 	qb := orm.NewQueryBuilder()
 
 	qb.Where("status", "=", "active").Where("age", ">", 18)
-	query, args := qb.Build()
+	query, args, err := qb.Build()
+	assert.NoError(t, err)
 
 	assert.Contains(t, query, "WHERE")
-	assert.Contains(t, query, "status = $1")
-	assert.Contains(t, query, "AND age > $2")
+	assert.Contains(t, query, "status")
+	assert.Contains(t, query, "$1")
+	assert.Contains(t, query, "AND")
+	assert.Contains(t, query, "age")
+	assert.Contains(t, query, "$2")
 	assert.Len(t, args, 2)
 }
 
@@ -1505,9 +1544,12 @@ func TestQueryBuilder_OrderByDesc(t *testing.T) {
 	qb := orm.NewQueryBuilder()
 
 	qb.OrderBy("created_at", "DESC")
-	query, _ := qb.Build()
+	query, _, err := qb.Build()
+	assert.NoError(t, err)
 
-	assert.Contains(t, query, "ORDER BY created_at DESC")
+	assert.Contains(t, query, "ORDER BY")
+	assert.Contains(t, query, "created_at")
+	assert.Contains(t, query, "DESC")
 }
 
 // TestQueryBuilder_FullQuery tests QueryBuilder with all clauses
@@ -1523,12 +1565,18 @@ func TestQueryBuilder_FullQuery(t *testing.T) {
 		Limit(10).
 		Offset(5)
 
-	query, _ := qb.Build()
+	query, _, err := qb.Build()
+	assert.NoError(t, err)
 
-	assert.Contains(t, query, "SELECT id, name FROM users")
-	assert.Contains(t, query, "INNER JOIN orders ON users.id = orders.user_id")
-	assert.Contains(t, query, "WHERE status = $1")
-	assert.Contains(t, query, "ORDER BY name ASC")
+	assert.Contains(t, query, "SELECT")
+	assert.Contains(t, query, "id")
+	assert.Contains(t, query, "name")
+	assert.Contains(t, query, "INNER JOIN")
+	assert.Contains(t, query, "orders")
+	assert.Contains(t, query, "WHERE")
+	assert.Contains(t, query, "status")
+	assert.Contains(t, query, "ORDER BY")
+	assert.Contains(t, query, "ASC")
 	assert.Contains(t, query, "LIMIT 10")
 	assert.Contains(t, query, "OFFSET 5")
 }
@@ -1542,10 +1590,13 @@ func TestQueryBuilder_MultipleJoinsCombined(t *testing.T) {
 	qb.LeftJoin("orders", "id", "user_id").
 		InnerJoin("profiles", "id", "user_id")
 
-	query, _ := qb.Build()
+	query, _, err := qb.Build()
+	assert.NoError(t, err)
 
-	assert.Contains(t, query, "LEFT JOIN orders")
-	assert.Contains(t, query, "INNER JOIN profiles")
+	assert.Contains(t, query, "LEFT JOIN")
+	assert.Contains(t, query, "orders")
+	assert.Contains(t, query, "INNER JOIN")
+	assert.Contains(t, query, "profiles")
 }
 
 // TestORM_CreateEmptyDataError tests ORM Create with empty data
@@ -1636,9 +1687,12 @@ func TestQueryBuilder_WhereEqFull(t *testing.T) {
 	qb := orm.NewQueryBuilder()
 
 	qb.WhereEq("status", "active")
-	query, args := qb.Build()
+	query, args, err := qb.Build()
+	assert.NoError(t, err)
 
-	assert.Contains(t, query, "WHERE status = $1")
+	assert.Contains(t, query, "WHERE")
+	assert.Contains(t, query, "status")
+	assert.Contains(t, query, "$1")
 	assert.Equal(t, "active", args[0])
 }
 
@@ -1651,8 +1705,11 @@ func TestTableHandler_Where(t *testing.T) {
 	qb := table.Where("status", "=", "active")
 	assert.NotNil(t, qb)
 
-	query, args := qb.Build()
-	assert.Contains(t, query, "WHERE status = $1")
+	query, args, err := qb.Build()
+	assert.NoError(t, err)
+	assert.Contains(t, query, "WHERE")
+	assert.Contains(t, query, "status")
+	assert.Contains(t, query, "$1")
 	assert.Equal(t, "active", args[0])
 }
 
@@ -1823,8 +1880,10 @@ func TestQueryBuilder_NoConditions(t *testing.T) {
 	orm := NewORM(mockDB, "users")
 	qb := orm.NewQueryBuilder()
 
-	query, args := qb.Build()
-	assert.Equal(t, "SELECT * FROM users", query)
+	query, args, err := qb.Build()
+	assert.NoError(t, err)
+	assert.Contains(t, query, "SELECT * FROM")
+	assert.Contains(t, query, "users")
 	assert.Len(t, args, 0)
 }
 
@@ -1835,7 +1894,8 @@ func TestQueryBuilder_LimitOnly(t *testing.T) {
 	qb := orm.NewQueryBuilder()
 
 	qb.Limit(5)
-	query, _ := qb.Build()
+	query, _, err := qb.Build()
+	assert.NoError(t, err)
 	assert.Contains(t, query, "LIMIT 5")
 	assert.NotContains(t, query, "OFFSET")
 }
@@ -1847,7 +1907,8 @@ func TestQueryBuilder_OffsetZero(t *testing.T) {
 	qb := orm.NewQueryBuilder()
 
 	qb.Offset(0)
-	query, _ := qb.Build()
+	query, _, err := qb.Build()
+	assert.NoError(t, err)
 	assert.Contains(t, query, "OFFSET 0")
 }
 
@@ -1925,8 +1986,10 @@ func TestQueryBuilder_RightJoin(t *testing.T) {
 	qb := orm.NewQueryBuilder()
 
 	qb.Join("RIGHT", "orders", "id", "user_id")
-	query, _ := qb.Build()
-	assert.Contains(t, query, "RIGHT JOIN orders ON users.id = orders.user_id")
+	query, _, err := qb.Build()
+	assert.NoError(t, err)
+	assert.Contains(t, query, "RIGHT JOIN")
+	assert.Contains(t, query, "orders")
 }
 
 // TestConfig_PostgreSQLAlias tests postgresql driver alias

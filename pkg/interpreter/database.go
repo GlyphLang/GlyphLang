@@ -5,8 +5,42 @@ import (
 	"reflect"
 )
 
+// allowedMethods is a whitelist of safe methods that can be called via reflection
+var allowedMethods = map[string]bool{
+	// Database/ORM methods
+	"Get":    true,
+	"Find":   true,
+	"Create": true,
+	"Update": true,
+	"Delete": true,
+	"Query":  true,
+	"First":  true,
+	"All":    true,
+	"Where":  true,
+	"Count":  true,
+	"Save":   true,
+	"Insert": true,
+	"Select": true,
+	"Limit":  true,
+	"Offset": true,
+	"Order":  true,
+	// Common safe methods
+	"String": true,
+	"Int":    true,
+	"Bool":   true,
+	"Float":  true,
+	"Len":    true,
+	"IsZero": true,
+}
+
 // CallMethod calls a method on an object using reflection
+// Only methods in the allowedMethods whitelist can be called for security
 func CallMethod(obj interface{}, methodName string, args ...interface{}) (interface{}, error) {
+	// Check if the method is in the whitelist
+	if !allowedMethods[methodName] {
+		return nil, fmt.Errorf("method %s is not allowed", methodName)
+	}
+
 	// Get the value and type of the object
 	objValue := reflect.ValueOf(obj)
 	objType := objValue.Type()

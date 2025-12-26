@@ -114,9 +114,38 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 		routeEnv.Define(key, value)
 	}
 
-	// Extract and add query parameters to environment
-	queryParams := extractQueryParams(request.Path)
+	// Extract and process query parameters with type conversion
+	rawQueryParams := ExtractRawQueryParams(request.Path)
+	queryParams, err := ProcessQueryParams(rawQueryParams, route.QueryParams)
+	if err != nil {
+		return &Response{
+			StatusCode: 400,
+			Body: map[string]interface{}{
+				"error": err.Error(),
+			},
+		}, err
+	}
+
+	// Apply defaults for declared params not in query string
+	for _, decl := range route.QueryParams {
+		if _, exists := queryParams[decl.Name]; !exists && decl.Default != nil {
+			defaultVal, evalErr := i.EvaluateExpression(decl.Default, routeEnv)
+			if evalErr != nil {
+				return nil, evalErr
+			}
+			queryParams[decl.Name] = defaultVal
+		}
+	}
+
+	// Bind query params as 'query' object
 	routeEnv.Define("query", queryParams)
+
+	// Also bind declared query params directly as variables
+	for _, decl := range route.QueryParams {
+		if val, exists := queryParams[decl.Name]; exists {
+			routeEnv.Define(decl.Name, val)
+		}
+	}
 
 	// Always add request body to environment (even if nil)
 	// This ensures 'input' variable is always available in routes

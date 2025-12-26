@@ -77,15 +77,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// parseQueryParams extracts query parameters from the request
-func parseQueryParams(r *http.Request) map[string]string {
-	params := make(map[string]string)
-	for key, values := range r.URL.Query() {
-		if len(values) > 0 {
-			params[key] = values[0] // Take first value
-		}
-	}
-	return params
+// parseQueryParams extracts all query parameter values from the request
+func parseQueryParams(r *http.Request) map[string][]string {
+	return r.URL.Query()
 }
 
 // parseJSONBody parses JSON request body into the context

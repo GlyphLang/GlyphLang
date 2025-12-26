@@ -1,0 +1,132 @@
+# Query Parameters Demo
+# Demonstrates the three query parameter features:
+# 1. Declarative syntax with ? prefix
+# 2. Type conversion (int, bool, float, str, arrays)
+# 3. Multi-value support for arrays
+
+# Type definitions for responses
+: SearchResult {
+  query: str
+  page: int
+  limit: int
+  total: int
+}
+
+: Product {
+  id: int
+  name: str
+  price: float
+  category: str
+  inStock: bool
+}
+
+: ProductList {
+  products: Product[]
+  filters: str[]
+  page: int
+  hasMore: bool
+}
+
+# Basic search endpoint with typed query params
+# GET /api/search?q=laptop&page=2&limit=25
+@ route /api/search [GET] -> SearchResult
+  ? q: str!              # Required - search query
+  ? page: int = 1        # Optional with default
+  ? limit: int = 10      # Optional with default
+
+  # Access via query.param or directly as variable (interpreter)
+  > {
+    query: query.q,
+    page: query.page,
+    limit: query.limit,
+    total: 100
+  }
+
+# Product listing with filters and sorting
+# GET /api/products?category=electronics&category=computers&minPrice=100&inStock=true
+@ route /api/products [GET] -> ProductList
+  ? category: str[]      # Multi-value: ?category=a&category=b
+  ? minPrice: float = 0
+  ? maxPrice: float = 10000
+  ? inStock: bool = false
+  ? page: int = 1
+
+  # category is an array of all values passed
+  # Example: ["electronics", "computers"]
+
+  > {
+    products: [],
+    filters: query.category,
+    page: query.page,
+    hasMore: true
+  }
+
+# User search with boolean flags
+# GET /api/users?active=true&verified=yes&role=admin&role=moderator
+@ route /api/users [GET]
+  ? active: bool = true    # Accepts: true/false, yes/no, 1/0, on/off
+  ? verified: bool = false
+  ? role: str[]            # Multi-value roles
+  ? sortBy: str = "name"
+  ? sortDesc: bool = false
+
+  > {
+    filters: {
+      active: query.active,
+      verified: query.verified,
+      roles: query.role,
+      sort: query.sortBy,
+      descending: query.sortDesc
+    },
+    users: []
+  }
+
+# Pagination example
+# GET /api/posts?page=3&perPage=20&tags=go&tags=tutorial
+@ route /api/posts [GET]
+  ? page: int = 1
+  ? perPage: int = 10
+  ? tags: str[]
+  ? authorId: int
+
+  > {
+    meta: {
+      page: query.page,
+      perPage: query.perPage
+    },
+    filters: {
+      tags: query.tags
+    },
+    posts: []
+  }
+
+# Combining query params with path params
+# GET /api/users/42/orders?status=pending&status=shipped&limit=5
+@ route /api/users/:userId/orders [GET]
+  ? status: str[]
+  ? limit: int = 10
+  ? includeItems: bool = true
+
+  > {
+    userId: userId,
+    statusFilter: query.status,
+    limit: query.limit,
+    includeItems: query.includeItems,
+    orders: []
+  }
+
+# Float values for geo/price queries
+# GET /api/locations?lat=40.7128&lng=-74.0060&radius=5.5
+@ route /api/locations [GET]
+  ? lat: float!
+  ? lng: float!
+  ? radius: float = 10.0
+
+  > {
+    center: {
+      latitude: query.lat,
+      longitude: query.lng
+    },
+    radiusKm: query.radius,
+    locations: []
+  }

@@ -510,6 +510,7 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 	var auth *interpreter.AuthConfig
 	var rateLimit *interpreter.RateLimit
 	var injections []interpreter.Injection
+	var queryParams []interpreter.QueryParamDecl
 	var body []interpreter.Statement
 
 	for !p.isAtEnd() {
@@ -586,12 +587,23 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 			p.skipNewlines()
 
 		case QUESTION:
-			// Validation statement: ? validate_fn(args)
-			stmt, err := p.parseStatement()
-			if err != nil {
-				return nil, err
+			// Check if this is query param declaration (? name: type) or validation (? validate_fn())
+			// Look ahead: after ?, if IDENT followed by COLON, it's a query param declaration
+			if p.peek(1).Type == IDENT && p.peek(2).Type == COLON {
+				p.advance() // consume ?
+				param, err := p.parseQueryParamDecl()
+				if err != nil {
+					return nil, err
+				}
+				queryParams = append(queryParams, param)
+			} else {
+				// Validation statement: ? validate_fn(args)
+				stmt, err := p.parseStatement()
+				if err != nil {
+					return nil, err
+				}
+				body = append(body, stmt)
 			}
-			body = append(body, stmt)
 			p.skipNewlines()
 
 		case DOLLAR, GREATER:
@@ -723,13 +735,59 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 endBody:
 
 	return &interpreter.Route{
-		Path:       path,
-		Method:     method,
-		ReturnType: returnType,
-		Auth:       auth,
-		RateLimit:  rateLimit,
-		Injections: injections,
-		Body:       body,
+		Path:        path,
+		Method:      method,
+		ReturnType:  returnType,
+		Auth:        auth,
+		RateLimit:   rateLimit,
+		Injections:  injections,
+		QueryParams: queryParams,
+		Body:        body,
+	}, nil
+}
+
+// parseQueryParamDecl parses a query parameter declaration: ? name: type [= default]
+// Examples:
+//   ? page: int = 1
+//   ? q: str!
+//   ? tags: str[]
+func (p *Parser) parseQueryParamDecl() (interpreter.QueryParamDecl, error) {
+	name, err := p.expectIdent()
+	if err != nil {
+		return interpreter.QueryParamDecl{}, err
+	}
+
+	if err := p.expect(COLON); err != nil {
+		return interpreter.QueryParamDecl{}, err
+	}
+
+	typeAnnotation, required, err := p.parseType()
+	if err != nil {
+		return interpreter.QueryParamDecl{}, err
+	}
+
+	// Check if it's an array type
+	isArray := false
+	if _, ok := typeAnnotation.(interpreter.ArrayType); ok {
+		isArray = true
+	}
+
+	// Check for default value
+	var defaultValue interpreter.Expr
+	if p.check(EQUALS) {
+		p.advance()
+		defaultValue, err = p.parseExpr()
+		if err != nil {
+			return interpreter.QueryParamDecl{}, err
+		}
+	}
+
+	return interpreter.QueryParamDecl{
+		Name:     name,
+		Type:     typeAnnotation,
+		Required: required,
+		Default:  defaultValue,
+		IsArray:  isArray,
 	}, nil
 }
 
@@ -1930,6 +1988,15 @@ func (p *Parser) isAtEnd() bool {
 
 func (p *Parser) check(t TokenType) bool {
 	return p.current().Type == t
+}
+
+// peek looks at a token at a given offset from current position (0 = current)
+func (p *Parser) peek(offset int) Token {
+	pos := p.position + offset
+	if pos >= len(p.tokens) {
+		return Token{Type: EOF}
+	}
+	return p.tokens[pos]
 }
 
 func (p *Parser) match(types ...TokenType) bool {

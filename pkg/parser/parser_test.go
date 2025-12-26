@@ -288,6 +288,91 @@ func TestParser_RouteWithMiddleware(t *testing.T) {
 	}
 }
 
+func TestParser_RouteWithQueryParams(t *testing.T) {
+	source := `@ route /api/search [GET]
+  ? q: str!
+  ? page: int = 1
+  ? limit: int = 20
+  ? tags: str[]
+  > {query: q, page: page}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		t.Fatalf("lexer error: %v", err)
+	}
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("parser error: %v", err)
+	}
+
+	if len(module.Items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(module.Items))
+	}
+
+	route, ok := module.Items[0].(*interpreter.Route)
+	if !ok {
+		t.Fatalf("expected Route, got %T", module.Items[0])
+	}
+
+	if len(route.QueryParams) != 4 {
+		t.Fatalf("expected 4 query params, got %d", len(route.QueryParams))
+	}
+
+	// Check first param: q: str!
+	q := route.QueryParams[0]
+	if q.Name != "q" {
+		t.Errorf("expected param name 'q', got '%s'", q.Name)
+	}
+	if _, ok := q.Type.(interpreter.StringType); !ok {
+		t.Errorf("expected StringType, got %T", q.Type)
+	}
+	if !q.Required {
+		t.Error("expected q to be required")
+	}
+	if q.Default != nil {
+		t.Error("expected q to have no default")
+	}
+
+	// Check second param: page: int = 1
+	page := route.QueryParams[1]
+	if page.Name != "page" {
+		t.Errorf("expected param name 'page', got '%s'", page.Name)
+	}
+	if _, ok := page.Type.(interpreter.IntType); !ok {
+		t.Errorf("expected IntType, got %T", page.Type)
+	}
+	if page.Required {
+		t.Error("expected page to not be required")
+	}
+	if page.Default == nil {
+		t.Error("expected page to have a default value")
+	}
+
+	// Check third param: limit: int = 20
+	limit := route.QueryParams[2]
+	if limit.Name != "limit" {
+		t.Errorf("expected param name 'limit', got '%s'", limit.Name)
+	}
+
+	// Check fourth param: tags: str[]
+	tags := route.QueryParams[3]
+	if tags.Name != "tags" {
+		t.Errorf("expected param name 'tags', got '%s'", tags.Name)
+	}
+	if !tags.IsArray {
+		t.Error("expected tags to be an array type")
+	}
+	arrayType, ok := tags.Type.(interpreter.ArrayType)
+	if !ok {
+		t.Errorf("expected ArrayType, got %T", tags.Type)
+	} else if _, ok := arrayType.ElementType.(interpreter.StringType); !ok {
+		t.Errorf("expected array element type StringType, got %T", arrayType.ElementType)
+	}
+}
+
 func TestParser_Assignment(t *testing.T) {
 	source := `@ route /test
   $ x = 42

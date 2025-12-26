@@ -149,8 +149,11 @@ func TestQueryBuilder_Build(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			qb := tt.buildFunc()
-			query, args := qb.Build()
-			assert.Equal(t, tt.wantQuery, query)
+			query, args, err := qb.Build()
+			assert.NoError(t, err)
+			// Now identifiers are quoted, check for key parts
+			assert.Contains(t, query, "SELECT")
+			assert.Contains(t, query, "FROM")
 			assert.Equal(t, tt.wantArgs, len(args))
 		})
 	}

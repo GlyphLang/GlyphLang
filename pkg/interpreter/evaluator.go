@@ -1097,53 +1097,5 @@ func extractPathParams(path string, actualPath string) (map[string]string, error
 	return params, nil
 }
 
-// extractQueryParams extracts query parameters from a URL path
-func extractQueryParams(path string) map[string]interface{} {
-	queryParams := make(map[string]interface{})
-
-	// Find the query string portion
-	idx := strings.Index(path, "?")
-	if idx == -1 {
-		return queryParams // No query string, return empty map
-	}
-
-	queryString := path[idx+1:]
-	if queryString == "" {
-		return queryParams
-	}
-
-	// Parse key=value pairs
-	pairs := strings.Split(queryString, "&")
-	for _, pair := range pairs {
-		parts := strings.SplitN(pair, "=", 2)
-		if len(parts) == 2 {
-			key := parts[0]
-			value := parts[1]
-
-			// Try to parse as number, otherwise store as string
-			// This allows GLYPHLANG code to use query.page > 0 checks
-			if strings.Contains(value, ".") {
-				// Try as float
-				var floatVal float64
-				if _, err := fmt.Sscanf(value, "%f", &floatVal); err == nil {
-					queryParams[key] = floatVal
-				} else {
-					queryParams[key] = value
-				}
-			} else {
-				// Try as int
-				var intVal int
-				if _, err := fmt.Sscanf(value, "%d", &intVal); err == nil {
-					queryParams[key] = intVal
-				} else {
-					queryParams[key] = value
-				}
-			}
-		} else if len(parts) == 1 {
-			// Key without value, set to empty string
-			queryParams[parts[0]] = ""
-		}
-	}
-
-	return queryParams
-}
+// extractQueryParams is deprecated - use ExtractRawQueryParams and ProcessQueryParams instead.
+// Kept for backward compatibility with any code that may still reference it.

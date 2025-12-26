@@ -4,10 +4,56 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	_ "github.com/lib/pq" // PostgreSQL driver
 )
+
+// identifierPattern matches valid SQL identifiers (alphanumeric and underscore only)
+var identifierPattern = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+
+// ErrInvalidIdentifier is returned when an identifier contains invalid characters
+var ErrInvalidIdentifier = fmt.Errorf("invalid identifier: must contain only alphanumeric characters and underscores, and start with a letter or underscore")
+
+// SanitizeIdentifier validates and quotes a SQL identifier (table/column name)
+// It returns an error if the identifier contains invalid characters
+func SanitizeIdentifier(name string) (string, error) {
+	if name == "" {
+		return "", fmt.Errorf("identifier cannot be empty")
+	}
+	if !identifierPattern.MatchString(name) {
+		return "", ErrInvalidIdentifier
+	}
+	// Return double-quoted identifier for PostgreSQL
+	return fmt.Sprintf(`"%s"`, name), nil
+}
+
+// SanitizeIdentifiers validates and quotes multiple SQL identifiers
+func SanitizeIdentifiers(names []string) ([]string, error) {
+	result := make([]string, len(names))
+	for i, name := range names {
+		sanitized, err := SanitizeIdentifier(name)
+		if err != nil {
+			return nil, fmt.Errorf("invalid identifier %q: %w", name, err)
+		}
+		result[i] = sanitized
+	}
+	return result, nil
+}
+
+// ValidateIdentifier validates an identifier without quoting it
+// Useful when you need to validate but the quoting is done elsewhere
+func ValidateIdentifier(name string) error {
+	if name == "" {
+		return fmt.Errorf("identifier cannot be empty")
+	}
+	if !identifierPattern.MatchString(name) {
+		return ErrInvalidIdentifier
+	}
+	return nil
+}
 
 // PostgresDB implements the Database interface for PostgreSQL
 type PostgresDB struct {
@@ -155,8 +201,20 @@ func (p *PostgresDB) BulkInsert(ctx context.Context, table string, columns []str
 		return nil
 	}
 
-	// Build the bulk insert query
-	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES ", table, columnsString(columns))
+	// Validate and sanitize table name
+	sanitizedTable, err := SanitizeIdentifier(table)
+	if err != nil {
+		return fmt.Errorf("invalid table name: %w", err)
+	}
+
+	// Validate and sanitize column names
+	sanitizedColumns, err := SanitizeIdentifiers(columns)
+	if err != nil {
+		return fmt.Errorf("invalid column name: %w", err)
+	}
+
+	// Build the bulk insert query with sanitized identifiers
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES ", sanitizedTable, strings.Join(sanitizedColumns, ", "))
 
 	var args []interface{}
 	placeholderIndex := 1
@@ -177,31 +235,105 @@ func (p *PostgresDB) BulkInsert(ctx context.Context, table string, columns []str
 		query += ")"
 	}
 
-	_, err := p.Exec(ctx, query, args...)
+	_, err = p.Exec(ctx, query, args...)
 	return err
+}
+
+// validColumnTypes contains the allowed PostgreSQL column types
+var validColumnTypes = map[string]bool{
+	// Numeric types
+	"SMALLINT": true, "INTEGER": true, "BIGINT": true, "INT": true,
+	"DECIMAL": true, "NUMERIC": true, "REAL": true, "DOUBLE PRECISION": true,
+	"SMALLSERIAL": true, "SERIAL": true, "BIGSERIAL": true,
+	// Character types
+	"CHAR": true, "VARCHAR": true, "TEXT": true,
+	// Binary types
+	"BYTEA": true,
+	// Date/Time types
+	"DATE": true, "TIME": true, "TIMESTAMP": true, "TIMESTAMPTZ": true,
+	"INTERVAL": true,
+	// Boolean
+	"BOOLEAN": true, "BOOL": true,
+	// UUID
+	"UUID": true,
+	// JSON
+	"JSON": true, "JSONB": true,
+	// Other common types
+	"MONEY": true, "INET": true, "CIDR": true, "MACADDR": true,
+}
+
+// columnTypePattern matches valid column type definitions
+var columnTypePattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_ (),.]*$`)
+
+// sanitizeColumnType validates a column type definition
+func sanitizeColumnType(colType string) (string, error) {
+	if colType == "" {
+		return "", fmt.Errorf("column type cannot be empty")
+	}
+
+	// Normalize to uppercase for checking
+	upperType := strings.ToUpper(strings.TrimSpace(colType))
+
+	// Check against pattern to prevent injection
+	if !columnTypePattern.MatchString(colType) {
+		return "", fmt.Errorf("invalid column type: %s", colType)
+	}
+
+	// Extract base type (before any parentheses or modifiers)
+	baseType := strings.Fields(upperType)[0]
+	// Remove parentheses if present (e.g., VARCHAR(255) -> VARCHAR)
+	if idx := strings.Index(baseType, "("); idx != -1 {
+		baseType = baseType[:idx]
+	}
+
+	// Check if the base type is allowed
+	if !validColumnTypes[baseType] {
+		return "", fmt.Errorf("unsupported column type: %s", baseType)
+	}
+
+	return colType, nil
 }
 
 // CreateTable creates a table with the given schema
 func (p *PostgresDB) CreateTable(ctx context.Context, table string, schema map[string]string) error {
-	columns := ""
-	first := true
-	for name, colType := range schema {
-		if !first {
-			columns += ", "
-		}
-		columns += fmt.Sprintf("%s %s", name, colType)
-		first = false
+	// Validate and sanitize table name
+	sanitizedTable, err := SanitizeIdentifier(table)
+	if err != nil {
+		return fmt.Errorf("invalid table name: %w", err)
 	}
 
-	query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s)", table, columns)
-	_, err := p.Exec(ctx, query)
+	var columnDefs []string
+	for name, colType := range schema {
+		// Validate and sanitize column name
+		sanitizedName, err := SanitizeIdentifier(name)
+		if err != nil {
+			return fmt.Errorf("invalid column name %q: %w", name, err)
+		}
+
+		// Validate column type
+		sanitizedType, err := sanitizeColumnType(colType)
+		if err != nil {
+			return fmt.Errorf("invalid column type for %q: %w", name, err)
+		}
+
+		columnDefs = append(columnDefs, fmt.Sprintf("%s %s", sanitizedName, sanitizedType))
+	}
+
+	query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s)", sanitizedTable, strings.Join(columnDefs, ", "))
+	_, err = p.Exec(ctx, query)
 	return err
 }
 
 // DropTable drops a table
 func (p *PostgresDB) DropTable(ctx context.Context, table string) error {
-	query := fmt.Sprintf("DROP TABLE IF EXISTS %s", table)
-	_, err := p.Exec(ctx, query)
+	// Validate and sanitize table name
+	sanitizedTable, err := SanitizeIdentifier(table)
+	if err != nil {
+		return fmt.Errorf("invalid table name: %w", err)
+	}
+
+	query := fmt.Sprintf("DROP TABLE IF EXISTS %s", sanitizedTable)
+	_, err = p.Exec(ctx, query)
 	return err
 }
 
@@ -221,9 +353,25 @@ func (p *PostgresDB) TableExists(ctx context.Context, table string) (bool, error
 
 // GetLastInsertID retrieves the last inserted ID (PostgreSQL specific)
 func (p *PostgresDB) GetLastInsertID(ctx context.Context, table string, idColumn string) (int64, error) {
+	// Validate identifiers to prevent SQL injection
+	sanitizedTable, err := SanitizeIdentifier(table)
+	if err != nil {
+		return 0, fmt.Errorf("invalid table name: %w", err)
+	}
+	sanitizedColumn, err := SanitizeIdentifier(idColumn)
+	if err != nil {
+		return 0, fmt.Errorf("invalid column name: %w", err)
+	}
+
+	// Use the sanitized identifiers in the query
+	// Note: pg_get_serial_sequence takes text arguments, so we need unquoted names for it
+	// We use the validated (but unquoted) names since we've confirmed they're safe
 	query := fmt.Sprintf("SELECT CURRVAL(pg_get_serial_sequence('%s', '%s'))", table, idColumn)
+	_ = sanitizedTable  // Used for validation only
+	_ = sanitizedColumn // Used for validation only
+
 	var id int64
-	err := p.QueryRow(ctx, query).Scan(&id)
+	err = p.QueryRow(ctx, query).Scan(&id)
 	return id, err
 }
 

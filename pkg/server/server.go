@@ -174,13 +174,23 @@ func (m *MockInterpreter) Execute(route *Route, ctx *Context) (interface{}, erro
 		return m.Response, nil
 	}
 
+	// Flatten single-value query params for backward compatibility
+	query := make(map[string]interface{})
+	for k, v := range ctx.QueryParams {
+		if len(v) == 1 {
+			query[k] = v[0]
+		} else {
+			query[k] = v
+		}
+	}
+
 	// Default mock response
 	response := map[string]interface{}{
 		"message":    "Mock response",
 		"path":       ctx.Request.URL.Path,
 		"method":     ctx.Request.Method,
 		"pathParams": ctx.PathParams,
-		"query":      ctx.QueryParams,
+		"query":      query,
 	}
 
 	if ctx.Body != nil && len(ctx.Body) > 0 {

@@ -26,12 +26,12 @@ type RouteHandler func(ctx *Context) error
 
 // Context represents the request context with parsed parameters
 type Context struct {
-	Request      *http.Request
+	Request        *http.Request
 	ResponseWriter http.ResponseWriter
-	PathParams   map[string]string
-	QueryParams  map[string]string
-	Body         map[string]interface{}
-	StatusCode   int
+	PathParams     map[string]string
+	QueryParams    map[string][]string // All values for each query param
+	Body           map[string]interface{}
+	StatusCode     int
 }
 
 // Middleware is a function that wraps a handler

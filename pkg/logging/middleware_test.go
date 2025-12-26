@@ -40,7 +40,7 @@ func TestStructuredLoggingMiddleware(t *testing.T) {
 		Request:        req,
 		ResponseWriter: w,
 		PathParams:     make(map[string]string),
-		QueryParams:    make(map[string]string),
+		QueryParams:    make(map[string][]string),
 		StatusCode:     0,
 	}
 
@@ -125,7 +125,7 @@ func TestStructuredLoggingMiddlewareWithExistingRequestID(t *testing.T) {
 		Request:        req,
 		ResponseWriter: w,
 		PathParams:     make(map[string]string),
-		QueryParams:    make(map[string]string),
+		QueryParams:    make(map[string][]string),
 		StatusCode:     0,
 	}
 
@@ -176,7 +176,7 @@ func TestStructuredLoggingMiddlewareError(t *testing.T) {
 		Request:        req,
 		ResponseWriter: w,
 		PathParams:     make(map[string]string),
-		QueryParams:    make(map[string]string),
+		QueryParams:    make(map[string][]string),
 		StatusCode:     0,
 	}
 
@@ -260,7 +260,7 @@ func TestStructuredLoggingMiddlewareStatusCodes(t *testing.T) {
 				Request:        req,
 				ResponseWriter: w,
 				PathParams:     make(map[string]string),
-				QueryParams:    make(map[string]string),
+				QueryParams:    make(map[string][]string),
 				StatusCode:     0,
 			}
 
@@ -314,7 +314,7 @@ func TestStructuredLoggingMiddlewareWithBodyLogging(t *testing.T) {
 		Request:        req,
 		ResponseWriter: w,
 		PathParams:     make(map[string]string),
-		QueryParams:    make(map[string]string),
+		QueryParams:    make(map[string][]string),
 		StatusCode:     0,
 	}
 
@@ -373,7 +373,7 @@ func TestStructuredRecoveryMiddleware(t *testing.T) {
 		Request:        req,
 		ResponseWriter: w,
 		PathParams:     make(map[string]string),
-		QueryParams:    make(map[string]string),
+		QueryParams:    make(map[string][]string),
 		StatusCode:     0,
 	}
 
@@ -486,7 +486,7 @@ func BenchmarkStructuredLoggingMiddleware(b *testing.B) {
 			Request:        req,
 			ResponseWriter: w,
 			PathParams:     make(map[string]string),
-			QueryParams:    make(map[string]string),
+			QueryParams:    make(map[string][]string),
 			StatusCode:     0,
 		}
 		handler(ctx)

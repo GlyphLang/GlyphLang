@@ -20,13 +20,14 @@ func (TypeDef) isItem() {}
 
 // Route represents an HTTP route
 type Route struct {
-	Path       string
-	Method     HttpMethod
-	ReturnType Type
-	Auth       *AuthConfig
-	RateLimit  *RateLimit
-	Injections []Injection
-	Body       []Statement
+	Path        string
+	Method      HttpMethod
+	ReturnType  Type
+	Auth        *AuthConfig
+	RateLimit   *RateLimit
+	Injections  []Injection
+	QueryParams []QueryParamDecl
+	Body        []Statement
 }
 
 func (Route) isItem() {}
@@ -133,6 +134,15 @@ type RateLimit struct {
 type Injection struct {
 	Name string
 	Type Type
+}
+
+// QueryParamDecl represents a declared query parameter
+type QueryParamDecl struct {
+	Name     string
+	Type     Type
+	Required bool
+	Default  Expr
+	IsArray  bool
 }
 
 // Statement represents a statement in the AST

@@ -123,14 +123,54 @@ func (qb *QueryBuilder) LeftJoin(table string, onColumn string, withColumn strin
 }
 
 // Build constructs the SQL query and arguments
-func (qb *QueryBuilder) Build() (string, []interface{}) {
+// Returns an error if any identifier is invalid
+func (qb *QueryBuilder) Build() (string, []interface{}, error) {
+	// Sanitize table name
+	sanitizedTable, err := SanitizeIdentifier(qb.orm.table)
+	if err != nil {
+		return "", nil, fmt.Errorf("invalid table name: %w", err)
+	}
+
+	// Sanitize select columns
+	sanitizedSelectCols := make([]string, len(qb.selectCols))
+	for i, col := range qb.selectCols {
+		if col == "*" {
+			sanitizedSelectCols[i] = col
+		} else {
+			sanitized, err := SanitizeIdentifier(col)
+			if err != nil {
+				return "", nil, fmt.Errorf("invalid select column %q: %w", col, err)
+			}
+			sanitizedSelectCols[i] = sanitized
+		}
+	}
+
 	// Build SELECT clause
-	query := fmt.Sprintf("SELECT %s FROM %s", strings.Join(qb.selectCols, ", "), qb.orm.table)
+	query := fmt.Sprintf("SELECT %s FROM %s", strings.Join(sanitizedSelectCols, ", "), sanitizedTable)
 
 	// Build JOIN clauses
 	for _, join := range qb.joins {
+		// Validate join type
+		joinType := strings.ToUpper(join.Type)
+		if joinType != "INNER" && joinType != "LEFT" && joinType != "RIGHT" && joinType != "FULL" {
+			return "", nil, fmt.Errorf("invalid join type: %s", join.Type)
+		}
+
+		sanitizedJoinTable, err := SanitizeIdentifier(join.Table)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid join table %q: %w", join.Table, err)
+		}
+		sanitizedOnColumn, err := SanitizeIdentifier(join.OnColumn)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid join on column %q: %w", join.OnColumn, err)
+		}
+		sanitizedWithColumn, err := SanitizeIdentifier(join.WithColumn)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid join with column %q: %w", join.WithColumn, err)
+		}
+
 		query += fmt.Sprintf(" %s JOIN %s ON %s.%s = %s.%s",
-			join.Type, join.Table, qb.orm.table, join.OnColumn, join.Table, join.WithColumn)
+			joinType, sanitizedJoinTable, sanitizedTable, sanitizedOnColumn, sanitizedJoinTable, sanitizedWithColumn)
 	}
 
 	// Build WHERE clause
@@ -141,14 +181,45 @@ func (qb *QueryBuilder) Build() (string, []interface{}) {
 			if i > 0 {
 				query += " AND "
 			}
-			query += fmt.Sprintf("%s %s $%d", cond.Column, cond.Operator, i+1)
+			sanitizedColumn, err := SanitizeIdentifier(cond.Column)
+			if err != nil {
+				return "", nil, fmt.Errorf("invalid where column %q: %w", cond.Column, err)
+			}
+			// Validate operator (only allow safe operators)
+			operator := strings.ToUpper(strings.TrimSpace(cond.Operator))
+			validOperators := map[string]bool{
+				"=": true, "!=": true, "<>": true, "<": true, ">": true,
+				"<=": true, ">=": true, "LIKE": true, "ILIKE": true,
+				"IN": true, "NOT IN": true, "IS": true, "IS NOT": true,
+			}
+			if !validOperators[operator] {
+				return "", nil, fmt.Errorf("invalid operator: %s", cond.Operator)
+			}
+			query += fmt.Sprintf("%s %s $%d", sanitizedColumn, operator, i+1)
 			args = append(args, cond.Value)
 		}
 	}
 
 	// Build ORDER BY clause
 	if qb.orderBy != "" {
-		query += fmt.Sprintf(" ORDER BY %s", qb.orderBy)
+		// Parse and sanitize orderBy (format: "column direction")
+		parts := strings.Fields(qb.orderBy)
+		if len(parts) >= 1 {
+			sanitizedOrderCol, err := SanitizeIdentifier(parts[0])
+			if err != nil {
+				return "", nil, fmt.Errorf("invalid order by column: %w", err)
+			}
+			direction := "ASC"
+			if len(parts) >= 2 {
+				dir := strings.ToUpper(parts[1])
+				if dir == "ASC" || dir == "DESC" {
+					direction = dir
+				} else {
+					return "", nil, fmt.Errorf("invalid order direction: %s", parts[1])
+				}
+			}
+			query += fmt.Sprintf(" ORDER BY %s %s", sanitizedOrderCol, direction)
+		}
 	}
 
 	// Build LIMIT clause
@@ -161,12 +232,15 @@ func (qb *QueryBuilder) Build() (string, []interface{}) {
 		query += fmt.Sprintf(" OFFSET %d", qb.offset)
 	}
 
-	return query, args
+	return query, args, nil
 }
 
 // Get executes the query and returns results
 func (qb *QueryBuilder) Get(ctx context.Context) ([]map[string]interface{}, error) {
-	query, args := qb.Build()
+	query, args, err := qb.Build()
+	if err != nil {
+		return nil, err
+	}
 	return qb.orm.Query(ctx, query, args...)
 }
 
@@ -210,21 +284,34 @@ func (o *ORM) Create(ctx context.Context, data map[string]interface{}) (map[stri
 		return nil, fmt.Errorf("no data to insert")
 	}
 
+	// Sanitize table name
+	sanitizedTable, err := SanitizeIdentifier(o.table)
+	if err != nil {
+		return nil, fmt.Errorf("invalid table name: %w", err)
+	}
+
 	columns := make([]string, 0, len(data))
+	sanitizedColumns := make([]string, 0, len(data))
 	values := make([]interface{}, 0, len(data))
 	placeholders := make([]string, 0, len(data))
 
 	i := 1
 	for col, val := range data {
+		// Sanitize column name
+		sanitizedCol, err := SanitizeIdentifier(col)
+		if err != nil {
+			return nil, fmt.Errorf("invalid column name %q: %w", col, err)
+		}
 		columns = append(columns, col)
+		sanitizedColumns = append(sanitizedColumns, sanitizedCol)
 		values = append(values, val)
 		placeholders = append(placeholders, fmt.Sprintf("$%d", i))
 		i++
 	}
 
 	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s) RETURNING *",
-		o.table,
-		strings.Join(columns, ", "),
+		sanitizedTable,
+		strings.Join(sanitizedColumns, ", "),
 		strings.Join(placeholders, ", "))
 
 	row := o.db.QueryRow(ctx, query, values...)
@@ -244,30 +331,39 @@ func (o *ORM) Update(ctx context.Context, id interface{}, data map[string]interf
 		return nil, fmt.Errorf("no data to update")
 	}
 
+	// Sanitize table name
+	sanitizedTable, err := SanitizeIdentifier(o.table)
+	if err != nil {
+		return nil, fmt.Errorf("invalid table name: %w", err)
+	}
+
 	setClauses := make([]string, 0, len(data))
 	values := make([]interface{}, 0, len(data)+1)
+	columns := make([]string, 0, len(data))
 
 	i := 1
 	for col, val := range data {
-		setClauses = append(setClauses, fmt.Sprintf("%s = $%d", col, i))
+		// Sanitize column name
+		sanitizedCol, err := SanitizeIdentifier(col)
+		if err != nil {
+			return nil, fmt.Errorf("invalid column name %q: %w", col, err)
+		}
+		setClauses = append(setClauses, fmt.Sprintf("%s = $%d", sanitizedCol, i))
 		values = append(values, val)
+		columns = append(columns, col)
 		i++
 	}
 
 	values = append(values, id)
 
-	query := fmt.Sprintf("UPDATE %s SET %s WHERE id = $%d RETURNING *",
-		o.table,
+	query := fmt.Sprintf("UPDATE %s SET %s WHERE \"id\" = $%d RETURNING *",
+		sanitizedTable,
 		strings.Join(setClauses, ", "),
 		i)
 
 	row := o.db.QueryRow(ctx, query, values...)
 
-	// Get column names from data keys
-	columns := make([]string, 0, len(data))
-	for col := range data {
-		columns = append(columns, col)
-	}
+	// Add id to columns for scanning
 	columns = append(columns, "id")
 
 	result, err := scanRow(row, columns)
@@ -280,7 +376,13 @@ func (o *ORM) Update(ctx context.Context, id interface{}, data map[string]interf
 
 // Delete deletes a record by ID
 func (o *ORM) Delete(ctx context.Context, id interface{}) error {
-	query := fmt.Sprintf("DELETE FROM %s WHERE id = $1", o.table)
+	// Sanitize table name
+	sanitizedTable, err := SanitizeIdentifier(o.table)
+	if err != nil {
+		return fmt.Errorf("invalid table name: %w", err)
+	}
+
+	query := fmt.Sprintf("DELETE FROM %s WHERE \"id\" = $1", sanitizedTable)
 	result, err := o.db.Exec(ctx, query, id)
 	if err != nil {
 		return err
@@ -300,7 +402,13 @@ func (o *ORM) Delete(ctx context.Context, id interface{}) error {
 
 // Count counts records matching the WHERE conditions
 func (o *ORM) Count(ctx context.Context, whereConds ...WhereCondition) (int64, error) {
-	query := fmt.Sprintf("SELECT COUNT(*) FROM %s", o.table)
+	// Sanitize table name
+	sanitizedTable, err := SanitizeIdentifier(o.table)
+	if err != nil {
+		return 0, fmt.Errorf("invalid table name: %w", err)
+	}
+
+	query := fmt.Sprintf("SELECT COUNT(*) FROM %s", sanitizedTable)
 
 	var args []interface{}
 	if len(whereConds) > 0 {
@@ -309,13 +417,28 @@ func (o *ORM) Count(ctx context.Context, whereConds ...WhereCondition) (int64, e
 			if i > 0 {
 				query += " AND "
 			}
-			query += fmt.Sprintf("%s %s $%d", cond.Column, cond.Operator, i+1)
+			// Sanitize column name
+			sanitizedColumn, err := SanitizeIdentifier(cond.Column)
+			if err != nil {
+				return 0, fmt.Errorf("invalid where column %q: %w", cond.Column, err)
+			}
+			// Validate operator (only allow safe operators)
+			operator := strings.ToUpper(strings.TrimSpace(cond.Operator))
+			validOperators := map[string]bool{
+				"=": true, "!=": true, "<>": true, "<": true, ">": true,
+				"<=": true, ">=": true, "LIKE": true, "ILIKE": true,
+				"IN": true, "NOT IN": true, "IS": true, "IS NOT": true,
+			}
+			if !validOperators[operator] {
+				return 0, fmt.Errorf("invalid operator: %s", cond.Operator)
+			}
+			query += fmt.Sprintf("%s %s $%d", sanitizedColumn, operator, i+1)
 			args = append(args, cond.Value)
 		}
 	}
 
 	var count int64
-	err := o.db.QueryRow(ctx, query, args...).Scan(&count)
+	err = o.db.QueryRow(ctx, query, args...).Scan(&count)
 	return count, err
 }
 

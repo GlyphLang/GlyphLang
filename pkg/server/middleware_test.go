@@ -66,7 +66,7 @@ func TestRecoveryMiddleware_PanicRecovery(t *testing.T) {
 			err := wrappedHandler(ctx)
 
 			if tt.expectError {
-				// Should have error from SendHTTPError
+				// Should have error from recovery
 				if err == nil {
 					t.Error("Expected error from panic recovery, got nil")
 				}
@@ -76,17 +76,23 @@ func TestRecoveryMiddleware_PanicRecovery(t *testing.T) {
 					t.Errorf("Expected status 500, got %d", w.Code)
 				}
 
-				// Response should be JSON error
-				var resp ErrorResponse
+				// Response should be JSON error (generic for security)
+				var resp map[string]interface{}
 				if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 					t.Fatalf("Failed to decode error response: %v", err)
 				}
 
-				if resp.Status != http.StatusInternalServerError {
-					t.Errorf("Response status = %d, want %d", resp.Status, http.StatusInternalServerError)
+				// Error should be boolean true
+				if resp["error"] != true {
+					t.Errorf("Response error = %v, want true", resp["error"])
 				}
-				if resp.Error != "InternalError" {
-					t.Errorf("Response error type = %s, want InternalError", resp.Error)
+				// Message should be generic (security: don't expose panic details)
+				if resp["message"] != "Internal Server Error" {
+					t.Errorf("Response message = %v, want Internal Server Error", resp["message"])
+				}
+				// Code should be 500
+				if resp["code"] != float64(500) {
+					t.Errorf("Response code = %v, want 500", resp["code"])
 				}
 			} else {
 				// No panic, should succeed
@@ -212,6 +218,7 @@ func TestRecoveryMiddleware_ChainedMiddlewares(t *testing.T) {
 }
 
 // TestRecoveryMiddleware_RequestContext tests that request context is logged
+// and that panic details are NOT exposed to clients (security fix)
 func TestRecoveryMiddleware_RequestContext(t *testing.T) {
 	// Create a handler that panics
 	panicHandler := func(ctx *Context) error {
@@ -243,15 +250,25 @@ func TestRecoveryMiddleware_RequestContext(t *testing.T) {
 		t.Error("Expected error from panic recovery, got nil")
 	}
 
-	// Verify error response
-	var resp ErrorResponse
+	// Verify error response returns generic message (security: don't expose panic details)
+	var resp map[string]interface{}
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("Failed to decode error response: %v", err)
 	}
 
-	// Details should mention panic recovery
-	if !strings.Contains(resp.Details, "panic recovered") {
-		t.Errorf("Expected details to mention panic recovery, got: %s", resp.Details)
+	// Error should be a boolean true
+	if resp["error"] != true {
+		t.Errorf("Expected error=true, got: %v", resp["error"])
+	}
+
+	// Message should be generic "Internal Server Error" (not expose panic details)
+	if resp["message"] != "Internal Server Error" {
+		t.Errorf("Expected generic error message, got: %v", resp["message"])
+	}
+
+	// Code should be 500
+	if resp["code"] != float64(500) {
+		t.Errorf("Expected code=500, got: %v", resp["code"])
 	}
 }
 
@@ -662,4 +679,272 @@ func TestTimeoutMiddleware(t *testing.T) {
 			t.Errorf("Expected status 504, got response %d / ctx %d", w.Code, ctx.StatusCode)
 		}
 	})
+}
+
+// TestSecurityHeadersMiddleware tests that security headers are added
+func TestSecurityHeadersMiddleware(t *testing.T) {
+	middleware := SecurityHeadersMiddleware()
+	handler := func(ctx *Context) error {
+		return nil
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	w := httptest.NewRecorder()
+	ctx := &Context{
+		Request:        req,
+		ResponseWriter: w,
+		StatusCode:     http.StatusOK,
+	}
+
+	wrappedHandler := middleware(handler)
+	wrappedHandler(ctx)
+
+	// Verify all security headers are set
+	tests := []struct {
+		header string
+		value  string
+	}{
+		{"X-Content-Type-Options", "nosniff"},
+		{"X-Frame-Options", "DENY"},
+		{"X-XSS-Protection", "1; mode=block"},
+		{"Referrer-Policy", "strict-origin-when-cross-origin"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.header, func(t *testing.T) {
+			got := w.Header().Get(tt.header)
+			if got != tt.value {
+				t.Errorf("Header %s = %q, want %q", tt.header, got, tt.value)
+			}
+		})
+	}
+}
+
+// TestCORSMiddleware_WildcardSecurity tests CORS wildcard security
+func TestCORSMiddleware_WildcardSecurity(t *testing.T) {
+	t.Run("wildcard sets literal asterisk", func(t *testing.T) {
+		middleware := CORSMiddleware([]string{"*"})
+		handler := func(ctx *Context) error {
+			return nil
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.Header.Set("Origin", "http://attacker.com")
+		w := httptest.NewRecorder()
+		ctx := &Context{
+			Request:        req,
+			ResponseWriter: w,
+			StatusCode:     http.StatusOK,
+		}
+
+		wrappedHandler := middleware(handler)
+		wrappedHandler(ctx)
+
+		// Should set literal "*" not reflect the origin
+		corsOrigin := w.Header().Get("Access-Control-Allow-Origin")
+		if corsOrigin != "*" {
+			t.Errorf("Expected literal '*', got %q", corsOrigin)
+		}
+
+		// Credentials should be explicitly disabled when using wildcard
+		corsCredentials := w.Header().Get("Access-Control-Allow-Credentials")
+		if corsCredentials != "false" {
+			t.Errorf("Expected credentials to be 'false' with wildcard, got %q", corsCredentials)
+		}
+	})
+
+	t.Run("specific origin reflects origin", func(t *testing.T) {
+		middleware := CORSMiddleware([]string{"http://trusted.com"})
+		handler := func(ctx *Context) error {
+			return nil
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.Header.Set("Origin", "http://trusted.com")
+		w := httptest.NewRecorder()
+		ctx := &Context{
+			Request:        req,
+			ResponseWriter: w,
+			StatusCode:     http.StatusOK,
+		}
+
+		wrappedHandler := middleware(handler)
+		wrappedHandler(ctx)
+
+		corsOrigin := w.Header().Get("Access-Control-Allow-Origin")
+		if corsOrigin != "http://trusted.com" {
+			t.Errorf("Expected reflected origin, got %q", corsOrigin)
+		}
+	})
+
+	t.Run("disallowed origin gets no headers", func(t *testing.T) {
+		middleware := CORSMiddleware([]string{"http://trusted.com"})
+		handler := func(ctx *Context) error {
+			return nil
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.Header.Set("Origin", "http://untrusted.com")
+		w := httptest.NewRecorder()
+		ctx := &Context{
+			Request:        req,
+			ResponseWriter: w,
+			StatusCode:     http.StatusOK,
+		}
+
+		wrappedHandler := middleware(handler)
+		wrappedHandler(ctx)
+
+		corsOrigin := w.Header().Get("Access-Control-Allow-Origin")
+		if corsOrigin != "" {
+			t.Errorf("Expected no CORS header for disallowed origin, got %q", corsOrigin)
+		}
+	})
+}
+
+// TestGetClientIP tests IP extraction from requests
+func TestGetClientIP(t *testing.T) {
+	tests := []struct {
+		name           string
+		remoteAddr     string
+		xForwardedFor  string
+		xRealIP        string
+		expectedIP     string
+	}{
+		{
+			name:       "use RemoteAddr when no proxy headers",
+			remoteAddr: "192.168.1.100:12345",
+			expectedIP: "192.168.1.100:12345",
+		},
+		{
+			name:          "prefer X-Forwarded-For over RemoteAddr",
+			remoteAddr:    "10.0.0.1:12345",
+			xForwardedFor: "203.0.113.195",
+			expectedIP:    "203.0.113.195",
+		},
+		{
+			name:          "X-Forwarded-For with multiple IPs uses first",
+			remoteAddr:    "10.0.0.1:12345",
+			xForwardedFor: "203.0.113.195, 70.41.3.18, 150.172.238.178",
+			expectedIP:    "203.0.113.195",
+		},
+		{
+			name:       "prefer X-Real-IP over RemoteAddr",
+			remoteAddr: "10.0.0.1:12345",
+			xRealIP:    "203.0.113.100",
+			expectedIP: "203.0.113.100",
+		},
+		{
+			name:          "prefer X-Forwarded-For over X-Real-IP",
+			remoteAddr:    "10.0.0.1:12345",
+			xForwardedFor: "203.0.113.195",
+			xRealIP:       "203.0.113.100",
+			expectedIP:    "203.0.113.195",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			req.RemoteAddr = tt.remoteAddr
+			if tt.xForwardedFor != "" {
+				req.Header.Set("X-Forwarded-For", tt.xForwardedFor)
+			}
+			if tt.xRealIP != "" {
+				req.Header.Set("X-Real-IP", tt.xRealIP)
+			}
+
+			ip := getClientIP(req)
+			if ip != tt.expectedIP {
+				t.Errorf("getClientIP() = %q, want %q", ip, tt.expectedIP)
+			}
+		})
+	}
+}
+
+// TestAuthRateLimiting tests auth rate limiting with lockout
+func TestAuthRateLimiting(t *testing.T) {
+	config := AuthRateLimitConfig{
+		MaxFailures:     3,
+		LockoutDuration: 100 * time.Millisecond,
+		MaxLockout:      500 * time.Millisecond,
+		ResetAfter:      1 * time.Second,
+	}
+
+	validTokens := map[string]bool{
+		"valid-token": true,
+	}
+
+	middleware := BasicAuthMiddlewareWithConfig(validTokens, config)
+	handler := func(ctx *Context) error {
+		ctx.StatusCode = 200
+		return nil
+	}
+
+	makeRequest := func(token string) int {
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.RemoteAddr = "192.168.1.100:12345"
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		w := httptest.NewRecorder()
+		ctx := &Context{
+			Request:        req,
+			ResponseWriter: w,
+			StatusCode:     http.StatusOK,
+		}
+		wrappedHandler := middleware(handler)
+		wrappedHandler(ctx)
+		if w.Code != 0 && w.Code != 200 {
+			return w.Code
+		}
+		return ctx.StatusCode
+	}
+
+	// First 2 failures should just return 401
+	for i := 0; i < 2; i++ {
+		status := makeRequest("invalid-token")
+		if status != 401 {
+			t.Errorf("Failure %d: expected 401, got %d", i+1, status)
+		}
+	}
+
+	// Third failure should trigger lockout
+	status := makeRequest("invalid-token")
+	if status != 401 {
+		t.Errorf("Third failure: expected 401, got %d", status)
+	}
+
+	// Fourth attempt should be rate limited (429)
+	status = makeRequest("valid-token")
+	if status != 429 {
+		t.Errorf("After lockout: expected 429, got %d", status)
+	}
+
+	// Wait for lockout to expire
+	time.Sleep(150 * time.Millisecond)
+
+	// Should work again with valid token
+	status = makeRequest("valid-token")
+	if status != 200 {
+		t.Errorf("After lockout expires: expected 200, got %d", status)
+	}
+}
+
+// TestDefaultAuthRateLimitConfig tests default config values
+func TestDefaultAuthRateLimitConfig(t *testing.T) {
+	config := DefaultAuthRateLimitConfig()
+
+	if config.MaxFailures != 5 {
+		t.Errorf("MaxFailures = %d, want 5", config.MaxFailures)
+	}
+	if config.LockoutDuration != 1*time.Minute {
+		t.Errorf("LockoutDuration = %v, want 1 minute", config.LockoutDuration)
+	}
+	if config.MaxLockout != 15*time.Minute {
+		t.Errorf("MaxLockout = %v, want 15 minutes", config.MaxLockout)
+	}
+	if config.ResetAfter != 15*time.Minute {
+		t.Errorf("ResetAfter = %v, want 15 minutes", config.ResetAfter)
+	}
 }

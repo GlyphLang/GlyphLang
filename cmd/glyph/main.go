@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -205,8 +207,8 @@ func runCompile(cmd *cobra.Command, args []string) error {
 		output = changeExtension(filePath, ".glybc")
 	}
 
-	// Write bytecode to file
-	if err := os.WriteFile(output, bytecode, 0644); err != nil {
+	// Write bytecode to file with restricted permissions (owner read/write only)
+	if err := os.WriteFile(output, bytecode, 0600); err != nil {
 		return fmt.Errorf("failed to write output: %w", err)
 	}
 
@@ -260,9 +262,9 @@ func runDecompile(cmd *cobra.Command, args []string) error {
 		output = changeExtension(filePath, ".glyph")
 	}
 
-	// Write decompiled source to file
+	// Write decompiled source to file with restricted permissions
 	source := result.Format()
-	if err := os.WriteFile(output, []byte(source), 0644); err != nil {
+	if err := os.WriteFile(output, []byte(source), 0600); err != nil {
 		return fmt.Errorf("failed to write output: %w", err)
 	}
 
@@ -391,16 +393,32 @@ func runDev(cmd *cobra.Command, args []string) error {
 }
 
 // openURL opens the specified URL in the default browser
-func openURL(url string) error {
+func openURL(urlStr string) error {
+	// Validate URL to prevent command injection
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+
+	// Only allow http and https schemes
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return fmt.Errorf("only http and https URLs are allowed, got: %s", parsedURL.Scheme)
+	}
+
+	// Ensure the URL has a valid host
+	if parsedURL.Host == "" {
+		return fmt.Errorf("URL must have a valid host")
+	}
+
 	var cmd *exec.Cmd
 
 	switch runtime.GOOS {
 	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", urlStr)
 	case "darwin":
-		cmd = exec.Command("open", url)
+		cmd = exec.Command("open", urlStr)
 	default: // Linux and other Unix-like
-		cmd = exec.Command("xdg-open", url)
+		cmd = exec.Command("xdg-open", urlStr)
 	}
 
 	return cmd.Start()
@@ -760,7 +778,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	mainFile := filepath.Join(name, "main.abc")
-	if err := os.WriteFile(mainFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(mainFile, []byte(content), 0600); err != nil {
 		return fmt.Errorf("failed to write main.abc: %w", err)
 	}
 
@@ -1127,8 +1145,12 @@ func executeRoute(route *interpreter.Route, ctx *server.Context, interp *interpr
 			(len(contentType) >= 16 && contentType[:16] == "application/json")
 
 		if shouldParseJSON && ctx.Request.Body != nil {
+			// Limit request body size to 10MB to prevent DoS attacks
+			const maxBodySize = 10 * 1024 * 1024
+			limitedReader := io.LimitReader(ctx.Request.Body, maxBodySize)
+
 			var bodyMap map[string]interface{}
-			decoder := json.NewDecoder(ctx.Request.Body)
+			decoder := json.NewDecoder(limitedReader)
 			if err := decoder.Decode(&bodyMap); err != nil {
 				// If parsing fails, treat as empty body (could be empty or malformed)
 				// Don't return error - just set to nil

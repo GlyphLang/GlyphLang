@@ -339,7 +339,7 @@ func TestMetricsMiddleware(t *testing.T) {
 				Request:        req,
 				ResponseWriter: w,
 				PathParams:     make(map[string]string),
-				QueryParams:    make(map[string]string),
+				QueryParams:    make(map[string][]string),
 				Body:           make(map[string]interface{}),
 			}
 
@@ -481,7 +481,7 @@ func BenchmarkMetricsMiddleware(b *testing.B) {
 		Request:        req,
 		ResponseWriter: w,
 		PathParams:     make(map[string]string),
-		QueryParams:    make(map[string]string),
+		QueryParams:    make(map[string][]string),
 		Body:           make(map[string]interface{}),
 	}
 

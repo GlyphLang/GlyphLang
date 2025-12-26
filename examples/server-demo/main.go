@@ -76,9 +76,9 @@ func main() {
 				{"id": 2, "name": "Jane Smith", "email": "jane@example.com"},
 			}
 
-			// Support query params
-			if page := ctx.QueryParams["page"]; page != "" {
-				log.Printf("Filtering by page: %s", page)
+			// Support query params (QueryParams is now map[string][]string)
+			if pages := ctx.QueryParams["page"]; len(pages) > 0 {
+				log.Printf("Filtering by page: %s", pages[0])
 			}
 
 			return server.SendJSON(ctx, 200, users)
