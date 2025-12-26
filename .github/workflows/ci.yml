@@ -98,7 +98,7 @@ jobs:
         run: go build -v -o glyph ./cmd/glyph
 
       - name: Verify binary runs
-        run: ./glyph version
+        run: ./glyph --help
 
   build-all-platforms:
     name: Build (${{ matrix.os }}-${{ matrix.arch }})
