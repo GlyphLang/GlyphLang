@@ -1,207 +1,263 @@
-# GlyphLang - Glyph Compiler
+# GlyphLang
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)]()
-[![Tests](https://img.shields.io/badge/tests-1696%20passing-success)]()
-[![Performance](https://img.shields.io/badge/compilation-867ns-blue)]()
-[![AI Tokens](https://img.shields.io/badge/tokens-45%25%20fewer%20than%20Python-purple)]()
+[![Tests](https://img.shields.io/badge/tests-637%2B%20passing-success)]()
+[![Coverage](https://img.shields.io/badge/coverage-80%25%2B-green)]()
+[![Version](https://img.shields.io/badge/version-v1.0.0-blue)](https://github.com/GlyphLang/GlyphLang/releases/tag/v1.0.0)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
-[![CLA Assistant](https://cla-assistant.io/readme/badge/glyph-lang/glyph)](https://cla-assistant.io/glyph-lang/glyph)
 
-**GlyphLang** is an AI-first backend language designed for LLM code generation. Symbol-based syntax uses **45% fewer tokens than Python** and **63% fewer than Java**, reducing AI costs by 56%. Sub-microsecond compilation, built-in security, production-grade performance.
+**GlyphLang** is a domain-specific language for building type-safe REST APIs with bytecode compilation and JIT optimization. Symbol-based syntax reduces token usage by 45% compared to Python, making it ideal for AI code generation.
 
 ```glyph
-@ route /hello/:name
+@ route /hello/:name [GET]
   $ greeting = "Hello, " + name + "!"
   > {message: greeting}
 ```
 
-## ⚡ Key Features
+## Features
 
-- **AI-First Design** - Symbol syntax (@, $, >, :) uses 45% fewer tokens than Python
-- **56% Lower AI Costs** - Fewer tokens = faster generation, lower API costs
-- **Sub-Microsecond Compilation** - 867 nanoseconds (115,000x faster than targets)
-- **Nanosecond Execution** - 2.95-37.6 ns/op with zero-allocation arithmetic
-- **7x Faster than Python** - Benchmarked arithmetic operations
-- **Built-in Security** - SQL injection and XSS detection with intelligent suggestions
-- **Comprehensive Validation** - Email, length, range, pattern validators
-- **Enhanced Errors** - Line numbers, source snippets, and smart suggestions
-- **Bytecode VM** - Complete VM with 25 opcodes and exceptional performance
-- **Production Ready** - 1696 tests passing, Docker/K8s deployment configs included
+### Core Language
+- **Type System** - int, string, bool, float, arrays, objects, optional (`T?`), union (`A | B`), generics
+- **Pattern Matching** - match expressions with guards and destructuring
+- **Async/Await** - futures with `All`, `Race`, `Any` combinators
+- **Modules** - file imports, aliases, selective imports
+- **Generics** - type parameters, inference, constraints
+- **Macros** - compile-time code generation
 
-## 🚀 Quick Start
+### Runtime
+- **Bytecode Compiler** - 3 optimization levels
+- **JIT Compilation** - type specialization, hot path detection
+- **Hot Reload** - instant updates during development
+- **Debug Mode** - breakpoints, variable inspection, REPL
 
-### Installation
+### Infrastructure
+- **HTTP Server** - routes, middleware, WebSocket support
+- **Database** - PostgreSQL with pooling, transactions, migrations
+- **Security** - JWT auth, rate limiting, CORS, SQL injection prevention
+- **Observability** - logging, Prometheus metrics, OpenTelemetry tracing
 
-**macOS / Linux:**
+### Tooling
+- **LSP Server** - full IDE support with completions, diagnostics, rename
+- **VS Code Extension** - syntax highlighting, error checking
+- **CLI** - compile, run, REPL, decompile commands
+
+## Installation
+
+**Download binary:**
 ```bash
-curl -fsSL https://glyph-lang.github.io/install.sh | bash
-```
+# Linux
+curl -L https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.0/glyph-linux-amd64.zip -o glyph.zip
+unzip glyph.zip && chmod +x glyph-linux-amd64 && sudo mv glyph-linux-amd64 /usr/local/bin/glyph
 
-**Windows (PowerShell):**
-```powershell
-iwr -useb https://glyph-lang.github.io/install.ps1 | iex
+# macOS (Intel)
+curl -L https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.0/glyph-darwin-amd64.zip -o glyph.zip
+unzip glyph.zip && chmod +x glyph-darwin-amd64 && sudo mv glyph-darwin-amd64 /usr/local/bin/glyph
+
+# macOS (Apple Silicon)
+curl -L https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.0/glyph-darwin-arm64.zip -o glyph.zip
+unzip glyph.zip && chmod +x glyph-darwin-arm64 && sudo mv glyph-darwin-arm64 /usr/local/bin/glyph
 ```
 
 **Or build from source:**
 ```bash
-git clone https://github.com/glyph-lang/glyph.git
-cd glyph && go build -o glyph ./cmd/glyph
+git clone https://github.com/GlyphLang/GlyphLang.git
+cd GlyphLang && go build -o glyph ./cmd/glyph
 ```
 
-### Your First API
+## Quick Start
 
 Create `hello.glyph`:
 
 ```glyph
-@ route /hello
+@ route /hello [GET]
   > {message: "Hello, World!"}
+
+@ route /greet/:name [GET]
+  > {message: "Hello, " + name + "!"}
 ```
 
 Run it:
 
 ```bash
-./glyph dev hello.glyph
+glyph run hello.glyph
 ```
 
-Visit http://localhost:3000/hello - Done! 🎉
+Visit http://localhost:3000/hello
 
-## Example Code
+## Examples
 
-```
-# Define a type
+### Type Definitions
+
+```glyph
 : User {
   id: int!
-  name: str!
-  email: str!
+  name: string!
+  email: string?
+  roles: [string]!
 }
 
-# Create an API endpoint
-@ route /api/users/:id -> User | Error
+: ApiResponse<T> {
+  data: T?
+  error: string?
+  success: bool!
+}
+```
+
+### Routes with Authentication
+
+```glyph
+@ route /api/users/:id [GET] -> User | Error
   + auth(jwt)
   + ratelimit(100/min)
   % db: Database
-  $ user = db.users.get(id)
+
+  $ user = db.query("SELECT * FROM users WHERE id = ?", id)
+  if user == null {
+    > {error: "User not found", code: 404}
+  }
   > user
 ```
 
-## Architecture
+### Pattern Matching
 
-- **Runtime**: Go (fast compilation, excellent HTTP/DB support)
-- **Compiler Core**: Rust (high-performance parsing and type checking)
-- **Target**: Portable bytecode (OS agnostic)
+```glyph
+@ route /status/:code [GET]
+  $ result = match code {
+    200 => "OK"
+    201 => "Created"
+    400 => "Bad Request"
+    404 => "Not Found"
+    n when n >= 500 => "Server Error"
+    _ => "Unknown"
+  }
+  > {status: code, message: result}
+```
+
+### Async/Await
+
+```glyph
+@ route /dashboard [GET]
+  $ userFuture = async { db.getUser(userId) }
+  $ ordersFuture = async { db.getOrders(userId) }
+  $ statsFuture = async { db.getStats(userId) }
+
+  $ user = await userFuture
+  $ orders = await ordersFuture
+  $ stats = await statsFuture
+
+  > {user: user, orders: orders, stats: stats}
+```
+
+### Generics
+
+```glyph
+! identity<T>(x: T): T {
+  > x
+}
+
+! first<T>(a: T, b: T): T {
+  > a
+}
+
+! map<T, U>(arr: [T], fn: (T) -> U): [U] {
+  $ result = []
+  for item in arr {
+    $ mapped = fn(item)
+    result = append(result, mapped)
+  }
+  > result
+}
+```
+
+### Modules
+
+```glyph
+# utils.glyph
+! formatName(first: string, last: string): string {
+  > first + " " + last
+}
+
+# main.glyph
+import "./utils"
+
+@ route /user/:id [GET]
+  $ name = utils.formatName(user.first, user.last)
+  > {displayName: name}
+```
+
+### Macros
+
+```glyph
+macro! crud(resource) {
+  @ route /${resource} [GET]
+    > db.query("SELECT * FROM ${resource}")
+
+  @ route /${resource}/:id [GET]
+    > db.query("SELECT * FROM ${resource} WHERE id = ?", id)
+
+  @ route /${resource} [POST]
+    > db.insert("${resource}", input)
+}
+
+crud!(users)
+crud!(posts)
+```
+
+## CLI Commands
+
+```bash
+glyph run <file>        # Run a Glyph file
+glyph compile <file>    # Compile to bytecode
+glyph repl              # Interactive REPL
+glyph lsp               # Start LSP server
+glyph decompile <file>  # Decompile bytecode
+glyph version           # Show version
+```
+
+## Documentation
+
+- [Language Specification](docs/LANGUAGE_SPECIFICATION.md)
+- [API Reference](docs/API_REFERENCE.md)
+- [Quickstart Guide](docs/QUICKSTART.md)
+- [CLI Reference](docs/CLI.md)
+- [Architecture](docs/ARCHITECTURE_DESIGN.md)
+
+## Performance
+
+| Metric | Value |
+|--------|-------|
+| Compilation | ~867 ns |
+| Execution | 2.95-37.6 ns/op |
+| Test Coverage | 80%+ (14 packages) |
+| Examples | 100% compatibility |
 
 ## Project Structure
 
 ```
-glyph/
-├── cmd/glyph/          # CLI tool
+GlyphLang/
+├── cmd/glyph/           # CLI application
 ├── pkg/
-│   ├── vm/            # Virtual machine (Go)
-│   ├── compiler/      # Compiler interface (Go)
-│   ├── cache/         # Context cache (Go)
-│   ├── runtime/       # Runtime services (Go)
-│   └── server/        # HTTP server (Go)
-├── glyph-core/         # Compiler core (Rust)
-├── examples/          # Example projects
-└── docs/              # Documentation
+│   ├── parser/          # Lexer and parser
+│   ├── interpreter/     # AST interpreter
+│   ├── compiler/        # Bytecode compiler
+│   ├── vm/              # Virtual machine
+│   ├── jit/             # JIT compiler
+│   ├── server/          # HTTP server
+│   ├── database/        # Database integration
+│   ├── security/        # Auth, rate limiting
+│   ├── lsp/             # Language server
+│   └── ...              # Other packages
+├── examples/            # Example projects
+├── docs/                # Documentation
+└── tests/               # Integration tests
 ```
-
-## Development
-
-```bash
-# Clone repository
-git clone https://github.com/glyph-lang/glyph.git
-cd glyph
-
-# Build Go components
-go build ./cmd/glyph
-
-# Build Rust core
-cd glyph-core
-cargo build --release
-cd ..
-
-# Run tests
-go test ./...
-cd glyph-core && cargo test && cd ..
-
-# Run example
-./glyph run examples/hello-world/main.glyph
-```
-
-## 🗺️ Roadmap
-
-### ✅ Phase 1: Core Infrastructure (Complete)
-- [x] Rust compiler (lexer, parser, AST, binary format)
-- [x] Go interpreter and HTTP server
-- [x] CLI with run/dev/build commands
-- [x] 221 tests passing
-
-### ✅ Phase 2: Security & Quality (Complete)
-- [x] SQL injection and XSS detection
-- [x] Comprehensive validation framework
-- [x] Enhanced error messages
-- [x] 166 tests passing
-
-### ✅ Phase 3: Bytecode & Performance (Complete)
-- [x] Bytecode compiler with 25 opcodes
-- [x] Stack-based VM
-- [x] Sub-microsecond compilation
-- [x] 105 tests passing
-
-### 🚧 Phase 4: Platform Features (In Progress)
-- [ ] Database integration (PostgreSQL, MySQL, MongoDB)
-- [ ] WebSocket support
-- [ ] Language Server Protocol (LSP)
-- [ ] VS Code extension
-
-**Total: 1696 tests passing across all phases**
-
-## 📊 Benchmarks
-
-### AI Token Efficiency
-
-| Language | Tokens | vs Glyph |
-|----------|--------|---------|
-| **Glyph** | 463 | baseline |
-| Python | 842 | 1.82x more |
-| Java | 1,252 | 2.7x more |
-
-**Result:** 45% fewer tokens than Python, 63% fewer than Java
-
-### AI Generation Cost (per 1000 API calls)
-
-| Model | Glyph | Python | Java |
-|-------|------|--------|------|
-| GPT-4 | $23 | $42 | $63 |
-| Claude | $26 | $46 | $69 |
-
-**Result:** 56% cost savings with Glyph
-
-### Runtime Performance
-
-| Operation | Glyph | Python | Java |
-|-----------|------|--------|------|
-| Arithmetic | 9.35 ns | 65.23 ns | 1.71 ns |
-| String Concat | 40.19 ns | 63.68 ns | 7.86 ns |
-| Object Creation | 9.72 ns | 84.71 ns | 21.79 ns |
-
-**Result:** Glyph is 4-9x faster than Python
 
 ## Contributing
 
 Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
+By contributing, you agree to the [Contributor License Agreement](CONTRIBUTING.md#contributor-license-agreement-cla).
+
 ## License
 
-This project is licensed under the **Apache License 2.0** - see the [LICENSE](LICENSE) file for details.
-
-### Contributing
-
-By contributing to GlyphLang, you agree to the [Contributor License Agreement](CONTRIBUTING.md#contributor-license-agreement-cla). This allows us to ensure the project can continue to evolve while protecting both contributors and users.
-
-## Links
-
-- [Documentation](https://docs.glyph.dev)
-- [Discord Community](https://discord.gg/glyph)
-- [Twitter](https://twitter.com/glyph_lang)
+Apache License 2.0 - see [LICENSE](LICENSE) for details.
