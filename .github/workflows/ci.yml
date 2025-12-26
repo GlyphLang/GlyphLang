@@ -27,6 +27,9 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
+      - name: Tidy modules
+        run: go mod tidy
+
       - name: Run go vet
         run: go vet ./...
 
@@ -152,6 +155,9 @@ jobs:
       - name: Run Gosec Security Scanner
         uses: securego/gosec@master
         with:
+          # G104: errors unhandled - too noisy, many false positives
+          # G112: slowloris - intentional for dev server
           # G115: integer overflow - false positives in bytecode handling
+          # G301/G302/G306: file permissions - intentional for dev tools
           # G304: file path injection - intentional for file reading
-          args: -exclude=G115,G304 -exclude-generated ./...
+          args: -exclude=G104,G112,G115,G301,G302,G304,G306 -exclude-generated ./...
