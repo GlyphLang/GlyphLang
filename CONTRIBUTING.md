@@ -14,7 +14,11 @@ Thank you for your interest in contributing to GlyphLang! This document outlines
 
 ## Contributor License Agreement (CLA)
 
-By submitting a pull request or other contribution to this project, you agree to the following terms:
+All contributors must sign our CLA before their pull request can be merged. When you open a pull request, the CLA Assistant bot will automatically check if you have signed. If not, it will provide a link to sign electronically.
+
+**[View the full CLA](https://gist.github.com/GlyphLang/daf9e93df782faadd67c22afc3661934)**
+
+By signing the CLA, you agree to the following terms:
 
 ### Grant of Rights
 
