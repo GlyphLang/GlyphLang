@@ -394,6 +394,9 @@ func TestRoomWithLimits(t *testing.T) {
 
 // TestConnectionState tests connection state preservation
 func TestConnectionState(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping flaky test in short mode")
+	}
 	t.Run("StatePreservation", func(t *testing.T) {
 		config := &Config{
 			EnableReconnection:  true,
