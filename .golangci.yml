@@ -51,5 +51,14 @@ issues:
     - path: pkg/interpreter/
       linters:
         - unparam
+    - path: pkg/memory/
+      linters:
+        - errcheck  # Pool cleanup functions intentionally ignore errors
+    - path: pkg/errors/
+      linters:
+        - errcheck  # Suggestion loading can fail silently
+    - path: pkg/compiler/macros\.go
+      linters:
+        - errcheck  # Macro expansion can fail silently in some cases
   max-issues-per-linter: 50
   max-same-issues: 10

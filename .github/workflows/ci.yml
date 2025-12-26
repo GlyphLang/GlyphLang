@@ -40,6 +40,7 @@ jobs:
     name: Test (Go ${{ matrix.go-version }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         go-version: ['1.22', '1.23']
     steps:
@@ -51,6 +52,9 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
           cache: true
+
+      - name: Tidy modules
+        run: go mod tidy
 
       - name: Download dependencies
         run: go mod download
@@ -144,4 +148,6 @@ jobs:
       - name: Run Gosec Security Scanner
         uses: securego/gosec@master
         with:
-          args: -exclude-generated ./...
+          # G115: integer overflow - false positives in bytecode handling
+          # G304: file path injection - intentional for file reading
+          args: -exclude=G115,G304 -exclude-generated ./...

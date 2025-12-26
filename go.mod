@@ -1,6 +1,6 @@
 module github.com/glyphlang/glyph
 
-go 1.24.0
+go 1.22
 
 require (
 	github.com/fatih/color v1.16.0
