@@ -1,0 +1,115 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  GO_VERSION: '1.23'
+
+jobs:
+  test:
+    name: Test before release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Run tests
+        run: go test -race ./...
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: test
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          PREV_TAG=$(git tag --sort=-version:refname | grep -A1 "^$TAG$" | tail -1)
+          if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "$TAG" ]; then
+            PREV_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+          echo "Generating notes from $PREV_TAG to $TAG"
+          git log --pretty=format:"- %s" $PREV_TAG..$TAG > release_notes.txt
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: GlyphLang ${{ github.ref_name }}
+          body_path: release_notes.txt
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+          generate_release_notes: true
+
+  build-and-upload:
+    name: Build and Upload (${{ matrix.os }}-${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    needs: release
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+            ext: ""
+          - os: darwin
+            arch: amd64
+            ext: ""
+          - os: darwin
+            arch: arm64
+            ext: ""
+          - os: windows
+            arch: amd64
+            ext: .exe
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: 0
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          go build -v -ldflags="-s -w -X main.version=$VERSION" -o glyph-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }} ./cmd/glyph
+
+      - name: Create archive (Unix)
+        if: matrix.os != 'windows'
+        run: |
+          chmod +x glyph-${{ matrix.os }}-${{ matrix.arch }}
+          zip glyph-${{ matrix.os }}-${{ matrix.arch }}.zip glyph-${{ matrix.os }}-${{ matrix.arch }}
+
+      - name: Create archive (Windows)
+        if: matrix.os == 'windows'
+        run: zip glyph-${{ matrix.os }}-${{ matrix.arch }}.zip glyph-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: glyph-${{ matrix.os }}-${{ matrix.arch }}.zip
