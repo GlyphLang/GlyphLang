@@ -60,5 +60,8 @@ issues:
     - path: pkg/compiler/macros\.go
       linters:
         - errcheck  # Macro expansion can fail silently in some cases
+    - path: pkg/cache/
+      linters:
+        - errcheck  # Cache operations intentionally ignore errors
   max-issues-per-linter: 50
   max-same-issues: 10
