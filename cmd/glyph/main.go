@@ -125,8 +125,17 @@ Example:
 		RunE:  runListCommands,
 	}
 
+	// Version command
+	var versionCmd = &cobra.Command{
+		Use:   "version",
+		Short: "Print version information",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("GlyphLang v%s\n", version)
+		},
+	}
+
 	// Version command (built-in, but we can customize)
-	rootCmd.SetVersionTemplate(`GLYPH version {{.Version}}
+	rootCmd.SetVersionTemplate(`GlyphLang v{{.Version}}
 `)
 
 	// Add commands to root
@@ -138,6 +147,7 @@ Example:
 	rootCmd.AddCommand(lspCmd)
 	rootCmd.AddCommand(execCmd)
 	rootCmd.AddCommand(listCmdsCmd)
+	rootCmd.AddCommand(versionCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		printError(err)
