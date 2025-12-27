@@ -60,8 +60,7 @@
   }
 
 # Async with conditional logic
-@ route /async-conditional [GET]
-  :value: int
+@ route /async-conditional/:value [GET]
   $ future = async {
     if value > 50 {
       > {status: "high", value: value}
