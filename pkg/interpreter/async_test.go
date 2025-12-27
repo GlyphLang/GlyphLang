@@ -1,337 +1,182 @@
-package interpreter_test
+package interpreter
 
 import (
+	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/glyphlang/glyph/pkg/interpreter"
-	"github.com/glyphlang/glyph/pkg/parser"
 )
 
-func TestFutureBasic(t *testing.T) {
-	t.Run("resolve future", func(t *testing.T) {
-		future := interpreter.NewFuture()
+// TestFutureBasicOperations tests basic Future functionality
+func TestFutureBasicOperations(t *testing.T) {
+	t.Run("NewFuture creates pending future", func(t *testing.T) {
+		f := NewFuture()
+		if !f.IsPending() {
+			t.Error("Expected new future to be pending")
+		}
+		if f.IsResolved() {
+			t.Error("Expected new future to not be resolved")
+		}
+		if f.IsRejected() {
+			t.Error("Expected new future to not be rejected")
+		}
+	})
 
-		// Resolve in a goroutine
+	t.Run("Resolve sets value", func(t *testing.T) {
+		f := NewFuture()
+		f.Resolve(42)
+
+		if !f.IsResolved() {
+			t.Error("Expected future to be resolved")
+		}
+		if f.IsPending() {
+			t.Error("Expected future to not be pending")
+		}
+		if f.Value() != 42 {
+			t.Errorf("Expected value 42, got %v", f.Value())
+		}
+	})
+
+	t.Run("Reject sets error", func(t *testing.T) {
+		f := NewFuture()
+		expectedErr := errors.New("test error")
+		f.Reject(expectedErr)
+
+		if !f.IsRejected() {
+			t.Error("Expected future to be rejected")
+		}
+		if f.IsPending() {
+			t.Error("Expected future to not be pending")
+		}
+		if f.Error() != expectedErr {
+			t.Errorf("Expected error %v, got %v", expectedErr, f.Error())
+		}
+	})
+
+	t.Run("Double resolve is ignored", func(t *testing.T) {
+		f := NewFuture()
+		f.Resolve(1)
+		f.Resolve(2) // Should be ignored
+
+		if f.Value() != 1 {
+			t.Errorf("Expected value 1 (first resolve), got %v", f.Value())
+		}
+	})
+
+	t.Run("Reject after resolve is ignored", func(t *testing.T) {
+		f := NewFuture()
+		f.Resolve(1)
+		f.Reject(errors.New("error")) // Should be ignored
+
+		if !f.IsResolved() {
+			t.Error("Expected future to remain resolved")
+		}
+		if f.IsRejected() {
+			t.Error("Expected future to not be rejected")
+		}
+	})
+}
+
+// TestFutureAwait tests the Await method
+func TestFutureAwait(t *testing.T) {
+	t.Run("Await returns resolved value", func(t *testing.T) {
+		f := NewFuture()
+
 		go func() {
 			time.Sleep(10 * time.Millisecond)
-			future.Resolve("hello")
+			f.Resolve("hello")
 		}()
 
-		result, err := future.Await()
+		val, err := f.Await()
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			t.Errorf("Expected no error, got %v", err)
 		}
-		if result != "hello" {
-			t.Errorf("expected 'hello', got %v", result)
+		if val != "hello" {
+			t.Errorf("Expected 'hello', got %v", val)
 		}
 	})
 
-	t.Run("reject future", func(t *testing.T) {
-		future := interpreter.NewFuture()
+	t.Run("Await returns rejected error", func(t *testing.T) {
+		f := NewFuture()
+		expectedErr := errors.New("async error")
 
-		// Reject in a goroutine
 		go func() {
 			time.Sleep(10 * time.Millisecond)
-			future.Reject(&interpreter.ValidationError{Message: "test error"})
+			f.Reject(expectedErr)
 		}()
 
-		_, err := future.Await()
-		if err == nil {
-			t.Fatal("expected error, got nil")
+		val, err := f.Await()
+		if err != expectedErr {
+			t.Errorf("Expected error %v, got %v", expectedErr, err)
+		}
+		if val != nil {
+			t.Errorf("Expected nil value, got %v", val)
 		}
 	})
 
-	t.Run("future state transitions", func(t *testing.T) {
-		future := interpreter.NewFuture()
+	t.Run("AwaitWithTimeout succeeds before timeout", func(t *testing.T) {
+		f := NewFuture()
 
-		if !future.IsPending() {
-			t.Error("new future should be pending")
-		}
-		if future.IsResolved() {
-			t.Error("new future should not be resolved")
-		}
-
-		future.Resolve(42)
-
-		if future.IsPending() {
-			t.Error("resolved future should not be pending")
-		}
-		if !future.IsResolved() {
-			t.Error("resolved future should be resolved")
-		}
-		if future.Value() != 42 {
-			t.Errorf("expected value 42, got %v", future.Value())
-		}
-	})
-
-	t.Run("future timeout", func(t *testing.T) {
-		future := interpreter.NewFuture()
-
-		// Don't resolve - should timeout
-		_, err := future.AwaitWithTimeout(50 * time.Millisecond)
-		if err == nil {
-			t.Fatal("expected timeout error, got nil")
-		}
-	})
-}
-
-func TestAsyncExprParsing(t *testing.T) {
-	t.Run("parse simple async block", func(t *testing.T) {
-		input := `
-@ GET /test
-  $ result = async {
-    $ x = 1
-    > x
-  }
-  > result
-`
-		lexer := parser.NewLexer(input)
-		tokens, err := lexer.Tokenize()
-		if err != nil {
-			t.Fatalf("lexer error: %v", err)
-		}
-
-		p := parser.NewParser(tokens)
-		module, err := p.Parse()
-		if err != nil {
-			t.Fatalf("parser error: %v", err)
-		}
-
-		if len(module.Items) != 1 {
-			t.Fatalf("expected 1 item, got %d", len(module.Items))
-		}
-
-		route, ok := module.Items[0].(*interpreter.Route)
-		if !ok {
-			t.Fatalf("expected Route, got %T", module.Items[0])
-		}
-
-		if len(route.Body) != 2 {
-			t.Fatalf("expected 2 statements in route body, got %d", len(route.Body))
-		}
-
-		// First statement should be an assignment with async expr
-		assign, ok := route.Body[0].(interpreter.AssignStatement)
-		if !ok {
-			t.Fatalf("expected AssignStatement, got %T", route.Body[0])
-		}
-		if assign.Target != "result" {
-			t.Errorf("expected target 'result', got %s", assign.Target)
-		}
-
-		_, ok = assign.Value.(interpreter.AsyncExpr)
-		if !ok {
-			t.Errorf("expected AsyncExpr, got %T", assign.Value)
-		}
-	})
-
-	t.Run("parse await expression", func(t *testing.T) {
-		input := `
-@ GET /test
-  $ future = async { > 42 }
-  $ value = await future
-  > value
-`
-		lexer := parser.NewLexer(input)
-		tokens, err := lexer.Tokenize()
-		if err != nil {
-			t.Fatalf("lexer error: %v", err)
-		}
-
-		p := parser.NewParser(tokens)
-		module, err := p.Parse()
-		if err != nil {
-			t.Fatalf("parser error: %v", err)
-		}
-
-		route, ok := module.Items[0].(*interpreter.Route)
-		if !ok {
-			t.Fatalf("expected Route, got %T", module.Items[0])
-		}
-
-		if len(route.Body) != 3 {
-			t.Fatalf("expected 3 statements, got %d", len(route.Body))
-		}
-
-		// Second statement should be await
-		assign, ok := route.Body[1].(interpreter.AssignStatement)
-		if !ok {
-			t.Fatalf("expected AssignStatement, got %T", route.Body[1])
-		}
-
-		awaitExpr, ok := assign.Value.(interpreter.AwaitExpr)
-		if !ok {
-			t.Fatalf("expected AwaitExpr, got %T", assign.Value)
-		}
-
-		varExpr, ok := awaitExpr.Expr.(interpreter.VariableExpr)
-		if !ok {
-			t.Fatalf("expected VariableExpr in await, got %T", awaitExpr.Expr)
-		}
-		if varExpr.Name != "future" {
-			t.Errorf("expected variable 'future', got %s", varExpr.Name)
-		}
-	})
-}
-
-func TestAsyncExprEvaluation(t *testing.T) {
-	t.Run("basic async/await", func(t *testing.T) {
-		input := `
-@ GET /test
-  $ future = async {
-    $ x = 10
-    $ y = 20
-    > x + y
-  }
-  $ result = await future
-  > result
-`
-		lexer := parser.NewLexer(input)
-		tokens, err := lexer.Tokenize()
-		if err != nil {
-			t.Fatalf("lexer error: %v", err)
-		}
-
-		p := parser.NewParser(tokens)
-		module, err := p.Parse()
-		if err != nil {
-			t.Fatalf("parser error: %v", err)
-		}
-
-		interp := interpreter.NewInterpreter()
-		if err := interp.LoadModule(*module); err != nil {
-			t.Fatalf("load module error: %v", err)
-		}
-
-		route, ok := module.Items[0].(*interpreter.Route)
-		if !ok {
-			t.Fatalf("expected Route, got %T", module.Items[0])
-		}
-
-		result, err := interp.ExecuteRouteSimple(route, nil)
-		if err != nil {
-			t.Fatalf("execution error: %v", err)
-		}
-
-		if result != int64(30) {
-			t.Errorf("expected 30, got %v (type: %T)", result, result)
-		}
-	})
-
-	t.Run("concurrent async operations", func(t *testing.T) {
-		input := `
-@ GET /test
-  $ f1 = async { > 100 }
-  $ f2 = async { > 200 }
-  $ f3 = async { > 300 }
-  $ v1 = await f1
-  $ v2 = await f2
-  $ v3 = await f3
-  > v1 + v2 + v3
-`
-		lexer := parser.NewLexer(input)
-		tokens, err := lexer.Tokenize()
-		if err != nil {
-			t.Fatalf("lexer error: %v", err)
-		}
-
-		p := parser.NewParser(tokens)
-		module, err := p.Parse()
-		if err != nil {
-			t.Fatalf("parser error: %v", err)
-		}
-
-		interp := interpreter.NewInterpreter()
-		if err := interp.LoadModule(*module); err != nil {
-			t.Fatalf("load module error: %v", err)
-		}
-
-		route, ok := module.Items[0].(*interpreter.Route)
-		if !ok {
-			t.Fatalf("expected Route, got %T", module.Items[0])
-		}
-
-		result, err := interp.ExecuteRouteSimple(route, nil)
-		if err != nil {
-			t.Fatalf("execution error: %v", err)
-		}
-
-		if result != int64(600) {
-			t.Errorf("expected 600, got %v", result)
-		}
-	})
-
-	t.Run("async with object return", func(t *testing.T) {
-		input := `
-@ GET /test
-  $ future = async {
-    > {name: "test", value: 42}
-  }
-  $ result = await future
-  > result
-`
-		lexer := parser.NewLexer(input)
-		tokens, err := lexer.Tokenize()
-		if err != nil {
-			t.Fatalf("lexer error: %v", err)
-		}
-
-		p := parser.NewParser(tokens)
-		module, err := p.Parse()
-		if err != nil {
-			t.Fatalf("parser error: %v", err)
-		}
-
-		interp := interpreter.NewInterpreter()
-		if err := interp.LoadModule(*module); err != nil {
-			t.Fatalf("load module error: %v", err)
-		}
-
-		route, ok := module.Items[0].(*interpreter.Route)
-		if !ok {
-			t.Fatalf("expected Route, got %T", module.Items[0])
-		}
-
-		result, err := interp.ExecuteRouteSimple(route, nil)
-		if err != nil {
-			t.Fatalf("execution error: %v", err)
-		}
-
-		obj, ok := result.(map[string]interface{})
-		if !ok {
-			t.Fatalf("expected map, got %T", result)
-		}
-
-		if obj["name"] != "test" {
-			t.Errorf("expected name 'test', got %v", obj["name"])
-		}
-		if obj["value"] != int64(42) {
-			t.Errorf("expected value 42, got %v", obj["value"])
-		}
-	})
-}
-
-func TestFutureHelpers(t *testing.T) {
-	t.Run("RunAsync helper", func(t *testing.T) {
-		future := interpreter.RunAsync(func() (interface{}, error) {
+		go func() {
 			time.Sleep(10 * time.Millisecond)
-			return "async result", nil
+			f.Resolve(100)
+		}()
+
+		val, err := f.AwaitWithTimeout(1 * time.Second)
+		if err != nil {
+			t.Errorf("Expected no error, got %v", err)
+		}
+		if val != 100 {
+			t.Errorf("Expected 100, got %v", val)
+		}
+	})
+
+	t.Run("AwaitWithTimeout times out", func(t *testing.T) {
+		f := NewFuture()
+		// Don't resolve - let it timeout
+
+		_, err := f.AwaitWithTimeout(50 * time.Millisecond)
+		if err == nil {
+			t.Error("Expected timeout error")
+		}
+	})
+}
+
+// TestRunAsync tests the RunAsync helper
+func TestRunAsync(t *testing.T) {
+	t.Run("RunAsync resolves with return value", func(t *testing.T) {
+		f := RunAsync(func() (interface{}, error) {
+			return 42, nil
 		})
 
-		result, err := future.Await()
+		val, err := f.Await()
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			t.Errorf("Expected no error, got %v", err)
 		}
-		if result != "async result" {
-			t.Errorf("expected 'async result', got %v", result)
+		if val != 42 {
+			t.Errorf("Expected 42, got %v", val)
 		}
 	})
 
-	t.Run("All futures", func(t *testing.T) {
-		f1 := interpreter.NewFuture()
-		f2 := interpreter.NewFuture()
-		f3 := interpreter.NewFuture()
+	t.Run("RunAsync rejects with error", func(t *testing.T) {
+		expectedErr := errors.New("async failure")
+		f := RunAsync(func() (interface{}, error) {
+			return nil, expectedErr
+		})
+
+		_, err := f.Await()
+		if err != expectedErr {
+			t.Errorf("Expected error %v, got %v", expectedErr, err)
+		}
+	})
+}
+
+// TestFutureAll tests the All combinator
+func TestFutureAll(t *testing.T) {
+	t.Run("All resolves with all values", func(t *testing.T) {
+		f1 := NewFuture()
+		f2 := NewFuture()
+		f3 := NewFuture()
 
 		go func() {
 			f1.Resolve(1)
@@ -339,50 +184,289 @@ func TestFutureHelpers(t *testing.T) {
 			f3.Resolve(3)
 		}()
 
-		results, err := interpreter.All(f1, f2, f3)
+		result := All(f1, f2, f3)
+		val, err := result.Await()
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			t.Errorf("Expected no error, got %v", err)
 		}
-		if len(results) != 3 {
-			t.Fatalf("expected 3 results, got %d", len(results))
+
+		values, ok := val.([]interface{})
+		if !ok {
+			t.Fatalf("Expected []interface{}, got %T", val)
 		}
-		if results[0] != 1 || results[1] != 2 || results[2] != 3 {
-			t.Errorf("unexpected results: %v", results)
+		if len(values) != 3 {
+			t.Errorf("Expected 3 values, got %d", len(values))
+		}
+		if values[0] != 1 || values[1] != 2 || values[2] != 3 {
+			t.Errorf("Expected [1, 2, 3], got %v", values)
 		}
 	})
 
-	t.Run("Race futures", func(t *testing.T) {
-		f1 := interpreter.NewFuture()
-		f2 := interpreter.NewFuture()
+	t.Run("All rejects on first error", func(t *testing.T) {
+		f1 := NewFuture()
+		f2 := NewFuture()
+		expectedErr := errors.New("failure")
 
 		go func() {
-			time.Sleep(50 * time.Millisecond)
+			f1.Resolve(1)
+			f2.Reject(expectedErr)
+		}()
+
+		result := All(f1, f2)
+		_, err := result.Await()
+		if err != expectedErr {
+			t.Errorf("Expected error %v, got %v", expectedErr, err)
+		}
+	})
+}
+
+// TestFutureRace tests the Race combinator
+func TestFutureRace(t *testing.T) {
+	t.Run("Race resolves with first completion", func(t *testing.T) {
+		f1 := NewFuture()
+		f2 := NewFuture()
+
+		go func() {
+			time.Sleep(10 * time.Millisecond)
 			f1.Resolve("slow")
 		}()
 
 		go func() {
-			time.Sleep(10 * time.Millisecond)
 			f2.Resolve("fast")
 		}()
 
-		result, err := interpreter.Race(f1, f2)
+		result := Race(f1, f2)
+		val, err := result.Await()
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			t.Errorf("Expected no error, got %v", err)
 		}
-		if result != "fast" {
-			t.Errorf("expected 'fast', got %v", result)
+		if val != "fast" {
+			t.Errorf("Expected 'fast', got %v", val)
 		}
 	})
 
-	t.Run("IsFuture check", func(t *testing.T) {
-		future := interpreter.NewFuture()
+	t.Run("Race with no futures rejects", func(t *testing.T) {
+		result := Race()
+		_, err := result.Await()
+		if err == nil {
+			t.Error("Expected error for empty Race")
+		}
+	})
+}
 
-		if !interpreter.IsFuture(future) {
-			t.Error("expected IsFuture to return true for Future")
+// TestFutureAny tests the Any combinator
+func TestFutureAny(t *testing.T) {
+	t.Run("Any resolves with first success", func(t *testing.T) {
+		f1 := NewFuture()
+		f2 := NewFuture()
+
+		go func() {
+			f1.Reject(errors.New("error 1"))
+			f2.Resolve("success")
+		}()
+
+		result := Any(f1, f2)
+		val, err := result.Await()
+		if err != nil {
+			t.Errorf("Expected no error, got %v", err)
+		}
+		if val != "success" {
+			t.Errorf("Expected 'success', got %v", val)
+		}
+	})
+
+	t.Run("Any rejects when all fail", func(t *testing.T) {
+		f1 := NewFuture()
+		f2 := NewFuture()
+
+		go func() {
+			f1.Reject(errors.New("error 1"))
+			f2.Reject(errors.New("error 2"))
+		}()
+
+		result := Any(f1, f2)
+		_, err := result.Await()
+		if err == nil {
+			t.Error("Expected error when all futures reject")
+		}
+	})
+}
+
+// TestIsFuture tests the type check utility
+func TestIsFuture(t *testing.T) {
+	f := NewFuture()
+	if !IsFuture(f) {
+		t.Error("Expected IsFuture to return true for *Future")
+	}
+	if IsFuture(42) {
+		t.Error("Expected IsFuture to return false for non-Future")
+	}
+	if IsFuture("string") {
+		t.Error("Expected IsFuture to return false for string")
+	}
+}
+
+// TestFutureStateString tests the String method
+func TestFutureStateString(t *testing.T) {
+	if FuturePending.String() != "pending" {
+		t.Errorf("Expected 'pending', got %s", FuturePending.String())
+	}
+	if FutureResolved.String() != "resolved" {
+		t.Errorf("Expected 'resolved', got %s", FutureResolved.String())
+	}
+	if FutureRejected.String() != "rejected" {
+		t.Errorf("Expected 'rejected', got %s", FutureRejected.String())
+	}
+}
+
+// TestConcurrentFutures tests that futures actually run concurrently
+func TestConcurrentFutures(t *testing.T) {
+	var counter int64
+
+	f1 := RunAsync(func() (interface{}, error) {
+		atomic.AddInt64(&counter, 1)
+		time.Sleep(50 * time.Millisecond)
+		return "f1", nil
+	})
+
+	f2 := RunAsync(func() (interface{}, error) {
+		atomic.AddInt64(&counter, 1)
+		time.Sleep(50 * time.Millisecond)
+		return "f2", nil
+	})
+
+	f3 := RunAsync(func() (interface{}, error) {
+		atomic.AddInt64(&counter, 1)
+		time.Sleep(50 * time.Millisecond)
+		return "f3", nil
+	})
+
+	// Small delay to let all goroutines start
+	time.Sleep(10 * time.Millisecond)
+
+	// All three should have started by now (counter == 3)
+	if atomic.LoadInt64(&counter) != 3 {
+		t.Errorf("Expected all futures to start concurrently, only %d started", counter)
+	}
+
+	// Wait for all
+	result := All(f1, f2, f3)
+	_, err := result.Await()
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
+// TestAsyncExprEvaluation tests evaluation of async/await using direct AST construction
+func TestAsyncExprEvaluation(t *testing.T) {
+	t.Run("Direct async block evaluation", func(t *testing.T) {
+		// Test the evaluator directly with a constructed async expression
+		interp := NewInterpreter()
+		env := NewEnvironment()
+
+		// Create an async expression that returns 42
+		asyncExpr := AsyncExpr{
+			Body: []Statement{
+				ReturnStatement{
+					Value: LiteralExpr{Value: IntLiteral{Value: 42}},
+				},
+			},
 		}
 
-		if interpreter.IsFuture("not a future") {
-			t.Error("expected IsFuture to return false for string")
+		// Evaluate the async expression
+		result, err := interp.evaluateAsyncExpr(asyncExpr, env)
+		if err != nil {
+			t.Fatalf("Async evaluation error: %v", err)
+		}
+
+		// Result should be a Future
+		future, ok := result.(*Future)
+		if !ok {
+			t.Fatalf("Expected *Future, got %T", result)
+		}
+
+		// Await the future
+		value, err := future.Await()
+		if err != nil {
+			t.Fatalf("Await error: %v", err)
+		}
+
+		if value != int64(42) {
+			t.Errorf("Expected 42, got %v", value)
+		}
+	})
+
+	t.Run("Direct await expression evaluation", func(t *testing.T) {
+		interp := NewInterpreter()
+		env := NewEnvironment()
+
+		// Create a future and store it in the environment
+		future := NewFuture()
+		go func() {
+			time.Sleep(10 * time.Millisecond)
+			future.Resolve("async result")
+		}()
+		env.Define("myFuture", future)
+
+		// Create an await expression
+		awaitExpr := AwaitExpr{
+			Expr: VariableExpr{Name: "myFuture"},
+		}
+
+		// Evaluate the await expression
+		result, err := interp.evaluateAwaitExpr(awaitExpr, env)
+		if err != nil {
+			t.Fatalf("Await evaluation error: %v", err)
+		}
+
+		if result != "async result" {
+			t.Errorf("Expected 'async result', got %v", result)
+		}
+	})
+
+	t.Run("Async with computation", func(t *testing.T) {
+		interp := NewInterpreter()
+		env := NewEnvironment()
+
+		// Create an async block that does computation
+		asyncExpr := AsyncExpr{
+			Body: []Statement{
+				AssignStatement{
+					Target: "x",
+					Value:  LiteralExpr{Value: IntLiteral{Value: 10}},
+				},
+				AssignStatement{
+					Target: "y",
+					Value:  LiteralExpr{Value: IntLiteral{Value: 20}},
+				},
+				ReturnStatement{
+					Value: BinaryOpExpr{
+						Op:    Add,
+						Left:  VariableExpr{Name: "x"},
+						Right: VariableExpr{Name: "y"},
+					},
+				},
+			},
+		}
+
+		result, err := interp.evaluateAsyncExpr(asyncExpr, env)
+		if err != nil {
+			t.Fatalf("Async evaluation error: %v", err)
+		}
+
+		future, ok := result.(*Future)
+		if !ok {
+			t.Fatalf("Expected *Future, got %T", result)
+		}
+
+		value, err := future.Await()
+		if err != nil {
+			t.Fatalf("Await error: %v", err)
+		}
+
+		// The result should be 30 (10 + 20)
+		if value != int64(30) {
+			t.Errorf("Expected 30, got %v (type: %T)", value, value)
 		}
 	})
 }

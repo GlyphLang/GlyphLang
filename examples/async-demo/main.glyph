@@ -1,32 +1,7 @@
-# Async/Await Demo for GlyphLang
-# This example demonstrates non-blocking I/O and concurrent request handling
+# Async/Await Demo
+# Demonstrates asynchronous programming with Futures in GlyphLang
 
-# Type definitions for the demo
-: User {
-  id: int!
-  name: str!
-  email: str!
-}
-
-: Order {
-  id: int!
-  userId: int!
-  total: float!
-  status: str!
-}
-
-: DashboardData {
-  users: [User]!
-  orders: [Order]!
-}
-
-: AsyncResult {
-  message: str!
-  value: int!
-}
-
-# Basic async/await example
-# Demonstrates spawning a simple async operation
+# Basic async/await - simple computation in async block
 @ route /async-simple [GET]
   $ future = async {
     $ x = 10
@@ -36,121 +11,77 @@
   $ result = await future
   > {message: "Async result", value: result}
 
-# Concurrent data fetching
-# Demonstrates fetching multiple resources in parallel
-@ route /fetch-all [GET]
-  # Start all async operations concurrently
-  $ usersFuture = async {
-    > [
-      {id: 1, name: "Alice", email: "alice@example.com"},
-      {id: 2, name: "Bob", email: "bob@example.com"},
-      {id: 3, name: "Charlie", email: "charlie@example.com"}
-    ]
-  }
-  $ ordersFuture = async {
-    > [
-      {id: 101, userId: 1, total: 99.99, status: "completed"},
-      {id: 102, userId: 2, total: 149.50, status: "pending"},
-      {id: 103, userId: 1, total: 75.00, status: "completed"}
-    ]
-  }
-
-  # Wait for all results
-  $ users = await usersFuture
-  $ orders = await ordersFuture
-
-  > {
-    users: users,
-    orders: orders
-  }
-
-# Sequential async operations
-# Demonstrates chaining async operations
-@ route /sequential [GET]
-  $ step1 = async { > "Step 1 complete" }
-  $ result1 = await step1
-
-  $ step2 = async { > "Step 2 complete" }
-  $ result2 = await step2
-
-  > {
-    step1: result1,
-    step2: result2,
-    final: "All steps completed"
-  }
-
-# Async with object returns
-# Demonstrates returning complex objects from async blocks
-@ route /async-object [GET]
-  $ dataFuture = async {
-    > {
-      timestamp: "2024-01-01T00:00:00Z",
-      data: {
-        items: [1, 2, 3, 4, 5],
-        metadata: {
-          count: 5,
-          source: "async"
-        }
-      }
-    }
-  }
-  $ data = await dataFuture
-  > data
-
-# Multiple parallel operations
-# Demonstrates spawning three concurrent operations
-@ route /parallel [GET]
+# Parallel execution - multiple async operations running concurrently
+@ route /async-parallel [GET]
+  # Start three async operations at once
   $ f1 = async { > 100 }
   $ f2 = async { > 200 }
   $ f3 = async { > 300 }
 
-  $ v1 = await f1
-  $ v2 = await f2
-  $ v3 = await f3
-
-  > {
-    result1: v1,
-    result2: v2,
-    result3: v3,
-    total: v1 + v2 + v3
-  }
-
-# Async with conditional logic
-# Demonstrates async blocks with control flow
-@ route /conditional-async [GET]
-  $ checkFuture = async {
-    $ value = 42
-    if value > 0 {
-      > {status: "positive", value: value}
-    } else {
-      > {status: "non-positive", value: value}
-    }
-  }
-  $ result = await checkFuture
-  > result
-
-# Async with array operations
-@ route /batch-process [GET]
-  $ items = [1, 2, 3, 4, 5]
-
-  # Process items in parallel
-  $ f1 = async { > items[0] * 10 }
-  $ f2 = async { > items[1] * 10 }
-  $ f3 = async { > items[2] * 10 }
-  $ f4 = async { > items[3] * 10 }
-  $ f5 = async { > items[4] * 10 }
-
+  # Await all results
   $ r1 = await f1
   $ r2 = await f2
   $ r3 = await f3
-  $ r4 = await f4
-  $ r5 = await f5
 
   > {
-    original: items,
-    processed: [r1, r2, r3, r4, r5]
+    total: r1 + r2 + r3,
+    values: [r1, r2, r3]
   }
 
-# Health check
-@ route /health [GET]
-  > {status: "ok", service: "async-demo"}
+# Async returning objects
+@ route /async-object [GET]
+  $ future = async {
+    > {
+      id: 1,
+      name: "Async User",
+      email: "async@example.com"
+    }
+  }
+  $ user = await future
+  > user
+
+# Sequential async operations
+@ route /async-sequential [GET]
+  $ step1 = async {
+    $ base = 10
+    > base * 2
+  }
+  $ first = await step1
+
+  $ step2 = async {
+    > first + 5
+  }
+  $ second = await step2
+
+  > {
+    step1: first,
+    step2: second,
+    message: "Sequential async completed"
+  }
+
+# Async with conditional logic
+@ route /async-conditional [GET]
+  :value: int
+  $ future = async {
+    if value > 50 {
+      > {status: "high", value: value}
+    } else {
+      > {status: "low", value: value}
+    }
+  }
+  > await future
+
+# Multiple awaits on same future (futures can be awaited multiple times)
+@ route /async-reuse [GET]
+  $ future = async {
+    > 42
+  }
+
+  $ first = await future
+  $ second = await future
+
+  > {
+    first: first,
+    second: second,
+    same: first == second
+  }

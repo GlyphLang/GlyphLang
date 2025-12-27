@@ -15,15 +15,15 @@ const (
 	FutureRejected
 )
 
-// Future represents a value that will be available in the future.
-// It provides non-blocking I/O and concurrent request handling using Go channels.
+// Future represents an asynchronous computation that will complete in the future.
+// It can be in one of three states: pending, resolved, or rejected.
 type Future struct {
+	state    FutureState
 	value    interface{}
 	err      error
-	state    FutureState
 	done     chan struct{}
 	mu       sync.RWMutex
-	resolved bool
+	resolved bool // Double-resolve protection
 }
 
 // NewFuture creates a new pending Future
@@ -34,37 +34,39 @@ func NewFuture() *Future {
 	}
 }
 
-// Resolve sets the value of the Future and marks it as resolved
+// Resolve completes the Future with a successful value.
+// Can only be called once; subsequent calls are ignored.
 func (f *Future) Resolve(value interface{}) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	if f.resolved {
-		return // Already resolved or rejected
+		return // Already resolved/rejected
 	}
 
-	f.value = value
-	f.state = FutureResolved
 	f.resolved = true
+	f.state = FutureResolved
+	f.value = value
 	close(f.done)
 }
 
-// Reject sets an error on the Future and marks it as rejected
+// Reject completes the Future with an error.
+// Can only be called once; subsequent calls are ignored.
 func (f *Future) Reject(err error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	if f.resolved {
-		return // Already resolved or rejected
+		return // Already resolved/rejected
 	}
 
-	f.err = err
-	f.state = FutureRejected
 	f.resolved = true
+	f.state = FutureRejected
+	f.err = err
 	close(f.done)
 }
 
-// Await blocks until the Future is resolved or rejected, then returns the value or error
+// Await blocks until the Future completes and returns the value or error.
 func (f *Future) Await() (interface{}, error) {
 	<-f.done
 
@@ -77,7 +79,8 @@ func (f *Future) Await() (interface{}, error) {
 	return f.value, nil
 }
 
-// AwaitWithTimeout blocks until the Future is resolved, rejected, or timeout occurs
+// AwaitWithTimeout blocks until the Future completes or the timeout expires.
+// Returns an error if the timeout is reached before completion.
 func (f *Future) AwaitWithTimeout(timeout time.Duration) (interface{}, error) {
 	select {
 	case <-f.done:
@@ -93,30 +96,25 @@ func (f *Future) AwaitWithTimeout(timeout time.Duration) (interface{}, error) {
 	}
 }
 
-// IsResolved returns true if the Future has been resolved (not rejected)
+// IsResolved returns true if the Future has completed successfully
 func (f *Future) IsResolved() bool {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	return f.state == FutureResolved
 }
 
-// IsRejected returns true if the Future has been rejected
+// IsRejected returns true if the Future has completed with an error
 func (f *Future) IsRejected() bool {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	return f.state == FutureRejected
 }
 
-// IsPending returns true if the Future is still pending
+// IsPending returns true if the Future has not yet completed
 func (f *Future) IsPending() bool {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	return f.state == FuturePending
-}
-
-// Done returns a channel that is closed when the Future completes
-func (f *Future) Done() <-chan struct{} {
-	return f.done
 }
 
 // State returns the current state of the Future
@@ -126,35 +124,142 @@ func (f *Future) State() FutureState {
 	return f.state
 }
 
-// Value returns the resolved value (nil if pending or rejected)
+// Value returns the resolved value. Panics if the Future is not resolved.
 func (f *Future) Value() interface{} {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
+
+	if f.state != FutureResolved {
+		panic("Future.Value() called on non-resolved future")
+	}
 	return f.value
 }
 
-// Error returns the rejection error (nil if pending or resolved)
+// Error returns the rejection error. Panics if the Future is not rejected.
 func (f *Future) Error() error {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
+
+	if f.state != FutureRejected {
+		panic("Future.Error() called on non-rejected future")
+	}
 	return f.err
 }
 
-// String returns a string representation of the Future state
-func (f *Future) String() string {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
+// Done returns a channel that is closed when the Future completes.
+// This allows for select-based waiting on multiple Futures.
+func (f *Future) Done() <-chan struct{} {
+	return f.done
+}
 
-	switch f.state {
-	case FuturePending:
-		return "Future<pending>"
-	case FutureResolved:
-		return fmt.Sprintf("Future<resolved: %v>", f.value)
-	case FutureRejected:
-		return fmt.Sprintf("Future<rejected: %v>", f.err)
-	default:
-		return "Future<unknown>"
+// RunAsync executes a function asynchronously and returns a Future for its result.
+func RunAsync(fn func() (interface{}, error)) *Future {
+	future := NewFuture()
+
+	go func() {
+		value, err := fn()
+		if err != nil {
+			future.Reject(err)
+		} else {
+			future.Resolve(value)
+		}
+	}()
+
+	return future
+}
+
+// All waits for all Futures to complete and returns a Future containing
+// a slice of all values. If any Future rejects, the returned Future rejects
+// with that error.
+func All(futures ...*Future) *Future {
+	result := NewFuture()
+
+	go func() {
+		values := make([]interface{}, len(futures))
+
+		for i, f := range futures {
+			value, err := f.Await()
+			if err != nil {
+				result.Reject(err)
+				return
+			}
+			values[i] = value
+		}
+
+		result.Resolve(values)
+	}()
+
+	return result
+}
+
+// Race returns a Future that completes with the first Future to complete,
+// whether it resolves or rejects.
+func Race(futures ...*Future) *Future {
+	if len(futures) == 0 {
+		result := NewFuture()
+		result.Reject(fmt.Errorf("Race called with no futures"))
+		return result
 	}
+
+	result := NewFuture()
+
+	for _, f := range futures {
+		go func(future *Future) {
+			value, err := future.Await()
+			if err != nil {
+				result.Reject(err)
+			} else {
+				result.Resolve(value)
+			}
+		}(f)
+	}
+
+	return result
+}
+
+// Any returns a Future that completes with the first Future to resolve
+// successfully. If all Futures reject, the returned Future rejects with
+// an error containing all rejection errors.
+func Any(futures ...*Future) *Future {
+	if len(futures) == 0 {
+		result := NewFuture()
+		result.Reject(fmt.Errorf("Any called with no futures"))
+		return result
+	}
+
+	result := NewFuture()
+	errors := make([]error, len(futures))
+	var errorCount int
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	wg.Add(len(futures))
+
+	for i, f := range futures {
+		go func(index int, future *Future) {
+			defer wg.Done()
+
+			value, err := future.Await()
+
+			mu.Lock()
+			defer mu.Unlock()
+
+			if err != nil {
+				errors[index] = err
+				errorCount++
+
+				// If all futures have failed, reject with aggregate error
+				if errorCount == len(futures) {
+					result.Reject(fmt.Errorf("all futures rejected: %v", errors))
+				}
+			} else {
+				// First successful resolution wins
+				result.Resolve(value)
+			}
+		}(i, f)
+	}
+
+	return result
 }
 
 // IsFuture checks if a value is a Future
@@ -163,108 +268,16 @@ func IsFuture(v interface{}) bool {
 	return ok
 }
 
-// RunAsync executes a function asynchronously and returns a Future
-// This is a helper function that can be used to wrap synchronous operations
-func RunAsync(fn func() (interface{}, error)) *Future {
-	future := NewFuture()
-
-	go func() {
-		result, err := fn()
-		if err != nil {
-			future.Reject(err)
-		} else {
-			future.Resolve(result)
-		}
-	}()
-
-	return future
-}
-
-// All waits for all futures to complete and returns a slice of their values
-// If any future is rejected, the first error is returned
-func All(futures ...*Future) ([]interface{}, error) {
-	results := make([]interface{}, len(futures))
-
-	for i, f := range futures {
-		val, err := f.Await()
-		if err != nil {
-			return nil, err
-		}
-		results[i] = val
+// String returns a string representation of the FutureState
+func (s FutureState) String() string {
+	switch s {
+	case FuturePending:
+		return "pending"
+	case FutureResolved:
+		return "resolved"
+	case FutureRejected:
+		return "rejected"
+	default:
+		return "unknown"
 	}
-
-	return results, nil
-}
-
-// Race returns the value of the first future to complete
-// If the first to complete is rejected, its error is returned
-func Race(futures ...*Future) (interface{}, error) {
-	if len(futures) == 0 {
-		return nil, fmt.Errorf("Race requires at least one future")
-	}
-
-	result := make(chan struct {
-		value interface{}
-		err   error
-	}, 1)
-
-	for _, f := range futures {
-		go func(fut *Future) {
-			val, err := fut.Await()
-			select {
-			case result <- struct {
-				value interface{}
-				err   error
-			}{val, err}:
-			default:
-			}
-		}(f)
-	}
-
-	r := <-result
-	return r.value, r.err
-}
-
-// Any returns the value of the first future to resolve successfully
-// If all futures are rejected, returns an error
-func Any(futures ...*Future) (interface{}, error) {
-	if len(futures) == 0 {
-		return nil, fmt.Errorf("Any requires at least one future")
-	}
-
-	var wg sync.WaitGroup
-	successChan := make(chan interface{}, 1)
-	errorCount := 0
-	var mu sync.Mutex
-
-	for _, f := range futures {
-		wg.Add(1)
-		go func(fut *Future) {
-			defer wg.Done()
-			val, err := fut.Await()
-			if err == nil {
-				select {
-				case successChan <- val:
-				default:
-				}
-			} else {
-				mu.Lock()
-				errorCount++
-				mu.Unlock()
-			}
-		}(f)
-	}
-
-	// Wait for completion in a separate goroutine
-	go func() {
-		wg.Wait()
-		close(successChan)
-	}()
-
-	// Wait for first success or all failures
-	if val, ok := <-successChan; ok {
-		return val, nil
-	}
-
-	return nil, fmt.Errorf("all futures were rejected")
 }
