@@ -136,11 +136,23 @@ Visit http://localhost:3000/hello
 ### Async/Await
 
 ```glyph
-@ route /dashboard [GET]
-  $ userFuture = async { db.getUser(userId) }
-  $ ordersFuture = async { db.getOrders(userId) }
-  $ statsFuture = async { db.getStats(userId) }
+# Basic async block - executes in background, returns Future
+@ route /compute [GET]
+  $ future = async {
+    $ x = 10
+    $ y = 20
+    > x + y
+  }
+  $ result = await future
+  > {value: result}
 
+# Parallel execution - all requests run concurrently
+@ route /dashboard [GET]
+  $ userFuture = async { > db.getUser(userId) }
+  $ ordersFuture = async { > db.getOrders(userId) }
+  $ statsFuture = async { > db.getStats(userId) }
+
+  # Await blocks until Future resolves
   $ user = await userFuture
   $ orders = await ordersFuture
   $ stats = await statsFuture
