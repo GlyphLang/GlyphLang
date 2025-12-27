@@ -1,9 +1,27 @@
 {
   "name": "glyph",
   "displayName": "Glyph Language Support",
-  "description": "Language support for Glyph (AI Backend Compiler)",
-  "version": "0.1.0",
+  "description": "Language support for GlyphLang - a domain-specific language for building type-safe REST APIs with bytecode compilation and JIT optimization",
+  "version": "1.0.0",
   "publisher": "glyph-lang",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GlyphLang/GlyphLang"
+  },
+  "homepage": "https://github.com/GlyphLang/GlyphLang#readme",
+  "bugs": {
+    "url": "https://github.com/GlyphLang/GlyphLang/issues"
+  },
+  "keywords": [
+    "glyph",
+    "glyphlang",
+    "api",
+    "rest",
+    "bytecode",
+    "compiler",
+    "language"
+  ],
   "engines": {
     "vscode": "^1.75.0"
   },

@@ -26,7 +26,7 @@ This extension provides comprehensive language support for GlyphLang (formerly A
 You must have the Glyph compiler installed and accessible in your PATH:
 
 ```bash
-go install github.com/glyph-lang/glyph/cmd/glyph@latest
+go install github.com/GlyphLang/GlyphLang/cmd/glyph@latest
 ```
 
 Or specify the path to the Glyph executable in settings:
@@ -117,9 +117,9 @@ To enable LSP logging for debugging:
 
 ## Release Notes
 
-### 0.1.0
+### 1.0.0
 
-Initial release with comprehensive language support:
+Production-ready release with comprehensive language support:
 
 **Language Features:**
 - Full syntax highlighting for .glyph and .glybc files
@@ -145,8 +145,8 @@ Initial release with comprehensive language support:
 
 ## Contributing
 
-Contributions are welcome! Please visit https://github.com/glyph-lang/glyph
+Contributions are welcome! Please visit https://github.com/GlyphLang/GlyphLang
 
 ## License
 
-MIT
+Apache License 2.0 - see [LICENSE](https://github.com/GlyphLang/GlyphLang/blob/main/LICENSE) for details.
