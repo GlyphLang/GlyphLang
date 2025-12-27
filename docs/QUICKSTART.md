@@ -61,6 +61,8 @@ For syntax highlighting and language support in VS Code:
 3. Search for "GlyphLang"
 4. Click Install
 
+Or install from the repository: https://github.com/GlyphLang/vscode-glyph
+
 The extension provides:
 - Syntax highlighting
 - Code completion

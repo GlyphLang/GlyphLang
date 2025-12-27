@@ -39,7 +39,7 @@
 
 ### Tooling
 - **LSP Server** - full IDE support with completions, diagnostics, rename
-- **VS Code Extension** - syntax highlighting, error checking
+- **[VS Code Extension](https://github.com/GlyphLang/vscode-glyph)** - syntax highlighting, error checking
 - **CLI** - compile, run, REPL, decompile commands
 
 ## Installation

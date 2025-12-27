@@ -555,7 +555,7 @@ glyph lsp
 
 **VS Code Extension:**
 
-The VS Code extension (`vscode-glyph`) automatically starts the LSP server.
+The [VS Code extension](https://github.com/GlyphLang/vscode-glyph) automatically starts the LSP server.
 
 ## Contributing
 
