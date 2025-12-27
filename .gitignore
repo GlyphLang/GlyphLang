@@ -52,6 +52,7 @@ yarn-error.log*
 
 # Claude Code
 .claude/
+DECISIONS.md
 
 # Project Summary & Status Documents
 docs/project_summary/
