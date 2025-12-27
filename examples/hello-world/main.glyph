@@ -1,5 +1,6 @@
 # Hello World Example
 # Basic GlyphLang route demonstrating simple response
+# GlyphLang v1.0.0
 
 @ route /
   > {
