@@ -36,8 +36,6 @@ jobs:
     name: Create Release
     runs-on: ubuntu-latest
     needs: test
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -65,11 +63,12 @@ jobs:
           prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
           generate_release_notes: true
 
-  build-and-upload:
-    name: Build and Upload (${{ matrix.os }}-${{ matrix.arch }})
+  build:
+    name: Build (${{ matrix.os }}-${{ matrix.arch }})
     runs-on: ubuntu-latest
     needs: release
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: linux
@@ -116,7 +115,31 @@ jobs:
         if: matrix.os == 'windows'
         run: zip glyph-${{ matrix.os }}-${{ matrix.arch }}.zip glyph-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
-      - name: Upload release asset
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: glyph-${{ matrix.os }}-${{ matrix.arch }}
+          path: glyph-${{ matrix.os }}-${{ matrix.arch }}.zip
+          retention-days: 1
+
+  upload-assets:
+    name: Upload Release Assets
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f
+
+      - name: Upload assets to release
         uses: softprops/action-gh-release@v2
         with:
-          files: glyph-${{ matrix.os }}-${{ matrix.arch }}.zip
+          files: |
+            artifacts/glyph-linux-amd64/glyph-linux-amd64.zip
+            artifacts/glyph-darwin-amd64/glyph-darwin-amd64.zip
+            artifacts/glyph-darwin-arm64/glyph-darwin-arm64.zip
+            artifacts/glyph-windows-amd64/glyph-windows-amd64.zip
