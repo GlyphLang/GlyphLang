@@ -1,10 +1,11 @@
 # GlyphLang
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)]()
-[![Tests](https://img.shields.io/badge/tests-637%2B%20passing-success)]()
+[![Tests](https://img.shields.io/badge/tests-3503%20passing-success)]()
 [![Coverage](https://img.shields.io/badge/coverage-80%25%2B-green)]()
 [![Version](https://img.shields.io/badge/version-v1.0.0-blue)](https://github.com/GlyphLang/GlyphLang/releases/tag/v1.0.0)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+[![CLA](https://cla-assistant.io/readme/badge/GlyphLang/GlyphLang)](https://cla-assistant.io/GlyphLang/GlyphLang)
 
 **GlyphLang** is a domain-specific language for building type-safe REST APIs with bytecode compilation and JIT optimization. Symbol-based syntax reduces token usage by 45% compared to Python, making it ideal for AI code generation.
 
@@ -56,6 +57,12 @@ unzip glyph.zip && chmod +x glyph-darwin-amd64 && sudo mv glyph-darwin-amd64 /us
 # macOS (Apple Silicon)
 curl -L https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.0/glyph-darwin-arm64.zip -o glyph.zip
 unzip glyph.zip && chmod +x glyph-darwin-arm64 && sudo mv glyph-darwin-arm64 /usr/local/bin/glyph
+```
+
+**Windows (PowerShell):**
+```powershell
+Invoke-WebRequest -Uri "https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.0/glyph-windows-amd64.zip" -OutFile glyph.zip
+Expand-Archive glyph.zip -DestinationPath . ; Move-Item glyph-windows-amd64.exe glyph.exe
 ```
 
 **Or build from source:**
@@ -219,10 +226,13 @@ crud!(posts)
 
 ```bash
 glyph run <file>        # Run a Glyph file
+glyph dev <file>        # Development server with hot reload
 glyph compile <file>    # Compile to bytecode
-glyph repl              # Interactive REPL
-glyph lsp               # Start LSP server
 glyph decompile <file>  # Decompile bytecode
+glyph lsp               # Start LSP server
+glyph init              # Initialize new project
+glyph commands <file>   # List CLI commands in a file
+glyph exec <file> <cmd> # Execute a CLI command
 glyph version           # Show version
 ```
 
@@ -240,7 +250,7 @@ glyph version           # Show version
 |--------|-------|
 | Compilation | ~867 ns |
 | Execution | 2.95-37.6 ns/op |
-| Test Coverage | 80%+ (14 packages) |
+| Test Coverage | 80%+ (23 packages) |
 | Examples | 100% compatibility |
 
 ## Project Structure
