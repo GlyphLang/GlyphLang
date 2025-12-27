@@ -122,10 +122,57 @@ jobs:
           path: glyph-${{ matrix.os }}-${{ matrix.arch }}.zip
           retention-days: 1
 
+  windows-installer:
+    name: Build Windows Installer
+    runs-on: windows-latest
+    needs: release
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Tidy modules
+        run: go mod tidy
+
+      - name: Build Windows binary
+        env:
+          CGO_ENABLED: 0
+        run: |
+          $VERSION = "${{ github.ref_name }}" -replace '^v', ''
+          New-Item -ItemType Directory -Force -Path dist
+          go build -v -ldflags="-s -w -X main.version=$VERSION" -o dist/glyph-windows-amd64.exe ./cmd/glyph
+
+      - name: Update version in installer script
+        run: |
+          $VERSION = "${{ github.ref_name }}" -replace '^v', ''
+          (Get-Content installer/glyph-setup.iss) -replace '#define MyAppVersion ".*"', "#define MyAppVersion `"$VERSION`"" | Set-Content installer/glyph-setup.iss
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      - name: Build installer
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\glyph-setup.iss
+
+      - name: List output
+        run: Get-ChildItem -Path dist
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/glyph-*-windows-setup.exe
+          retention-days: 1
+
   upload-assets:
     name: Upload Release Assets
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build, windows-installer]
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -143,3 +190,4 @@ jobs:
             artifacts/glyph-darwin-amd64/glyph-darwin-amd64.zip
             artifacts/glyph-darwin-arm64/glyph-darwin-arm64.zip
             artifacts/glyph-windows-amd64/glyph-windows-amd64.zip
+            artifacts/windows-installer/glyph-*-windows-setup.exe
