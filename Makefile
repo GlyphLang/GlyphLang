@@ -78,7 +78,7 @@ clean:
 	@echo "Cleaning build artifacts..."
 	cd glyph-core && cargo clean
 	go clean
-	rm -f aida glyph.exe
+	rm -f glyph glyph.exe
 
 # Docker targets
 docker:

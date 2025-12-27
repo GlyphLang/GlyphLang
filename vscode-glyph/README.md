@@ -1,6 +1,6 @@
 # GlyphLang Support for VS Code
 
-This extension provides comprehensive language support for GlyphLang (formerly AIBC) - an AI-focused backend language with native compilation.
+This extension provides comprehensive language support for GlyphLang - a domain-specific language for building type-safe REST APIs with bytecode compilation and JIT optimization.
 
 ## Features
 
