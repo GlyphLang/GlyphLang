@@ -38,7 +38,7 @@ After building, verify the installation:
 
 ```bash
 glyph --version
-# GlyphLang v1.0.2
+# GlyphLang v1.0.5
 ```
 
 ### Binary Downloads
