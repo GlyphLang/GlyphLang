@@ -180,7 +180,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer
-          path: dist/glyph-*-windows-setup.exe
+          path: dist/glyph-*windows-setup.exe
           retention-days: 1
 
   upload-assets:
