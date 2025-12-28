@@ -17,11 +17,13 @@ import (
 	"time"
 
 	"github.com/glyphlang/glyph/pkg/compiler"
+	glyphcontext "github.com/glyphlang/glyph/pkg/context"
 	"github.com/glyphlang/glyph/pkg/decompiler"
 	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/lsp"
 	"github.com/glyphlang/glyph/pkg/parser"
 	"github.com/glyphlang/glyph/pkg/server"
+	"github.com/glyphlang/glyph/pkg/validate"
 	"github.com/glyphlang/glyph/pkg/vm"
 	"github.com/glyphlang/glyph/pkg/websocket"
 	"github.com/fatih/color"
@@ -125,6 +127,67 @@ Example:
 		RunE:  runListCommands,
 	}
 
+	// Context command - generate AI-optimized context
+	var contextCmd = &cobra.Command{
+		Use:   "context [path]",
+		Short: "Generate AI-optimized context for the project",
+		Long: `Generate compact, cacheable context for AI agents working with this Glyph project.
+
+The context includes:
+- Type definitions with field signatures
+- Route definitions with methods, paths, and return types
+- Function signatures
+- CLI command definitions
+- Detected patterns (CRUD, auth usage, etc.)
+
+Output formats:
+- json: Full structured context (default)
+- compact: Minimal text representation for token efficiency
+- stubs: Type stub file format (.glyph.d style)
+
+Examples:
+  glyph context                    # Generate context for current directory
+  glyph context ./src              # Generate context for specific directory
+  glyph context --format compact   # Generate compact text output
+  glyph context --output .glyph/context.json  # Write to file
+  glyph context --file main.glyph  # Generate context for single file`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: runContext,
+	}
+	contextCmd.Flags().StringP("format", "f", "json", "Output format: json, compact, stubs")
+	contextCmd.Flags().StringP("output", "o", "", "Output file (default: stdout)")
+	contextCmd.Flags().String("file", "", "Generate context for a single file only")
+	contextCmd.Flags().Bool("pretty", true, "Pretty-print JSON output")
+	contextCmd.Flags().Bool("changed", false, "Show only changes since last context generation")
+	contextCmd.Flags().Bool("save", false, "Save context to .glyph/context.json for future diffing")
+	contextCmd.Flags().String("for", "", "Generate targeted context for a task: route, type, function, command")
+
+	// Validate command - validate source files with structured errors
+	var validateCmd = &cobra.Command{
+		Use:   "validate <file>",
+		Short: "Validate a GLYPH source file",
+		Long: `Validate a GLYPH source file and report errors.
+
+By default, outputs human-readable error messages. Use --ai for structured
+JSON output optimized for AI agents to parse and fix issues.
+
+The --ai flag outputs:
+- Structured error types (syntax_error, undefined_reference, type_mismatch, etc.)
+- Precise locations (file, line, column)
+- Fix hints for each error
+- Source context around the error
+
+Examples:
+  glyph validate main.glyph           # Human-readable output
+  glyph validate main.glyph --ai      # Structured JSON for AI
+  glyph validate src/ --ai            # Validate all files in directory`,
+		Args: cobra.ExactArgs(1),
+		RunE: runValidate,
+	}
+	validateCmd.Flags().Bool("ai", false, "Output structured JSON for AI agents")
+	validateCmd.Flags().Bool("strict", false, "Treat warnings as errors")
+	validateCmd.Flags().Bool("quiet", false, "Only output errors, no stats")
+
 	// Version command
 	var versionCmd = &cobra.Command{
 		Use:   "version",
@@ -147,6 +210,8 @@ Example:
 	rootCmd.AddCommand(lspCmd)
 	rootCmd.AddCommand(execCmd)
 	rootCmd.AddCommand(listCmdsCmd)
+	rootCmd.AddCommand(contextCmd)
+	rootCmd.AddCommand(validateCmd)
 	rootCmd.AddCommand(versionCmd)
 
 	if err := rootCmd.Execute(); err != nil {
@@ -1672,4 +1737,312 @@ func joinStrings(strs []string, sep string) string {
 		result += sep + strs[i]
 	}
 	return result
+}
+
+// runContext handles the context command - generates AI-optimized context
+func runContext(cmd *cobra.Command, args []string) error {
+	format, _ := cmd.Flags().GetString("format")
+	output, _ := cmd.Flags().GetString("output")
+	singleFile, _ := cmd.Flags().GetString("file")
+	pretty, _ := cmd.Flags().GetBool("pretty")
+	showChanged, _ := cmd.Flags().GetBool("changed")
+	saveContext, _ := cmd.Flags().GetBool("save")
+	forTask, _ := cmd.Flags().GetString("for")
+
+	// Determine root directory
+	rootDir := "."
+	if len(args) > 0 {
+		rootDir = args[0]
+	}
+
+	// Get absolute path
+	absPath, err := filepath.Abs(rootDir)
+	if err != nil {
+		return fmt.Errorf("failed to resolve path: %w", err)
+	}
+
+	// Create generator
+	gen := glyphcontext.NewGenerator(absPath)
+
+	// Generate context
+	var ctx *glyphcontext.ProjectContext
+	if singleFile != "" {
+		printInfo(fmt.Sprintf("Generating context for %s...", singleFile))
+		ctx, err = gen.GenerateForFile(singleFile)
+	} else {
+		printInfo(fmt.Sprintf("Generating context for %s...", absPath))
+		ctx, err = gen.Generate()
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to generate context: %w", err)
+	}
+
+	// Handle --for flag (targeted context)
+	if forTask != "" {
+		var targetedCtx *glyphcontext.TargetedContext
+
+		switch forTask {
+		case "route":
+			targetedCtx = ctx.ForRoute()
+		case "type":
+			targetedCtx = ctx.ForType()
+		case "function":
+			targetedCtx = ctx.ForFunction()
+		case "command":
+			targetedCtx = ctx.ForCommand()
+		default:
+			return fmt.Errorf("unknown task: %s (use: route, type, function, command)", forTask)
+		}
+
+		// Format targeted output
+		var outputData []byte
+		switch format {
+		case "json":
+			outputData, err = targetedCtx.ToJSON(pretty)
+			if err != nil {
+				return fmt.Errorf("failed to serialize context: %w", err)
+			}
+		case "compact", "stubs":
+			outputData = []byte(targetedCtx.ToCompact())
+		default:
+			return fmt.Errorf("unknown format: %s (use: json, compact)", format)
+		}
+
+		// Output
+		if output != "" {
+			if err := os.WriteFile(output, outputData, 0644); err != nil {
+				return fmt.Errorf("failed to write output file: %w", err)
+			}
+			printSuccess(fmt.Sprintf("Context for %s written to %s", forTask, output))
+		} else {
+			fmt.Println(string(outputData))
+		}
+
+		return nil
+	}
+
+	// Handle --changed flag
+	if showChanged {
+		contextPath := glyphcontext.DefaultContextPath(absPath)
+		var previousCtx *glyphcontext.ProjectContext
+
+		// Try to load previous context
+		previousCtx, loadErr := glyphcontext.LoadContext(contextPath)
+		if loadErr != nil {
+			printWarning("No previous context found, showing all as new")
+		}
+
+		// Generate diff
+		diff := ctx.Diff(previousCtx)
+
+		// Format diff output
+		var outputData []byte
+		switch format {
+		case "json":
+			outputData, err = diff.ToJSON(pretty)
+			if err != nil {
+				return fmt.Errorf("failed to serialize diff: %w", err)
+			}
+		case "compact", "stubs":
+			outputData = []byte(diff.ToCompact(ctx))
+		default:
+			return fmt.Errorf("unknown format: %s (use: json, compact)", format)
+		}
+
+		// Output diff
+		if output != "" {
+			if err := os.WriteFile(output, outputData, 0644); err != nil {
+				return fmt.Errorf("failed to write output file: %w", err)
+			}
+			printSuccess(fmt.Sprintf("Diff written to %s", output))
+		} else {
+			fmt.Println(string(outputData))
+		}
+
+		// Optionally save the new context
+		if saveContext {
+			if err := ctx.SaveContext(contextPath); err != nil {
+				return fmt.Errorf("failed to save context: %w", err)
+			}
+			printSuccess(fmt.Sprintf("Context saved to %s", contextPath))
+		}
+
+		return nil
+	}
+
+	// Format output (normal mode)
+	var outputData []byte
+	switch format {
+	case "json":
+		outputData, err = ctx.ToJSON(pretty)
+		if err != nil {
+			return fmt.Errorf("failed to serialize context: %w", err)
+		}
+	case "compact":
+		outputData = []byte(ctx.ToCompact())
+	case "stubs":
+		outputData = []byte(ctx.GenerateStubs())
+	default:
+		return fmt.Errorf("unknown format: %s (use: json, compact, stubs)", format)
+	}
+
+	// Write output
+	if output != "" {
+		// Ensure parent directory exists
+		dir := filepath.Dir(output)
+		if dir != "." && dir != "" {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				return fmt.Errorf("failed to create output directory: %w", err)
+			}
+		}
+
+		if err := os.WriteFile(output, outputData, 0644); err != nil {
+			return fmt.Errorf("failed to write output file: %w", err)
+		}
+		printSuccess(fmt.Sprintf("Context written to %s", output))
+
+		// Print stats
+		printInfo(fmt.Sprintf("Files: %d", len(ctx.Files)))
+		printInfo(fmt.Sprintf("Types: %d", len(ctx.Types)))
+		printInfo(fmt.Sprintf("Routes: %d", len(ctx.Routes)))
+		printInfo(fmt.Sprintf("Functions: %d", len(ctx.Functions)))
+		printInfo(fmt.Sprintf("Commands: %d", len(ctx.Commands)))
+		if len(ctx.Patterns) > 0 {
+			printInfo(fmt.Sprintf("Patterns: %v", ctx.Patterns))
+		}
+	} else {
+		// Write to stdout
+		fmt.Println(string(outputData))
+	}
+
+	// Save context if requested
+	if saveContext {
+		contextPath := glyphcontext.DefaultContextPath(absPath)
+		if err := ctx.SaveContext(contextPath); err != nil {
+			return fmt.Errorf("failed to save context: %w", err)
+		}
+		printSuccess(fmt.Sprintf("Context saved to %s", contextPath))
+	}
+
+	return nil
+}
+
+// runValidate handles the validate command - validates source files with structured errors
+func runValidate(cmd *cobra.Command, args []string) error {
+	filePath := args[0]
+	aiMode, _ := cmd.Flags().GetBool("ai")
+	strict, _ := cmd.Flags().GetBool("strict")
+	quiet, _ := cmd.Flags().GetBool("quiet")
+
+	// Check if path is a directory
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to access path: %w", err)
+	}
+
+	var results []*validate.ValidationResult
+
+	if info.IsDir() {
+		// Validate all .glyph files in directory
+		err := filepath.Walk(filePath, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if !info.IsDir() && filepath.Ext(path) == ".glyph" {
+				result := validateFile(path)
+				results = append(results, result)
+			}
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("failed to walk directory: %w", err)
+		}
+	} else {
+		// Validate single file
+		result := validateFile(filePath)
+		results = append(results, result)
+	}
+
+	// Handle strict mode - treat warnings as errors
+	if strict {
+		for _, r := range results {
+			if len(r.Warnings) > 0 {
+				r.Valid = false
+				for _, w := range r.Warnings {
+					w.Severity = "error"
+					r.Errors = append(r.Errors, w)
+				}
+				r.Warnings = nil
+			}
+		}
+	}
+
+	// Output results
+	if aiMode {
+		// JSON output for AI
+		if len(results) == 1 {
+			output, err := results[0].ToJSON(true)
+			if err != nil {
+				return fmt.Errorf("failed to serialize result: %w", err)
+			}
+			fmt.Println(string(output))
+		} else {
+			// Multiple files - wrap in array
+			output, err := json.MarshalIndent(results, "", "  ")
+			if err != nil {
+				return fmt.Errorf("failed to serialize results: %w", err)
+			}
+			fmt.Println(string(output))
+		}
+	} else {
+		// Human-readable output
+		allValid := true
+		for _, r := range results {
+			if !quiet || !r.Valid {
+				fmt.Print(r.ToHuman())
+			}
+			if !r.Valid {
+				allValid = false
+			}
+		}
+
+		// Summary for multiple files
+		if len(results) > 1 && !quiet {
+			validCount := 0
+			for _, r := range results {
+				if r.Valid {
+					validCount++
+				}
+			}
+			fmt.Printf("\nValidation complete: %d/%d files valid\n", validCount, len(results))
+		}
+
+		if !allValid {
+			os.Exit(1)
+		}
+	}
+
+	return nil
+}
+
+// validateFile validates a single file and returns the result
+func validateFile(filePath string) *validate.ValidationResult {
+	source, err := os.ReadFile(filePath)
+	if err != nil {
+		return &validate.ValidationResult{
+			Valid:    false,
+			FilePath: filePath,
+			Errors: []*validate.ValidationError{
+				{
+					Type:     "file_error",
+					Message:  fmt.Sprintf("failed to read file: %v", err),
+					Severity: "error",
+				},
+			},
+		}
+	}
+
+	validator := validate.NewValidator(string(source), filePath)
+	return validator.Validate()
 }
