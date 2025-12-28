@@ -102,24 +102,27 @@ jobs:
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
         run: |
-          VERSION=${GITHUB_REF#refs/tags/}
+          VERSION=${GITHUB_REF#refs/tags/v}
           go build -v -ldflags="-s -w -X main.version=$VERSION" -o glyph-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }} ./cmd/glyph
 
       - name: Create archive (Unix)
         if: matrix.os != 'windows'
         run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
           chmod +x glyph-${{ matrix.os }}-${{ matrix.arch }}
-          zip glyph-${{ matrix.os }}-${{ matrix.arch }}.zip glyph-${{ matrix.os }}-${{ matrix.arch }}
+          zip glyph-${VERSION}-${{ matrix.os }}-${{ matrix.arch }}.zip glyph-${{ matrix.os }}-${{ matrix.arch }}
 
       - name: Create archive (Windows)
         if: matrix.os == 'windows'
-        run: zip glyph-${{ matrix.os }}-${{ matrix.arch }}.zip glyph-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          zip glyph-${VERSION}-${{ matrix.os }}-${{ matrix.arch }}.zip glyph-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: glyph-${{ matrix.os }}-${{ matrix.arch }}
-          path: glyph-${{ matrix.os }}-${{ matrix.arch }}.zip
+          path: glyph-*-${{ matrix.os }}-${{ matrix.arch }}.zip
           retention-days: 1
 
   windows-installer:
@@ -186,8 +189,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/glyph-linux-amd64/glyph-linux-amd64.zip
-            artifacts/glyph-darwin-amd64/glyph-darwin-amd64.zip
-            artifacts/glyph-darwin-arm64/glyph-darwin-arm64.zip
-            artifacts/glyph-windows-amd64/glyph-windows-amd64.zip
+            artifacts/glyph-linux-amd64/glyph-*-linux-amd64.zip
+            artifacts/glyph-darwin-amd64/glyph-*-darwin-amd64.zip
+            artifacts/glyph-darwin-arm64/glyph-*-darwin-arm64.zip
+            artifacts/glyph-windows-amd64/glyph-*-windows-amd64.zip
             artifacts/windows-installer/glyph-*-windows-setup.exe
