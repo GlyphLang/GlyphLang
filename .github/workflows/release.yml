@@ -110,19 +110,25 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
           chmod +x glyph-${{ matrix.os }}-${{ matrix.arch }}
+          # Versioned archive (for archival)
           zip glyph-${VERSION}-${{ matrix.os }}-${{ matrix.arch }}.zip glyph-${{ matrix.os }}-${{ matrix.arch }}
+          # Non-versioned archive (for /latest/ links)
+          cp glyph-${VERSION}-${{ matrix.os }}-${{ matrix.arch }}.zip glyph-${{ matrix.os }}-${{ matrix.arch }}.zip
 
       - name: Create archive (Windows)
         if: matrix.os == 'windows'
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
+          # Versioned archive (for archival)
           zip glyph-${VERSION}-${{ matrix.os }}-${{ matrix.arch }}.zip glyph-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          # Non-versioned archive (for /latest/ links)
+          cp glyph-${VERSION}-${{ matrix.os }}-${{ matrix.arch }}.zip glyph-${{ matrix.os }}-${{ matrix.arch }}.zip
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: glyph-${{ matrix.os }}-${{ matrix.arch }}
-          path: glyph-*-${{ matrix.os }}-${{ matrix.arch }}.zip
+          path: glyph-*${{ matrix.os }}-${{ matrix.arch }}.zip
           retention-days: 1
 
   windows-installer:
@@ -162,6 +168,11 @@ jobs:
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\glyph-setup.iss
 
+      - name: Create non-versioned copy
+        run: |
+          $VERSION = "${{ github.ref_name }}" -replace '^v', ''
+          Copy-Item "dist/glyph-${VERSION}-windows-setup.exe" "dist/glyph-windows-setup.exe"
+
       - name: List output
         run: Get-ChildItem -Path dist
 
@@ -189,8 +200,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/glyph-linux-amd64/glyph-*-linux-amd64.zip
-            artifacts/glyph-darwin-amd64/glyph-*-darwin-amd64.zip
-            artifacts/glyph-darwin-arm64/glyph-*-darwin-arm64.zip
-            artifacts/glyph-windows-amd64/glyph-*-windows-amd64.zip
-            artifacts/windows-installer/glyph-*-windows-setup.exe
+            artifacts/glyph-linux-amd64/*.zip
+            artifacts/glyph-darwin-amd64/*.zip
+            artifacts/glyph-darwin-arm64/*.zip
+            artifacts/glyph-windows-amd64/*.zip
+            artifacts/windows-installer/*.exe

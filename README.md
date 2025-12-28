@@ -46,26 +46,26 @@
 
 **Windows Installer (Recommended):**
 
-Download and run the installer: [glyph-1.0.2-windows-setup.exe](https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.2/glyph-1.0.2-windows-setup.exe)
+Download and run the installer: [glyph-windows-setup.exe](https://github.com/GlyphLang/GlyphLang/releases/latest/download/glyph-windows-setup.exe)
 
 **Download binary:**
 ```bash
 # Linux
-curl -L https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.2/glyph-1.0.2-linux-amd64.zip -o glyph.zip
+curl -L https://github.com/GlyphLang/GlyphLang/releases/latest/download/glyph-linux-amd64.zip -o glyph.zip
 unzip glyph.zip && chmod +x glyph-linux-amd64 && sudo mv glyph-linux-amd64 /usr/local/bin/glyph
 
 # macOS (Intel)
-curl -L https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.2/glyph-1.0.2-darwin-amd64.zip -o glyph.zip
+curl -L https://github.com/GlyphLang/GlyphLang/releases/latest/download/glyph-darwin-amd64.zip -o glyph.zip
 unzip glyph.zip && chmod +x glyph-darwin-amd64 && sudo mv glyph-darwin-amd64 /usr/local/bin/glyph
 
 # macOS (Apple Silicon)
-curl -L https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.2/glyph-1.0.2-darwin-arm64.zip -o glyph.zip
+curl -L https://github.com/GlyphLang/GlyphLang/releases/latest/download/glyph-darwin-arm64.zip -o glyph.zip
 unzip glyph.zip && chmod +x glyph-darwin-arm64 && sudo mv glyph-darwin-arm64 /usr/local/bin/glyph
 ```
 
 **Windows (PowerShell):**
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.2/glyph-1.0.2-windows-amd64.zip" -OutFile glyph.zip
+Invoke-WebRequest -Uri "https://github.com/GlyphLang/GlyphLang/releases/latest/download/glyph-windows-amd64.zip" -OutFile glyph.zip
 Expand-Archive glyph.zip -DestinationPath . ; Move-Item glyph-windows-amd64.exe glyph.exe
 ```
 
