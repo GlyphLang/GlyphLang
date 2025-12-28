@@ -18,10 +18,10 @@ func TestIntegration_HelloWorldFile(t *testing.T) {
   timestamp: int
 }
 
-@ route /hello
+@ GET /hello
   > {text: "Hello, World!", timestamp: 1234567890}
 
-@ route /greet/:name -> Message
+@ GET /greet/:name -> Message
   $ message = {
     text: "Hello, " + name + "!",
     timestamp: time.now()
@@ -77,13 +77,13 @@ func TestIntegration_RestApiFile(t *testing.T) {
   email: str!
 }
 
-@ route /api/users/:id -> User
+@ GET /api/users/:id -> User
   + auth(jwt)
   % db: Database
   $ user = db.users.get(id)
   > user
 
-@ route /health
+@ GET /health
   > {status: "ok", timestamp: now()}`
 
 	// Lex
@@ -130,7 +130,7 @@ func TestIntegration_FullPipeline(t *testing.T) {
 	}{
 		{
 			name: "simple string return",
-			source: `@ route /test
+			source: `@ GET /test
   > "Hello"`,
 			routeIndex:     0,
 			params:         nil,
@@ -138,7 +138,7 @@ func TestIntegration_FullPipeline(t *testing.T) {
 		},
 		{
 			name: "integer calculation",
-			source: `@ route /calc
+			source: `@ GET /calc
   $ result = 10 + 20
   > result`,
 			routeIndex:     0,
@@ -147,7 +147,7 @@ func TestIntegration_FullPipeline(t *testing.T) {
 		},
 		{
 			name: "path parameter",
-			source: `@ route /echo/:msg
+			source: `@ GET /echo/:msg
   > msg`,
 			routeIndex:     0,
 			params:         map[string]string{"msg": "test"},
@@ -155,7 +155,7 @@ func TestIntegration_FullPipeline(t *testing.T) {
 		},
 		{
 			name: "object literal",
-			source: `@ route /obj
+			source: `@ GET /obj
   > {count: 42, active: true}`,
 			routeIndex: 0,
 			params:     nil,
@@ -291,13 +291,13 @@ func TestIntegration_ErrorHandling(t *testing.T) {
 	}{
 		{
 			name:           "valid code",
-			source:         "@ route /test\n  > {ok: true}",
+			source:         "@ GET /test\n  > {ok: true}",
 			expectLexErr:   false,
 			expectParseErr: false,
 		},
 		{
 			name:           "unclosed string (lexer handles it)",
-			source:         "@ route /test\n  > {msg: \"unclosed",
+			source:         "@ GET /test\n  > {msg: \"unclosed",
 			expectLexErr:   true, // Lexer now errors on unterminated strings
 			expectParseErr: false,
 		},
@@ -347,15 +347,15 @@ func TestIntegration_MultipleRoutesWithFeatures(t *testing.T) {
   name: str!
 }
 
-@ route /public
+@ GET /public
   > {message: "Public endpoint"}
 
-@ route /protected [POST]
+@ POST /protected
   + auth(jwt)
   + ratelimit(100/min)
   > {message: "Protected endpoint"}
 
-@ route /users/:id [GET] -> User
+@ GET /users/:id -> User
   + auth(jwt)
   $ user = {id: id, name: "Test User"}
   > user`
@@ -412,7 +412,7 @@ func TestIntegration_Expressions(t *testing.T) {
 	}{
 		{
 			name: "addition",
-			source: `@ route /add
+			source: `@ GET /add
   $ result = 10 + 5
   > result`,
 			params:   nil,
@@ -420,7 +420,7 @@ func TestIntegration_Expressions(t *testing.T) {
 		},
 		{
 			name: "multiplication",
-			source: `@ route /mul
+			source: `@ GET /mul
   $ result = 6 * 7
   > result`,
 			params:   nil,
@@ -428,7 +428,7 @@ func TestIntegration_Expressions(t *testing.T) {
 		},
 		{
 			name: "string concat",
-			source: `@ route /greet/:name
+			source: `@ GET /greet/:name
   $ msg = "Hello, " + name
   > msg`,
 			params:   map[string]string{"name": "World"},
@@ -436,7 +436,7 @@ func TestIntegration_Expressions(t *testing.T) {
 		},
 		{
 			name: "complex arithmetic",
-			source: `@ route /complex
+			source: `@ GET /complex
   $ a = 10
   $ b = 20
   $ c = a + b * 2
@@ -469,7 +469,7 @@ func TestIntegration_Expressions(t *testing.T) {
 
 // Benchmark full pipeline
 func BenchmarkIntegration_FullPipeline(b *testing.B) {
-	source := `@ route /hello
+	source := `@ GET /hello
   > {message: "Hello, World!"}`
 
 	for i := 0; i < b.N; i++ {
@@ -490,7 +490,7 @@ func BenchmarkIntegration_ComplexRoute(b *testing.B) {
   name: str!
 }
 
-@ route /api/users/:id [GET]
+@ GET /api/users/:id
   + auth(jwt)
   + ratelimit(100/min)
   $ user = {id: id, name: "Test"}

@@ -15,7 +15,7 @@ func TestDocumentManager(t *testing.T) {
   email: str!
 }
 
-@ route /api/users [GET]
+@ GET /api/users
   > {users: []}
 `
 
@@ -89,7 +89,7 @@ func TestDocumentParsing(t *testing.T) {
   name: str!
 }
 
-@ route /api/user [GET]
+@ GET /api/user
   > {name: "test"}
 `
 
@@ -355,7 +355,7 @@ func TestDocumentGetAll(t *testing.T) {
 
 	// Open multiple documents
 	dm.Open("file:///test1.abc", 1, ": User { name: str! }")
-	dm.Open("file:///test2.abc", 1, "@ route /test [GET]\n  > {}")
+	dm.Open("file:///test2.abc", 1, "@ GET /test\n  > {}")
 	dm.Open("file:///test3.abc", 1, ": Product { price: int! }")
 
 	all := dm.GetAll()

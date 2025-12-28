@@ -25,7 +25,7 @@ func TestImprovedErrorMessages(t *testing.T) {
 		},
 		{
 			name: "missing route path",
-			input: `@ route [GET] -> User
+			input: `@ GET [GET] -> User
   > { name: "test" }`,
 			expectError: true,
 			errorCheck: func(err error) bool {
@@ -54,7 +54,7 @@ func TestImprovedErrorMessages(t *testing.T) {
 		},
 		{
 			name: "unterminated string",
-			input: `@ route /test [GET]
+			input: `@ GET /test
   $ msg = "unterminated string
   > msg`,
 			expectError: true,
@@ -65,7 +65,7 @@ func TestImprovedErrorMessages(t *testing.T) {
 		},
 		{
 			name: "invalid character",
-			input: `@ route /test [GET]
+			input: `@ GET /test
   $ msg = "hello" ; invalid semicolon`,
 			expectError: true,
 			errorCheck: func(err error) bool {
@@ -179,12 +179,12 @@ func TestParserErrorTypes(t *testing.T) {
 		},
 		{
 			name: "invalid statement",
-			input: `@ route /test [GET]
+			input: `@ GET /test
   invalid statement here`,
 		},
 		{
 			name: "missing equals in assignment",
-			input: `@ route /test [GET]
+			input: `@ GET /test
   $ msg "hello"`,
 		},
 	}

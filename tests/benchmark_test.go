@@ -24,7 +24,7 @@ func parseSource(source string) (*interpreter.Module, error) {
 
 // BenchmarkCompilation benchmarks the compilation process
 func BenchmarkCompilation(b *testing.B) {
-	source := `@ route /test
+	source := `@ GET /test
   > {status: "ok"}`
 
 	module, err := parseSource(source)
@@ -45,10 +45,10 @@ func BenchmarkCompilation(b *testing.B) {
 // BenchmarkCompilationSmallProgram benchmarks small program compilation
 func BenchmarkCompilationSmallProgram(b *testing.B) {
 	source := `
-@ route /hello
+@ GET /hello
   > {message: "Hello, World!"}
 
-@ route /greet/:name
+@ GET /greet/:name
   > {message: "Hello, " + name + "!"}
 `
 
@@ -82,20 +82,20 @@ func BenchmarkCompilationMediumProgram(b *testing.B) {
   message: str!
 }
 
-@ route /api/users -> List[User]
+@ GET /api/users -> List[User]
   + auth(jwt)
   + ratelimit(100/min)
   % db: Database
   $ users = db.users.all()
   > users
 
-@ route /api/users/:id -> User | Error
+@ GET /api/users/:id -> User | Error
   + auth(jwt)
   % db: Database
   $ user = db.users.get(id)
   > user
 
-@ route /api/users [POST] -> User | Error
+@ POST /api/users -> User | Error
   + auth(jwt, role: admin)
   < input: CreateUserInput
   ! validate input {
@@ -205,7 +205,7 @@ func BenchmarkStackPop(b *testing.B) {
 
 // BenchmarkCompileAndExecute benchmarks full compile + execute cycle
 func BenchmarkCompileAndExecute(b *testing.B) {
-	source := `@ route /test
+	source := `@ GET /test
   > {status: "ok"}`
 
 	module, err := parseSource(source)
@@ -248,7 +248,7 @@ func BenchmarkCompilerCreation(b *testing.B) {
 
 // BenchmarkParallelCompilation benchmarks parallel compilation
 func BenchmarkParallelCompilation(b *testing.B) {
-	source := `@ route /test
+	source := `@ GET /test
   > {status: "ok"}`
 
 	module, err := parseSource(source)
@@ -347,7 +347,7 @@ func BenchmarkTypeChecking(b *testing.B) {
 
 	source := `
 : User { id: int!, name: str! }
-@ route /user -> User
+@ GET /user -> User
   > {id: 123, name: "test"}
 `
 
@@ -367,7 +367,7 @@ func BenchmarkTypeChecking(b *testing.B) {
 
 // BenchmarkMemoryAllocation tracks memory allocation patterns
 func BenchmarkMemoryAllocation(b *testing.B) {
-	source := `@ route /test
+	source := `@ GET /test
   > {status: "ok"}`
 
 	module, err := parseSource(source)
@@ -391,7 +391,7 @@ func BenchmarkMemoryAllocation(b *testing.B) {
 func BenchmarkLexing(b *testing.B) {
 	b.Skip("Skipping until lexer FFI is implemented")
 
-	source := `@ route /test
+	source := `@ GET /test
   > {status: "ok"}`
 
 	// TODO: When lexer is accessible:
@@ -427,24 +427,24 @@ func BenchmarkComparisonWithExamples(b *testing.B) {
 	}{
 		{
 			name: "HelloWorld",
-			source: `@ route /hello
+			source: `@ GET /hello
   > {message: "Hello, World!"}`,
 		},
 		{
 			name: "PathParam",
-			source: `@ route /greet/:name
+			source: `@ GET /greet/:name
   > {message: "Hello, " + name + "!"}`,
 		},
 		{
 			name: "WithAuth",
-			source: `@ route /protected
+			source: `@ GET /protected
   + auth(jwt)
   > {data: "secret"}`,
 		},
 		{
 			name: "TypeDefinition",
 			source: `: User { id: int!, name: str! }
-@ route /user -> User
+@ GET /user -> User
   > {id: 1, name: "test"}`,
 		},
 	}
@@ -514,7 +514,7 @@ func generateLargeProgram(numRoutes int) string {
 
 	// Add routes
 	for i := 0; i < numRoutes; i++ {
-		program += fmt.Sprintf(`@ route /api/resource%d/:id -> User | Error
+		program += fmt.Sprintf(`@ GET /api/resource%d/:id -> User | Error
   + auth(jwt)
   %% db: Database
   $ result = db.resource%d.get(id)

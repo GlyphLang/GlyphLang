@@ -123,7 +123,7 @@ func TestLexer_Division(t *testing.T) {
 }
 
 func TestParser_SimpleRoute(t *testing.T) {
-	source := `@ route /hello
+	source := `@ GET /hello
   > {message: "Hello, World!"}`
 
 	lexer := NewLexer(source)
@@ -161,7 +161,7 @@ func TestParser_SimpleRoute(t *testing.T) {
 }
 
 func TestParser_RouteWithPathParam(t *testing.T) {
-	source := `@ route /users/:id [GET]
+	source := `@ GET /users/:id
   > {id: id}`
 
 	lexer := NewLexer(source)
@@ -241,7 +241,7 @@ func TestParser_TypeDef(t *testing.T) {
 }
 
 func TestParser_RouteWithMiddleware(t *testing.T) {
-	source := `@ route /protected
+	source := `@ GET /protected
   + auth(jwt)
   + ratelimit(100/min)
   > {status: "ok"}`
@@ -289,7 +289,7 @@ func TestParser_RouteWithMiddleware(t *testing.T) {
 }
 
 func TestParser_RouteWithQueryParams(t *testing.T) {
-	source := `@ route /api/search [GET]
+	source := `@ GET /api/search
   ? q: str!
   ? page: int = 1
   ? limit: int = 20
@@ -374,7 +374,7 @@ func TestParser_RouteWithQueryParams(t *testing.T) {
 }
 
 func TestParser_Assignment(t *testing.T) {
-	source := `@ route /test
+	source := `@ GET /test
   $ x = 42
   > {value: x}`
 
@@ -410,7 +410,7 @@ func TestParser_Assignment(t *testing.T) {
 }
 
 func TestParser_BinaryOp(t *testing.T) {
-	source := `@ route /calc
+	source := `@ GET /calc
   $ result = 10 + 20 * 2
   > {result: result}`
 
@@ -496,7 +496,7 @@ func TestParser_ComplexPathParameters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			source := fmt.Sprintf("@ route %s\n  > {ok: true}", tt.path)
+			source := fmt.Sprintf("@ GET %s\n  > {ok: true}", tt.path)
 			lexer := NewLexer(source)
 			tokens, err := lexer.Tokenize()
 			require.NoError(t, err)
@@ -528,7 +528,7 @@ func TestParser_ReturnTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			source := fmt.Sprintf("@ route /test %s\n  > {ok: true}", tt.returnTypeStr)
+			source := fmt.Sprintf("@ GET /test %s\n  > {ok: true}", tt.returnTypeStr)
 			lexer := NewLexer(source)
 			tokens, err := lexer.Tokenize()
 			require.NoError(t, err)
@@ -546,7 +546,7 @@ func TestParser_ReturnTypes(t *testing.T) {
 
 // Test multiple middlewares
 func TestParser_MultipleMiddlewares(t *testing.T) {
-	source := `@ route /api/admin
+	source := `@ GET /api/admin
   + auth(jwt, role: admin)
   + ratelimit(50/min)
   > {status: "ok"}`
@@ -580,25 +580,25 @@ func TestParser_ComplexExpressions(t *testing.T) {
 	}{
 		{
 			name: "nested arithmetic",
-			source: `@ route /calc
+			source: `@ GET /calc
   $ result = (10 + 20) * (5 - 2)
   > {result: result}`,
 		},
 		{
 			name: "string concatenation",
-			source: `@ route /concat
+			source: `@ GET /concat
   $ full = "Hello, " + name + "!"
   > {text: full}`,
 		},
 		{
 			name: "comparison operators",
-			source: `@ route /compare
+			source: `@ GET /compare
   $ check = age >= 18
   > {adult: check}`,
 		},
 		{
 			name: "field access",
-			source: `@ route /field
+			source: `@ GET /field
   $ name = user.profile.name
   > {name: name}`,
 		},
@@ -626,22 +626,22 @@ func TestParser_ObjectLiterals(t *testing.T) {
 	}{
 		{
 			name: "simple object",
-			source: `@ route /obj
+			source: `@ GET /obj
   > {name: "test", age: 30}`,
 		},
 		{
 			name: "nested object",
-			source: `@ route /nested
+			source: `@ GET /nested
   > {user: {name: "test", profile: {bio: "dev"}}}`,
 		},
 		{
 			name: "object with expressions",
-			source: `@ route /expr
+			source: `@ GET /expr
   > {total: price * quantity, discount: true}`,
 		},
 		{
 			name: "object with variables",
-			source: `@ route /vars
+			source: `@ GET /vars
   $ x = 42
   > {value: x, doubled: x * 2}`,
 		},
@@ -669,17 +669,17 @@ func TestParser_FunctionCalls(t *testing.T) {
 	}{
 		{
 			name: "no args",
-			source: `@ route /time
+			source: `@ GET /time
   > {now: time.now()}`,
 		},
 		{
 			name: "with args",
-			source: `@ route /add
+			source: `@ GET /add
   > {result: add(10, 20)}`,
 		},
 		{
 			name: "nested calls",
-			source: `@ route /nested
+			source: `@ GET /nested
   > {result: max(min(x, 10), 5)}`,
 		},
 	}
@@ -700,10 +700,10 @@ func TestParser_FunctionCalls(t *testing.T) {
 
 // Test multiple routes in one file
 func TestParser_MultipleRoutes(t *testing.T) {
-	source := `@ route /hello
+	source := `@ GET /hello
   > {message: "Hello"}
 
-@ route /goodbye
+@ GET /goodbye
   > {message: "Goodbye"}`
 
 	lexer := NewLexer(source)
@@ -774,7 +774,7 @@ func TestParser_ErrorCases(t *testing.T) {
 		},
 		{
 			name:        "empty route body",
-			source:      "@ route /test",
+			source:      "@ GET /test",
 			shouldError: false, // Empty body might be allowed
 		},
 	}
@@ -810,7 +810,7 @@ func TestParser_IfStatements(t *testing.T) {
 	}{
 		{
 			name: "if with else",
-			source: `@ route /check/:age
+			source: `@ GET /check/:age
   if age >= 18 {
     > {status: "adult"}
   } else {
@@ -819,14 +819,14 @@ func TestParser_IfStatements(t *testing.T) {
 		},
 		{
 			name: "if without else",
-			source: `@ route /check
+			source: `@ GET /check
   if true {
     > {ok: true}
   }`,
 		},
 		{
 			name: "if with multiple statements",
-			source: `@ route /check
+			source: `@ GET /check
   if x > 10 {
     $ result = "high"
     > {result: result}
@@ -837,7 +837,7 @@ func TestParser_IfStatements(t *testing.T) {
 		},
 		{
 			name: "nested if",
-			source: `@ route /nested
+			source: `@ GET /nested
   if x > 0 {
     if y > 0 {
       > {quadrant: 1}
@@ -879,25 +879,25 @@ func TestParser_LogicalOperators(t *testing.T) {
 	}{
 		{
 			name: "AND operator",
-			source: `@ route /and
+			source: `@ GET /and
   $ result = true && false
   > {result: result}`,
 		},
 		{
 			name: "OR operator",
-			source: `@ route /or
+			source: `@ GET /or
   $ result = true || false
   > {result: result}`,
 		},
 		{
 			name: "complex logical expression",
-			source: `@ route /complex
+			source: `@ GET /complex
   $ result = (x > 10 && y < 20) || z == 0
   > {result: result}`,
 		},
 		{
 			name: "if with logical operators",
-			source: `@ route /check
+			source: `@ GET /check
   if age >= 18 && hasLicense {
     > {canDrive: true}
   } else {
@@ -906,7 +906,7 @@ func TestParser_LogicalOperators(t *testing.T) {
 		},
 		{
 			name: "multiple AND/OR",
-			source: `@ route /multi
+			source: `@ GET /multi
   $ result = a && b && c || d || e
   > {result: result}`,
 		},
@@ -937,43 +937,43 @@ func TestParser_ArrayLiterals(t *testing.T) {
 	}{
 		{
 			name: "empty array",
-			source: `@ route /empty
+			source: `@ GET /empty
   $ arr = []
   > {array: arr}`,
 		},
 		{
 			name: "integer array",
-			source: `@ route /ints
+			source: `@ GET /ints
   $ numbers = [1, 2, 3, 4, 5]
   > {numbers: numbers}`,
 		},
 		{
 			name: "string array",
-			source: `@ route /strings
+			source: `@ GET /strings
   $ names = ["Alice", "Bob", "Charlie"]
   > {names: names}`,
 		},
 		{
 			name: "mixed array",
-			source: `@ route /mixed
+			source: `@ GET /mixed
   $ items = [1, "two", true, 4.5]
   > {items: items}`,
 		},
 		{
 			name: "nested arrays",
-			source: `@ route /nested
+			source: `@ GET /nested
   $ matrix = [[1, 2], [3, 4]]
   > {matrix: matrix}`,
 		},
 		{
 			name: "array with expressions",
-			source: `@ route /expr
+			source: `@ GET /expr
   $ values = [1 + 1, x * 2, y]
   > {values: values}`,
 		},
 		{
 			name: "array of objects",
-			source: `@ route /objects
+			source: `@ GET /objects
   $ users = [
     {name: "Alice", age: 30},
     {name: "Bob", age: 25}
@@ -1014,10 +1014,10 @@ func TestParser_HelloWorldExample(t *testing.T) {
   timestamp: int
 }
 
-@ route /hello
+@ GET /hello
   > {text: "Hello, World!", timestamp: 1234567890}
 
-@ route /greet/:name -> Message
+@ GET /greet/:name -> Message
   $ message = {
     text: "Hello, " + name + "!",
     timestamp: time.now()
@@ -1051,7 +1051,7 @@ func TestParser_HelloWorldExample(t *testing.T) {
 
 // Benchmark parser performance
 func BenchmarkParser_SimpleRoute(b *testing.B) {
-	source := `@ route /hello
+	source := `@ GET /hello
   > {message: "Hello, World!"}`
 
 	for i := 0; i < b.N; i++ {
@@ -1068,7 +1068,7 @@ func BenchmarkParser_ComplexModule(b *testing.B) {
   name: str!
 }
 
-@ route /api/users/:id [GET]
+@ GET /api/users/:id
   + auth(jwt)
   + ratelimit(100/min)
   $ user = db.users.get(id)
@@ -1085,7 +1085,7 @@ func BenchmarkParser_ComplexModule(b *testing.B) {
 // Test While Loops
 
 func TestParser_SimpleWhileLoop(t *testing.T) {
-	source := `@ route /test
+	source := `@ GET /test
   $ i = 0
   while i < 5 {
     $ i = i + 1
@@ -1120,7 +1120,7 @@ func TestParser_SimpleWhileLoop(t *testing.T) {
 }
 
 func TestParser_NestedWhileLoops(t *testing.T) {
-	source := `@ route /test
+	source := `@ GET /test
   $ i = 0
   while i < 3 {
     $ j = 0
@@ -1155,7 +1155,7 @@ func TestParser_NestedWhileLoops(t *testing.T) {
 }
 
 func TestParser_WhileWithComplexCondition(t *testing.T) {
-	source := `@ route /test
+	source := `@ GET /test
   $ i = 0
   $ max = 10
   while i < max && i < 100 {
@@ -1185,7 +1185,7 @@ func TestParser_WhileWithComplexCondition(t *testing.T) {
 }
 
 func TestParser_WhileWithMultipleStatements(t *testing.T) {
-	source := `@ route /test
+	source := `@ GET /test
   $ sum = 0
   $ i = 0
   while i < 5 {
@@ -1215,7 +1215,7 @@ func TestParser_WhileWithMultipleStatements(t *testing.T) {
 }
 
 func TestParser_WhileWithIfStatement(t *testing.T) {
-	source := `@ route /test
+	source := `@ GET /test
   $ sum = 0
   $ i = 0
   while i < 10 {
@@ -1251,7 +1251,7 @@ func TestParser_WhileWithIfStatement(t *testing.T) {
 
 // Test for loop parsing
 func TestParser_ForLoop_SimpleArray(t *testing.T) {
-	source := `@ route /test
+	source := `@ GET /test
   $ items = [1, 2, 3]
   for item in items {
     $ x = item + 1
@@ -1289,7 +1289,7 @@ func TestParser_ForLoop_SimpleArray(t *testing.T) {
 }
 
 func TestParser_ForLoop_WithIndex(t *testing.T) {
-	source := `@ route /test
+	source := `@ GET /test
   for index, value in array {
     $ result = index + value
   }
@@ -1322,7 +1322,7 @@ func TestParser_ForLoop_WithIndex(t *testing.T) {
 }
 
 func TestParser_ForLoop_ArrayLiteral(t *testing.T) {
-	source := `@ route /test
+	source := `@ GET /test
   for item in [1, 2, 3] {
     $ x = item
   }
@@ -1350,7 +1350,7 @@ func TestParser_ForLoop_ArrayLiteral(t *testing.T) {
 }
 
 func TestParser_ForLoop_ObjectIteration(t *testing.T) {
-	source := `@ route /test
+	source := `@ GET /test
   for key, value in {name: "Alice", age: 30} {
     $ output = key + value
   }
@@ -1382,7 +1382,7 @@ func TestParser_ForLoop_ObjectIteration(t *testing.T) {
 }
 
 func TestParser_ForLoop_Nested(t *testing.T) {
-	source := `@ route /test
+	source := `@ GET /test
   for row in rows {
     for col in row {
       $ cell = col
@@ -2083,7 +2083,7 @@ func TestParser_MixedModule_AllDirectiveTypes(t *testing.T) {
 		},
 		{
 			name: "Route",
-			source: `@ route /users [GET]
+			source: `@ GET /users
   > {users: []}`,
 			check: func(t *testing.T, item interpreter.Item) {
 				_, ok := item.(*interpreter.Route)
@@ -2149,7 +2149,7 @@ func TestParser_UnaryOperators(t *testing.T) {
 	}{
 		{
 			name: "unary not operator",
-			source: `@ route /test
+			source: `@ GET /test
   $ valid = !false
   > {valid: valid}`,
 			checkFn: func(t *testing.T, module *interpreter.Module) {
@@ -2162,7 +2162,7 @@ func TestParser_UnaryOperators(t *testing.T) {
 		},
 		{
 			name: "unary negation",
-			source: `@ route /test
+			source: `@ GET /test
   $ neg = -42
   > {neg: neg}`,
 			checkFn: func(t *testing.T, module *interpreter.Module) {
@@ -2175,7 +2175,7 @@ func TestParser_UnaryOperators(t *testing.T) {
 		},
 		{
 			name: "chained unary not",
-			source: `@ route /test
+			source: `@ GET /test
   $ result = !!true
   > {result: result}`,
 			checkFn: func(t *testing.T, module *interpreter.Module) {
@@ -2214,21 +2214,21 @@ func TestParser_ArrayIndexing(t *testing.T) {
 	}{
 		{
 			name: "simple array index",
-			source: `@ route /test
+			source: `@ GET /test
   $ arr = [1, 2, 3]
   $ first = arr[0]
   > {first: first}`,
 		},
 		{
 			name: "nested array index",
-			source: `@ route /test
+			source: `@ GET /test
   $ matrix = [[1, 2], [3, 4]]
   $ val = matrix[0][1]
   > {val: val}`,
 		},
 		{
 			name: "array index with expression",
-			source: `@ route /test
+			source: `@ GET /test
   $ arr = [10, 20, 30]
   $ i = 1
   $ val = arr[i]
@@ -2262,7 +2262,7 @@ func TestParser_RateLimitVariations(t *testing.T) {
 	}{
 		{
 			name: "integer with slash format",
-			source: `@ route /test
+			source: `@ GET /test
   + ratelimit(50/sec)
   > {ok: true}`,
 			expectedReqs:   50,
@@ -2270,7 +2270,7 @@ func TestParser_RateLimitVariations(t *testing.T) {
 		},
 		{
 			name: "string format",
-			source: `@ route /test
+			source: `@ GET /test
   + ratelimit("200/hour")
   > {ok: true}`,
 			expectedReqs:   200,
@@ -2305,17 +2305,17 @@ func TestParser_ErrorHandling(t *testing.T) {
 	}{
 		{
 			name:        "unclosed brace",
-			source:      `@ route /test { $ x = 1`,
+			source:      `@ GET /test { $ x = 1`,
 			expectError: true,
 		},
 		{
 			name:        "invalid rate limit",
-			source:      `@ route /test + ratelimit() > {ok: true}`,
+			source:      `@ GET /test + ratelimit() > {ok: true}`,
 			expectError: true,
 		},
 		{
 			name:        "missing return value",
-			source:      `@ route /test >`,
+			source:      `@ GET /test >`,
 			expectError: true,
 		},
 	}
@@ -2364,7 +2364,7 @@ func TestParser_TypeDefWithoutColon(t *testing.T) {
 
 // TestParser_ValidationStatement tests ? validation syntax
 func TestParser_ValidationStatement(t *testing.T) {
-	source := `@ route /validate
+	source := `@ GET /validate
   ? isValid(input)
   > {valid: true}`
 
@@ -2382,7 +2382,7 @@ func TestParser_ValidationStatement(t *testing.T) {
 
 // TestParser_ExpressionStatements tests standalone expression statements
 func TestParser_ExpressionStatements(t *testing.T) {
-	source := `@ route /test
+	source := `@ GET /test
   $ _ = log("starting request")
   $ result = compute()
   > {result: result}`
@@ -2407,13 +2407,13 @@ func TestParser_MoreStatementTypes(t *testing.T) {
 	}{
 		{
 			name: "typed variable declaration",
-			source: `@ route /test
+			source: `@ GET /test
   $ count: int = 0
   > {count: count}`,
 		},
 		{
 			name: "else-if chain",
-			source: `@ route /test
+			source: `@ GET /test
   $ x = 5
   if x > 10 {
     $ result = "big"
@@ -2426,7 +2426,7 @@ func TestParser_MoreStatementTypes(t *testing.T) {
 		},
 		{
 			name: "switch statement",
-			source: `@ route /test
+			source: `@ GET /test
   $ day = 1
   switch day {
     case 1 {
@@ -2526,13 +2526,13 @@ func TestParser_AuthConfigVariations(t *testing.T) {
 	}{
 		{
 			name: "jwt auth with role",
-			source: `@ route /admin
+			source: `@ GET /admin
   + auth(jwt, admin)
   > {access: "granted"}`,
 		},
 		{
 			name: "basic auth",
-			source: `@ route /protected
+			source: `@ GET /protected
   + auth(basic)
   > {protected: true}`,
 		},
@@ -2562,7 +2562,7 @@ func TestParser_LogicalOps(t *testing.T) {
 	}{
 		{
 			name: "logical and",
-			source: `@ route /test
+			source: `@ GET /test
   $ a = true
   $ b = false
   if a && b {
@@ -2572,7 +2572,7 @@ func TestParser_LogicalOps(t *testing.T) {
 		},
 		{
 			name: "logical or",
-			source: `@ route /test
+			source: `@ GET /test
   $ a = true
   $ b = false
   if a || b {
@@ -2604,7 +2604,7 @@ func TestParser_ComparisonOperators(t *testing.T) {
 	}{
 		{
 			name: "less than or equal",
-			source: `@ route /test
+			source: `@ GET /test
   $ x = 5
   if x <= 10 {
     > {result: "small"}
@@ -2613,7 +2613,7 @@ func TestParser_ComparisonOperators(t *testing.T) {
 		},
 		{
 			name: "greater than or equal",
-			source: `@ route /test
+			source: `@ GET /test
   $ x = 15
   if x >= 10 {
     > {result: "big"}
@@ -2622,7 +2622,7 @@ func TestParser_ComparisonOperators(t *testing.T) {
 		},
 		{
 			name: "not equal",
-			source: `@ route /test
+			source: `@ GET /test
   $ x = 5
   if x != 10 {
     > {result: "not ten"}
@@ -2631,7 +2631,7 @@ func TestParser_ComparisonOperators(t *testing.T) {
 		},
 		{
 			name: "equality",
-			source: `@ route /test
+			source: `@ GET /test
   $ x = 10
   if x == 10 {
     > {result: "ten"}
@@ -2667,19 +2667,19 @@ func TestParser_ParserErrors(t *testing.T) {
 		},
 		{
 			name:   "incomplete route",
-			source: `@ route /test`,
+			source: `@ GET /test`,
 		},
 		{
 			name:   "incomplete if statement",
-			source: `@ route /test if x {`,
+			source: `@ GET /test if x {`,
 		},
 		{
 			name:   "incomplete while loop",
-			source: `@ route /test while true {`,
+			source: `@ GET /test while true {`,
 		},
 		{
 			name:   "incomplete for loop",
-			source: `@ route /test for x in {`,
+			source: `@ GET /test for x in {`,
 		},
 	}
 
@@ -2704,19 +2704,19 @@ func TestParser_FieldAccessExpressions(t *testing.T) {
 	}{
 		{
 			name: "simple field access",
-			source: `@ route /test
+			source: `@ GET /test
   $ name = user.name
   > {name: name}`,
 		},
 		{
 			name: "nested field access",
-			source: `@ route /test
+			source: `@ GET /test
   $ city = user.address.city
   > {city: city}`,
 		},
 		{
 			name: "method call on object",
-			source: `@ route /test
+			source: `@ GET /test
   $ len = items.length()
   > {len: len}`,
 		},
@@ -2739,7 +2739,7 @@ func TestParser_FieldAccessExpressions(t *testing.T) {
 
 // TestParser_StringConcatenation tests string concatenation
 func TestParser_StringConcatenation(t *testing.T) {
-	source := `@ route /test
+	source := `@ GET /test
   $ name = "World"
   $ greeting = "Hello, " + name + "!"
   > {greeting: greeting}`

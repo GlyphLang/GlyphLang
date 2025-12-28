@@ -111,7 +111,7 @@ func TestParserTypeDefinitions(t *testing.T) {
   id: int!
   name: str!
 }
-@ route /users/:id -> User
+@ GET /users/:id -> User
   > {id: id, name: "test"}`,
 		},
 		{
@@ -121,7 +121,7 @@ func TestParserTypeDefinitions(t *testing.T) {
   bio: str
   avatar: str
 }
-@ route /profile/:id -> Profile
+@ GET /profile/:id -> Profile
   > {id: id, bio: "", avatar: ""}`,
 		},
 		{
@@ -132,7 +132,7 @@ func TestParserTypeDefinitions(t *testing.T) {
   active: bool!
   tags: List[str]
 }
-@ route /data -> Data
+@ GET /data -> Data
   > {count: 1, score: 1.5, active: true, tags: ["a", "b"]}`,
 		},
 		{
@@ -145,7 +145,7 @@ func TestParserTypeDefinitions(t *testing.T) {
   id: int!
   title: str!
 }
-@ route /users/:id -> User
+@ GET /users/:id -> User
   > {id: id}`,
 		},
 	}
@@ -176,58 +176,58 @@ func TestParserRouteDefinitions(t *testing.T) {
 	}{
 		{
 			name: "Simple GET route",
-			source: `@ route /hello
+			source: `@ GET /hello
   > {message: "Hello"}`,
 		},
 		{
 			name: "Route with path parameter",
-			source: `@ route /users/:id
+			source: `@ GET /users/:id
   > {id: id}`,
 		},
 		{
 			name: "Route with multiple path parameters",
-			source: `@ route /users/:userId/posts/:postId
+			source: `@ GET /users/:userId/posts/:postId
   > {userId: userId, postId: postId}`,
 		},
 		{
 			name: "POST route",
-			source: `@ route /api/users [POST]
+			source: `@ POST /api/users
   < input: CreateUserInput
   > {created: true}`,
 		},
 		{
 			name: "Route with return type",
-			source: `@ route /api/users -> List[User]
+			source: `@ GET /api/users -> List[User]
   > []`,
 		},
 		{
 			name: "Route with result type",
-			source: `@ route /api/data/:id -> Data | Error
+			source: `@ GET /api/data/:id -> Data | Error
   > {error: "not found"}`,
 		},
 		{
 			name: "Route with middleware",
-			source: `@ route /protected
+			source: `@ GET /protected
   + auth(jwt)
   > {status: "ok"}`,
 		},
 		{
 			name: "Route with multiple middlewares",
-			source: `@ route /api/admin
+			source: `@ GET /api/admin
   + auth(jwt, role: admin)
   + ratelimit(100/min)
   > {status: "ok"}`,
 		},
 		{
 			name: "Route with database query",
-			source: `@ route /api/users/:id
+			source: `@ GET /api/users/:id
   % db: Database
   $ user = db.users.get(id)
   > user`,
 		},
 		{
 			name: "Route with validation",
-			source: `@ route /api/create [POST]
+			source: `@ POST /api/create
   < input: CreateInput
   ! validate input {
     name: str(min=1, max=100)
@@ -263,32 +263,32 @@ func TestParserExpressions(t *testing.T) {
 	}{
 		{
 			name: "String literal",
-			source: `@ route /test
+			source: `@ GET /test
   > {text: "Hello, World!"}`,
 		},
 		{
 			name: "Integer literal",
-			source: `@ route /test
+			source: `@ GET /test
   > {count: 42}`,
 		},
 		{
 			name: "Float literal",
-			source: `@ route /test
+			source: `@ GET /test
   > {score: 95.5}`,
 		},
 		{
 			name: "Boolean literal",
-			source: `@ route /test
+			source: `@ GET /test
   > {active: true, disabled: false}`,
 		},
 		{
 			name: "String concatenation",
-			source: `@ route /greet/:name
+			source: `@ GET /greet/:name
   > {message: "Hello, " + name + "!"}`,
 		},
 		{
 			name: "Arithmetic operations",
-			source: `@ route /calc
+			source: `@ GET /calc
   > {
     sum: 10 + 20,
     diff: 100 - 50,
@@ -298,7 +298,7 @@ func TestParserExpressions(t *testing.T) {
 		},
 		{
 			name: "Comparison operations",
-			source: `@ route /compare
+			source: `@ GET /compare
   > {
     equal: 5 == 5,
     notEqual: 5 != 10,
@@ -308,29 +308,29 @@ func TestParserExpressions(t *testing.T) {
 		},
 		{
 			name: "Variable reference",
-			source: `@ route /test/:id
+			source: `@ GET /test/:id
   $ value = id
   > {id: value}`,
 		},
 		{
 			name: "Field access",
-			source: `@ route /test
+			source: `@ GET /test
   $ obj = {name: "Alice"}
   > {name: obj.name}`,
 		},
 		{
 			name: "Function call",
-			source: `@ route /test
+			source: `@ GET /test
   > {timestamp: now()}`,
 		},
 		{
 			name: "Array literal",
-			source: `@ route /test
+			source: `@ GET /test
   > {numbers: [1, 2, 3, 4, 5]}`,
 		},
 		{
 			name: "Nested object",
-			source: `@ route /test
+			source: `@ GET /test
   > {
     user: {
       id: 1,
@@ -370,13 +370,13 @@ func TestParserStatements(t *testing.T) {
 	}{
 		{
 			name: "Variable assignment",
-			source: `@ route /test
+			source: `@ GET /test
   $ x = 42
   > {value: x}`,
 		},
 		{
 			name: "Multiple assignments",
-			source: `@ route /test
+			source: `@ GET /test
   $ x = 10
   $ y = 20
   $ sum = x + y
@@ -384,12 +384,12 @@ func TestParserStatements(t *testing.T) {
 		},
 		{
 			name: "Return statement",
-			source: `@ route /test
+			source: `@ GET /test
   > {status: "ok"}`,
 		},
 		{
 			name: "If statement",
-			source: `@ route /test/:id
+			source: `@ GET /test/:id
   $ num = id
   if num > 10 {
     > {result: "large"}
@@ -399,7 +399,7 @@ func TestParserStatements(t *testing.T) {
 		},
 		{
 			name: "Database query",
-			source: `@ route /api/users
+			source: `@ GET /api/users
   % db: Database
   $ users = db.query("SELECT * FROM users")
   > users`,
@@ -449,7 +449,7 @@ func TestParserErrorCases(t *testing.T) {
 		},
 		{
 			name:        "Unclosed brace",
-			source:      `@ route /test\n  > {status: "ok"`,
+			source:      `@ GET /test\n  > {status: "ok"`,
 			shouldError: true,
 			description: "Unclosed brace should error",
 		},
@@ -461,19 +461,19 @@ func TestParserErrorCases(t *testing.T) {
 		},
 		{
 			name:        "Empty route body",
-			source:      `@ route /test`,
+			source:      `@ GET /test`,
 			shouldError: true,
 			description: "Route with no body should error",
 		},
 		{
 			name:        "Invalid path parameter",
-			source:      `@ route /users/:`,
+			source:      `@ GET /users/:`,
 			shouldError: true,
 			description: "Empty path parameter name",
 		},
 		{
 			name:        "Mismatched quotes",
-			source:      `@ route /test\n  > {text: "hello}`,
+			source:      `@ GET /test\n  > {text: "hello}`,
 			shouldError: true,
 			description: "Unclosed string literal",
 		},
@@ -526,7 +526,7 @@ func TestParserComments(t *testing.T) {
 		{
 			name: "Line comment",
 			source: `# This is a comment
-@ route /test
+@ GET /test
   > {status: "ok"}`,
 		},
 		{
@@ -536,7 +536,7 @@ func TestParserComments(t *testing.T) {
   id: int!      # User ID
   name: str!    # User name
 }
-@ route /users/:id -> User
+@ GET /users/:id -> User
   > {id: id, name: "test"}`,
 		},
 		{
@@ -544,7 +544,7 @@ func TestParserComments(t *testing.T) {
 			source: `# Example API
 # Version 1.0
 
-@ route /test
+@ GET /test
   # Return OK status
   > {status: "ok"}`,
 		},
@@ -578,7 +578,7 @@ func TestParserWhitespace(t *testing.T) {
 			name: "Extra newlines",
 			source: `
 
-@ route /test
+@ GET /test
 
 
   > {status: "ok"}
@@ -587,12 +587,12 @@ func TestParserWhitespace(t *testing.T) {
 		},
 		{
 			name: "Tabs and spaces",
-			source: `@ route /test
+			source: `@ GET /test
 	  > {status: "ok"}`,
 		},
 		{
 			name: "Compact format",
-			source: `@ route /test
+			source: `@ GET /test
 > {status: "ok"}`,
 		},
 	}
@@ -640,26 +640,26 @@ func TestParserComplexPrograms(t *testing.T) {
   success: bool!
 }
 
-@ route /api/users -> List[User]
+@ GET /api/users -> List[User]
   + auth(jwt)
   % db: Database
   $ users = db.users.all()
   > users
 
-@ route /api/users/:id -> User | Error
+@ GET /api/users/:id -> User | Error
   + auth(jwt)
   % db: Database
   $ user = db.users.get(id)
   > user
 
-@ route /api/users [POST] -> User | Error
+@ POST /api/users -> User | Error
   + auth(jwt)
   < input: CreateUserInput
   % db: Database
   $ user = db.users.create(input)
   > user
 
-@ route /api/users/:id [DELETE] -> DeleteResult
+@ DELETE /api/users/:id -> DeleteResult
   + auth(jwt)
   % db: Database
   $ result = db.users.delete(id)
@@ -667,16 +667,16 @@ func TestParserComplexPrograms(t *testing.T) {
 		},
 		{
 			name: "Multi-route app",
-			source: `@ route /health
+			source: `@ GET /health
   > {status: "ok", timestamp: now()}
 
-@ route /version
+@ GET /version
   > {version: "1.0.0"}
 
-@ route /greet/:name
+@ GET /greet/:name
   > {message: "Hello, " + name + "!"}
 
-@ route /api/data/:id
+@ GET /api/data/:id
   % db: Database
   $ data = db.get(id)
   > data`,
@@ -717,17 +717,17 @@ func TestParserEdgeCases(t *testing.T) {
 		},
 		{
 			name: "Unicode in strings",
-			source: `@ route /test
+			source: `@ GET /test
   > {message: "Hello 世界 🌍"}`,
 		},
 		{
 			name: "Very long string",
-			source: `@ route /test
+			source: `@ GET /test
   > {text: "` + strings.Repeat("a", 1000) + `"}`,
 		},
 		{
 			name: "Deeply nested object",
-			source: `@ route /test
+			source: `@ GET /test
   > {
     a: {
       b: {

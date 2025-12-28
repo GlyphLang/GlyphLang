@@ -426,7 +426,7 @@ func TestExpressionEvaluationIntegration(t *testing.T) {
 func TestCompilerVMRoundTrip(t *testing.T) {
 	helper := NewTestHelper(t)
 
-	source := `@ route /test
+	source := `@ GET /test
   > {status: "ok", message: "Test passed"}`
 
 	// Parse source to module

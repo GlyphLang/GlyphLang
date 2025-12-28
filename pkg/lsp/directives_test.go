@@ -162,7 +162,7 @@ func TestDirectiveDocumentSymbols(t *testing.T) {
   > "Queue"
 }
 
-@ route /api/users [GET] {
+@ GET /api/users {
   > {users: []}
 }
 `

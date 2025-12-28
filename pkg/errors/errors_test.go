@@ -44,7 +44,7 @@ func TestNewCompileError(t *testing.T) {
 
 // Test ParseError creation
 func TestNewParseError(t *testing.T) {
-	source := `@ route /users GET {
+	source := `@ GET /users GET {
     $ users = [1, 2, 3
 }`
 	snippet := ExtractSourceSnippet(source, 2)

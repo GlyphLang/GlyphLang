@@ -53,7 +53,7 @@ func TestConvertHTTPMethod(t *testing.T) {
 }
 
 func TestParseSource(t *testing.T) {
-	source := `@ route /hello
+	source := `@ GET /hello
   > {text: "Hello, World!"}`
 
 	module, err := parseSource(source)
@@ -72,15 +72,15 @@ func TestGetHelloWorldTemplate(t *testing.T) {
 	template := getHelloWorldTemplate()
 	assert.NotEmpty(t, template)
 	assert.Contains(t, template, "Hello World Example")
-	assert.Contains(t, template, "@ route /hello")
+	assert.Contains(t, template, "@ GET /hello")
 }
 
 func TestGetRestAPITemplate(t *testing.T) {
 	template := getRestAPITemplate()
 	assert.NotEmpty(t, template)
 	assert.Contains(t, template, "Example REST API")
-	assert.Contains(t, template, "@ route /api/users")
-	assert.Contains(t, template, "@ route /health")
+	assert.Contains(t, template, "@ GET /api/users")
+	assert.Contains(t, template, "@ GET /health")
 }
 
 func TestRunInitCommand(t *testing.T) {

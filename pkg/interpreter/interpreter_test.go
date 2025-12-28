@@ -762,7 +762,7 @@ func TestExtractPathParams_Mismatch(t *testing.T) {
 func TestExecuteRoute_HelloWorldWithObject(t *testing.T) {
 	interp := NewInterpreter()
 
-	// @ route /hello
+	// @ GET /hello
 	//   > {text: "Hello, World!", timestamp: 1234567890}
 	route := &Route{
 		Path:   "/hello",
@@ -791,7 +791,7 @@ func TestExecuteRoute_HelloWorldWithObject(t *testing.T) {
 func TestExecuteRoute_GreetWithObjectAndParams(t *testing.T) {
 	interp := NewInterpreter()
 
-	// @ route /greet/:name -> Message
+	// @ GET /greet/:name -> Message
 	//   $ message = {
 	//     text: "Hello, " + name + "!",
 	//     timestamp: time.now()
@@ -843,7 +843,7 @@ func TestExecuteRoute_GreetWithObjectAndParams(t *testing.T) {
 func TestExecuteRoute_ObjectFieldAccess(t *testing.T) {
 	interp := NewInterpreter()
 
-	// @ route /user-name
+	// @ GET /user-name
 	//   $ user = {name: "Alice", age: 30}
 	//   $ username = user.name
 	//   > username
@@ -882,7 +882,7 @@ func TestExecuteRoute_ObjectFieldAccess(t *testing.T) {
 func TestExecuteRoute_ComplexObjectWithFieldAccess(t *testing.T) {
 	interp := NewInterpreter()
 
-	// @ route /user-info
+	// @ GET /user-info
 	//   $ user = {
 	//     name: "Alice",
 	//     profile: {
@@ -1178,7 +1178,7 @@ func TestEvaluateArray_Nested(t *testing.T) {
 func TestExecuteRoute_WithIfElse(t *testing.T) {
 	interp := NewInterpreter()
 
-	// @ route /check
+	// @ GET /check
 	//   $ age = 20
 	//   if age >= 18 {
 	//     > {status: "adult"}
@@ -1277,7 +1277,7 @@ func TestExecuteRoute_WithIfElse(t *testing.T) {
 func TestExecuteRoute_ArrayInRoute(t *testing.T) {
 	interp := NewInterpreter()
 
-	// @ route /numbers
+	// @ GET /numbers
 	//   $ nums = [1, 2, 3, 4, 5]
 	//   > {numbers: nums}
 	route := &Route{
@@ -2469,7 +2469,7 @@ func TestExecuteSwitch_NoFallthrough(t *testing.T) {
 func TestExecuteSwitch_WithReturnStatement(t *testing.T) {
 	interp := NewInterpreter()
 
-	// @ route /test
+	// @ GET /test
 	//   switch 1 {
 	//     case 1 { > "matched" }
 	//     default { > "no match" }

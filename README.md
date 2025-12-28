@@ -10,7 +10,7 @@
 **GlyphLang** is a domain-specific language for building type-safe REST APIs with bytecode compilation and JIT optimization. Symbol-based syntax reduces token usage by 45% compared to Python, making it ideal for AI code generation.
 
 ```glyph
-@ route /hello/:name [GET]
+@ GET /hello/:name
   $ greeting = "Hello, " + name + "!"
   > {message: greeting}
 ```
@@ -80,10 +80,10 @@ cd GlyphLang && go build -o glyph ./cmd/glyph
 Create `hello.glyph`:
 
 ```glyph
-@ route /hello [GET]
+@ GET /hello
   > {message: "Hello, World!"}
 
-@ route /greet/:name [GET]
+@ GET /greet/:name
   > {message: "Hello, " + name + "!"}
 ```
 
@@ -117,7 +117,7 @@ Visit http://localhost:3000/hello
 ### Routes with Authentication
 
 ```glyph
-@ route /api/users/:id [GET] -> User | Error
+@ GET /api/users/:id -> User | Error
   + auth(jwt)
   + ratelimit(100/min)
   % db: Database
@@ -132,7 +132,7 @@ Visit http://localhost:3000/hello
 ### Pattern Matching
 
 ```glyph
-@ route /status/:code [GET]
+@ GET /status/:code
   $ result = match code {
     200 => "OK"
     201 => "Created"
@@ -148,7 +148,7 @@ Visit http://localhost:3000/hello
 
 ```glyph
 # Basic async block - executes in background, returns Future
-@ route /compute [GET]
+@ GET /compute
   $ future = async {
     $ x = 10
     $ y = 20
@@ -158,7 +158,7 @@ Visit http://localhost:3000/hello
   > {value: result}
 
 # Parallel execution - all requests run concurrently
-@ route /dashboard [GET]
+@ GET /dashboard
   $ userFuture = async { > db.getUser(userId) }
   $ ordersFuture = async { > db.getOrders(userId) }
   $ statsFuture = async { > db.getStats(userId) }
@@ -203,7 +203,7 @@ Visit http://localhost:3000/hello
 # main.glyph
 import "./utils"
 
-@ route /user/:id [GET]
+@ GET /user/:id
   $ name = utils.formatName(user.first, user.last)
   > {displayName: name}
 ```
@@ -212,13 +212,13 @@ import "./utils"
 
 ```glyph
 macro! crud(resource) {
-  @ route /${resource} [GET]
+  @ GET /${resource}
     > db.query("SELECT * FROM ${resource}")
 
-  @ route /${resource}/:id [GET]
+  @ GET /${resource}/:id
     > db.query("SELECT * FROM ${resource} WHERE id = ?", id)
 
-  @ route /${resource} [POST]
+  @ POST /${resource}
     > db.insert("${resource}", input)
 }
 
@@ -233,11 +233,26 @@ glyph run <file>        # Run a Glyph file
 glyph dev <file>        # Development server with hot reload
 glyph compile <file>    # Compile to bytecode
 glyph decompile <file>  # Decompile bytecode
+glyph context [dir]     # Generate AI-optimized project context
+glyph validate <file>   # Validate source with structured errors
 glyph lsp               # Start LSP server
 glyph init              # Initialize new project
 glyph commands <file>   # List CLI commands in a file
 glyph exec <file> <cmd> # Execute a CLI command
 glyph version           # Show version
+```
+
+### AI Agent Commands
+
+```bash
+# Generate context for AI agents
+glyph context --format compact    # Minimal text output
+glyph context --changed           # Show only changes
+glyph context --for route         # Focus on routes only
+
+# Validate with AI-friendly output
+glyph validate main.glyph --ai    # Structured JSON errors
+glyph validate src/ --ai          # Validate directory
 ```
 
 ## Documentation

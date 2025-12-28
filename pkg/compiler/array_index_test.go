@@ -17,7 +17,7 @@ func TestArrayIndexCompilation(t *testing.T) {
 	}{
 		{
 			name: "simple array index",
-			code: `@ route /test [GET]
+			code: `@ GET /test
   $ arr = [1, 2, 3]
   $ val = arr[0]
   > val`,
@@ -26,7 +26,7 @@ func TestArrayIndexCompilation(t *testing.T) {
 		},
 		{
 			name: "array index with variable",
-			code: `@ route /test [GET]
+			code: `@ GET /test
   $ arr = [10, 20, 30]
   $ idx = 1
   $ val = arr[idx]
@@ -36,7 +36,7 @@ func TestArrayIndexCompilation(t *testing.T) {
 		},
 		{
 			name: "array index with expression",
-			code: `@ route /test [GET]
+			code: `@ GET /test
   $ arr = [100, 200, 300]
   $ val = arr[1 + 1]
   > val`,
@@ -45,7 +45,7 @@ func TestArrayIndexCompilation(t *testing.T) {
 		},
 		{
 			name: "string array index",
-			code: `@ route /test [GET]
+			code: `@ GET /test
   $ arr = ["a", "b", "c"]
   $ val = arr[2]
   > val`,
@@ -108,7 +108,7 @@ func TestArrayIndexCompilation(t *testing.T) {
 }
 
 func TestArrayIndexBoundsError(t *testing.T) {
-	code := `@ route /test [GET]
+	code := `@ GET /test
   $ arr = [1, 2, 3]
   $ val = arr[10]
   > val`
@@ -148,7 +148,7 @@ func TestArrayIndexBoundsError(t *testing.T) {
 }
 
 func TestArrayIndexNegativeError(t *testing.T) {
-	code := `@ route /test [GET]
+	code := `@ GET /test
   $ arr = [1, 2, 3]
   $ val = arr[0 - 1]
   > val`
@@ -188,7 +188,7 @@ func TestArrayIndexNegativeError(t *testing.T) {
 }
 
 func TestNestedArrayIndex(t *testing.T) {
-	code := `@ route /test [GET]
+	code := `@ GET /test
   $ arr = [[1, 2], [3, 4], [5, 6]]
   $ inner = arr[1]
   $ val = inner[0]

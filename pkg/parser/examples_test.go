@@ -189,7 +189,7 @@ func TestExamples_FixtureFiles(t *testing.T) {
 
 // Test specific fixture examples
 func TestExamples_SimpleRoute(t *testing.T) {
-	source := `@ route /hello
+	source := `@ GET /hello
   > {message: "Hello, World!"}`
 
 	lexer := NewLexer(source)
@@ -207,7 +207,7 @@ func TestExamples_SimpleRoute(t *testing.T) {
 }
 
 func TestExamples_PathParam(t *testing.T) {
-	source := `@ route /users/:id
+	source := `@ GET /users/:id
   > {id: id}`
 
 	lexer := NewLexer(source)
@@ -225,7 +225,7 @@ func TestExamples_PathParam(t *testing.T) {
 }
 
 func TestExamples_JsonResponse(t *testing.T) {
-	source := `@ route /data
+	source := `@ GET /data
   > {
     status: "ok",
     count: 42,
@@ -248,13 +248,13 @@ func TestExamples_JsonResponse(t *testing.T) {
 }
 
 func TestExamples_MultipleRoutes(t *testing.T) {
-	source := `@ route /first
+	source := `@ GET /first
   > {msg: "first"}
 
-@ route /second
+@ GET /second
   > {msg: "second"}
 
-@ route /third
+@ GET /third
   > {msg: "third"}`
 
 	lexer := NewLexer(source)
@@ -278,7 +278,7 @@ func TestExamples_MultipleRoutes(t *testing.T) {
 }
 
 func TestExamples_WithAuth(t *testing.T) {
-	source := `@ route /protected
+	source := `@ GET /protected
   + auth(jwt)
   > {msg: "protected"}`
 
@@ -298,7 +298,7 @@ func TestExamples_WithAuth(t *testing.T) {
 }
 
 func TestExamples_PostRoute(t *testing.T) {
-	source := `@ route /create [POST]
+	source := `@ POST /create
   > {created: true}`
 
 	lexer := NewLexer(source)
@@ -316,7 +316,7 @@ func TestExamples_PostRoute(t *testing.T) {
 }
 
 func TestExamples_ErrorHandling(t *testing.T) {
-	source := `@ route /divide/:a/:b
+	source := `@ GET /divide/:a/:b
   if b == 0 {
     > {error: "Division by zero"}
   } else {

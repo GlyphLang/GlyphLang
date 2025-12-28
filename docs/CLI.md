@@ -266,6 +266,96 @@ Available commands in examples/cli-demo/main.glyph:
                 No arguments required
 ```
 
+### `glyph context [directory]`
+
+Generate AI-optimized project context for AI agents working with Glyph codebases.
+
+```bash
+glyph context              # Generate context for current directory
+glyph context ./src        # Generate for specific directory
+
+# Options:
+#   -f, --format <type>     Output format: json, compact, stubs (default: json)
+#   -o, --output <file>     Output file (default: stdout)
+#   --file <file>           Generate context for single file only
+#   --pretty                Pretty-print JSON output (default: true)
+#   --changed               Show only changes since last context generation
+#   --save                  Save context to .glyph/context.json for future diffing
+#   --for <type>            Generate targeted context: route, type, function, command
+```
+
+**Features:**
+- Compact representations of types, routes, functions, commands
+- Hash-based caching for change detection
+- Multiple output formats for token efficiency
+- Incremental updates with `--changed` flag
+- Pattern detection (CRUD, auth usage, database routes)
+
+**Example:**
+```bash
+# Generate compact context for AI agent
+$ glyph context --format compact
+Types: User(id:int!, name:str!, email:str?)
+Routes: GET /api/users/:id -> User | Error [auth:jwt]
+Patterns: crud, auth_usage, database_routes
+
+# Save context and show changes on next run
+$ glyph context --save
+$ glyph context --changed
+Changed: User.email type modified
+```
+
+### `glyph validate <file>`
+
+Validate Glyph source files with structured, AI-friendly error output.
+
+```bash
+glyph validate main.glyph       # Human-readable output
+glyph validate main.glyph --ai  # Structured JSON for AI agents
+glyph validate src/ --ai        # Validate all files in directory
+
+# Options:
+#   --ai              Output structured JSON for AI agents
+#   --strict          Treat warnings as errors
+#   --quiet           Only output errors (no success messages)
+```
+
+**Features:**
+- Structured JSON output with error types
+- Precise locations (file, line, column)
+- Fix hints for each error
+- Semantic validation (type references, duplicate routes)
+- Directory validation support
+
+**Error Types:**
+- `syntax_error` - Parser syntax errors
+- `lexer_error` - Tokenization errors
+- `undefined_reference` - Reference to undefined type/variable
+- `type_mismatch` - Type incompatibility
+- `duplicate_definition` - Duplicate type/route definition
+- `invalid_route` - Invalid route configuration
+- `missing_required` - Missing required field or parameter
+
+**Example:**
+```bash
+# Validate with AI-friendly output
+$ glyph validate main.glyph --ai
+{
+  "valid": false,
+  "file_path": "main.glyph",
+  "errors": [
+    {
+      "type": "undefined_reference",
+      "message": "undefined type: UserProfile",
+      "location": {"file": "main.glyph", "line": 15, "column": 12},
+      "fix_hint": "define type 'UserProfile' or import it",
+      "severity": "error"
+    }
+  ],
+  "stats": {"types": 3, "routes": 5, "functions": 2, "lines": 87}
+}
+```
+
 ### `glyph init <name>`
 
 Initialize a new Glyph project.
@@ -315,12 +405,14 @@ Usage:
 
 Available Commands:
   compile     Compile source code to bytecode
+  context     Generate AI-optimized project context
   decompile   Decompile bytecode to readable format
   dev         Start development server with hot reload
   init        Initialize new project
   run         Run Glyph source file or bytecode
   exec        Execute a CLI command from a Glyph file
   commands    List all CLI commands in a Glyph file
+  validate    Validate source with structured errors
   lsp         Start Language Server Protocol server
   help        Help about any command
 
@@ -377,7 +469,7 @@ Browsers connected via the live reload endpoint will automatically refresh.
 ## Integration Status
 
 ### Complete
-- CLI command structure (compile, decompile, run, dev, init, exec, commands, lsp)
+- CLI command structure (compile, decompile, run, dev, init, exec, commands, context, validate, lsp)
 - Go parser with full lexer and AST generation
 - Bytecode compiler with 3 optimization levels
 - Bytecode VM execution

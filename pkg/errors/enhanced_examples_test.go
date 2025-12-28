@@ -7,7 +7,7 @@ import (
 
 // Example: Enhanced variable suggestion
 func ExampleCompileError_enhancedVariableSuggestion() {
-	source := `@ route /users GET -> array {
+	source := `@ GET /users GET -> array {
     $ userList = getUsers()
     $ totl = userList.length
     return userList
@@ -31,7 +31,7 @@ func ExampleCompileError_enhancedVariableSuggestion() {
 
 // Example: Type error with expected vs actual
 func ExampleCompileError_enhancedTypeError() {
-	source := `@ route /calculate POST -> int {
+	source := `@ GET /calculate POST -> int {
     $ result: int = "not a number"
     return result
 }`
@@ -53,7 +53,7 @@ func ExampleCompileError_enhancedTypeError() {
 
 // Example: Syntax error with suggested fix
 func ExampleCompileError_syntaxErrorWithFix() {
-	source := `@ route /data GET -> object {
+	source := `@ GET /data GET -> object {
     $ data = {name: "test", age 25}
     return data
 }`
@@ -73,7 +73,7 @@ func ExampleCompileError_syntaxErrorWithFix() {
 
 // Example: Missing bracket detection
 func ExampleDetectMissingBracket() {
-	source := `@ route /items GET -> array {
+	source := `@ GET /items GET -> array {
     $ items = [1, 2, 3
     return items
 }`
@@ -94,7 +94,7 @@ func ExampleDetectMissingBracket() {
 
 // Example: Unclosed string detection
 func ExampleDetectUnclosedString() {
-	source := `@ route /message GET -> string {
+	source := `@ GET /message GET -> string {
     $ msg = "Hello world
     return msg
 }`
@@ -135,7 +135,7 @@ func ExampleGetFunctionSuggestion() {
 	availableFuncs := []string{"println", "print", "printf", "log"}
 	suggestion := GetFunctionSuggestion("prnt", availableFuncs)
 
-	source := `@ route /test GET -> string {
+	source := `@ GET /test GET -> string {
     prnt("Hello")
     return "ok"
 }`
@@ -157,7 +157,7 @@ func ExampleGetTypeSuggestion() {
 	customTypes := []string{"User", "Product", "Order"}
 	suggestion := GetTypeSuggestion("Usr", customTypes)
 
-	source := `@ route /data GET -> Usr {
+	source := `@ GET /data GET -> Usr {
     $ user: Usr = getUser()
     return user
 }`
@@ -192,7 +192,7 @@ func ExampleGetRouteSuggestion() {
 
 // Test enhanced error formatting with all features
 func TestEnhancedErrorFormatting(t *testing.T) {
-	source := `@ route /users GET -> array {
+	source := `@ GET /users GET -> array {
     $ userCount: int = "invalid"
     return getUsers()
 }`
@@ -313,7 +313,7 @@ func TestSyntaxErrorDetection(t *testing.T) {
 	}{
 		{
 			name: "Missing closing brace",
-			source: `@ route /test GET {
+			source: `@ GET /test GET {
     $ x = 1
 `,
 			line:     2,
@@ -322,7 +322,7 @@ func TestSyntaxErrorDetection(t *testing.T) {
 		},
 		{
 			name: "Unclosed string",
-			source: `@ route /test GET {
+			source: `@ GET /test GET {
     $ msg = "hello
 }`,
 			line:     2,

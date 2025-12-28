@@ -404,7 +404,7 @@ func TestLexer_ComplexExamples(t *testing.T) {
 	}{
 		{
 			name: "route definition",
-			input: `@ route /api/users/:id [GET]
+			input: `@ GET /api/users/:id
   > {id: id, name: "test"}`,
 		},
 		{
@@ -460,7 +460,7 @@ func TestLexer_ComplexExamples(t *testing.T) {
 
 // Test line and column tracking
 func TestLexer_LineAndColumnTracking(t *testing.T) {
-	input := `@ route /hello
+	input := `@ GET /hello
   $ x = 42
   > x`
 
@@ -512,7 +512,7 @@ func TestLexer_EdgeCases(t *testing.T) {
 
 // Test literal values are preserved
 func TestLexer_LiteralPreservation(t *testing.T) {
-	input := `@ route /greet/:name
+	input := `@ GET /greet/:name
   $ msg = "Hello, " + name + "!"
   > {text: msg, count: 123, score: 45.67, active: true}`
 
@@ -529,7 +529,7 @@ func TestLexer_LiteralPreservation(t *testing.T) {
 	}
 
 	// Verify some expected literals
-	assert.Contains(t, literals[IDENT], "route")
+	assert.Contains(t, literals[IDENT], "GET")
 	assert.Contains(t, literals[IDENT], "msg")
 	assert.Contains(t, literals[IDENT], "name")
 	assert.Contains(t, literals[STRING], "Hello, ")
@@ -581,7 +581,7 @@ func TestLexer_ForLoopWithComma(t *testing.T) {
 
 // Benchmark lexer performance
 func BenchmarkLexer_SimpleRoute(b *testing.B) {
-	input := `@ route /hello
+	input := `@ GET /hello
   > {message: "Hello, World!"}`
 
 	for i := 0; i < b.N; i++ {
@@ -591,7 +591,7 @@ func BenchmarkLexer_SimpleRoute(b *testing.B) {
 }
 
 func BenchmarkLexer_ComplexRoute(b *testing.B) {
-	input := `@ route /api/users/:id [GET]
+	input := `@ GET /api/users/:id
   + auth(jwt)
   + ratelimit(100/min)
   $ user = db.users.get(id)

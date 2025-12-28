@@ -267,7 +267,7 @@ func TestFormatDocument(t *testing.T) {
 func TestGetSignatureHelp(t *testing.T) {
 	dm := NewDocumentManager()
 
-	source := `@ route /test [GET]
+	source := `@ GET /test
   $ result = hash(
   > {}`
 	doc, _ := dm.Open("file:///test.abc", 1, source)
@@ -475,7 +475,7 @@ func TestDocumentClose(t *testing.T) {
 func TestGetOptimizerHints(t *testing.T) {
 	dm := NewDocumentManager()
 
-	source := `@ route /api/users [GET]
+	source := `@ GET /api/users
   $ result = db.query()
   > {data: result}
 `
@@ -492,7 +492,7 @@ func TestGetOptimizerHints(t *testing.T) {
 func TestAnalyzeRouteForOptimizations(t *testing.T) {
 	dm := NewDocumentManager()
 
-	source := `@ route /api/users [GET]
+	source := `@ GET /api/users
   $ x = 1 + 2
   $ y = x * 3
   > {result: y}
@@ -546,13 +546,13 @@ func TestCheckTypesWithArrays(t *testing.T) {
 func TestDocumentSymbolsWithRoutes(t *testing.T) {
 	dm := NewDocumentManager()
 
-	source := `@ route /api/users [GET]
+	source := `@ GET /api/users
   > {users: []}
 
-@ route /api/users/:id [GET]
+@ GET /api/users/:id
   > {user: {}}
 
-@ route /api/users [POST]
+@ POST /api/users
   > {created: true}
 `
 	doc, _ := dm.Open("file:///test.abc", 1, source)
@@ -575,7 +575,7 @@ func TestDocumentSymbolsWithRoutes(t *testing.T) {
 func TestGetHoverOnMiddleware(t *testing.T) {
 	dm := NewDocumentManager()
 
-	source := `@ route /api/users [GET]
+	source := `@ GET /api/users
   + auth(jwt)
   + ratelimit(100/min)
   > {users: []}
@@ -649,7 +649,7 @@ func TestGetDiagnosticsWithWarnings(t *testing.T) {
   name: str!
 }
 
-@ route /api/users [GET]
+@ GET /api/users
   $ unused = "test"
   > {users: []}
 `
@@ -1058,7 +1058,7 @@ func TestGenerateSourceActions(t *testing.T) {
   email: str!
 }
 
-@ route /api/users [GET]
+@ GET /api/users
   > {users: []}
 `
 	doc, _ := dm.Open("file:///test.abc", 1, source)
@@ -1080,7 +1080,7 @@ func TestIsRenameableSymbol(t *testing.T) {
   name: str!
 }
 
-@ route /api/users [GET]
+@ GET /api/users
   $ x = 1
   > {result: x}
 `
@@ -1236,7 +1236,7 @@ func TestGetDefinitionEdgeCases(t *testing.T) {
   author: User
 }
 
-@ route /users/:id [GET]
+@ GET /users/:id
   > {user: {}}
 `
 	doc, _ := dm.Open("file:///test.abc", 1, source)
@@ -1348,7 +1348,7 @@ func TestGetSignatureHelpEdgeCases(t *testing.T) {
 	dm := NewDocumentManager()
 
 	t.Run("inside function call", func(t *testing.T) {
-		source := `@ route /test [GET]
+		source := `@ GET /test
   $ x = hash("test")`
 		doc, _ := dm.Open("file:///test.abc", 1, source)
 		sig := GetSignatureHelp(doc, Position{Line: 1, Character: 14})
@@ -1356,7 +1356,7 @@ func TestGetSignatureHelpEdgeCases(t *testing.T) {
 	})
 
 	t.Run("outside function call", func(t *testing.T) {
-		source := `@ route /test [GET]
+		source := `@ GET /test
   $ x = 123`
 		doc, _ := dm.Open("file:///test2.abc", 1, source)
 		sig := GetSignatureHelp(doc, Position{Line: 1, Character: 6})
@@ -1620,7 +1620,7 @@ func TestGetReferencesWithRoutes(t *testing.T) {
   name: str!
 }
 
-@ route /users/:id [GET]
+@ GET /users/:id
   $ user = db.find(id)
   > {user: user}
 `
@@ -1836,7 +1836,7 @@ func TestParseDocumentEdgeCases(t *testing.T) {
 	})
 
 	t.Run("syntax with route", func(t *testing.T) {
-		source := `@ route /api/test [GET]
+		source := `@ GET /api/test
   > {ok: true}
 `
 		doc, err := dm.Open("file:///route.abc", 1, source)
@@ -1864,7 +1864,7 @@ func TestGenerateRefactorActions(t *testing.T) {
   name: str!
 }
 
-@ route /api/users [GET]
+@ GET /api/users
   > {users: []}
 `
 	doc, _ := dm.Open("file:///test.abc", 1, source)
@@ -1887,7 +1887,7 @@ func TestGetHoverOnVariousElements(t *testing.T) {
   name: str!
 }
 
-@ route /api/users/:id [GET]
+@ GET /api/users/:id
   $ result = db.find(id)
   > {user: result}
 `
@@ -2115,7 +2115,7 @@ fn greet(name: str) -> str {
   > "Hello " + name
 }
 
-@ route /users/:id [GET]
+@ GET /users/:id
   > {user: {}}
 `
 	doc, _ := dm.Open("file:///test.abc", 1, source)
@@ -2271,10 +2271,10 @@ func TestGetDocumentSymbolsAllTypes(t *testing.T) {
 
 	// Test with routes
 	t.Run("with routes", func(t *testing.T) {
-		source := `@ route /api/users [GET]
+		source := `@ GET /api/users
   > []
 
-@ route /api/users/:id [DELETE]
+@ DELETE /api/users/:id
   > {}
 `
 		doc, _ := dm.Open("file:///routes.abc", 1, source)
@@ -2449,7 +2449,7 @@ func TestHandleNotificationMore(t *testing.T) {
 func TestFormatRouteHoverFull(t *testing.T) {
 	dm := NewDocumentManager()
 
-	source := `@ route /api/users/:id [GET]
+	source := `@ GET /api/users/:id
   + auth(jwt)
   > {user: {}}
 `

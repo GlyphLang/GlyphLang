@@ -12,7 +12,7 @@ import (
 func Example_helloWorld() {
 	interp := NewInterpreter()
 
-	// @ route /hello
+	// @ GET /hello
 	//   > {text: "Hello, World!", timestamp: 1234567890}
 	route := &Route{
 		Path:   "/hello",
@@ -39,7 +39,7 @@ func Example_helloWorld() {
 func Example_greetWithParam() {
 	interp := NewInterpreter()
 
-	// @ route /greet/:name
+	// @ GET /greet/:name
 	//   $ greeting = "Hello, " + name + "!"
 	//   > greeting
 	route := &Route{
@@ -78,7 +78,7 @@ func Example_greetWithParam() {
 func Example_arithmetic() {
 	interp := NewInterpreter()
 
-	// @ route /calculate
+	// @ GET /calculate
 	//   $ a = 10
 	//   $ b = 20
 	//   $ sum = a + b
@@ -147,7 +147,7 @@ func TestInterpreter_HelloWorldExample(t *testing.T) {
 	err := interp.LoadModule(module)
 	require.NoError(t, err)
 
-	// Route 1: @ route /hello
+	// Route 1: @ GET /hello
 	//   > {text: "Hello, World!", timestamp: 1234567890}
 	route1 := &Route{
 		Path:   "/hello",
@@ -171,7 +171,7 @@ func TestInterpreter_HelloWorldExample(t *testing.T) {
 	assert.Equal(t, "Hello, World!", obj1["text"])
 	assert.Equal(t, int64(1234567890), obj1["timestamp"])
 
-	// Route 2: @ route /greet/:name -> Message
+	// Route 2: @ GET /greet/:name -> Message
 	//   $ message = {
 	//     text: "Hello, " + name + "!",
 	//     timestamp: time.now()
@@ -224,7 +224,7 @@ func TestInterpreter_HelloWorldExample(t *testing.T) {
 func TestInterpreter_ConditionalExample(t *testing.T) {
 	interp := NewInterpreter()
 
-	// @ route /check/:age
+	// @ GET /check/:age
 	//   $ age_num = parse_int(age)
 	//   if age_num >= 18:
 	//     > "adult"
@@ -293,7 +293,7 @@ func TestInterpreter_UserDefinedFunctionExample(t *testing.T) {
 	err := interp.LoadModule(module)
 	require.NoError(t, err)
 
-	// @ route /sum/:x/:y
+	// @ GET /sum/:x/:y
 	//   $ result = add(x, y)
 	//   > result
 	route := &Route{
@@ -333,7 +333,7 @@ func TestInterpreter_UserDefinedFunctionExample(t *testing.T) {
 func TestInterpreter_ComplexExpressionExample(t *testing.T) {
 	interp := NewInterpreter()
 
-	// @ route /complex
+	// @ GET /complex
 	//   $ result = (10 + 20) * 3 - 5
 	//   > result
 	route := &Route{
@@ -414,7 +414,7 @@ func TestInterpreter_ComparisonExample(t *testing.T) {
 func TestInterpreter_FieldAccessExample(t *testing.T) {
 	interp := NewInterpreter()
 
-	// @ route /user-info
+	// @ GET /user-info
 	//   $ user = {name: "Alice", age: 30}
 	//   $ name = user.name
 	//   > name

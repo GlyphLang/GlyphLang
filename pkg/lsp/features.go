@@ -953,7 +953,12 @@ func checkTypes(module *interpreter.Module) []Diagnostic {
 // getKeywordInfo returns information about a keyword
 func getKeywordInfo(keyword string) string {
 	keywordDocs := map[string]string{
-		"route":   "**route** - Defines an HTTP route handler\n\nExample:\n```glyph\n@ route /api/users [GET]\n  > {users: []}\n```",
+		"route":  "**route** - Defines an HTTP route handler (explicit form)\n\nExample:\n```glyph\n@ route /api/users [GET]\n  > {users: []}\n```",
+		"GET":    "**GET** - HTTP GET method for retrieving resources\n\nExample:\n```glyph\n@ GET /api/users\n  > {users: []}\n```",
+		"POST":   "**POST** - HTTP POST method for creating resources\n\nExample:\n```glyph\n@ POST /api/users\n  > {created: true}\n```",
+		"PUT":    "**PUT** - HTTP PUT method for replacing resources\n\nExample:\n```glyph\n@ PUT /api/users/:id\n  > {updated: true}\n```",
+		"DELETE": "**DELETE** - HTTP DELETE method for removing resources\n\nExample:\n```glyph\n@ DELETE /api/users/:id\n  > {deleted: true}\n```",
+		"PATCH":  "**PATCH** - HTTP PATCH method for partial updates\n\nExample:\n```glyph\n@ PATCH /api/users/:id\n  > {patched: true}\n```",
 		"command": "**command** - Defines a CLI command\n\nExample:\n```glyph\n! command hello name: str!\n  > \"Hello \" + name\n```",
 		"cron":    "**cron** - Defines a scheduled task\n\nExample:\n```glyph\n* cron \"0 0 * * *\"\n  > \"Daily task executed\"\n```",
 		"event":   "**event** - Defines an event handler\n\nExample:\n```glyph\n~ event \"user.created\"\n  > \"Handle user creation\"\n```",

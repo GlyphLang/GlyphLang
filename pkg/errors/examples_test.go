@@ -9,7 +9,7 @@ import (
 // Run with: go test -v -run Example
 
 func ExampleCompileError_parseError() {
-	source := `@ route /users GET {
+	source := `@ GET /users GET {
     $ users = [1, 2, 3
     return users
 }`
@@ -142,7 +142,7 @@ func TestSuggestionHelpers(t *testing.T) {
 
 // Demonstrate the FormatError function with different error types
 func TestFormatErrorExamples(t *testing.T) {
-	source := `@ route /api/data GET {
+	source := `@ GET /api/data GET {
     $ items = fetchData()
     return items.filter(x => x.value > 0)
 }`

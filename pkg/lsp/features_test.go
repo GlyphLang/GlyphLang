@@ -13,7 +13,7 @@ func TestGetDiagnostics(t *testing.T) {
   name: str!
 }
 
-@ route /api/users [GET]
+@ GET /api/users
   > {users: []}
 `
 
@@ -57,7 +57,7 @@ func TestGetHover(t *testing.T) {
   age: int!
 }
 
-@ route /api/users [GET]
+@ GET /api/users
   > {users: []}
 `
 
@@ -85,7 +85,7 @@ func TestGetHover(t *testing.T) {
 			name:        "Hover on keyword",
 			pos:         Position{Line: 5, Character: 3},
 			expectHover: true,
-			contains:    "route",
+			contains:    "GET",
 		},
 		{
 			name:        "No hover on whitespace",
@@ -209,10 +209,10 @@ func TestGetDocumentSymbols(t *testing.T) {
   title: str!
 }
 
-@ route /api/users [GET]
+@ GET /api/users
   > {users: []}
 
-@ route /api/posts [POST]
+@ POST /api/posts
   > {posts: []}
 `
 
@@ -401,7 +401,7 @@ func TestFormatTypeDefHover(t *testing.T) {
 func TestFormatRouteHover(t *testing.T) {
 	dm := NewDocumentManager()
 
-	source := `@ route /api/users [GET]
+	source := `@ GET /api/users
   + auth(jwt)
   + ratelimit(100/min)
   > {users: []}
@@ -475,7 +475,7 @@ func TestDiagnosticsWithHint(t *testing.T) {
 	dm := NewDocumentManager()
 
 	// Create source that will generate an error with hint
-	invalidSource := `@ route /test
+	invalidSource := `@ GET /test
   > {}`
 
 	doc, _ := dm.Open("file:///test.abc", 1, invalidSource)

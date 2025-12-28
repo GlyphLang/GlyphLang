@@ -1406,10 +1406,10 @@ func getHelloWorldTemplate() string {
   timestamp: int
 }
 
-@ route /hello
+@ GET /hello
   > {text: "Hello, World!", timestamp: 1234567890}
 
-@ route /greet/:name -> Message
+@ GET /greet/:name -> Message
   $ message = {
     text: "Hello, " + name + "!",
     timestamp: time.now()
@@ -1427,11 +1427,11 @@ func getRestAPITemplate() string {
   email: str!
 }
 
-@ route /api/users -> List[User]
+@ GET /api/users -> List[User]
   + auth(jwt)
   > []
 
-@ route /health
+@ GET /health
   > {status: "ok", timestamp: now()}
 `
 }

@@ -16,13 +16,13 @@ func TestParserIntegration(t *testing.T) {
 	}{
 		{
 			name: "Simple route",
-			source: `@ route /test
+			source: `@ GET /test
   > {status: "ok"}`,
 			shouldError: false,
 		},
 		{
 			name: "Route with path parameter",
-			source: `@ route /users/:id
+			source: `@ GET /users/:id
   > {id: id}`,
 			shouldError: false,
 		},
@@ -32,19 +32,19 @@ func TestParserIntegration(t *testing.T) {
   id: int!
   name: str!
 }
-@ route /users/:id -> User
+@ GET /users/:id -> User
   > {id: id, name: "test"}`,
 			shouldError: false,
 		},
 		{
 			name: "Route with type annotation",
-			source: `@ route /api/users -> List[User]
+			source: `@ GET /api/users -> List[User]
   > []`,
 			shouldError: false,
 		},
 		{
 			name: "Multiple middleware",
-			source: `@ route /protected
+			source: `@ GET /protected
   + auth(jwt)
   + ratelimit(100/min)
   > {status: "ok"}`,
@@ -52,14 +52,14 @@ func TestParserIntegration(t *testing.T) {
 		},
 		{
 			name: "HTTP method specification",
-			source: `@ route /api/users [POST]
+			source: `@ POST /api/users
   < input: CreateUserInput
   > {created: true}`,
 			shouldError: false,
 		},
 		{
 			name: "Database query",
-			source: `@ route /api/users/:id
+			source: `@ GET /api/users/:id
   % db: Database
   $ user = db.users.get(id)
   > user`,
@@ -67,7 +67,7 @@ func TestParserIntegration(t *testing.T) {
 		},
 		{
 			name: "Validation",
-			source: `@ route /api/create [POST]
+			source: `@ POST /api/create
   < input: CreateInput
   ! validate input {
     name: str(min=1, max=100)
@@ -77,7 +77,7 @@ func TestParserIntegration(t *testing.T) {
 		},
 		{
 			name: "Result type with error",
-			source: `@ route /api/data/:id -> Data | Error
+			source: `@ GET /api/data/:id -> Data | Error
   > {error: "not found"}`,
 			shouldError: false,
 		},
@@ -135,7 +135,7 @@ func TestLexerIntegration(t *testing.T) {
 	}{
 		{
 			name:     "Route symbols",
-			input:    "@ route /test",
+			input:    "@ GET /test",
 			expected: []string{"@", "route", "/test"},
 		},
 		{
@@ -191,14 +191,14 @@ func TestTypeCheckerIntegration(t *testing.T) {
 		{
 			name: "Valid type usage",
 			source: `: User { id: int! }
-@ route /user -> User
+@ GET /user -> User
   > {id: 123}`,
 			shouldError: false,
 		},
 		{
 			name: "Type mismatch",
 			source: `: User { id: int! }
-@ route /user -> User
+@ GET /user -> User
   > {id: "not a number"}`,
 			shouldError: true,
 			errorMsg:    "type mismatch",
@@ -209,7 +209,7 @@ func TestTypeCheckerIntegration(t *testing.T) {
   id: int!
   name: str!
 }
-@ route /user -> User
+@ GET /user -> User
   > {id: 123}`,
 			shouldError: true,
 			errorMsg:    "missing required field",
@@ -220,20 +220,20 @@ func TestTypeCheckerIntegration(t *testing.T) {
   id: int!
   name: str
 }
-@ route /user -> User
+@ GET /user -> User
   > {id: 123, name: ""}`,
 			shouldError: false,
 		},
 		{
 			name: "List type",
-			source: `@ route /numbers -> List[int]
+			source: `@ GET /numbers -> List[int]
   > [1, 2, 3]`,
 			shouldError: false,
 		},
 		{
 			name: "Result type",
 			source: `: Error { msg: str! }
-@ route /data -> int | Error
+@ GET /data -> int | Error
   > {msg: "error"}`,
 			shouldError: false,
 		},
@@ -311,7 +311,7 @@ func TestCompilerVMIntegration(t *testing.T) {
 	helper := NewTestHelper(t)
 
 	// Simple program
-	source := `@ route /test
+	source := `@ GET /test
   > {status: "ok"}`
 
 	// Compile
@@ -552,7 +552,7 @@ func TestBytecodeFormat(t *testing.T) {
 	helper := NewTestHelper(t)
 
 	comp := compiler.NewCompiler()
-	module, err := parseSource("@ route /test\n  > {status: \"ok\"}")
+	module, err := parseSource("@ GET /test\n  > {status: \"ok\"}")
 	if err != nil {
 		t.Fatalf("Parse failed: %v", err)
 	}
@@ -590,12 +590,12 @@ func TestCompilerErrorMessages(t *testing.T) {
 		},
 		{
 			name:     "Type error",
-			source:   ": User { id: int! }\n@ route /user -> User\n  > {id: \"string\"}",
+			source:   ": User { id: int! }\n@ GET /user -> User\n  > {id: \"string\"}",
 			errorMsg: "type mismatch",
 		},
 		{
 			name:     "Unknown type",
-			source:   "@ route /test -> UnknownType",
+			source:   "@ GET /test -> UnknownType",
 			errorMsg: "undefined type",
 		},
 	}
