@@ -48,11 +48,11 @@
 }
 
 # HTTP endpoints to enqueue jobs
-@ route /queue/email [POST]
+@ POST /queue/email
   + auth(jwt)
   > {queued: "email.send", message_id: input.id}
 
-@ route /queue/status [GET]
+@ GET /queue/status
   > {
     queues: ["email.send", "image.process", "report.generate", "webhook.deliver"],
     status: "running"

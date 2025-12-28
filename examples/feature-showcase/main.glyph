@@ -75,7 +75,7 @@ type ChatMessage {
 # ============================================================================
 
 # Simple GET route - health check
-@ route /api/health [GET]
+@ GET /api/health
   > {
     success: true,
     message: "Service is healthy",
@@ -83,7 +83,7 @@ type ChatMessage {
   }
 
 # GET with path parameter
-@ route /api/users/:id [GET]
+@ GET /api/users/:id
   + auth(jwt)
   + ratelimit(100/min)
   % db: Database
@@ -97,7 +97,7 @@ type ChatMessage {
   }
 
 # GET with all users and pagination
-@ route /api/users [GET]
+@ GET /api/users
   + auth(jwt)
   + ratelimit(50/min)
   % db: Database
@@ -114,7 +114,7 @@ type ChatMessage {
   }
 
 # GET with filtering
-@ route /api/users/active [GET]
+@ GET /api/users/active
   + auth(jwt)
   % db: Database
 
@@ -131,7 +131,7 @@ type ChatMessage {
 # ============================================================================
 
 # POST to create a new resource
-@ route /api/users [POST]
+@ POST /api/users
   + auth(jwt, role: admin)
   + ratelimit(10/min)
   % db: Database
@@ -165,7 +165,7 @@ type ChatMessage {
   }
 
 # POST for authentication
-@ route /api/auth/login [POST]
+@ POST /api/auth/login
   + ratelimit(5/min)
   % db: Database
 
@@ -193,7 +193,7 @@ type ChatMessage {
 # ============================================================================
 
 # PUT to fully replace a resource
-@ route /api/users/:id [PUT]
+@ PUT /api/users/:id
   + auth(jwt)
   % db: Database
 
@@ -214,7 +214,7 @@ type ChatMessage {
   }
 
 # PATCH to partially update a resource
-@ route /api/users/:id [PATCH]
+@ PATCH /api/users/:id
   + auth(jwt)
   % db: Database
 
@@ -241,7 +241,7 @@ type ChatMessage {
 # ============================================================================
 
 # DELETE a single resource
-@ route /api/users/:id [DELETE]
+@ DELETE /api/users/:id
   + auth(jwt, role: admin)
   % db: Database
 
@@ -255,7 +255,7 @@ type ChatMessage {
   }
 
 # DELETE with batch operation
-@ route /api/users/inactive [DELETE]
+@ DELETE /api/users/inactive
   + auth(jwt, role: admin)
   % db: Database
 
@@ -266,7 +266,7 @@ type ChatMessage {
 # SECTION 6: CONTROL FLOW - IF/ELSE
 # ============================================================================
 
-@ route /api/check-age [POST]
+@ POST /api/check-age
   $ age = input.age
   $ category = ""
 
@@ -291,7 +291,7 @@ type ChatMessage {
   }
 
 # Route with logical operators (AND/OR)
-@ route /api/access/:age/:premium [GET]
+@ GET /api/access/:age/:premium
   $ hasAccess = false
   $ level = ""
 
@@ -314,7 +314,7 @@ type ChatMessage {
 # SECTION 7: CONTROL FLOW - WHILE LOOPS
 # ============================================================================
 
-@ route /api/factorial/:n [GET]
+@ GET /api/factorial/:n
   $ n = parseInt(n)
   $ result = 1
   $ i = 1
@@ -326,7 +326,7 @@ type ChatMessage {
 
   > {n: n, factorial: result}
 
-@ route /api/fibonacci/:count [GET]
+@ GET /api/fibonacci/:count
   $ count = parseInt(count)
   $ a = 0
   $ b = 1
@@ -342,7 +342,7 @@ type ChatMessage {
   > {count: count, result: a}
 
 # Nested while loops
-@ route /api/nested-loops [GET]
+@ GET /api/nested-loops
   $ i = 0
   $ total = 0
   while i < 3 {
@@ -359,7 +359,7 @@ type ChatMessage {
 # SECTION 8: CONTROL FLOW - FOR LOOPS
 # ============================================================================
 
-@ route /api/process-items [POST]
+@ POST /api/process-items
   $ items = input.items
   $ total = 0
   $ processed = []
@@ -372,7 +372,7 @@ type ChatMessage {
 
   > {total: total, processed: processed}
 
-@ route /api/analyze-data [POST]
+@ POST /api/analyze-data
   $ data = input.data
   $ results = []
 
@@ -385,7 +385,7 @@ type ChatMessage {
   > {results: results}
 
 # Object iteration (key-value pairs)
-@ route /api/config [GET]
+@ GET /api/config
   $ config = {host: "localhost", port: "8080", debug: "true"}
   $ settings = []
 
@@ -397,7 +397,7 @@ type ChatMessage {
   > {settings: settings}
 
 # Nested for loops
-@ route /api/matrix [GET]
+@ GET /api/matrix
   $ matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
   $ sum = 0
 
@@ -413,7 +413,7 @@ type ChatMessage {
 # SECTION 9: CONTROL FLOW - SWITCH STATEMENTS
 # ============================================================================
 
-@ route /api/order-status/:status [GET]
+@ GET /api/order-status/:status
   $ status_message = ""
   $ can_cancel = false
 
@@ -447,7 +447,7 @@ type ChatMessage {
   > {status: status, message: status_message, can_cancel: can_cancel}
 
 # Switch with numbers
-@ route /api/grade/:score [GET]
+@ GET /api/grade/:score
   $ grade = ""
   $ s = parseInt(score)
 
@@ -475,7 +475,7 @@ type ChatMessage {
 # SECTION 10: BUILTIN FUNCTIONS - STRING OPERATIONS
 # ============================================================================
 
-@ route /api/string-ops [POST]
+@ POST /api/string-ops
   $ text = input.text
 
   # String length
@@ -524,7 +524,7 @@ type ChatMessage {
 # SECTION 11: BUILTIN FUNCTIONS - NUMERIC OPERATIONS
 # ============================================================================
 
-@ route /api/math-ops [POST]
+@ POST /api/math-ops
   $ a = input.a
   $ b = input.b
 
@@ -563,7 +563,7 @@ type ChatMessage {
 # SECTION 12: OPERATORS - ALL TYPES
 # ============================================================================
 
-@ route /api/operators [POST]
+@ POST /api/operators
   $ a = input.a
   $ b = input.b
 
@@ -610,7 +610,7 @@ type ChatMessage {
 # SECTION 13: COMPLEX EXPRESSIONS
 # ============================================================================
 
-@ route /api/expressions [POST]
+@ POST /api/expressions
   # Object literals
   $ person = {
     name: "Alice",
@@ -661,7 +661,7 @@ type ChatMessage {
 # SECTION 14: DATABASE OPERATIONS
 # ============================================================================
 
-@ route /api/db-demo [GET]
+@ GET /api/db-demo
   % db: Database
 
   # Get all records
@@ -685,7 +685,7 @@ type ChatMessage {
   }
 
 # CRUD demonstration
-@ route /api/db-crud [POST]
+@ POST /api/db-crud
   % db: Database
 
   $ operation = input.operation
@@ -783,7 +783,7 @@ type ChatMessage {
 }
 
 # WebSocket status endpoint
-@ route /api/ws-status [GET]
+@ GET /api/ws-status
   > {
     rooms: ws.get_rooms(),
     room_count: ws.get_room_count(),
@@ -970,7 +970,7 @@ type ChatMessage {
 # SECTION 19: COMPLEX BUSINESS LOGIC - E-COMMERCE CHECKOUT
 # ============================================================================
 
-@ route /api/checkout [POST]
+@ POST /api/checkout
   + auth(jwt)
   + ratelimit(10/min)
   % db: Database
@@ -1075,7 +1075,7 @@ type ChatMessage {
 # SECTION 20: ANALYTICS AND STATISTICS
 # ============================================================================
 
-@ route /api/analytics [GET]
+@ GET /api/analytics
   + auth(jwt, role: admin)
   + ratelimit(30/min)
   % db: Database

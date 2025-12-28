@@ -10,7 +10,7 @@
 }
 
 # Simple route with object literal
-@ route /hello
+@ GET /hello
   > {
     message: "Hello, World!",
     timestamp: 1234567890,
@@ -18,7 +18,7 @@
   }
 
 # Route with path parameters and return type
-@ route /greet/:name -> User
+@ GET /greet/:name -> User
   $ message = "Hello, " + name + "!"
   > {
     id: 1,
@@ -29,7 +29,7 @@
   }
 
 # Route with if/else statement
-@ route /check-age/:age
+@ GET /check-age/:age
   $ ageNum = 18
 
   if ageNum >= 18 {
@@ -47,7 +47,7 @@
   }
 
 # Route with logical operators (AND/OR)
-@ route /access/:age/:premium [GET]
+@ GET /access/:age/:premium
   $ hasAccess = false
 
   # Complex logical expression
@@ -69,7 +69,7 @@
   }
 
 # Route with array literals
-@ route /users [GET]
+@ GET /users
   $ userList = [
     {name: "Alice", age: 30, role: "admin"},
     {name: "Bob", age: 25, role: "user"},
@@ -87,7 +87,7 @@
   }
 
 # Route with nested arrays
-@ route /matrix
+@ GET /matrix
   $ matrix = [
     [1, 2, 3],
     [4, 5, 6],
@@ -103,7 +103,7 @@
   }
 
 # Route with complex expressions
-@ route /calculate/:x/:y [POST]
+@ POST /calculate/:x/:y
   $ sum = x + y
   $ product = x * y
   $ comparison = x > y
@@ -119,7 +119,7 @@
   > result
 
 # Route with middleware and auth
-@ route /api/admin/stats [GET]
+@ GET /api/admin/stats
   + auth(jwt)
   + ratelimit(100/min)
 
@@ -132,7 +132,7 @@
   > stats
 
 # Route with nested if statements
-@ route /eligibility/:age/:income/:credit
+@ GET /eligibility/:age/:income/:credit
   if age >= 21 {
     if income > 50000 {
       if credit > 700 {
@@ -152,7 +152,7 @@
   }
 
 # Route demonstrating all operators
-@ route /operators
+@ GET /operators
   $ a = 10
   $ b = 20
   $ c = 5

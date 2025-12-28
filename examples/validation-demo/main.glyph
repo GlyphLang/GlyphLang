@@ -40,7 +40,7 @@
 }
 
 # Create user with comprehensive validation
-@ route /api/users [POST] -> ApiResponse
+@ POST /api/users -> ApiResponse
   + ratelimit(20/min)
   % db: Database
 
@@ -192,7 +192,7 @@
   }
 
 # Update user with partial validation
-@ route /api/users/:id [PUT] -> ApiResponse
+@ PUT /api/users/:id -> ApiResponse
   + auth(jwt)
   + ratelimit(30/min)
   % db: Database
@@ -306,7 +306,7 @@
   }
 
 # Create product with business rule validation
-@ route /api/products [POST] -> ApiResponse
+@ POST /api/products -> ApiResponse
   + auth(jwt, role: admin)
   + ratelimit(50/min)
   % db: Database
@@ -454,7 +454,7 @@
   }
 
 # Validate search query parameters
-@ route /api/search [GET] -> ApiResponse
+@ GET /api/search -> ApiResponse
   + ratelimit(100/min)
   % db: Database
 
@@ -547,5 +547,5 @@
   }
 
 # Health check endpoint
-@ route /health
+@ GET /health
   > {status: "ok", service: "validation-demo", timestamp: now()}

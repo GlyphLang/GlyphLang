@@ -55,7 +55,7 @@
 }
 
 # Get all blog posts with pagination
-@ route /api/posts [GET] -> PostList
+@ GET /api/posts -> PostList
   + ratelimit(100/min)
   % db: Database
 
@@ -83,7 +83,7 @@
   }
 
 # Get a single post with all comments
-@ route /api/posts/:id [GET] -> PostWithComments
+@ GET /api/posts/:id -> PostWithComments
   + ratelimit(200/min)
   % db: Database
 
@@ -112,7 +112,7 @@
   }
 
 # Create a new blog post
-@ route /api/posts [POST] -> ApiResponse
+@ POST /api/posts -> ApiResponse
   + auth(jwt)
   + ratelimit(20/min)
   % db: Database
@@ -162,7 +162,7 @@
   }
 
 # Update a blog post
-@ route /api/posts/:id [PUT] -> ApiResponse
+@ PUT /api/posts/:id -> ApiResponse
   + auth(jwt)
   + ratelimit(30/min)
   % db: Database
@@ -213,7 +213,7 @@
   }
 
 # Delete a blog post
-@ route /api/posts/:id [DELETE] -> ApiResponse
+@ DELETE /api/posts/:id -> ApiResponse
   + auth(jwt, role: admin)
   + ratelimit(10/min)
   % db: Database
@@ -239,7 +239,7 @@
   }
 
 # Add a comment to a post
-@ route /api/posts/:id/comments [POST] -> ApiResponse
+@ POST /api/posts/:id/comments -> ApiResponse
   + auth(jwt)
   + ratelimit(50/min)
   % db: Database
@@ -280,7 +280,7 @@
   }
 
 # Get posts by tag
-@ route /api/posts/tags/:tag [GET] -> PostList
+@ GET /api/posts/tags/:tag -> PostList
   + ratelimit(100/min)
   % db: Database
 
@@ -296,7 +296,7 @@
   }
 
 # Get posts by author
-@ route /api/authors/:author/posts [GET] -> PostList
+@ GET /api/authors/:author/posts -> PostList
   + ratelimit(100/min)
   % db: Database
 
@@ -311,7 +311,7 @@
   }
 
 # Get published posts only
-@ route /api/posts/published [GET] -> PostList
+@ GET /api/posts/published -> PostList
   + ratelimit(200/min)
   % db: Database
 
@@ -329,7 +329,7 @@
   }
 
 # Upvote a comment
-@ route /api/comments/:id/upvote [PATCH] -> ApiResponse
+@ PATCH /api/comments/:id/upvote -> ApiResponse
   + auth(jwt)
   + ratelimit(100/min)
   % db: Database

@@ -5,14 +5,14 @@
 # Health Check
 # =================
 
-@ route /health [GET]
+@ GET /health
   > {status: "ok", service: "E-Commerce API"}
 
 # =================
 # Products
 # =================
 
-@ route /products [GET]
+@ GET /products
   $ page: int = 1
   $ limit: int = 20
   $ category: string = ""
@@ -85,7 +85,7 @@
     }
   }
 
-@ route /products/:id [GET]
+@ GET /products/:id
   $ product_id = int(id)
 
   $ product = {
@@ -109,7 +109,7 @@
 
   > {product: product}
 
-@ route /products [POST]
+@ POST /products
   $ name: string
   $ description: string
   $ price: float
@@ -144,7 +144,7 @@
 # Shopping Cart
 # =================
 
-@ route /cart/:userId [GET]
+@ GET /cart/:userId
   $ user_id = int(userId)
 
   $ cart = {
@@ -173,7 +173,7 @@
 
   > {cart: cart}
 
-@ route /cart/:userId/items [POST]
+@ POST /cart/:userId/items
   $ user_id = int(userId)
   $ product_id: int
   $ quantity: int
@@ -188,7 +188,7 @@
     :quantity = quantity
   }
 
-@ route /cart/:userId/items/:productId [PUT]
+@ PUT /cart/:userId/items/:productId
   $ user_id = int(userId)
   $ product_id = int(productId)
   $ quantity: int
@@ -201,7 +201,7 @@
     :quantity = quantity
   }
 
-@ route /cart/:userId/items/:productId [DELETE]
+@ DELETE /cart/:userId/items/:productId
   $ user_id = int(userId)
   $ product_id = int(productId)
 
@@ -210,7 +210,7 @@
     :product_id = product_id
   }
 
-@ route /cart/:userId/clear [POST]
+@ POST /cart/:userId/clear
   $ user_id = int(userId)
 
   > {
@@ -222,7 +222,7 @@
 # Orders
 # =================
 
-@ route /orders [POST]
+@ POST /orders
   $ user_id: int
   $ shipping_address: object
   $ payment_method: string
@@ -247,7 +247,7 @@
     :order = order
   }
 
-@ route /orders/:id [GET]
+@ GET /orders/:id
   $ order_id = id
 
   $ order = {
@@ -265,7 +265,7 @@
 
   > {order: order}
 
-@ route /orders/:id/status [PUT]
+@ PUT /orders/:id/status
   $ order_id = id
   $ status: string
 
@@ -280,7 +280,7 @@
 # Reviews
 # =================
 
-@ route /products/:productId/reviews [GET]
+@ GET /products/:productId/reviews
   $ product_id = int(productId)
 
   $ reviews = [
@@ -304,7 +304,7 @@
     :total_reviews = 1
   }
 
-@ route /products/:productId/reviews [POST]
+@ POST /products/:productId/reviews
   $ product_id = int(productId)
   $ user_id: int
   $ rating: int
@@ -336,7 +336,7 @@
 # Categories
 # =================
 
-@ route /categories [GET]
+@ GET /categories
   $ categories = [
     {:id = 1, :name = "Electronics", :slug = "electronics", :count = 145},
     {:id = 2, :name = "Furniture", :slug = "furniture", :count = 67},
@@ -349,7 +349,7 @@
 # Wishlist
 # =================
 
-@ route /wishlist/:userId [GET]
+@ GET /wishlist/:userId
   $ user_id = int(userId)
 
   $ items = [
@@ -362,7 +362,7 @@
     :count = 1
   }
 
-@ route /wishlist/:userId [POST]
+@ POST /wishlist/:userId
   $ user_id = int(userId)
   $ product_id: int
 

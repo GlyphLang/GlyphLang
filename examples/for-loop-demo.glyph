@@ -1,7 +1,7 @@
 # For Loop Examples in Glyph
 
 # Example 1: Simple array iteration
-@ route /users [GET]
+@ GET /users
   $ users = [{name: "Alice", age: 30}, {name: "Bob", age: 25}, {name: "Charlie", age: 35}]
   $ greetings = []
 
@@ -13,7 +13,7 @@
   > {greetings: greetings}
 
 # Example 2: Array iteration with index
-@ route /items [GET]
+@ GET /items
   $ items = ["apple", "banana", "cherry"]
   $ indexed = []
 
@@ -25,7 +25,7 @@
   > {indexed: indexed}
 
 # Example 3: Object iteration (returns key-value pairs)
-@ route /config [GET]
+@ GET /config
   $ config = {host: "localhost", port: "8080", debug: "true"}
   $ settings = []
 
@@ -37,7 +37,7 @@
   > {settings: settings}
 
 # Example 4: Nested loops
-@ route /matrix [GET]
+@ GET /matrix
   $ matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
   $ sum = 0
 
@@ -50,7 +50,7 @@
   > {total: sum}
 
 # Example 5: Filtering with for loop
-@ route /adults [GET]
+@ GET /adults
   $ people = [{name: "Alice", age: 30}, {name: "Bob", age: 17}, {name: "Charlie", age: 25}]
   $ adults = []
 

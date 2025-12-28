@@ -60,7 +60,7 @@
 }
 
 # Public endpoint - no auth required
-@ route /api/health
+@ GET /api/health
   + ratelimit(1000/min)
 
   > {
@@ -70,7 +70,7 @@
   }
 
 # Register new user
-@ route /api/auth/register [POST] -> AuthResponse
+@ POST /api/auth/register -> AuthResponse
   + ratelimit(10/min)
   % db: Database
 
@@ -162,7 +162,7 @@
   }
 
 # Login endpoint
-@ route /api/auth/login [POST] -> AuthResponse
+@ POST /api/auth/login -> AuthResponse
   + ratelimit(20/min)
   % db: Database
 
@@ -234,7 +234,7 @@
   }
 
 # Logout endpoint (client-side token removal, server can blacklist if needed)
-@ route /api/auth/logout [POST] -> ApiResponse
+@ POST /api/auth/logout -> ApiResponse
   + auth(jwt)
   + ratelimit(50/min)
 
@@ -248,7 +248,7 @@
   }
 
 # Get current user profile (protected route)
-@ route /api/auth/me [GET] -> UserProfile
+@ GET /api/auth/me -> UserProfile
   + auth(jwt)
   + ratelimit(100/min)
   % db: Database
@@ -278,7 +278,7 @@
   }
 
 # Update user profile (protected route)
-@ route /api/auth/profile [PUT] -> ApiResponse
+@ PUT /api/auth/profile -> ApiResponse
   + auth(jwt)
   + ratelimit(30/min)
   % db: Database
@@ -325,7 +325,7 @@
   }
 
 # Change password (protected route)
-@ route /api/auth/password [PUT] -> ApiResponse
+@ PUT /api/auth/password -> ApiResponse
   + auth(jwt)
   + ratelimit(10/min)
   % db: Database
@@ -372,7 +372,7 @@
   }
 
 # Refresh JWT token (protected route)
-@ route /api/auth/refresh [POST] -> TokenRefreshResponse
+@ POST /api/auth/refresh -> TokenRefreshResponse
   + auth(jwt)
   + ratelimit(50/min)
 
@@ -396,7 +396,7 @@
   }
 
 # Admin-only endpoint - get all users
-@ route /api/admin/users [GET]
+@ GET /api/admin/users
   + auth(jwt, role: admin)
   + ratelimit(50/min)
   % db: Database
@@ -413,7 +413,7 @@
   }
 
 # Admin-only endpoint - delete user
-@ route /api/admin/users/:id [DELETE] -> ApiResponse
+@ DELETE /api/admin/users/:id -> ApiResponse
   + auth(jwt, role: admin)
   + ratelimit(10/min)
   % db: Database
@@ -450,7 +450,7 @@
   }
 
 # Moderator-only endpoint - update user role
-@ route /api/admin/users/:id/role [PUT] -> ApiResponse
+@ PUT /api/admin/users/:id/role -> ApiResponse
   + auth(jwt, role: moderator)
   + ratelimit(20/min)
   % db: Database

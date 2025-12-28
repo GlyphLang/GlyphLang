@@ -18,13 +18,13 @@
 }
 
 # GET route - Hover over "route" keyword for docs
-@ route /api/users [GET]
+@ GET /api/users
   + auth(jwt)
   + ratelimit(100/min)
   > {users: []}
 
 # POST route with path parameter
-@ route /api/users/:id [GET]
+@ GET /api/users/:id
   $ user = {
     id: id,
     name: "John Doe",
@@ -34,7 +34,7 @@
   > user
 
 # Route with conditional logic
-@ route /api/posts [POST]
+@ POST /api/posts
   $ title = "New Post"
 
   if title {

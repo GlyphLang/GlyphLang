@@ -64,7 +64,7 @@
 }
 
 # Get user with proper error handling
-@ route /api/users/:id -> ApiResponse
+@ GET /api/users/:id -> ApiResponse
   + ratelimit(100/min)
   % db: Database
 
@@ -98,7 +98,7 @@
   }
 
 # Get order with authorization check
-@ route /api/orders/:id -> ApiResponse
+@ GET /api/orders/:id -> ApiResponse
   + auth(jwt)
   + ratelimit(50/min)
   % db: Database
@@ -145,7 +145,7 @@
   }
 
 # Create order with multiple potential errors
-@ route /api/orders [POST] -> ApiResponse
+@ POST /api/orders -> ApiResponse
   + auth(jwt)
   + ratelimit(20/min)
   % db: Database
@@ -245,7 +245,7 @@
   }
 
 # Delete resource with cascading error handling
-@ route /api/users/:id [DELETE] -> ApiResponse
+@ DELETE /api/users/:id -> ApiResponse
   + auth(jwt, role: admin)
   + ratelimit(10/min)
   % db: Database
@@ -317,7 +317,7 @@
   }
 
 # Process payment with multiple failure modes
-@ route /api/payments [POST] -> ApiResponse
+@ POST /api/payments -> ApiResponse
   + auth(jwt)
   + ratelimit(10/min)
   % db: Database
@@ -441,7 +441,7 @@
   }
 
 # Bulk operation with partial failure handling
-@ route /api/products/bulk-update [PUT] -> ApiResponse
+@ PUT /api/products/bulk-update -> ApiResponse
   + auth(jwt, role: admin)
   + ratelimit(5/min)
   % db: Database
@@ -545,7 +545,7 @@
   }
 
 # Refund request with state validation
-@ route /api/orders/:id/refund [POST] -> ApiResponse
+@ POST /api/orders/:id/refund -> ApiResponse
   + auth(jwt)
   + ratelimit(5/min)
   % db: Database
@@ -655,7 +655,7 @@
   }
 
 # Health check endpoint
-@ route /health
+@ GET /health
   > {
     success: true,
     data: {

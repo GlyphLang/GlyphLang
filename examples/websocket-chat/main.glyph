@@ -2,7 +2,7 @@
 # Real-time chat using WebSocket routes
 
 # Status endpoint for monitoring
-@ route /status {
+@ GET /status {
   > {
     status: "WebSocket Chat Server",
     version: "1.0.0"

@@ -65,7 +65,7 @@
 }
 
 # Get all products with optional category filtering
-@ route /api/products [GET] -> ProductList
+@ GET /api/products -> ProductList
   + ratelimit(100/min)
   % db: Database
 
@@ -88,7 +88,7 @@
   }
 
 # Get product by ID
-@ route /api/products/:id [GET] -> Product
+@ GET /api/products/:id -> Product
   + ratelimit(200/min)
   % db: Database
 
@@ -105,7 +105,7 @@
   }
 
 # Get user's shopping cart
-@ route /api/cart [GET] -> Cart
+@ GET /api/cart -> Cart
   + auth(jwt)
   + ratelimit(100/min)
   % db: Database
@@ -133,7 +133,7 @@
   }
 
 # Add item to cart
-@ route /api/cart/items [POST] -> CartResponse
+@ POST /api/cart/items -> CartResponse
   + auth(jwt)
   + ratelimit(50/min)
   % db: Database
@@ -217,7 +217,7 @@
   }
 
 # Update cart item quantity
-@ route /api/cart/items/:product_id [PUT] -> CartResponse
+@ PUT /api/cart/items/:product_id -> CartResponse
   + auth(jwt)
   + ratelimit(50/min)
   % db: Database
@@ -289,7 +289,7 @@
   }
 
 # Remove item from cart
-@ route /api/cart/items/:product_id [DELETE] -> CartResponse
+@ DELETE /api/cart/items/:product_id -> CartResponse
   + auth(jwt)
   + ratelimit(50/min)
   % db: Database
@@ -331,7 +331,7 @@
   }
 
 # Clear entire cart
-@ route /api/cart/clear [DELETE] -> CartResponse
+@ DELETE /api/cart/clear -> CartResponse
   + auth(jwt)
   + ratelimit(20/min)
   % db: Database
@@ -364,7 +364,7 @@
   }
 
 # Apply discount code
-@ route /api/cart/discount [POST] -> CartResponse
+@ POST /api/cart/discount -> CartResponse
   + auth(jwt)
   + ratelimit(30/min)
   % db: Database
@@ -435,7 +435,7 @@
   }
 
 # Checkout - create order from cart
-@ route /api/cart/checkout [POST] -> ApiResponse
+@ POST /api/cart/checkout -> ApiResponse
   + auth(jwt)
   + ratelimit(10/min)
   % db: Database
@@ -490,7 +490,7 @@
   }
 
 # Get product categories
-@ route /api/categories [GET]
+@ GET /api/categories
   + ratelimit(100/min)
   % db: Database
 

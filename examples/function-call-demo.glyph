@@ -1,21 +1,21 @@
 # Function Call Examples in Glyph
 
 # Example 1: Get current timestamp
-@ route /time [GET]
+@ GET /time
   > {timestamp: now()}
 
 # Example 2: Array length
-@ route /array-length [GET]
+@ GET /array-length
   $ arr = [1, 2, 3, 4, 5]
   > {length: length(arr), array: arr}
 
 # Example 3: String length
-@ route /string-length [GET]
+@ GET /string-length
   $ str = "Hello, World!"
   > {length: length(str), string: str}
 
 # Example 4: Function call in condition
-@ route /check-size [GET]
+@ GET /check-size
   $ items = ["a", "b", "c", "d"]
   if length(items) > 3 {
     > {status: "large", count: length(items)}
@@ -24,7 +24,7 @@
   }
 
 # Example 5: Multiple function calls
-@ route /info [GET]
+@ GET /info
   $ data = [10, 20, 30]
   > {
     timestamp: now(),

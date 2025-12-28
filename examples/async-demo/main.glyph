@@ -2,7 +2,7 @@
 # Demonstrates asynchronous programming with Futures in GlyphLang
 
 # Basic async/await - simple computation in async block
-@ route /async-simple [GET]
+@ GET /async-simple
   $ future = async {
     $ x = 10
     $ y = 20
@@ -12,7 +12,7 @@
   > {message: "Async result", value: result}
 
 # Parallel execution - multiple async operations running concurrently
-@ route /async-parallel [GET]
+@ GET /async-parallel
   # Start three async operations at once
   $ f1 = async { > 100 }
   $ f2 = async { > 200 }
@@ -29,7 +29,7 @@
   }
 
 # Async returning objects
-@ route /async-object [GET]
+@ GET /async-object
   $ future = async {
     > {
       id: 1,
@@ -41,7 +41,7 @@
   > user
 
 # Sequential async operations
-@ route /async-sequential [GET]
+@ GET /async-sequential
   $ step1 = async {
     $ base = 10
     > base * 2
@@ -60,7 +60,7 @@
   }
 
 # Async with conditional logic
-@ route /async-conditional/:value [GET]
+@ GET /async-conditional/:value
   $ future = async {
     if value > 50 {
       > {status: "high", value: value}
@@ -71,7 +71,7 @@
   > await future
 
 # Multiple awaits on same future (futures can be awaited multiple times)
-@ route /async-reuse [GET]
+@ GET /async-reuse
   $ future = async {
     > 42
   }

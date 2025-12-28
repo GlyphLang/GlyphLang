@@ -2,7 +2,7 @@
 # Using ! symbol for commands (AI-optimized syntax)
 
 # API endpoint for CLI status
-@ route /cli/status {
+@ GET /cli/status {
   > {status: "CLI Demo running", version: "1.0.0"}
 }
 

@@ -43,7 +43,7 @@
 }
 
 # Get all users
-@ route /api/users [GET] -> UserListResponse
+@ GET /api/users -> UserListResponse
   + ratelimit(100/min)
   % db: Database
 
@@ -58,7 +58,7 @@
   }
 
 # Get a specific user by ID
-@ route /api/users/:id [GET] -> UserResponse
+@ GET /api/users/:id -> UserResponse
   + ratelimit(200/min)
   % db: Database
 
@@ -79,7 +79,7 @@
   }
 
 # Create a new user
-@ route /api/users [POST] -> UserResponse
+@ POST /api/users -> UserResponse
   + ratelimit(50/min)
   % db: Database
 
@@ -132,7 +132,7 @@
   }
 
 # Update a user
-@ route /api/users/:id [PUT] -> UserResponse
+@ PUT /api/users/:id -> UserResponse
   + ratelimit(50/min)
   % db: Database
 
@@ -180,7 +180,7 @@
   }
 
 # Delete a user
-@ route /api/users/:id [DELETE] -> UserResponse
+@ DELETE /api/users/:id -> UserResponse
   + ratelimit(50/min)
   % db: Database
 
@@ -203,7 +203,7 @@
   }
 
 # Get active users
-@ route /api/users/active [GET] -> UserListResponse
+@ GET /api/users/active -> UserListResponse
   + ratelimit(100/min)
   % db: Database
 
@@ -218,7 +218,7 @@
   }
 
 # Get users by age range
-@ route /api/users/age/:min/:max [GET] -> UserListResponse
+@ GET /api/users/age/:min/:max -> UserListResponse
   + ratelimit(100/min)
   % db: Database
 
@@ -241,7 +241,7 @@
   }
 
 # Search users by username
-@ route /api/users/search/:query [GET] -> UserListResponse
+@ GET /api/users/search/:query -> UserListResponse
   + ratelimit(100/min)
   % db: Database
 
@@ -264,7 +264,7 @@
   }
 
 # Deactivate a user (soft delete)
-@ route /api/users/:id/deactivate [PATCH] -> UserResponse
+@ PATCH /api/users/:id/deactivate -> UserResponse
   + ratelimit(50/min)
   % db: Database
 
@@ -292,7 +292,7 @@
   }
 
 # Reactivate a user
-@ route /api/users/:id/activate [PATCH] -> UserResponse
+@ PATCH /api/users/:id/activate -> UserResponse
   + ratelimit(50/min)
   % db: Database
 
@@ -320,7 +320,7 @@
   }
 
 # Get user statistics
-@ route /api/users/stats [GET] -> UserStatsResponse
+@ GET /api/users/stats -> UserStatsResponse
   + ratelimit(100/min)
   % db: Database
 
