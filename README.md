@@ -3,7 +3,7 @@
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)]()
 [![Tests](https://img.shields.io/badge/tests-3503%20passing-success)]()
 [![Coverage](https://img.shields.io/badge/coverage-80%25%2B-green)]()
-[![Version](https://img.shields.io/badge/version-v1.0.0-blue)](https://github.com/GlyphLang/GlyphLang/releases/tag/v1.0.0)
+[![Version](https://img.shields.io/badge/version-v1.0.2-blue)](https://github.com/GlyphLang/GlyphLang/releases/latest)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![CLA](https://cla-assistant.io/readme/badge/GlyphLang/GlyphLang)](https://cla-assistant.io/GlyphLang/GlyphLang)
 
@@ -44,24 +44,28 @@
 
 ## Installation
 
+**Windows Installer (Recommended):**
+
+Download and run the installer: [glyph-1.0.2-windows-setup.exe](https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.2/glyph-1.0.2-windows-setup.exe)
+
 **Download binary:**
 ```bash
 # Linux
-curl -L https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.0/glyph-linux-amd64.zip -o glyph.zip
+curl -L https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.2/glyph-1.0.2-linux-amd64.zip -o glyph.zip
 unzip glyph.zip && chmod +x glyph-linux-amd64 && sudo mv glyph-linux-amd64 /usr/local/bin/glyph
 
 # macOS (Intel)
-curl -L https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.0/glyph-darwin-amd64.zip -o glyph.zip
+curl -L https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.2/glyph-1.0.2-darwin-amd64.zip -o glyph.zip
 unzip glyph.zip && chmod +x glyph-darwin-amd64 && sudo mv glyph-darwin-amd64 /usr/local/bin/glyph
 
 # macOS (Apple Silicon)
-curl -L https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.0/glyph-darwin-arm64.zip -o glyph.zip
+curl -L https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.2/glyph-1.0.2-darwin-arm64.zip -o glyph.zip
 unzip glyph.zip && chmod +x glyph-darwin-arm64 && sudo mv glyph-darwin-arm64 /usr/local/bin/glyph
 ```
 
 **Windows (PowerShell):**
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.0/glyph-windows-amd64.zip" -OutFile glyph.zip
+Invoke-WebRequest -Uri "https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.2/glyph-1.0.2-windows-amd64.zip" -OutFile glyph.zip
 Expand-Archive glyph.zip -DestinationPath . ; Move-Item glyph-windows-amd64.exe glyph.exe
 ```
 

@@ -38,17 +38,20 @@ After building, verify the installation:
 
 ```bash
 glyph --version
-# Glyph version 0.1.0-alpha
+# GlyphLang v1.0.2
 ```
 
 ### Binary Downloads
 
-Pre-built binaries are available for major platforms:
+Pre-built binaries are available from the [releases page](https://github.com/GlyphLang/GlyphLang/releases/latest):
 
-- **Linux (amd64)**: `glyph-linux-amd64`
-- **macOS (amd64)**: `glyph-darwin-amd64`
-- **macOS (arm64)**: `glyph-darwin-arm64`
-- **Windows (amd64)**: `glyph-windows-amd64.exe`
+| Platform | Download |
+|----------|----------|
+| Windows (Installer) | [glyph-1.0.2-windows-setup.exe](https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.2/glyph-1.0.2-windows-setup.exe) |
+| Windows (ZIP) | [glyph-1.0.2-windows-amd64.zip](https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.2/glyph-1.0.2-windows-amd64.zip) |
+| Linux (amd64) | [glyph-1.0.2-linux-amd64.zip](https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.2/glyph-1.0.2-linux-amd64.zip) |
+| macOS (Intel) | [glyph-1.0.2-darwin-amd64.zip](https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.2/glyph-1.0.2-darwin-amd64.zip) |
+| macOS (Apple Silicon) | [glyph-1.0.2-darwin-arm64.zip](https://github.com/GlyphLang/GlyphLang/releases/download/v1.0.2/glyph-1.0.2-darwin-arm64.zip) |
 
 Download the appropriate binary for your platform and add it to your PATH.
 
