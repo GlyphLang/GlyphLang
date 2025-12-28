@@ -1,5 +1,6 @@
 # GlyphLang
 
+[![AI Token Savings](https://img.shields.io/badge/AI%20tokens-45%25%20fewer%20than%20Python-blueviolet)]()
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)]()
 [![Tests](https://img.shields.io/badge/tests-3503%20passing-success)]()
 [![Coverage](https://img.shields.io/badge/coverage-80%25%2B-green)]()
@@ -7,7 +8,19 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![CLA](https://cla-assistant.io/readme/badge/GlyphLang/GlyphLang)](https://cla-assistant.io/GlyphLang/GlyphLang)
 
-**GlyphLang** is a domain-specific language for building type-safe REST APIs with bytecode compilation and JIT optimization. Symbol-based syntax reduces token usage by 45% compared to Python, making it ideal for AI code generation.
+**GlyphLang** is the AI-first language for REST APIs. Symbol-based syntax uses 45% fewer tokens than Python and 63% fewer than Java, making LLM code generation faster, cheaper, and more reliable.
+
+```
+Glyph:  @ GET /users/:id -> User     (17 tokens)
+Python: @app.route('/users/<id>')... (60 tokens)
+Java:   @GetMapping("/users/{id}")...  (74 tokens)
+```
+
+**Why AI-first matters:**
+- Faster generation (fewer tokens = faster LLM response)
+- Lower cost (55% savings on API calls at scale)
+- Fewer errors (less code = less hallucination)
+- More context (fit more business logic in context windows)
 
 ```glyph
 @ GET /hello/:name
@@ -16,6 +29,12 @@
 ```
 
 ## Features
+
+### AI-First Design
+- **Token-Optimized Syntax** - Symbols (`@`, `$`, `>`, `:`) instead of keywords
+- **Context Command** - Generate project summaries optimized for LLM context windows
+- **Structured Validation** - JSON error output for AI agents to parse and fix
+- **Consistent Patterns** - Predictable syntax reduces hallucination
 
 ### Core Language
 - **Type System** - int, string, bool, float, arrays, objects, optional (`T?`), union (`A | B`), generics
@@ -40,7 +59,7 @@
 ### Tooling
 - **LSP Server** - full IDE support with completions, diagnostics, rename
 - **[VS Code Extension](https://github.com/GlyphLang/vscode-glyph)** - syntax highlighting, error checking
-- **CLI** - compile, run, REPL, decompile commands
+- **CLI** - compile, run, REPL, decompile, AI context commands
 
 ## Installation
 
@@ -228,31 +247,47 @@ crud!(posts)
 
 ## CLI Commands
 
+### AI Agent Commands
+
+These commands are designed for AI coding assistants and agents:
+
+```bash
+# Generate context for AI agents (fits in context windows)
+glyph context                     # Full project context as JSON
+glyph context --format compact    # Minimal text (fewer tokens)
+glyph context --changed           # Only changes since last run
+glyph context --for route         # Focus on routes only
+glyph context --for type          # Focus on type definitions
+
+# Validate with structured output for AI to parse and fix
+glyph validate main.glyph --ai    # JSON errors with fix hints
+glyph validate src/ --ai          # Validate entire directory
+```
+
+Example AI workflow:
+```bash
+# 1. Agent gets project context
+glyph context --format compact > context.txt
+
+# 2. Agent makes changes, then validates
+glyph validate src/ --ai | agent-fix-errors
+
+# 3. Agent checks what changed
+glyph context --changed
+```
+
+### Standard Commands
+
 ```bash
 glyph run <file>        # Run a Glyph file
 glyph dev <file>        # Development server with hot reload
 glyph compile <file>    # Compile to bytecode
 glyph decompile <file>  # Decompile bytecode
-glyph context [dir]     # Generate AI-optimized project context
-glyph validate <file>   # Validate source with structured errors
 glyph lsp               # Start LSP server
 glyph init              # Initialize new project
 glyph commands <file>   # List CLI commands in a file
 glyph exec <file> <cmd> # Execute a CLI command
 glyph version           # Show version
-```
-
-### AI Agent Commands
-
-```bash
-# Generate context for AI agents
-glyph context --format compact    # Minimal text output
-glyph context --changed           # Show only changes
-glyph context --for route         # Focus on routes only
-
-# Validate with AI-friendly output
-glyph validate main.glyph --ai    # Structured JSON errors
-glyph validate src/ --ai          # Validate directory
 ```
 
 ## Documentation
@@ -264,6 +299,24 @@ glyph validate src/ --ai          # Validate directory
 - [Architecture](docs/ARCHITECTURE_DESIGN.md)
 
 ## Performance
+
+### AI Token Efficiency
+
+| Comparison | Glyph Tokens | Other Tokens | Savings |
+|------------|--------------|--------------|---------|
+| vs Python | 463 | 842 | 45% fewer |
+| vs Java | 463 | 1252 | 63% fewer |
+
+| Use Case | Glyph | Python | Java |
+|----------|-------|--------|------|
+| Hello World API | 17 | 60 | 74 |
+| CRUD API | 172 | 273 | 285 |
+| WebSocket Handler | 111 | 203 | 396 |
+| Type Definition | 31 | 55 | 235 |
+
+*Benchmark: 7 equivalent API implementations. Run `python benchmarks/bench_ai_efficiency.py` to reproduce.*
+
+### Runtime Performance
 
 | Metric | Value |
 |--------|-------|

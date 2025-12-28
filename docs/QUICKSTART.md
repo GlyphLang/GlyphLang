@@ -1,5 +1,7 @@
 # GlyphLang Quick Start Guide
 
+GlyphLang is the AI-first language for REST APIs. Its symbol-based syntax uses 45% fewer tokens than Python, making it ideal for AI code generation and agent workflows.
+
 This guide will help you get started with GlyphLang in under 45 minutes. You will learn how to install GlyphLang, create your first API, add authentication, and connect to a database.
 
 ## Table of Contents
@@ -9,7 +11,8 @@ This guide will help you get started with GlyphLang in under 45 minutes. You wil
 3. [Building a REST API (15 minutes)](#building-a-rest-api-15-minutes)
 4. [Adding Authentication (10 minutes)](#adding-authentication-10-minutes)
 5. [Database Integration (10 minutes)](#database-integration-10-minutes)
-6. [Next Steps](#next-steps)
+6. [AI Agent Integration](#ai-agent-integration)
+7. [Next Steps](#next-steps)
 
 ---
 
@@ -723,6 +726,88 @@ $ nextId = db.users.nextId()
     }
   }
 ```
+
+---
+
+## AI Agent Integration
+
+GlyphLang includes built-in commands for AI coding assistants and agents.
+
+### Generate Project Context
+
+The `context` command creates a compact summary of your project that fits in LLM context windows:
+
+```bash
+# Generate full project context as JSON
+glyph context
+
+# Generate minimal text output (fewer tokens)
+glyph context --format compact
+
+# Focus on specific aspects
+glyph context --for route    # Routes only
+glyph context --for type     # Type definitions only
+glyph context --for function # Functions only
+
+# Show only changes since last run
+glyph context --changed
+```
+
+### Validate with AI-Friendly Output
+
+The `validate` command provides structured errors that AI agents can parse and fix:
+
+```bash
+# Validate with structured JSON output
+glyph validate main.glyph --ai
+
+# Validate entire directory
+glyph validate src/ --ai
+```
+
+Example output:
+
+```json
+{
+  "valid": false,
+  "errors": [
+    {
+      "type": "undefined_reference",
+      "message": "undefined variable: userId",
+      "file": "main.glyph",
+      "line": 15,
+      "column": 10,
+      "hint": "Did you mean 'user_id'?"
+    }
+  ]
+}
+```
+
+### AI Agent Workflow
+
+A typical AI coding workflow with GlyphLang:
+
+```bash
+# 1. Agent gets project context
+glyph context --format compact > context.txt
+
+# 2. Agent makes changes to .glyph files
+
+# 3. Agent validates changes
+glyph validate src/ --ai
+
+# 4. If errors, agent fixes them and re-validates
+
+# 5. Agent checks what changed
+glyph context --changed
+```
+
+### Why This Matters
+
+- **45% fewer tokens** than Python for equivalent code
+- **Structured errors** agents can parse and fix automatically
+- **Compact context** fits more project info in context windows
+- **Consistent syntax** reduces hallucination errors
 
 ---
 
