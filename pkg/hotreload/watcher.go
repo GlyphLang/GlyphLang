@@ -21,16 +21,16 @@ import (
 
 // FileWatcher watches for file changes
 type FileWatcher struct {
-	mu            sync.RWMutex
-	watchPaths    []string
-	patterns      []string
-	excludes      []string
-	debounceTime  time.Duration
-	onChange      func([]FileChange)
-	fileHashes    map[string]string
-	stop          chan struct{}
-	running       bool
-	pollInterval  time.Duration
+	mu           sync.RWMutex
+	watchPaths   []string
+	patterns     []string
+	excludes     []string
+	debounceTime time.Duration
+	onChange     func([]FileChange)
+	fileHashes   map[string]string
+	stop         chan struct{}
+	running      bool
+	pollInterval time.Duration
 }
 
 // FileChange represents a change to a file
@@ -239,7 +239,7 @@ func (w *FileWatcher) detectChanges() []FileChange {
 	currentFiles := make(map[string]bool)
 
 	for _, watchPath := range w.watchPaths {
-		filepath.Walk(watchPath, func(path string, info os.FileInfo, err error) error {
+		_ = filepath.Walk(watchPath, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return nil
 			}
@@ -504,7 +504,7 @@ func (rm *ReloadManager) handleChanges(changes []FileChange) {
 	// Find main file to compile
 	mainFile := ""
 	for _, change := range changes {
-		if strings.HasSuffix(change.Path, ".glyph") || strings.HasSuffix(change.Path, ".glyph") {
+		if strings.HasSuffix(change.Path, ".glyph") {
 			mainFile = change.Path
 			break
 		}

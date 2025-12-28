@@ -210,7 +210,7 @@ func ExampleExtractContext() {
 	ctx := tracing.ExtractContext(context.Background(), req)
 
 	// Start a span with the extracted context
-	ctx, span := tracing.StartSpan(ctx, "handle-api-request", tracing.SpanKind.Server)
+	_, span := tracing.StartSpan(ctx, "handle-api-request", tracing.SpanKind.Server)
 	defer span.End()
 
 	fmt.Println("Trace context extracted from request")

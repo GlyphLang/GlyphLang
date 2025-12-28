@@ -528,6 +528,18 @@ func TestReloadEvent(t *testing.T) {
 	if event.Duration != 100*time.Millisecond {
 		t.Errorf("Expected duration 100ms, got %v", event.Duration)
 	}
+
+	if event.Error != nil {
+		t.Error("Expected error to be nil")
+	}
+
+	if event.ReloadCount != 1 {
+		t.Errorf("Expected reload count 1, got %d", event.ReloadCount)
+	}
+
+	if event.Timestamp.IsZero() {
+		t.Error("Expected timestamp to be set")
+	}
 }
 
 // TestReloadStats tests ReloadStats struct
@@ -568,6 +580,18 @@ func TestDevServerConfig(t *testing.T) {
 
 	if config.Host != "0.0.0.0" {
 		t.Errorf("Expected host 0.0.0.0, got %s", config.Host)
+	}
+
+	if !config.LiveReload {
+		t.Error("Expected LiveReload to be true")
+	}
+
+	if !config.OpenBrowser {
+		t.Error("Expected OpenBrowser to be true")
+	}
+
+	if config.BuildOnStart {
+		t.Error("Expected BuildOnStart to be false")
 	}
 }
 
