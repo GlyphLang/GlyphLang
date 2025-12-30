@@ -1,10 +1,19 @@
 # GlyphLang Production Readiness
 
-**Current Status**: v1.0.0 Released
+**Current Status**: v1.0.6 Released
 
 ---
 
 ## Post-v1.0 Roadmap
+
+### AI-First Enhancements
+
+- [ ] **LLM Prompt Library** - Official prompts for Claude, GPT, etc. (system prompts, few-shot examples)
+- [ ] **Agent SDK** - Integration packages for MCP, LangChain, CrewAI, AutoGPT
+- [ ] **AI Benchmark CI** - Run token efficiency benchmarks in CI, publish results to badge
+- [ ] **CLAUDE.md Template** - Project-specific context file for Claude Code integration
+- [ ] **Copilot/Cursor Support** - IDE-specific AI assistant configurations
+- [ ] **Code Generation API** - REST endpoint that accepts natural language, returns Glyph code
 
 ### Tooling
 
@@ -16,6 +25,7 @@
 
 ### Deployment
 
+- [ ] **Code Signing** - Sign Windows executables to remove SmartScreen warning (SignPath.io for OSS)
 - [ ] **Docker Support** - Official images, multi-stage builds
 - [ ] **Kubernetes Integration** - Helm charts, operator pattern
 - [ ] **Serverless Support** - AWS Lambda, Google Cloud Functions
@@ -45,16 +55,38 @@
 | CI/CD Pipeline | Complete |
 | Documentation | Complete |
 
+### AI-First Status
+
+| Feature | Status |
+|---------|--------|
+| Token-optimized syntax | Complete (45% fewer than Python) |
+| `glyph context` command | Complete |
+| `glyph validate --ai` command | Complete |
+| AI token efficiency benchmarks | Complete (`benchmarks/bench_ai_efficiency.py`) |
+| README AI-first positioning | Complete (v1.0.6) |
+| QUICKSTART AI section | Complete (v1.0.6) |
+| LLM prompt library | Not started |
+| Agent SDK (MCP/LangChain) | Not started |
+| AI benchmark CI automation | Not started |
+
 ---
 
 ## v2.0.0 Target Features
 
+**AI-First**
+- LLM prompt library with official system prompts
+- Agent SDK for MCP/LangChain integration
+- AI benchmark automation in CI
+
+**Tooling**
 - Package manager with registry
 - Formatter and linter tooling
+- Profiling and debugging tools
+
+**Deployment**
 - Docker/Kubernetes native support
 - Serverless deployment adapters
-- Profiling and debugging tools
 
 ---
 
-**Last Updated**: 2025-12-27
+**Last Updated**: 2025-12-28
