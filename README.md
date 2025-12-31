@@ -264,22 +264,33 @@ import "./utils"
 ### Macros
 
 ```glyph
-macro! crud(resource) {
-  @ GET /${resource} {
-    > db.query("SELECT * FROM ${resource}")
-  }
-
-  @ GET /${resource}/:id {
-    > db.query("SELECT * FROM ${resource} WHERE id = ?", id)
-  }
-
-  @ POST /${resource} {
-    > db.insert("${resource}", input)
+# Define reusable patterns with macros
+macro! validate_required(field) {
+  if field == null {
+    > {error: "field is required", status: 400}
   }
 }
 
-crud!(users)
-crud!(posts)
+macro! json_response(data, status) {
+  > {data: data, status: status, timestamp: now()}
+}
+
+# CRUD pattern - what macro expansion produces:
+@ GET /users {
+  > db.query("SELECT * FROM users")
+}
+
+@ GET /users/:id {
+  > db.query("SELECT * FROM users WHERE id = ?", id)
+}
+
+@ POST /users {
+  > db.insert("users", input)
+}
+
+@ DELETE /users/:id {
+  > db.query("DELETE FROM users WHERE id = ?", id)
+}
 ```
 
 ### Cron Tasks
