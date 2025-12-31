@@ -1,6 +1,6 @@
 # GlyphLang Production Readiness
 
-**Current Status**: v1.0.6 Released
+**Current Status**: v0.1.6 Released (Pre-production)
 
 ---
 
@@ -63,8 +63,8 @@
 | `glyph context` command | Complete |
 | `glyph validate --ai` command | Complete |
 | AI token efficiency benchmarks | Complete (`benchmarks/bench_ai_efficiency.py`) |
-| README AI-first positioning | Complete (v1.0.6) |
-| QUICKSTART AI section | Complete (v1.0.6) |
+| README AI-first positioning | Complete (v0.1.6) |
+| QUICKSTART AI section | Complete (v0.1.6) |
 | LLM prompt library | Not started |
 | Agent SDK (MCP/LangChain) | Not started |
 | AI benchmark CI automation | Not started |
