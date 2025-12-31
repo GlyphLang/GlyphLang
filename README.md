@@ -1,4 +1,4 @@
-# GlyphLang
+# GlyphLanguage
 
 [![AI Token Savings](https://img.shields.io/badge/AI%20tokens-45%25%20fewer%20than%20Python-blueviolet)]()
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)]()
