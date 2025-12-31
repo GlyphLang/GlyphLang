@@ -495,22 +495,22 @@ func openInEditor(filePath string) error {
 	case "windows":
 		// On Windows, use the default "edit" verb which opens in the associated editor
 		// Falls back to notepad if no association
-		cmd = exec.Command("cmd", "/c", "start", "", absPath)
+		cmd = exec.Command("cmd", "/c", "start", "", absPath) //#nosec G204 -- absPath validated via filepath.Abs
 	case "darwin":
 		// On macOS, use 'open -e' for TextEdit or just 'open' for default app
-		cmd = exec.Command("open", "-t", absPath)
+		cmd = exec.Command("open", "-t", absPath) //#nosec G204 -- absPath validated via filepath.Abs
 	default:
 		// On Linux, try common editors in order of preference
 		editors := []string{"code", "gedit", "kate", "xed", "nano", "vi"}
 		for _, editor := range editors {
 			if _, err := exec.LookPath(editor); err == nil {
-				cmd = exec.Command(editor, absPath)
+				cmd = exec.Command(editor, absPath) //#nosec G204 -- editor from hardcoded list, absPath validated
 				break
 			}
 		}
 		if cmd == nil {
 			// Fallback to xdg-open which should open in default text editor
-			cmd = exec.Command("xdg-open", absPath)
+			cmd = exec.Command("xdg-open", absPath) //#nosec G204 -- absPath validated via filepath.Abs
 		}
 	}
 
@@ -1516,7 +1516,7 @@ func printRequest(method, path string) {
 }
 
 func printDuration(d time.Duration) {
-	fmt.Printf("(%s)\n", d)
+	fmt.Printf("(%dms)\n", d.Milliseconds())
 }
 
 // runLSP handles the LSP command
