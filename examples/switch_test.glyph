@@ -1,4 +1,4 @@
-@route /order-status/:status [GET]
+@ route /order-status/:status [GET] {
   switch status {
     case "pending" {
       > {message: "Order is pending", color: "yellow"}
@@ -13,8 +13,9 @@
       > {message: "Unknown status", color: "red"}
     }
   }
+}
 
-@route /number-name/:num [GET]
+@ route /number-name/:num [GET] {
   $ n = 1
   switch n {
     case 1 {
@@ -30,8 +31,9 @@
       > "unknown"
     }
   }
+}
 
-@route /grade/:score [GET]
+@ route /grade/:score [GET] {
   $ grade = ""
   switch score {
     case 90 {
@@ -48,3 +50,4 @@
     }
   }
   > {grade: grade, score: score}
+}

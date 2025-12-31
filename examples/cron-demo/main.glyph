@@ -34,8 +34,9 @@
 }
 
 # HTTP endpoint to check cron status
-@ GET /cron/status
+@ GET /cron/status {
   > {
     message: "Cron scheduler running",
     jobs: ["daily_cleanup", "hourly_stats", "health_check", "weekly_report"]
   }
+}

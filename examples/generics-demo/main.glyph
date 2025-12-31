@@ -32,41 +32,48 @@
 }
 
 # Route demonstrating generic function usage
-@route /identity/:value [GET]
+@route /identity/:value [GET] {
   $ result = identity<string>(value)
   > {input: value, output: result, type: "string"}
+}
 
 # Route demonstrating type inference
-@route /identity-infer/:value [GET]
+@route /identity-infer/:value [GET] {
   # Type argument is inferred from the argument type
   $ result = identity(value)
   > {input: value, output: result, message: "Type inferred automatically"}
+}
 
 # Route demonstrating pair with explicit types
-@route /pair/:a/:b [GET]
+@route /pair/:a/:b [GET] {
   $ result = pair<string, string>(a, b)
   > result
+}
 
 # Route demonstrating generic first function
-@route /first/:x/:y [GET]
+@route /first/:x/:y [GET] {
   $ result = first(x, y)
   > {first: result, values: [x, y]}
+}
 
 # Route demonstrating swap
-@route /swap/:a/:b [GET]
+@route /swap/:a/:b [GET] {
   $ original = {first: a, second: b}
   $ swapped = swap(a, b)
   > {original: original, swapped: swapped}
+}
 
 # Route demonstrating numeric constraint
-@route /double/:num [GET]
+@route /double/:num [GET] {
   $ result = double<int>(num)
   > {input: num, doubled: result}
+}
 
 # Route demonstrating comparison with Comparable constraint
-@route /compare/:a/:b [GET]
+@route /compare/:a/:b [GET] {
   $ result = compare(a, b)
   > {a: a, b: b, equal: result}
+}
 
 # Generic type definition for Result
 : Result<T, E> {
@@ -97,13 +104,15 @@
 }
 
 # Route demonstrating Result type
-@route /result/success/:value [GET]
+@route /result/success/:value [GET] {
   $ result = createSuccess(value)
   > result
+}
 
-@route /result/error/:message [GET]
+@route /result/error/:message [GET] {
   $ result = createError(message)
   > result
+}
 
 # Function with multiple type parameters and constraints
 ! safeCompare<T: Comparable, U: Comparable>(a: T, b: U): object {
@@ -111,12 +120,14 @@
 }
 
 # Route demonstrating safe comparison
-@route /safe-compare/:a/:b [GET]
+@route /safe-compare/:a/:b [GET] {
   $ result = safeCompare(a, b)
   > result
+}
 
 # Nested generic function calls
-@route /nested/:value [GET]
+@route /nested/:value [GET] {
   # Call identity inside identity
   $ result = identity(identity(value))
   > {input: value, output: result, nestedCalls: 2}
+}

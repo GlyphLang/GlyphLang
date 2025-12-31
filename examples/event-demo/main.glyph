@@ -32,7 +32,8 @@
 }
 
 # HTTP endpoint to emit test events
-@ POST /events/emit
+@ POST /events/emit {
   + auth(jwt)
   $ event_type = input.type
   > {emitted: true, type: event_type}
+}

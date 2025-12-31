@@ -1,3 +1,4 @@
-@ GET /test
+@ GET /test {
   $ t = now()
   > {time: t, double: t}
+}

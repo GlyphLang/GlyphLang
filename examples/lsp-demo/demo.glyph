@@ -18,13 +18,14 @@
 }
 
 # GET route - Hover over "route" keyword for docs
-@ GET /api/users
+@ GET /api/users {
   + auth(jwt)
   + ratelimit(100/min)
   > {users: []}
+}
 
 # POST route with path parameter
-@ GET /api/users/:id
+@ GET /api/users/:id {
   $ user = {
     id: id,
     name: "John Doe",
@@ -32,9 +33,10 @@
     age: 30
   }
   > user
+}
 
 # Route with conditional logic
-@ POST /api/posts
+@ POST /api/posts {
   $ title = "New Post"
 
   if title {
@@ -42,6 +44,7 @@
   } else {
     > {success: false, error: "Title required"}
   }
+}
 
 # Demonstrate completions:
 # - Type "@" and you'll see "route" completion

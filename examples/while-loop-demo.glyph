@@ -2,7 +2,7 @@
 # This file demonstrates the while loop feature
 
 # Example 1: Simple counter
-@ GET /counter
+@ GET /counter {
   $ i = 0
   $ result = 0
   while i < 5 {
@@ -10,9 +10,10 @@
     $ i = i + 1
   }
   > {count: i, sum: result}
+}
 
 # Example 2: Nested while loops
-@ GET /nested
+@ GET /nested {
   $ i = 0
   $ total = 0
   while i < 3 {
@@ -24,18 +25,20 @@
     $ i = i + 1
   }
   > {total: total}
+}
 
 # Example 3: While loop with complex condition
-@ GET /conditional
+@ GET /conditional {
   $ i = 0
   $ max = 10
   while i < max && i < 5 {
     $ i = i + 1
   }
   > {finalValue: i}
+}
 
 # Example 4: While loop with if statement
-@ GET /fibonacci
+@ GET /fibonacci {
   $ a = 0
   $ b = 1
   $ count = 0
@@ -50,9 +53,10 @@
     $ count = count + 1
   }
   > {result: result, iterations: count}
+}
 
 # Example 5: While loop that might not execute
-@ GET /conditional-execute
+@ GET /conditional-execute {
   $ value = 100
   $ executed = false
   while value < 50 {
@@ -60,3 +64,4 @@
     $ value = value + 1
   }
   > {executed: executed, value: value}
+}
