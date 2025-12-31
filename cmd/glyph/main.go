@@ -31,7 +31,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var version = "0.1.7"
+var version = "0.1.8"
 
 func main() {
 	// Check if invoked with just a .glyph file (e.g., double-click on Windows)
@@ -493,9 +493,14 @@ func openInEditor(filePath string) error {
 
 	switch runtime.GOOS {
 	case "windows":
-		// On Windows, use the default "edit" verb which opens in the associated editor
-		// Falls back to notepad if no association
-		cmd = exec.Command("cmd", "/c", "start", "", absPath) //#nosec G204 -- absPath validated via filepath.Abs
+		// On Windows, try VS Code first, then fall back to notepad
+		// We can't use "start" with the file path because .glyph files are associated
+		// with glyph.exe itself, which would cause an infinite loop
+		if codePath, err := exec.LookPath("code"); err == nil {
+			cmd = exec.Command(codePath, absPath) //#nosec G204 -- codePath from LookPath, absPath validated
+		} else {
+			cmd = exec.Command("notepad", absPath) //#nosec G204 -- absPath validated via filepath.Abs
+		}
 	case "darwin":
 		// On macOS, use 'open -e' for TextEdit or just 'open' for default app
 		cmd = exec.Command("open", "-t", absPath) //#nosec G204 -- absPath validated via filepath.Abs
