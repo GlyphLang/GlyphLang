@@ -11,14 +11,14 @@ from "./utils" import { formatDisplayName, isAdult }
 
 # GET all users endpoint
 @ GET /users
-  ~ db: Database
+  % db: Database
   $ users = utils.getAllUsers(db)
   $ total = length(users)
   > {users: users, count: total}
 
 # GET single user by ID with formatted response
 @ GET /users/:id -> m.UserResponse
-  ~ db: Database
+  % db: Database
   $ user = utils.getUserById(db, parseInt(id))
 
   if user == null {
@@ -38,7 +38,7 @@ from "./utils" import { formatDisplayName, isAdult }
 
 # POST create new user with validation
 @ POST /users -> m.User
-  ~ db: Database
+  % db: Database
 
   # Validate email using models module function
   if m.isValidEmail(input.email) == false {
@@ -57,7 +57,7 @@ from "./utils" import { formatDisplayName, isAdult }
 
 # GET user stats - demonstrating multiple module usage
 @ GET /users/:id/stats
-  ~ db: Database
+  % db: Database
   $ user = utils.getUserById(db, parseInt(id))
   $ currentYear = 2024
   $ age = utils.calculateAge(user.birthYear, currentYear)

@@ -81,3 +81,31 @@ func (v ObjectValue) Type() string { return "object" }
 func (v ObjectValue) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.Val)
 }
+
+// FutureValue represents an async future
+type FutureValue struct {
+	Result   Value
+	Error    error
+	Resolved bool
+	Done     chan struct{}
+}
+
+func (v *FutureValue) Type() string { return "future" }
+
+func (v *FutureValue) MarshalJSON() ([]byte, error) {
+	if v.Resolved {
+		return json.Marshal(v.Result)
+	}
+	return []byte(`{"pending":true}`), nil
+}
+
+// Await blocks until the future is resolved and returns the result
+func (v *FutureValue) Await() (Value, error) {
+	if v.Done != nil {
+		<-v.Done
+	}
+	if v.Error != nil {
+		return nil, v.Error
+	}
+	return v.Result, nil
+}

@@ -54,6 +54,10 @@ const (
 	OpWsGetConnCount  Opcode = 0xA8 // Get total connection count
 	OpWsGetUptime     Opcode = 0xA9 // Get server uptime in seconds
 
+	// Async/await opcodes
+	OpAsync       Opcode = 0xB0 // Create async future (operand: body length)
+	OpAwait       Opcode = 0xB1 // Await a future
+
 	OpHalt        Opcode = 0xFF
 )
 
@@ -340,6 +344,10 @@ func (vm *VM) executeInstruction(opcode Opcode) error {
 		return vm.execWsGetConnCount()
 	case OpWsGetUptime:
 		return vm.execWsGetUptime()
+	case OpAsync:
+		return vm.execAsync()
+	case OpAwait:
+		return vm.execAwait()
 	case OpHalt:
 		vm.halted = true
 		return nil
@@ -1853,4 +1861,87 @@ func valueToInterface(v Value) interface{} {
 	default:
 		return nil
 	}
+}
+
+// execAsync executes an async block and creates a future
+// The async body bytecode follows immediately after the opcode
+// Format: OpAsync [bodyLen:4 bytes] [body bytecode]
+func (vm *VM) execAsync() error {
+	// Read body length
+	bodyLen, err := vm.readOperand()
+	if err != nil {
+		return err
+	}
+
+	// Capture the async body bytecode
+	if vm.pc+int(bodyLen) > len(vm.code) {
+		return fmt.Errorf("async body extends beyond bytecode")
+	}
+	asyncBody := make([]byte, bodyLen)
+	copy(asyncBody, vm.code[vm.pc:vm.pc+int(bodyLen)])
+
+	// Skip past the async body in the main execution
+	vm.pc += int(bodyLen)
+
+	// Create a future and execute async body in a goroutine
+	future := &FutureValue{
+		Done: make(chan struct{}),
+	}
+
+	go func() {
+		defer close(future.Done)
+
+		// Create a new VM for the async execution
+		asyncVM := NewVM()
+		asyncVM.constants = vm.constants
+
+		// Copy current locals to async VM
+		for k, v := range vm.locals {
+			asyncVM.locals[k] = v
+		}
+		for k, v := range vm.globals {
+			asyncVM.globals[k] = v
+		}
+		for k, v := range vm.builtins {
+			asyncVM.builtins[k] = v
+		}
+
+		// Execute the async body
+		result, execErr := asyncVM.Execute(asyncBody)
+		if execErr != nil {
+			future.Error = execErr
+		} else {
+			future.Result = result
+		}
+		future.Resolved = true
+	}()
+
+	// Push the future onto the stack
+	vm.Push(future)
+	return nil
+}
+
+// execAwait waits for a future to resolve and pushes its result
+func (vm *VM) execAwait() error {
+	val, err := vm.Pop()
+	if err != nil {
+		return err
+	}
+
+	future, ok := val.(*FutureValue)
+	if !ok {
+		// If it's not a future, just return the value as-is
+		// This allows await to work with non-future values
+		vm.Push(val)
+		return nil
+	}
+
+	// Wait for the future to resolve
+	result, err := future.Await()
+	if err != nil {
+		return err
+	}
+
+	vm.Push(result)
+	return nil
 }

@@ -312,6 +312,19 @@ func (p *Parser) parseType() (interpreter.Type, bool, error) {
 	typeName := p.current().Literal
 	p.advance()
 
+	// Check for qualified type name (e.g., module.TypeName)
+	for p.check(DOT) {
+		p.advance() // consume dot
+		if !p.check(IDENT) {
+			return nil, false, p.typeError(
+				fmt.Sprintf("Expected type name after '.', but found %s", p.current().Type),
+				p.current(),
+			)
+		}
+		typeName = typeName + "." + p.current().Literal
+		p.advance()
+	}
+
 	switch typeName {
 	case "int":
 		baseType = interpreter.IntType{}
@@ -899,9 +912,22 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 			}
 
 			// Get identifier (path segment or param name)
-			if p.check(IDENT) {
+			// Accept both IDENT and keyword tokens as valid path segments
+			if p.isPathSegmentToken() {
 				pathBuilder.WriteString(p.current().Literal)
 				p.advance()
+
+				// Handle hyphenated path segments: /async-simple, /user-profile
+				for p.check(MINUS) {
+					pathBuilder.WriteByte('-')
+					p.advance()
+					if p.isPathSegmentToken() {
+						pathBuilder.WriteString(p.current().Literal)
+						p.advance()
+					} else {
+						break
+					}
+				}
 			} else {
 				break
 			}
@@ -2510,6 +2536,19 @@ func (p *Parser) isAtEnd() bool {
 
 func (p *Parser) check(t TokenType) bool {
 	return p.current().Type == t
+}
+
+// isPathSegmentToken returns true if the current token can be used as a path segment
+// This includes IDENT and keyword tokens (async, await, import, etc.) which should
+// be treated as regular identifiers when they appear in route paths
+func (p *Parser) isPathSegmentToken() bool {
+	switch p.current().Type {
+	case IDENT, ASYNC, AWAIT, IMPORT, FROM, AS, MODULE, MATCH, WHEN, MACRO, QUOTE,
+		TRUE, FALSE, NULL, FOR, WHILE, SWITCH, CASE, DEFAULT, IN:
+		return true
+	default:
+		return false
+	}
 }
 
 // peek looks at a token at a given offset from current position (0 = current)

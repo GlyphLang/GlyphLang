@@ -635,6 +635,14 @@ func (c *Compiler) compileExpression(expr interpreter.Expr) error {
 		return c.compileMatchExpr(e)
 	case interpreter.MatchExpr:
 		return c.compileMatchExpr(&e)
+	case *interpreter.AsyncExpr:
+		return c.compileAsyncExpr(e)
+	case interpreter.AsyncExpr:
+		return c.compileAsyncExpr(&e)
+	case *interpreter.AwaitExpr:
+		return c.compileAwaitExpr(e)
+	case interpreter.AwaitExpr:
+		return c.compileAwaitExpr(&e)
 	default:
 		return fmt.Errorf("unsupported expression type: %T", expr)
 	}
@@ -1255,5 +1263,53 @@ func (c *Compiler) compileLiteralValue(lit interpreter.Literal) error {
 
 	idx := c.addConstant(val)
 	c.emitWithOperand(vm.OpPush, uint32(idx))
+	return nil
+}
+
+// compileAsyncExpr compiles an async block expression
+// The async block body is compiled inline and wrapped with OpAsync
+func (c *Compiler) compileAsyncExpr(expr *interpreter.AsyncExpr) error {
+	// Create a temporary compiler to compile the async body
+	bodyCompiler := &Compiler{
+		code:        make([]byte, 0),
+		symbolTable: c.symbolTable, // Share symbol table for variable access
+		constants:   c.constants,
+	}
+
+	// Compile the async body statements
+	for _, stmt := range expr.Body {
+		if err := bodyCompiler.compileStatement(stmt); err != nil {
+			return err
+		}
+	}
+
+	// The body should end with a return
+	// If no explicit return, add OpHalt
+	if len(bodyCompiler.code) == 0 ||
+		bodyCompiler.code[len(bodyCompiler.code)-1] != byte(vm.OpReturn) {
+		bodyCompiler.emit(vm.OpHalt)
+	}
+
+	// Merge constants from body compiler
+	c.constants = bodyCompiler.constants
+
+	// Emit OpAsync with body length, followed by body bytecode
+	bodyLen := uint32(len(bodyCompiler.code))
+	c.emitWithOperand(vm.OpAsync, bodyLen)
+	c.code = append(c.code, bodyCompiler.code...)
+
+	return nil
+}
+
+// compileAwaitExpr compiles an await expression
+func (c *Compiler) compileAwaitExpr(expr *interpreter.AwaitExpr) error {
+	// Compile the expression being awaited (should produce a future)
+	if err := c.compileExpression(expr.Expr); err != nil {
+		return err
+	}
+
+	// Emit await instruction
+	c.emit(vm.OpAwait)
+
 	return nil
 }
