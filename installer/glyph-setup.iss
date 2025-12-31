@@ -2,7 +2,7 @@
 ; Creates a Windows installer for GlyphLang
 
 #define MyAppName "GlyphLang"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "0.1.6"
 #define MyAppPublisher "GlyphLang"
 #define MyAppURL "https://github.com/glyphlang/glyph"
 #define MyAppExeName "glyph.exe"
@@ -64,7 +64,7 @@ Name: "{userdesktop}\GlyphLang"; Filename: "{cmd}"; Parameters: "/k ""{app}\{#My
 Root: HKCU; Subkey: "Software\Classes\.glyph"; ValueType: string; ValueName: ""; ValueData: "GlyphLang.Source"; Flags: uninsdeletevalue
 Root: HKCU; Subkey: "Software\Classes\GlyphLang.Source"; ValueType: string; ValueName: ""; ValueData: "GlyphLang Source File"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\GlyphLang.Source\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"
-Root: HKCU; Subkey: "Software\Classes\GlyphLang.Source\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" run ""%1"""
+Root: HKCU; Subkey: "Software\Classes\GlyphLang.Source\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
 
 [Code]
 // Pascal Script for PATH manipulation
