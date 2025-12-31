@@ -34,6 +34,20 @@ import (
 var version = "1.0.6"
 
 func main() {
+	// Check if invoked with just a .glyph file (e.g., double-click on Windows)
+	// In this case, open the file in the default text editor
+	if len(os.Args) == 2 && filepath.Ext(os.Args[1]) == ".glyph" {
+		filePath := os.Args[1]
+		// Check if the file exists
+		if _, err := os.Stat(filePath); err == nil {
+			if err := openInEditor(filePath); err != nil {
+				printError(fmt.Errorf("failed to open editor: %w", err))
+				os.Exit(1)
+			}
+			return
+		}
+	}
+
 	var rootCmd = &cobra.Command{
 		Use:   "glyph",
 		Short: "AI Backend Compiler - A language for AI-generated backends",
@@ -465,6 +479,42 @@ func runDev(cmd *cobra.Command, args []string) error {
 
 	// Setup graceful shutdown
 	return manager.waitForShutdown()
+}
+
+// openInEditor opens the specified file in the default text editor
+func openInEditor(filePath string) error {
+	// Get absolute path for safety
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		return fmt.Errorf("invalid file path: %w", err)
+	}
+
+	var cmd *exec.Cmd
+
+	switch runtime.GOOS {
+	case "windows":
+		// On Windows, use the default "edit" verb which opens in the associated editor
+		// Falls back to notepad if no association
+		cmd = exec.Command("cmd", "/c", "start", "", absPath)
+	case "darwin":
+		// On macOS, use 'open -e' for TextEdit or just 'open' for default app
+		cmd = exec.Command("open", "-t", absPath)
+	default:
+		// On Linux, try common editors in order of preference
+		editors := []string{"code", "gedit", "kate", "xed", "nano", "vi"}
+		for _, editor := range editors {
+			if _, err := exec.LookPath(editor); err == nil {
+				cmd = exec.Command(editor, absPath)
+				break
+			}
+		}
+		if cmd == nil {
+			// Fallback to xdg-open which should open in default text editor
+			cmd = exec.Command("xdg-open", absPath)
+		}
+	}
+
+	return cmd.Start()
 }
 
 // openURL opens the specified URL in the default browser
