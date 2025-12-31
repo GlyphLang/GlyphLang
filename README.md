@@ -282,6 +282,70 @@ crud!(users)
 crud!(posts)
 ```
 
+### Cron Tasks
+
+```glyph
+# Daily cleanup at midnight
+* "0 0 * * *" daily_cleanup {
+  % db: Database
+  > {task: "cleanup", timestamp: now()}
+}
+
+# Every 5 minutes health check
+* "*/5 * * * *" health_check {
+  > {status: "healthy", checked_at: now()}
+}
+
+# Weekly report on Sundays at 9am with retries
+* "0 9 * * 0" weekly_report {
+  + retries(3)
+  % db: Database
+  > {week: "current", generated_at: now()}
+}
+```
+
+### Event Handlers
+
+```glyph
+# Handle user creation event
+~ "user.created" {
+  $ user_id = event.id
+  $ email = event.email
+  > {handled: true, user_id: user_id}
+}
+
+# Async event handler
+~ "order.completed" async {
+  $ order_id = event.order_id
+  $ total = event.total
+  > {processed: true, order_id: order_id}
+}
+```
+
+### Queue Workers
+
+```glyph
+# Email sending worker with concurrency and retries
+& "email.send" {
+  + concurrency(5)
+  + retries(3)
+  + timeout(30)
+
+  $ to = message.to
+  $ subject = message.subject
+  > {sent: true, to: to}
+}
+
+# Image processing worker
+& "image.process" {
+  + concurrency(3)
+  + timeout(120)
+
+  $ image_id = message.image_id
+  > {processed: true, image_id: image_id}
+}
+```
+
 ## CLI Commands
 
 ### AI Agent Commands
