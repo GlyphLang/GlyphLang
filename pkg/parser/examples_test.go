@@ -189,8 +189,9 @@ func TestExamples_FixtureFiles(t *testing.T) {
 
 // Test specific fixture examples
 func TestExamples_SimpleRoute(t *testing.T) {
-	source := `@ GET /hello
-  > {message: "Hello, World!"}`
+	source := `@ GET /hello {
+  > {message: "Hello, World!"}
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -207,8 +208,9 @@ func TestExamples_SimpleRoute(t *testing.T) {
 }
 
 func TestExamples_PathParam(t *testing.T) {
-	source := `@ GET /users/:id
-  > {id: id}`
+	source := `@ GET /users/:id {
+  > {id: id}
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -225,13 +227,14 @@ func TestExamples_PathParam(t *testing.T) {
 }
 
 func TestExamples_JsonResponse(t *testing.T) {
-	source := `@ GET /data
+	source := `@ GET /data {
   > {
     status: "ok",
     count: 42,
     active: true,
     score: 98.5
-  }`
+  }
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -248,14 +251,17 @@ func TestExamples_JsonResponse(t *testing.T) {
 }
 
 func TestExamples_MultipleRoutes(t *testing.T) {
-	source := `@ GET /first
+	source := `@ GET /first {
   > {msg: "first"}
+}
 
-@ GET /second
+@ GET /second {
   > {msg: "second"}
+}
 
-@ GET /third
-  > {msg: "third"}`
+@ GET /third {
+  > {msg: "third"}
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -278,9 +284,10 @@ func TestExamples_MultipleRoutes(t *testing.T) {
 }
 
 func TestExamples_WithAuth(t *testing.T) {
-	source := `@ GET /protected
+	source := `@ GET /protected {
   + auth(jwt)
-  > {msg: "protected"}`
+  > {msg: "protected"}
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -298,8 +305,9 @@ func TestExamples_WithAuth(t *testing.T) {
 }
 
 func TestExamples_PostRoute(t *testing.T) {
-	source := `@ POST /create
-  > {created: true}`
+	source := `@ POST /create {
+  > {created: true}
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -316,13 +324,14 @@ func TestExamples_PostRoute(t *testing.T) {
 }
 
 func TestExamples_ErrorHandling(t *testing.T) {
-	source := `@ GET /divide/:a/:b
+	source := `@ GET /divide/:a/:b {
   if b == 0 {
     > {error: "Division by zero"}
   } else {
     $ result = a / b
     > {result: result}
-  }`
+  }
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()

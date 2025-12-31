@@ -1,3 +1,4 @@
 # Simple route that returns a string
-@ route /test
+@ GET /test {
   > {status: "ok"}
+}

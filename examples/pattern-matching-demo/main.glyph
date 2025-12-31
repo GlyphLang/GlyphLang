@@ -2,7 +2,7 @@
 # Demonstrates the pattern matching feature in GlyphLang
 
 # Simple literal pattern matching with HTTP status codes
-@route /status/:code [GET]
+@route /status/:code [GET] {
   $ result = match code {
     200 => "OK"
     201 => "Created"
@@ -12,9 +12,10 @@
     _ => "Unknown Status"
   }
   > {status: code, message: result}
+}
 
 # Pattern matching with guards
-@route /grade/:score [GET]
+@route /grade/:score [GET] {
   $ grade = match score {
     n when n >= 90 => "A"
     n when n >= 80 => "B"
@@ -23,9 +24,10 @@
     _ => "F"
   }
   > {score: score, grade: grade}
+}
 
 # Object destructuring pattern matching
-@route /user/:id [GET]
+@route /user/:id [GET] {
   $ user = {name: "Alice", age: 30, role: "admin"}
   $ greeting = match user {
     {name, role} when role == "admin" => "Welcome Administrator " + name
@@ -33,9 +35,10 @@
     _ => "Hello Guest"
   }
   > {greeting: greeting}
+}
 
 # Array destructuring pattern matching
-@route /first-element [POST]
+@route /first-element [POST] {
   $ items = input.items
   $ result = match items {
     [first] => {count: 1, first: first}
@@ -44,18 +47,20 @@
     _ => {count: 0, message: "Empty or too many items"}
   }
   > result
+}
 
 # Boolean pattern matching
-@route /toggle/:state [GET]
+@route /toggle/:state [GET] {
   $ isEnabled = state == "on"
   $ result = match isEnabled {
     true => {enabled: true, message: "Feature is ON"}
     false => {enabled: false, message: "Feature is OFF"}
   }
   > result
+}
 
 # HTTP method pattern matching
-@route /method-info/:method [GET]
+@route /method-info/:method [GET] {
   $ info = match method {
     "GET" => {safe: true, idempotent: true, description: "Retrieve a resource"}
     "POST" => {safe: false, idempotent: false, description: "Create a resource"}
@@ -65,16 +70,18 @@
     _ => {safe: false, idempotent: false, description: "Unknown method"}
   }
   > info
+}
 
 # Variable binding pattern
-@route /double/:num [GET]
+@route /double/:num [GET] {
   $ result = match num {
     x => x + x
   }
   > {original: num, doubled: result}
+}
 
 # Nested object pattern matching
-@route /shipping [POST]
+@route /shipping [POST] {
   $ order = input
   $ shippingCost = match order {
     {priority, weight} when priority == "express" => weight * 2
@@ -83,3 +90,4 @@
     _ => 0
   }
   > {orderId: order.id, shippingCost: shippingCost}
+}

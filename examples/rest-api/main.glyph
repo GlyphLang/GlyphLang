@@ -16,45 +16,51 @@
 }
 
 # Get all users
-@ GET /api/users -> List[User]
+@ GET /api/users -> List[User] {
   + auth(jwt)
   + ratelimit(100/min)
   % db: Database
   $ users = db.users.all()
   > users
+}
 
 # Get user by ID
-@ GET /api/users/:id -> User
+@ GET /api/users/:id -> User {
   + auth(jwt)
   % db: Database
   $ user = db.users.get(id)
   > user
+}
 
 # Create new user
-@ POST /api/users -> User
+@ POST /api/users -> User {
   + auth(jwt, role: admin)
   % db: Database
   $ user = db.users.create(input)
   > user
+}
 
 # Update user
-@ PUT /api/users/:id -> User
+@ PUT /api/users/:id -> User {
   + auth(jwt)
   % db: Database
   $ user = db.users.update(id, input)
   > user
+}
 
 : DeleteResponse {
   success: bool!
 }
 
 # Delete user
-@ DELETE /api/users/:id -> DeleteResponse
+@ DELETE /api/users/:id -> DeleteResponse {
   + auth(jwt, role: admin)
   % db: Database
   $ result = db.users.delete(id)
   > {success: true}
+}
 
 # Health check endpoint
-@ GET /health
+@ GET /health {
   > {status: "ok", timestamp: now()}
+}

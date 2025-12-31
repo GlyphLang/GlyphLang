@@ -46,7 +46,7 @@
 }
 
 # Get all todos with filtering
-@ GET /api/todos -> TodoList
+@ GET /api/todos -> TodoList {
   + ratelimit(100/min)
   % db: Database
 
@@ -68,9 +68,10 @@
     completed: completed,
     pending: pending
   }
+}
 
 # Get a specific todo by ID
-@ GET /api/todos/:id -> Todo
+@ GET /api/todos/:id -> Todo {
   + ratelimit(200/min)
   % db: Database
 
@@ -86,9 +87,10 @@
   } else {
     > todo
   }
+}
 
 # Create a new todo
-@ POST /api/todos -> TodoResponse
+@ POST /api/todos -> TodoResponse {
   + ratelimit(50/min)
   % db: Database
 
@@ -125,9 +127,10 @@
       todo: saved
     }
   }
+}
 
 # Update an existing todo
-@ PUT /api/todos/:id -> TodoResponse
+@ PUT /api/todos/:id -> TodoResponse {
   + ratelimit(50/min)
   % db: Database
 
@@ -170,9 +173,10 @@
       todo: saved
     }
   }
+}
 
 # Delete a todo
-@ DELETE /api/todos/:id -> TodoResponse
+@ DELETE /api/todos/:id -> TodoResponse {
   + ratelimit(50/min)
   % db: Database
 
@@ -193,9 +197,10 @@
       todo: existingTodo
     }
   }
+}
 
 # Mark todo as completed
-@ PATCH /api/todos/:id/complete -> TodoResponse
+@ PATCH /api/todos/:id/complete -> TodoResponse {
   + ratelimit(100/min)
   % db: Database
 
@@ -218,9 +223,10 @@
       todo: saved
     }
   }
+}
 
 # Get todos by priority
-@ GET /api/todos/priority/:priority -> TodoList
+@ GET /api/todos/priority/:priority -> TodoList {
   + ratelimit(100/min)
   % db: Database
 
@@ -235,3 +241,4 @@
     completed: completed,
     pending: pending
   }
+}

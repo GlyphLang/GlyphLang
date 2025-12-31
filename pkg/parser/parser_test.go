@@ -123,8 +123,9 @@ func TestLexer_Division(t *testing.T) {
 }
 
 func TestParser_SimpleRoute(t *testing.T) {
-	source := `@ GET /hello
-  > {message: "Hello, World!"}`
+	source := `@ GET /hello {
+  > {message: "Hello, World!"}
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -161,8 +162,9 @@ func TestParser_SimpleRoute(t *testing.T) {
 }
 
 func TestParser_RouteWithPathParam(t *testing.T) {
-	source := `@ GET /users/:id
-  > {id: id}`
+	source := `@ GET /users/:id {
+  > {id: id}
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -241,10 +243,11 @@ func TestParser_TypeDef(t *testing.T) {
 }
 
 func TestParser_RouteWithMiddleware(t *testing.T) {
-	source := `@ GET /protected
+	source := `@ GET /protected {
   + auth(jwt)
   + ratelimit(100/min)
-  > {status: "ok"}`
+  > {status: "ok"}
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -289,12 +292,13 @@ func TestParser_RouteWithMiddleware(t *testing.T) {
 }
 
 func TestParser_RouteWithQueryParams(t *testing.T) {
-	source := `@ GET /api/search
+	source := `@ GET /api/search {
   ? q: str!
   ? page: int = 1
   ? limit: int = 20
   ? tags: str[]
-  > {query: q, page: page}`
+  > {query: q, page: page}
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -374,9 +378,10 @@ func TestParser_RouteWithQueryParams(t *testing.T) {
 }
 
 func TestParser_Assignment(t *testing.T) {
-	source := `@ GET /test
+	source := `@ GET /test {
   $ x = 42
-  > {value: x}`
+  > {value: x}
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -410,9 +415,10 @@ func TestParser_Assignment(t *testing.T) {
 }
 
 func TestParser_BinaryOp(t *testing.T) {
-	source := `@ GET /calc
+	source := `@ GET /calc {
   $ result = 10 + 20 * 2
-  > {result: result}`
+  > {result: result}
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -464,7 +470,7 @@ func TestParser_AllHTTPMethods(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			source := fmt.Sprintf("@ route /test %s\n  > {status: \"ok\"}", tt.methodStr)
+			source := fmt.Sprintf("@ route /test %s {\n  > {status: \"ok\"}\n}", tt.methodStr)
 			lexer := NewLexer(source)
 			tokens, err := lexer.Tokenize()
 			require.NoError(t, err)
@@ -496,7 +502,7 @@ func TestParser_ComplexPathParameters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			source := fmt.Sprintf("@ GET %s\n  > {ok: true}", tt.path)
+			source := fmt.Sprintf("@ GET %s {\n  > {ok: true}\n}", tt.path)
 			lexer := NewLexer(source)
 			tokens, err := lexer.Tokenize()
 			require.NoError(t, err)
@@ -528,7 +534,7 @@ func TestParser_ReturnTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			source := fmt.Sprintf("@ GET /test %s\n  > {ok: true}", tt.returnTypeStr)
+			source := fmt.Sprintf("@ GET /test %s {\n  > {ok: true}\n}", tt.returnTypeStr)
 			lexer := NewLexer(source)
 			tokens, err := lexer.Tokenize()
 			require.NoError(t, err)
@@ -546,10 +552,11 @@ func TestParser_ReturnTypes(t *testing.T) {
 
 // Test multiple middlewares
 func TestParser_MultipleMiddlewares(t *testing.T) {
-	source := `@ GET /api/admin
+	source := `@ GET /api/admin {
   + auth(jwt, role: admin)
   + ratelimit(50/min)
-  > {status: "ok"}`
+  > {status: "ok"}
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -580,27 +587,31 @@ func TestParser_ComplexExpressions(t *testing.T) {
 	}{
 		{
 			name: "nested arithmetic",
-			source: `@ GET /calc
+			source: `@ GET /calc {
   $ result = (10 + 20) * (5 - 2)
-  > {result: result}`,
+  > {result: result}
+}`,
 		},
 		{
 			name: "string concatenation",
-			source: `@ GET /concat
+			source: `@ GET /concat {
   $ full = "Hello, " + name + "!"
-  > {text: full}`,
+  > {text: full}
+}`,
 		},
 		{
 			name: "comparison operators",
-			source: `@ GET /compare
+			source: `@ GET /compare {
   $ check = age >= 18
-  > {adult: check}`,
+  > {adult: check}
+}`,
 		},
 		{
 			name: "field access",
-			source: `@ GET /field
+			source: `@ GET /field {
   $ name = user.profile.name
-  > {name: name}`,
+  > {name: name}
+}`,
 		},
 	}
 
@@ -626,24 +637,28 @@ func TestParser_ObjectLiterals(t *testing.T) {
 	}{
 		{
 			name: "simple object",
-			source: `@ GET /obj
-  > {name: "test", age: 30}`,
+			source: `@ GET /obj {
+  > {name: "test", age: 30}
+}`,
 		},
 		{
 			name: "nested object",
-			source: `@ GET /nested
-  > {user: {name: "test", profile: {bio: "dev"}}}`,
+			source: `@ GET /nested {
+  > {user: {name: "test", profile: {bio: "dev"}}}
+}`,
 		},
 		{
 			name: "object with expressions",
-			source: `@ GET /expr
-  > {total: price * quantity, discount: true}`,
+			source: `@ GET /expr {
+  > {total: price * quantity, discount: true}
+}`,
 		},
 		{
 			name: "object with variables",
-			source: `@ GET /vars
+			source: `@ GET /vars {
   $ x = 42
-  > {value: x, doubled: x * 2}`,
+  > {value: x, doubled: x * 2}
+}`,
 		},
 	}
 
@@ -669,18 +684,21 @@ func TestParser_FunctionCalls(t *testing.T) {
 	}{
 		{
 			name: "no args",
-			source: `@ GET /time
-  > {now: time.now()}`,
+			source: `@ GET /time {
+  > {now: time.now()}
+}`,
 		},
 		{
 			name: "with args",
-			source: `@ GET /add
-  > {result: add(10, 20)}`,
+			source: `@ GET /add {
+  > {result: add(10, 20)}
+}`,
 		},
 		{
 			name: "nested calls",
-			source: `@ GET /nested
-  > {result: max(min(x, 10), 5)}`,
+			source: `@ GET /nested {
+  > {result: max(min(x, 10), 5)}
+}`,
 		},
 	}
 
@@ -700,11 +718,13 @@ func TestParser_FunctionCalls(t *testing.T) {
 
 // Test multiple routes in one file
 func TestParser_MultipleRoutes(t *testing.T) {
-	source := `@ GET /hello
+	source := `@ GET /hello {
   > {message: "Hello"}
+}
 
-@ GET /goodbye
-  > {message: "Goodbye"}`
+@ GET /goodbye {
+  > {message: "Goodbye"}
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -759,7 +779,7 @@ func TestParser_ErrorCases(t *testing.T) {
 	}{
 		{
 			name:        "missing route path",
-			source:      "@ route\n  > {ok: true}",
+			source:      "@ route {\n  > {ok: true}\n}",
 			shouldError: true,
 		},
 		{
@@ -774,7 +794,7 @@ func TestParser_ErrorCases(t *testing.T) {
 		},
 		{
 			name:        "empty route body",
-			source:      "@ GET /test",
+			source:      "@ GET /test {}",
 			shouldError: false, // Empty body might be allowed
 		},
 	}
@@ -810,34 +830,37 @@ func TestParser_IfStatements(t *testing.T) {
 	}{
 		{
 			name: "if with else",
-			source: `@ GET /check/:age
+			source: `@ GET /check/:age {
   if age >= 18 {
     > {status: "adult"}
   } else {
     > {status: "minor"}
-  }`,
+  }
+}`,
 		},
 		{
 			name: "if without else",
-			source: `@ GET /check
+			source: `@ GET /check {
   if true {
     > {ok: true}
-  }`,
+  }
+}`,
 		},
 		{
 			name: "if with multiple statements",
-			source: `@ GET /check
+			source: `@ GET /check {
   if x > 10 {
     $ result = "high"
     > {result: result}
   } else {
     $ result = "low"
     > {result: result}
-  }`,
+  }
+}`,
 		},
 		{
 			name: "nested if",
-			source: `@ GET /nested
+			source: `@ GET /nested {
   if x > 0 {
     if y > 0 {
       > {quadrant: 1}
@@ -846,7 +869,8 @@ func TestParser_IfStatements(t *testing.T) {
     }
   } else {
     > {quadrant: 2}
-  }`,
+  }
+}`,
 		},
 	}
 
@@ -879,36 +903,41 @@ func TestParser_LogicalOperators(t *testing.T) {
 	}{
 		{
 			name: "AND operator",
-			source: `@ GET /and
+			source: `@ GET /and {
   $ result = true && false
-  > {result: result}`,
+  > {result: result}
+}`,
 		},
 		{
 			name: "OR operator",
-			source: `@ GET /or
+			source: `@ GET /or {
   $ result = true || false
-  > {result: result}`,
+  > {result: result}
+}`,
 		},
 		{
 			name: "complex logical expression",
-			source: `@ GET /complex
+			source: `@ GET /complex {
   $ result = (x > 10 && y < 20) || z == 0
-  > {result: result}`,
+  > {result: result}
+}`,
 		},
 		{
 			name: "if with logical operators",
-			source: `@ GET /check
+			source: `@ GET /check {
   if age >= 18 && hasLicense {
     > {canDrive: true}
   } else {
     > {canDrive: false}
-  }`,
+  }
+}`,
 		},
 		{
 			name: "multiple AND/OR",
-			source: `@ GET /multi
+			source: `@ GET /multi {
   $ result = a && b && c || d || e
-  > {result: result}`,
+  > {result: result}
+}`,
 		},
 	}
 
@@ -937,48 +966,55 @@ func TestParser_ArrayLiterals(t *testing.T) {
 	}{
 		{
 			name: "empty array",
-			source: `@ GET /empty
+			source: `@ GET /empty {
   $ arr = []
-  > {array: arr}`,
+  > {array: arr}
+}`,
 		},
 		{
 			name: "integer array",
-			source: `@ GET /ints
+			source: `@ GET /ints {
   $ numbers = [1, 2, 3, 4, 5]
-  > {numbers: numbers}`,
+  > {numbers: numbers}
+}`,
 		},
 		{
 			name: "string array",
-			source: `@ GET /strings
+			source: `@ GET /strings {
   $ names = ["Alice", "Bob", "Charlie"]
-  > {names: names}`,
+  > {names: names}
+}`,
 		},
 		{
 			name: "mixed array",
-			source: `@ GET /mixed
+			source: `@ GET /mixed {
   $ items = [1, "two", true, 4.5]
-  > {items: items}`,
+  > {items: items}
+}`,
 		},
 		{
 			name: "nested arrays",
-			source: `@ GET /nested
+			source: `@ GET /nested {
   $ matrix = [[1, 2], [3, 4]]
-  > {matrix: matrix}`,
+  > {matrix: matrix}
+}`,
 		},
 		{
 			name: "array with expressions",
-			source: `@ GET /expr
+			source: `@ GET /expr {
   $ values = [1 + 1, x * 2, y]
-  > {values: values}`,
+  > {values: values}
+}`,
 		},
 		{
 			name: "array of objects",
-			source: `@ GET /objects
+			source: `@ GET /objects {
   $ users = [
     {name: "Alice", age: 30},
     {name: "Bob", age: 25}
   ]
-  > {users: users}`,
+  > {users: users}
+}`,
 		},
 	}
 
@@ -1014,15 +1050,17 @@ func TestParser_HelloWorldExample(t *testing.T) {
   timestamp: int
 }
 
-@ GET /hello
+@ GET /hello {
   > {text: "Hello, World!", timestamp: 1234567890}
+}
 
-@ GET /greet/:name -> Message
+@ GET /greet/:name -> Message {
   $ message = {
     text: "Hello, " + name + "!",
     timestamp: time.now()
   }
-  > message`
+  > message
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -1051,8 +1089,9 @@ func TestParser_HelloWorldExample(t *testing.T) {
 
 // Benchmark parser performance
 func BenchmarkParser_SimpleRoute(b *testing.B) {
-	source := `@ GET /hello
-  > {message: "Hello, World!"}`
+	source := `@ GET /hello {
+  > {message: "Hello, World!"}
+}`
 
 	for i := 0; i < b.N; i++ {
 		lexer := NewLexer(source)
@@ -1068,11 +1107,12 @@ func BenchmarkParser_ComplexModule(b *testing.B) {
   name: str!
 }
 
-@ GET /api/users/:id
+@ GET /api/users/:id {
   + auth(jwt)
   + ratelimit(100/min)
   $ user = db.users.get(id)
-  > user`
+  > user
+}`
 
 	for i := 0; i < b.N; i++ {
 		lexer := NewLexer(source)
@@ -1085,12 +1125,13 @@ func BenchmarkParser_ComplexModule(b *testing.B) {
 // Test While Loops
 
 func TestParser_SimpleWhileLoop(t *testing.T) {
-	source := `@ GET /test
+	source := `@ GET /test {
   $ i = 0
   while i < 5 {
     $ i = i + 1
   }
-  > i`
+  > i
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -1120,7 +1161,7 @@ func TestParser_SimpleWhileLoop(t *testing.T) {
 }
 
 func TestParser_NestedWhileLoops(t *testing.T) {
-	source := `@ GET /test
+	source := `@ GET /test {
   $ i = 0
   while i < 3 {
     $ j = 0
@@ -1129,7 +1170,8 @@ func TestParser_NestedWhileLoops(t *testing.T) {
     }
     $ i = i + 1
   }
-  > i`
+  > i
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -1155,13 +1197,14 @@ func TestParser_NestedWhileLoops(t *testing.T) {
 }
 
 func TestParser_WhileWithComplexCondition(t *testing.T) {
-	source := `@ GET /test
+	source := `@ GET /test {
   $ i = 0
   $ max = 10
   while i < max && i < 100 {
     $ i = i + 1
   }
-  > i`
+  > i
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -1185,7 +1228,7 @@ func TestParser_WhileWithComplexCondition(t *testing.T) {
 }
 
 func TestParser_WhileWithMultipleStatements(t *testing.T) {
-	source := `@ GET /test
+	source := `@ GET /test {
   $ sum = 0
   $ i = 0
   while i < 5 {
@@ -1193,7 +1236,8 @@ func TestParser_WhileWithMultipleStatements(t *testing.T) {
     $ i = i + 1
     $ temp = i * 2
   }
-  > sum`
+  > sum
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -1215,7 +1259,7 @@ func TestParser_WhileWithMultipleStatements(t *testing.T) {
 }
 
 func TestParser_WhileWithIfStatement(t *testing.T) {
-	source := `@ GET /test
+	source := `@ GET /test {
   $ sum = 0
   $ i = 0
   while i < 10 {
@@ -1224,7 +1268,8 @@ func TestParser_WhileWithIfStatement(t *testing.T) {
     }
     $ i = i + 1
   }
-  > sum`
+  > sum
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -1251,12 +1296,13 @@ func TestParser_WhileWithIfStatement(t *testing.T) {
 
 // Test for loop parsing
 func TestParser_ForLoop_SimpleArray(t *testing.T) {
-	source := `@ GET /test
+	source := `@ GET /test {
   $ items = [1, 2, 3]
   for item in items {
     $ x = item + 1
   }
-  > {ok: true}`
+  > {ok: true}
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -1289,11 +1335,12 @@ func TestParser_ForLoop_SimpleArray(t *testing.T) {
 }
 
 func TestParser_ForLoop_WithIndex(t *testing.T) {
-	source := `@ GET /test
+	source := `@ GET /test {
   for index, value in array {
     $ result = index + value
   }
-  > {ok: true}`
+  > {ok: true}
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -1322,11 +1369,12 @@ func TestParser_ForLoop_WithIndex(t *testing.T) {
 }
 
 func TestParser_ForLoop_ArrayLiteral(t *testing.T) {
-	source := `@ GET /test
+	source := `@ GET /test {
   for item in [1, 2, 3] {
     $ x = item
   }
-  > {ok: true}`
+  > {ok: true}
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -1350,11 +1398,12 @@ func TestParser_ForLoop_ArrayLiteral(t *testing.T) {
 }
 
 func TestParser_ForLoop_ObjectIteration(t *testing.T) {
-	source := `@ GET /test
+	source := `@ GET /test {
   for key, value in {name: "Alice", age: 30} {
     $ output = key + value
   }
-  > {ok: true}`
+  > {ok: true}
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -1382,13 +1431,14 @@ func TestParser_ForLoop_ObjectIteration(t *testing.T) {
 }
 
 func TestParser_ForLoop_Nested(t *testing.T) {
-	source := `@ GET /test
+	source := `@ GET /test {
   for row in rows {
     for col in row {
       $ cell = col
     }
   }
-  > {ok: true}`
+  > {ok: true}
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -1418,8 +1468,7 @@ func TestParser_ForLoop_Nested(t *testing.T) {
 }
 
 func TestParser_SwitchStatement_IntegerCases(t *testing.T) {
-	input := `
-@route /test [GET]
+	input := `@ GET /test {
   $ status = 1
   switch status {
     case 1 {
@@ -1432,7 +1481,7 @@ func TestParser_SwitchStatement_IntegerCases(t *testing.T) {
       > "other"
     }
   }
-`
+}`
 	lexer := NewLexer(input)
 	tokens, err := lexer.Tokenize()
 	require.NoError(t, err)
@@ -1479,8 +1528,7 @@ func TestParser_SwitchStatement_IntegerCases(t *testing.T) {
 }
 
 func TestParser_SwitchStatement_StringCases(t *testing.T) {
-	input := `
-@route /api/status [GET]
+	input := `@ GET /api/status {
   switch status {
     case "pending" {
       > {message: "Order is pending"}
@@ -1492,7 +1540,7 @@ func TestParser_SwitchStatement_StringCases(t *testing.T) {
       > {message: "Unknown status"}
     }
   }
-`
+}`
 	lexer := NewLexer(input)
 	tokens, err := lexer.Tokenize()
 	require.NoError(t, err)
@@ -1525,14 +1573,13 @@ func TestParser_SwitchStatement_StringCases(t *testing.T) {
 }
 
 func TestParser_SwitchStatement_NoDefault(t *testing.T) {
-	input := `
-@route /test [GET]
+	input := `@ GET /test {
   switch x {
     case 1 {
       > "one"
     }
   }
-`
+}`
 	lexer := NewLexer(input)
 	tokens, err := lexer.Tokenize()
 	require.NoError(t, err)
@@ -1549,8 +1596,7 @@ func TestParser_SwitchStatement_NoDefault(t *testing.T) {
 }
 
 func TestParser_SwitchStatement_MultipleCases(t *testing.T) {
-	input := `
-@route /test [GET]
+	input := `@ GET /test {
   switch value {
     case 1 {
       > "one"
@@ -1568,7 +1614,7 @@ func TestParser_SwitchStatement_MultipleCases(t *testing.T) {
       > "five"
     }
   }
-`
+}`
 	lexer := NewLexer(input)
 	tokens, err := lexer.Tokenize()
 	require.NoError(t, err)
@@ -1584,8 +1630,7 @@ func TestParser_SwitchStatement_MultipleCases(t *testing.T) {
 }
 
 func TestParser_SwitchStatement_NestedStatements(t *testing.T) {
-	input := `
-@route /test [GET]
+	input := `@ GET /test {
   switch x {
     case 1 {
       $ y = 10
@@ -1598,7 +1643,7 @@ func TestParser_SwitchStatement_NestedStatements(t *testing.T) {
       > z
     }
   }
-`
+}`
 	lexer := NewLexer(input)
 	tokens, err := lexer.Tokenize()
 	require.NoError(t, err)
@@ -2083,8 +2128,9 @@ func TestParser_MixedModule_AllDirectiveTypes(t *testing.T) {
 		},
 		{
 			name: "Route",
-			source: `@ GET /users
-  > {users: []}`,
+			source: `@ GET /users {
+  > {users: []}
+}`,
 			check: func(t *testing.T, item interpreter.Item) {
 				_, ok := item.(*interpreter.Route)
 				assert.True(t, ok, "Expected Route")
@@ -2149,9 +2195,10 @@ func TestParser_UnaryOperators(t *testing.T) {
 	}{
 		{
 			name: "unary not operator",
-			source: `@ GET /test
+			source: `@ GET /test {
   $ valid = !false
-  > {valid: valid}`,
+  > {valid: valid}
+}`,
 			checkFn: func(t *testing.T, module *interpreter.Module) {
 				route := module.Items[0].(*interpreter.Route)
 				assign := route.Body[0].(interpreter.AssignStatement)
@@ -2162,9 +2209,10 @@ func TestParser_UnaryOperators(t *testing.T) {
 		},
 		{
 			name: "unary negation",
-			source: `@ GET /test
+			source: `@ GET /test {
   $ neg = -42
-  > {neg: neg}`,
+  > {neg: neg}
+}`,
 			checkFn: func(t *testing.T, module *interpreter.Module) {
 				route := module.Items[0].(*interpreter.Route)
 				assign := route.Body[0].(interpreter.AssignStatement)
@@ -2175,9 +2223,10 @@ func TestParser_UnaryOperators(t *testing.T) {
 		},
 		{
 			name: "chained unary not",
-			source: `@ GET /test
+			source: `@ GET /test {
   $ result = !!true
-  > {result: result}`,
+  > {result: result}
+}`,
 			checkFn: func(t *testing.T, module *interpreter.Module) {
 				route := module.Items[0].(*interpreter.Route)
 				assign := route.Body[0].(interpreter.AssignStatement)
@@ -2214,25 +2263,28 @@ func TestParser_ArrayIndexing(t *testing.T) {
 	}{
 		{
 			name: "simple array index",
-			source: `@ GET /test
+			source: `@ GET /test {
   $ arr = [1, 2, 3]
   $ first = arr[0]
-  > {first: first}`,
+  > {first: first}
+}`,
 		},
 		{
 			name: "nested array index",
-			source: `@ GET /test
+			source: `@ GET /test {
   $ matrix = [[1, 2], [3, 4]]
   $ val = matrix[0][1]
-  > {val: val}`,
+  > {val: val}
+}`,
 		},
 		{
 			name: "array index with expression",
-			source: `@ GET /test
+			source: `@ GET /test {
   $ arr = [10, 20, 30]
   $ i = 1
   $ val = arr[i]
-  > {val: val}`,
+  > {val: val}
+}`,
 		},
 	}
 
@@ -2262,17 +2314,19 @@ func TestParser_RateLimitVariations(t *testing.T) {
 	}{
 		{
 			name: "integer with slash format",
-			source: `@ GET /test
+			source: `@ GET /test {
   + ratelimit(50/sec)
-  > {ok: true}`,
+  > {ok: true}
+}`,
 			expectedReqs:   50,
 			expectedWindow: "sec",
 		},
 		{
 			name: "string format",
-			source: `@ GET /test
+			source: `@ GET /test {
   + ratelimit("200/hour")
-  > {ok: true}`,
+  > {ok: true}
+}`,
 			expectedReqs:   200,
 			expectedWindow: "hour",
 		},
@@ -2364,9 +2418,10 @@ func TestParser_TypeDefWithoutColon(t *testing.T) {
 
 // TestParser_ValidationStatement tests ? validation syntax
 func TestParser_ValidationStatement(t *testing.T) {
-	source := `@ GET /validate
+	source := `@ GET /validate {
   ? isValid(input)
-  > {valid: true}`
+  > {valid: true}
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -2382,10 +2437,11 @@ func TestParser_ValidationStatement(t *testing.T) {
 
 // TestParser_ExpressionStatements tests standalone expression statements
 func TestParser_ExpressionStatements(t *testing.T) {
-	source := `@ GET /test
+	source := `@ GET /test {
   $ _ = log("starting request")
   $ result = compute()
-  > {result: result}`
+  > {result: result}
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -2407,13 +2463,14 @@ func TestParser_MoreStatementTypes(t *testing.T) {
 	}{
 		{
 			name: "typed variable declaration",
-			source: `@ GET /test
+			source: `@ GET /test {
   $ count: int = 0
-  > {count: count}`,
+  > {count: count}
+}`,
 		},
 		{
 			name: "else-if chain",
-			source: `@ GET /test
+			source: `@ GET /test {
   $ x = 5
   if x > 10 {
     $ result = "big"
@@ -2422,11 +2479,12 @@ func TestParser_MoreStatementTypes(t *testing.T) {
   } else {
     $ result = "small"
   }
-  > {result: result}`,
+  > {result: result}
+}`,
 		},
 		{
 			name: "switch statement",
-			source: `@ GET /test
+			source: `@ GET /test {
   $ day = 1
   switch day {
     case 1 {
@@ -2439,7 +2497,8 @@ func TestParser_MoreStatementTypes(t *testing.T) {
       $ name = "Unknown"
     }
   }
-  > {day: name}`,
+  > {day: name}
+}`,
 		},
 	}
 
@@ -2526,15 +2585,17 @@ func TestParser_AuthConfigVariations(t *testing.T) {
 	}{
 		{
 			name: "jwt auth with role",
-			source: `@ GET /admin
+			source: `@ GET /admin {
   + auth(jwt, admin)
-  > {access: "granted"}`,
+  > {access: "granted"}
+}`,
 		},
 		{
 			name: "basic auth",
-			source: `@ GET /protected
+			source: `@ GET /protected {
   + auth(basic)
-  > {protected: true}`,
+  > {protected: true}
+}`,
 		},
 	}
 
@@ -2562,23 +2623,25 @@ func TestParser_LogicalOps(t *testing.T) {
 	}{
 		{
 			name: "logical and",
-			source: `@ GET /test
+			source: `@ GET /test {
   $ a = true
   $ b = false
   if a && b {
     > {result: "both"}
   }
-  > {result: "not both"}`,
+  > {result: "not both"}
+}`,
 		},
 		{
 			name: "logical or",
-			source: `@ GET /test
+			source: `@ GET /test {
   $ a = true
   $ b = false
   if a || b {
     > {result: "either"}
   }
-  > {result: "neither"}`,
+  > {result: "neither"}
+}`,
 		},
 	}
 
@@ -2604,39 +2667,43 @@ func TestParser_ComparisonOperators(t *testing.T) {
 	}{
 		{
 			name: "less than or equal",
-			source: `@ GET /test
+			source: `@ GET /test {
   $ x = 5
   if x <= 10 {
     > {result: "small"}
   }
-  > {result: "big"}`,
+  > {result: "big"}
+}`,
 		},
 		{
 			name: "greater than or equal",
-			source: `@ GET /test
+			source: `@ GET /test {
   $ x = 15
   if x >= 10 {
     > {result: "big"}
   }
-  > {result: "small"}`,
+  > {result: "small"}
+}`,
 		},
 		{
 			name: "not equal",
-			source: `@ GET /test
+			source: `@ GET /test {
   $ x = 5
   if x != 10 {
     > {result: "not ten"}
   }
-  > {result: "ten"}`,
+  > {result: "ten"}
+}`,
 		},
 		{
 			name: "equality",
-			source: `@ GET /test
+			source: `@ GET /test {
   $ x = 10
   if x == 10 {
     > {result: "ten"}
   }
-  > {result: "not ten"}`,
+  > {result: "not ten"}
+}`,
 		},
 	}
 
@@ -2704,21 +2771,24 @@ func TestParser_FieldAccessExpressions(t *testing.T) {
 	}{
 		{
 			name: "simple field access",
-			source: `@ GET /test
+			source: `@ GET /test {
   $ name = user.name
-  > {name: name}`,
+  > {name: name}
+}`,
 		},
 		{
 			name: "nested field access",
-			source: `@ GET /test
+			source: `@ GET /test {
   $ city = user.address.city
-  > {city: city}`,
+  > {city: city}
+}`,
 		},
 		{
 			name: "method call on object",
-			source: `@ GET /test
+			source: `@ GET /test {
   $ len = items.length()
-  > {len: len}`,
+  > {len: len}
+}`,
 		},
 	}
 
@@ -2739,10 +2809,11 @@ func TestParser_FieldAccessExpressions(t *testing.T) {
 
 // TestParser_StringConcatenation tests string concatenation
 func TestParser_StringConcatenation(t *testing.T) {
-	source := `@ GET /test
+	source := `@ GET /test {
   $ name = "World"
   $ greeting = "Hello, " + name + "!"
-  > {greeting: greeting}`
+  > {greeting: greeting}
+}`
 
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -2794,13 +2865,14 @@ func TestParser_TokenTypes(t *testing.T) {
 // Test Pattern Matching Parsing
 
 func TestParser_MatchExpr_LiteralPatterns(t *testing.T) {
-	input := `@route /test [GET]
+	input := `@ GET /test {
   $ result = match code {
     200 => "OK"
     404 => "Not Found"
     _ => "Unknown"
   }
-  > result`
+  > result
+}`
 
 	lexer := NewLexer(input)
 	tokens, err := lexer.Tokenize()
@@ -2845,12 +2917,13 @@ func TestParser_MatchExpr_LiteralPatterns(t *testing.T) {
 }
 
 func TestParser_MatchExpr_WithGuard(t *testing.T) {
-	input := `@route /test [GET]
+	input := `@ GET /test {
   $ result = match n {
     x when x > 10 => "big"
     x => "small"
   }
-  > result`
+  > result
+}`
 
 	lexer := NewLexer(input)
 	tokens, err := lexer.Tokenize()
@@ -2884,12 +2957,13 @@ func TestParser_MatchExpr_WithGuard(t *testing.T) {
 }
 
 func TestParser_MatchExpr_ObjectPattern(t *testing.T) {
-	input := `@route /test [GET]
+	input := `@ GET /test {
   $ result = match obj {
     {name, age} => name
     _ => "unknown"
   }
-  > result`
+  > result
+}`
 
 	lexer := NewLexer(input)
 	tokens, err := lexer.Tokenize()
@@ -2925,13 +2999,14 @@ func TestParser_MatchExpr_ObjectPattern(t *testing.T) {
 }
 
 func TestParser_MatchExpr_ArrayPattern(t *testing.T) {
-	input := `@route /test [GET]
+	input := `@ GET /test {
   $ result = match arr {
     [first, second] => first
     [head, ...rest] => head
     _ => null
   }
-  > result`
+  > result
+}`
 
 	lexer := NewLexer(input)
 	tokens, err := lexer.Tokenize()

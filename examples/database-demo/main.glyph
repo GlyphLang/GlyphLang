@@ -43,7 +43,7 @@
 }
 
 # Get all users
-@ GET /api/users -> UserListResponse
+@ GET /api/users -> UserListResponse {
   + ratelimit(100/min)
   % db: Database
 
@@ -56,9 +56,10 @@
     users: users,
     total: total
   }
+}
 
 # Get a specific user by ID
-@ GET /api/users/:id -> UserResponse
+@ GET /api/users/:id -> UserResponse {
   + ratelimit(200/min)
   % db: Database
 
@@ -77,9 +78,10 @@
       user: user
     }
   }
+}
 
 # Create a new user
-@ POST /api/users -> UserResponse
+@ POST /api/users -> UserResponse {
   + ratelimit(50/min)
   % db: Database
 
@@ -130,9 +132,10 @@
       }
     }
   }
+}
 
 # Update a user
-@ PUT /api/users/:id -> UserResponse
+@ PUT /api/users/:id -> UserResponse {
   + ratelimit(50/min)
   % db: Database
 
@@ -178,9 +181,10 @@
       user: updated
     }
   }
+}
 
 # Delete a user
-@ DELETE /api/users/:id -> UserResponse
+@ DELETE /api/users/:id -> UserResponse {
   + ratelimit(50/min)
   % db: Database
 
@@ -201,9 +205,10 @@
       user: existingUser
     }
   }
+}
 
 # Get active users
-@ GET /api/users/active -> UserListResponse
+@ GET /api/users/active -> UserListResponse {
   + ratelimit(100/min)
   % db: Database
 
@@ -216,9 +221,10 @@
     users: activeUsers,
     total: total
   }
+}
 
 # Get users by age range
-@ GET /api/users/age/:min/:max -> UserListResponse
+@ GET /api/users/age/:min/:max -> UserListResponse {
   + ratelimit(100/min)
   % db: Database
 
@@ -239,9 +245,10 @@
     users: filteredUsers,
     total: filteredUsers.length()
   }
+}
 
 # Search users by username
-@ GET /api/users/search/:query -> UserListResponse
+@ GET /api/users/search/:query -> UserListResponse {
   + ratelimit(100/min)
   % db: Database
 
@@ -262,9 +269,10 @@
     users: results,
     total: results.length()
   }
+}
 
 # Deactivate a user (soft delete)
-@ PATCH /api/users/:id/deactivate -> UserResponse
+@ PATCH /api/users/:id/deactivate -> UserResponse {
   + ratelimit(50/min)
   % db: Database
 
@@ -290,9 +298,10 @@
       user: updated
     }
   }
+}
 
 # Reactivate a user
-@ PATCH /api/users/:id/activate -> UserResponse
+@ PATCH /api/users/:id/activate -> UserResponse {
   + ratelimit(50/min)
   % db: Database
 
@@ -318,9 +327,10 @@
       user: updated
     }
   }
+}
 
 # Get user statistics
-@ GET /api/users/stats -> UserStatsResponse
+@ GET /api/users/stats -> UserStatsResponse {
   + ratelimit(100/min)
   % db: Database
 
@@ -335,6 +345,7 @@
     active: activeUsers,
     inactive: inactiveUsers
   }
+}
 
 : UserStatsResponse {
   success: bool!

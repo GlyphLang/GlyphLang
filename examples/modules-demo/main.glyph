@@ -10,14 +10,15 @@ import "./models" as m
 from "./utils" import { formatDisplayName, isAdult }
 
 # GET all users endpoint
-@ GET /users
+@ GET /users {
   % db: Database
   $ users = utils.getAllUsers(db)
   $ total = length(users)
   > {users: users, count: total}
+}
 
 # GET single user by ID with formatted response
-@ GET /users/:id -> m.UserResponse
+@ GET /users/:id -> m.UserResponse {
   % db: Database
   $ user = utils.getUserById(db, parseInt(id))
 
@@ -35,9 +36,10 @@ from "./utils" import { formatDisplayName, isAdult }
     displayName: displayName,
     isAdult: adult
   }
+}
 
 # POST create new user with validation
-@ POST /users -> m.User
+@ POST /users -> m.User {
   % db: Database
 
   # Validate email using models module function
@@ -54,9 +56,10 @@ from "./utils" import { formatDisplayName, isAdult }
   })
 
   > newUser
+}
 
 # GET user stats - demonstrating multiple module usage
-@ GET /users/:id/stats
+@ GET /users/:id/stats {
   % db: Database
   $ user = utils.getUserById(db, parseInt(id))
   $ currentYear = 2024
@@ -69,3 +72,4 @@ from "./utils" import { formatDisplayName, isAdult }
     isAdult: adult,
     displayName: formatDisplayName(user.firstName, user.lastName)
   }
+}

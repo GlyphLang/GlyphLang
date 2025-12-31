@@ -17,38 +17,42 @@ func TestArrayIndexCompilation(t *testing.T) {
 	}{
 		{
 			name: "simple array index",
-			code: `@ GET /test
+			code: `@ GET /test {
   $ arr = [1, 2, 3]
   $ val = arr[0]
-  > val`,
+  > val
+}`,
 			wantType: "int",
 			wantVal:  int64(1),
 		},
 		{
 			name: "array index with variable",
-			code: `@ GET /test
+			code: `@ GET /test {
   $ arr = [10, 20, 30]
   $ idx = 1
   $ val = arr[idx]
-  > val`,
+  > val
+}`,
 			wantType: "int",
 			wantVal:  int64(20),
 		},
 		{
 			name: "array index with expression",
-			code: `@ GET /test
+			code: `@ GET /test {
   $ arr = [100, 200, 300]
   $ val = arr[1 + 1]
-  > val`,
+  > val
+}`,
 			wantType: "int",
 			wantVal:  int64(300),
 		},
 		{
 			name: "string array index",
-			code: `@ GET /test
+			code: `@ GET /test {
   $ arr = ["a", "b", "c"]
   $ val = arr[2]
-  > val`,
+  > val
+}`,
 			wantType: "string",
 			wantVal:  "c",
 		},
@@ -108,10 +112,11 @@ func TestArrayIndexCompilation(t *testing.T) {
 }
 
 func TestArrayIndexBoundsError(t *testing.T) {
-	code := `@ GET /test
+	code := `@ GET /test {
   $ arr = [1, 2, 3]
   $ val = arr[10]
-  > val`
+  > val
+}`
 
 	// Tokenize the code
 	lexer := parser.NewLexer(code)
@@ -148,10 +153,11 @@ func TestArrayIndexBoundsError(t *testing.T) {
 }
 
 func TestArrayIndexNegativeError(t *testing.T) {
-	code := `@ GET /test
+	code := `@ GET /test {
   $ arr = [1, 2, 3]
   $ val = arr[0 - 1]
-  > val`
+  > val
+}`
 
 	// Tokenize the code
 	lexer := parser.NewLexer(code)
@@ -188,11 +194,12 @@ func TestArrayIndexNegativeError(t *testing.T) {
 }
 
 func TestNestedArrayIndex(t *testing.T) {
-	code := `@ GET /test
+	code := `@ GET /test {
   $ arr = [[1, 2], [3, 4], [5, 6]]
   $ inner = arr[1]
   $ val = inner[0]
-  > val`
+  > val
+}`
 
 	// Tokenize the code
 	lexer := parser.NewLexer(code)

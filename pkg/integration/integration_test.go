@@ -18,15 +18,17 @@ func TestIntegration_HelloWorldFile(t *testing.T) {
   timestamp: int
 }
 
-@ GET /hello
+@ GET /hello {
   > {text: "Hello, World!", timestamp: 1234567890}
+}
 
-@ GET /greet/:name -> Message
+@ GET /greet/:name -> Message {
   $ message = {
     text: "Hello, " + name + "!",
     timestamp: time.now()
   }
-  > message`
+  > message
+}`
 
 	// Lex
 	lexer := parser.NewLexer(source)
@@ -77,14 +79,16 @@ func TestIntegration_RestApiFile(t *testing.T) {
   email: str!
 }
 
-@ GET /api/users/:id -> User
+@ GET /api/users/:id -> User {
   + auth(jwt)
   % db: Database
   $ user = db.users.get(id)
   > user
+}
 
-@ GET /health
-  > {status: "ok", timestamp: now()}`
+@ GET /health {
+  > {status: "ok", timestamp: now()}
+}`
 
 	// Lex
 	lexer := parser.NewLexer(source)
@@ -130,33 +134,37 @@ func TestIntegration_FullPipeline(t *testing.T) {
 	}{
 		{
 			name: "simple string return",
-			source: `@ GET /test
-  > "Hello"`,
+			source: `@ GET /test {
+  > "Hello"
+}`,
 			routeIndex:     0,
 			params:         nil,
 			expectedResult: "Hello",
 		},
 		{
 			name: "integer calculation",
-			source: `@ GET /calc
+			source: `@ GET /calc {
   $ result = 10 + 20
-  > result`,
+  > result
+}`,
 			routeIndex:     0,
 			params:         nil,
 			expectedResult: int64(30),
 		},
 		{
 			name: "path parameter",
-			source: `@ GET /echo/:msg
-  > msg`,
+			source: `@ GET /echo/:msg {
+  > msg
+}`,
 			routeIndex:     0,
 			params:         map[string]string{"msg": "test"},
 			expectedResult: "test",
 		},
 		{
 			name: "object literal",
-			source: `@ GET /obj
-  > {count: 42, active: true}`,
+			source: `@ GET /obj {
+  > {count: 42, active: true}
+}`,
 			routeIndex: 0,
 			params:     nil,
 			expectedResult: map[string]interface{}{
@@ -291,19 +299,19 @@ func TestIntegration_ErrorHandling(t *testing.T) {
 	}{
 		{
 			name:           "valid code",
-			source:         "@ GET /test\n  > {ok: true}",
+			source:         "@ GET /test {\n  > {ok: true}\n}",
 			expectLexErr:   false,
 			expectParseErr: false,
 		},
 		{
 			name:           "unclosed string (lexer handles it)",
-			source:         "@ GET /test\n  > {msg: \"unclosed",
+			source:         "@ GET /test {\n  > {msg: \"unclosed\n}",
 			expectLexErr:   true, // Lexer now errors on unterminated strings
 			expectParseErr: false,
 		},
 		{
 			name:           "invalid token sequence",
-			source:         "@ route\n  > {ok: true}", // missing path
+			source:         "@ route {\n  > {ok: true}\n}", // missing path
 			expectLexErr:   false,
 			expectParseErr: true,
 		},
@@ -347,18 +355,21 @@ func TestIntegration_MultipleRoutesWithFeatures(t *testing.T) {
   name: str!
 }
 
-@ GET /public
+@ GET /public {
   > {message: "Public endpoint"}
+}
 
-@ POST /protected
+@ POST /protected {
   + auth(jwt)
   + ratelimit(100/min)
   > {message: "Protected endpoint"}
+}
 
-@ GET /users/:id -> User
+@ GET /users/:id -> User {
   + auth(jwt)
   $ user = {id: id, name: "Test User"}
-  > user`
+  > user
+}`
 
 	// Lex
 	lexer := parser.NewLexer(source)
@@ -412,35 +423,39 @@ func TestIntegration_Expressions(t *testing.T) {
 	}{
 		{
 			name: "addition",
-			source: `@ GET /add
+			source: `@ GET /add {
   $ result = 10 + 5
-  > result`,
+  > result
+}`,
 			params:   nil,
 			expected: int64(15),
 		},
 		{
 			name: "multiplication",
-			source: `@ GET /mul
+			source: `@ GET /mul {
   $ result = 6 * 7
-  > result`,
+  > result
+}`,
 			params:   nil,
 			expected: int64(42),
 		},
 		{
 			name: "string concat",
-			source: `@ GET /greet/:name
+			source: `@ GET /greet/:name {
   $ msg = "Hello, " + name
-  > msg`,
+  > msg
+}`,
 			params:   map[string]string{"name": "World"},
 			expected: "Hello, World",
 		},
 		{
 			name: "complex arithmetic",
-			source: `@ GET /complex
+			source: `@ GET /complex {
   $ a = 10
   $ b = 20
   $ c = a + b * 2
-  > c`,
+  > c
+}`,
 			params:   nil,
 			expected: int64(50),
 		},
@@ -469,8 +484,9 @@ func TestIntegration_Expressions(t *testing.T) {
 
 // Benchmark full pipeline
 func BenchmarkIntegration_FullPipeline(b *testing.B) {
-	source := `@ GET /hello
-  > {message: "Hello, World!"}`
+	source := `@ GET /hello {
+  > {message: "Hello, World!"}
+}`
 
 	for i := 0; i < b.N; i++ {
 		lexer := parser.NewLexer(source)
@@ -490,11 +506,12 @@ func BenchmarkIntegration_ComplexRoute(b *testing.B) {
   name: str!
 }
 
-@ GET /api/users/:id
+@ GET /api/users/:id {
   + auth(jwt)
   + ratelimit(100/min)
   $ user = {id: id, name: "Test"}
-  > user`
+  > user
+}`
 
 	for i := 0; i < b.N; i++ {
 		lexer := parser.NewLexer(source)

@@ -75,15 +75,16 @@ type ChatMessage {
 # ============================================================================
 
 # Simple GET route - health check
-@ GET /api/health
+@ GET /api/health {
   > {
     success: true,
     message: "Service is healthy",
     timestamp: now()
   }
+}
 
 # GET with path parameter
-@ GET /api/users/:id
+@ GET /api/users/:id {
   + auth(jwt)
   + ratelimit(100/min)
   % db: Database
@@ -95,9 +96,10 @@ type ChatMessage {
   } else {
     > user
   }
+}
 
 # GET with all users and pagination
-@ GET /api/users
+@ GET /api/users {
   + auth(jwt)
   + ratelimit(50/min)
   % db: Database
@@ -112,14 +114,16 @@ type ChatMessage {
     per_page: 20,
     has_more: total > 20
   }
+}
 
 # GET with filtering
-@ GET /api/users/active
+@ GET /api/users/active {
   + auth(jwt)
   % db: Database
 
   $ active_users = db.users.filter("active", true)
   > {users: active_users, count: active_users.length()}
+}
 
 # Alternative GET syntax using @ METHOD /path
 @ GET /health {
@@ -131,7 +135,7 @@ type ChatMessage {
 # ============================================================================
 
 # POST to create a new resource
-@ POST /api/users
+@ POST /api/users {
   + auth(jwt, role: admin)
   + ratelimit(10/min)
   % db: Database
@@ -163,9 +167,10 @@ type ChatMessage {
       > {success: true, message: "User created", data: new_user}
     }
   }
+}
 
 # POST for authentication
-@ POST /api/auth/login
+@ POST /api/auth/login {
   + ratelimit(5/min)
   % db: Database
 
@@ -187,13 +192,14 @@ type ChatMessage {
       > {success: true, message: "Login successful", token: token, user: user}
     }
   }
+}
 
 # ============================================================================
 # SECTION 4: HTTP ROUTES - PUT/PATCH REQUESTS
 # ============================================================================
 
 # PUT to fully replace a resource
-@ PUT /api/users/:id
+@ PUT /api/users/:id {
   + auth(jwt)
   % db: Database
 
@@ -212,9 +218,10 @@ type ChatMessage {
 
     > {success: true, message: "User updated", data: updated}
   }
+}
 
 # PATCH to partially update a resource
-@ PATCH /api/users/:id
+@ PATCH /api/users/:id {
   + auth(jwt)
   % db: Database
 
@@ -235,13 +242,14 @@ type ChatMessage {
     $ saved = db.users.update(id, user)
     > {success: true, message: "User patched", data: saved}
   }
+}
 
 # ============================================================================
 # SECTION 5: HTTP ROUTES - DELETE REQUESTS
 # ============================================================================
 
 # DELETE a single resource
-@ DELETE /api/users/:id
+@ DELETE /api/users/:id {
   + auth(jwt, role: admin)
   % db: Database
 
@@ -253,20 +261,22 @@ type ChatMessage {
     $ result = db.users.delete(id)
     > {success: true, message: "User deleted"}
   }
+}
 
 # DELETE with batch operation
-@ DELETE /api/users/inactive
+@ DELETE /api/users/inactive {
   + auth(jwt, role: admin)
   % db: Database
 
   $ result = db.users.deleteWhere("active", false)
   > {success: true, message: "Inactive users deleted", count: result}
+}
 
 # ============================================================================
 # SECTION 6: CONTROL FLOW - IF/ELSE
 # ============================================================================
 
-@ POST /api/check-age
+@ POST /api/check-age {
   $ age = input.age
   $ category = ""
 
@@ -289,9 +299,10 @@ type ChatMessage {
 
     > {success: true, age: age, category: category}
   }
+}
 
 # Route with logical operators (AND/OR)
-@ GET /api/access/:age/:premium
+@ GET /api/access/:age/:premium {
   $ hasAccess = false
   $ level = ""
 
@@ -309,12 +320,13 @@ type ChatMessage {
   }
 
   > {hasAccess: hasAccess, accessLevel: level}
+}
 
 # ============================================================================
 # SECTION 7: CONTROL FLOW - WHILE LOOPS
 # ============================================================================
 
-@ GET /api/factorial/:n
+@ GET /api/factorial/:n {
   $ n = parseInt(n)
   $ result = 1
   $ i = 1
@@ -325,8 +337,9 @@ type ChatMessage {
   }
 
   > {n: n, factorial: result}
+}
 
-@ GET /api/fibonacci/:count
+@ GET /api/fibonacci/:count {
   $ count = parseInt(count)
   $ a = 0
   $ b = 1
@@ -340,9 +353,10 @@ type ChatMessage {
   }
 
   > {count: count, result: a}
+}
 
 # Nested while loops
-@ GET /api/nested-loops
+@ GET /api/nested-loops {
   $ i = 0
   $ total = 0
   while i < 3 {
@@ -354,12 +368,13 @@ type ChatMessage {
     $ i = i + 1
   }
   > {total: total}
+}
 
 # ============================================================================
 # SECTION 8: CONTROL FLOW - FOR LOOPS
 # ============================================================================
 
-@ POST /api/process-items
+@ POST /api/process-items {
   $ items = input.items
   $ total = 0
   $ processed = []
@@ -371,8 +386,9 @@ type ChatMessage {
   }
 
   > {total: total, processed: processed}
+}
 
-@ POST /api/analyze-data
+@ POST /api/analyze-data {
   $ data = input.data
   $ results = []
 
@@ -383,9 +399,10 @@ type ChatMessage {
   }
 
   > {results: results}
+}
 
 # Object iteration (key-value pairs)
-@ GET /api/config
+@ GET /api/config {
   $ config = {host: "localhost", port: "8080", debug: "true"}
   $ settings = []
 
@@ -395,9 +412,10 @@ type ChatMessage {
   }
 
   > {settings: settings}
+}
 
 # Nested for loops
-@ GET /api/matrix
+@ GET /api/matrix {
   $ matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
   $ sum = 0
 
@@ -408,12 +426,13 @@ type ChatMessage {
   }
 
   > {total: sum}
+}
 
 # ============================================================================
 # SECTION 9: CONTROL FLOW - SWITCH STATEMENTS
 # ============================================================================
 
-@ GET /api/order-status/:status
+@ GET /api/order-status/:status {
   $ status_message = ""
   $ can_cancel = false
 
@@ -445,9 +464,10 @@ type ChatMessage {
   }
 
   > {status: status, message: status_message, can_cancel: can_cancel}
+}
 
 # Switch with numbers
-@ GET /api/grade/:score
+@ GET /api/grade/:score {
   $ grade = ""
   $ s = parseInt(score)
 
@@ -470,12 +490,13 @@ type ChatMessage {
   }
 
   > {score: s, grade: grade}
+}
 
 # ============================================================================
 # SECTION 10: BUILTIN FUNCTIONS - STRING OPERATIONS
 # ============================================================================
 
-@ POST /api/string-ops
+@ POST /api/string-ops {
   $ text = input.text
 
   # String length
@@ -519,12 +540,13 @@ type ChatMessage {
     words: words,
     rejoined: rejoined
   }
+}
 
 # ============================================================================
 # SECTION 11: BUILTIN FUNCTIONS - NUMERIC OPERATIONS
 # ============================================================================
 
-@ POST /api/math-ops
+@ POST /api/math-ops {
   $ a = input.a
   $ b = input.b
 
@@ -558,12 +580,13 @@ type ChatMessage {
     parsed_float: parsed_float,
     number_as_string: num_to_str
   }
+}
 
 # ============================================================================
 # SECTION 12: OPERATORS - ALL TYPES
 # ============================================================================
 
-@ POST /api/operators
+@ POST /api/operators {
   $ a = input.a
   $ b = input.b
 
@@ -605,12 +628,13 @@ type ChatMessage {
     logical: {and: and_result, or: or_result},
     string: {concatenated: concatenated}
   }
+}
 
 # ============================================================================
 # SECTION 13: COMPLEX EXPRESSIONS
 # ============================================================================
 
-@ POST /api/expressions
+@ POST /api/expressions {
   # Object literals
   $ person = {
     name: "Alice",
@@ -656,12 +680,13 @@ type ChatMessage {
     array_index: {first: first_num, third: third_num},
     computed: result
   }
+}
 
 # ============================================================================
 # SECTION 14: DATABASE OPERATIONS
 # ============================================================================
 
-@ GET /api/db-demo
+@ GET /api/db-demo {
   % db: Database
 
   # Get all records
@@ -683,9 +708,10 @@ type ChatMessage {
     admin_count: admins.length(),
     next_id: next_id
   }
+}
 
 # CRUD demonstration
-@ POST /api/db-crud
+@ POST /api/db-crud {
   % db: Database
 
   $ operation = input.operation
@@ -717,6 +743,7 @@ type ChatMessage {
       > {success: false, message: "Unknown operation"}
     }
   }
+}
 
 # ============================================================================
 # SECTION 15: WEBSOCKET SUPPORT
@@ -783,13 +810,14 @@ type ChatMessage {
 }
 
 # WebSocket status endpoint
-@ GET /api/ws-status
+@ GET /api/ws-status {
   > {
     rooms: ws.get_rooms(),
     room_count: ws.get_room_count(),
     total_connections: ws.get_connection_count(),
     uptime: ws.get_uptime()
   }
+}
 
 # ============================================================================
 # SECTION 16: SCHEDULED TASKS (CRON)
@@ -970,7 +998,7 @@ type ChatMessage {
 # SECTION 19: COMPLEX BUSINESS LOGIC - E-COMMERCE CHECKOUT
 # ============================================================================
 
-@ POST /api/checkout
+@ POST /api/checkout {
   + auth(jwt)
   + ratelimit(10/min)
   % db: Database
@@ -1070,12 +1098,13 @@ type ChatMessage {
       }
     }
   }
+}
 
 # ============================================================================
 # SECTION 20: ANALYTICS AND STATISTICS
 # ============================================================================
 
-@ GET /api/analytics
+@ GET /api/analytics {
   + auth(jwt, role: admin)
   + ratelimit(30/min)
   % db: Database
@@ -1123,6 +1152,7 @@ type ChatMessage {
     },
     timestamp: now()
   }
+}
 
 # ============================================================================
 # SECTION 21: ALTERNATIVE SYNTAX EXAMPLES

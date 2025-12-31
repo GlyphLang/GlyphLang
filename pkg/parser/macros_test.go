@@ -155,8 +155,9 @@ func TestParser_MacroInvocation(t *testing.T) {
 
 func TestParser_MacroWithRoute(t *testing.T) {
 	input := `macro! crud(resource) {
-		@ GET /resource
+		@ GET /resource {
 			> "get " + resource
+		}
 	}`
 
 	lexer := NewLexer(input)

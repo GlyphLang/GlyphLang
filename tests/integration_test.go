@@ -16,14 +16,16 @@ func TestParserIntegration(t *testing.T) {
 	}{
 		{
 			name: "Simple route",
-			source: `@ GET /test
-  > {status: "ok"}`,
+			source: `@ GET /test {
+  > {status: "ok"}
+}`,
 			shouldError: false,
 		},
 		{
 			name: "Route with path parameter",
-			source: `@ GET /users/:id
-  > {id: id}`,
+			source: `@ GET /users/:id {
+  > {id: id}
+}`,
 			shouldError: false,
 		},
 		{
@@ -32,53 +34,57 @@ func TestParserIntegration(t *testing.T) {
   id: int!
   name: str!
 }
-@ GET /users/:id -> User
-  > {id: id, name: "test"}`,
+@ GET /users/:id -> User {
+  > {id: id, name: "test"}
+}`,
 			shouldError: false,
 		},
 		{
 			name: "Route with type annotation",
-			source: `@ GET /api/users -> List[User]
-  > []`,
+			source: `@ GET /api/users -> List[User] {
+  > []
+}`,
 			shouldError: false,
 		},
 		{
 			name: "Multiple middleware",
-			source: `@ GET /protected
+			source: `@ GET /protected {
   + auth(jwt)
   + ratelimit(100/min)
-  > {status: "ok"}`,
+  > {status: "ok"}
+}`,
 			shouldError: false,
 		},
 		{
 			name: "HTTP method specification",
-			source: `@ POST /api/users
+			source: `@ POST /api/users {
   < input: CreateUserInput
-  > {created: true}`,
+  > {created: true}
+}`,
 			shouldError: false,
 		},
 		{
 			name: "Database query",
-			source: `@ GET /api/users/:id
+			source: `@ GET /api/users/:id {
   % db: Database
   $ user = db.users.get(id)
-  > user`,
+  > user
+}`,
 			shouldError: false,
 		},
 		{
 			name: "Validation",
-			source: `@ POST /api/create
+			source: `@ POST /api/create {
   < input: CreateInput
-  ! validate input {
-    name: str(min=1, max=100)
-  }
-  > {status: "ok"}`,
+  > {status: "ok"}
+}`,
 			shouldError: false,
 		},
 		{
 			name: "Result type with error",
-			source: `@ GET /api/data/:id -> Data | Error
-  > {error: "not found"}`,
+			source: `@ GET /api/data/:id -> Data | Error {
+  > {error: "not found"}
+}`,
 			shouldError: false,
 		},
 		{
@@ -191,15 +197,17 @@ func TestTypeCheckerIntegration(t *testing.T) {
 		{
 			name: "Valid type usage",
 			source: `: User { id: int! }
-@ GET /user -> User
-  > {id: 123}`,
+@ GET /user -> User {
+  > {id: 123}
+}`,
 			shouldError: false,
 		},
 		{
 			name: "Type mismatch",
 			source: `: User { id: int! }
-@ GET /user -> User
-  > {id: "not a number"}`,
+@ GET /user -> User {
+  > {id: "not a number"}
+}`,
 			shouldError: true,
 			errorMsg:    "type mismatch",
 		},
@@ -209,8 +217,9 @@ func TestTypeCheckerIntegration(t *testing.T) {
   id: int!
   name: str!
 }
-@ GET /user -> User
-  > {id: 123}`,
+@ GET /user -> User {
+  > {id: 123}
+}`,
 			shouldError: true,
 			errorMsg:    "missing required field",
 		},
@@ -220,21 +229,24 @@ func TestTypeCheckerIntegration(t *testing.T) {
   id: int!
   name: str
 }
-@ GET /user -> User
-  > {id: 123, name: ""}`,
+@ GET /user -> User {
+  > {id: 123, name: ""}
+}`,
 			shouldError: false,
 		},
 		{
 			name: "List type",
-			source: `@ GET /numbers -> List[int]
-  > [1, 2, 3]`,
+			source: `@ GET /numbers -> List[int] {
+  > [1, 2, 3]
+}`,
 			shouldError: false,
 		},
 		{
 			name: "Result type",
 			source: `: Error { msg: str! }
-@ GET /data -> int | Error
-  > {msg: "error"}`,
+@ GET /data -> int | Error {
+  > {msg: "error"}
+}`,
 			shouldError: false,
 		},
 	}
@@ -311,8 +323,9 @@ func TestCompilerVMIntegration(t *testing.T) {
 	helper := NewTestHelper(t)
 
 	// Simple program
-	source := `@ GET /test
-  > {status: "ok"}`
+	source := `@ GET /test {
+  > {status: "ok"}
+}`
 
 	// Compile
 	comp := compiler.NewCompiler()
@@ -552,7 +565,7 @@ func TestBytecodeFormat(t *testing.T) {
 	helper := NewTestHelper(t)
 
 	comp := compiler.NewCompiler()
-	module, err := parseSource("@ GET /test\n  > {status: \"ok\"}")
+	module, err := parseSource("@ GET /test {\n  > {status: \"ok\"}\n}")
 	if err != nil {
 		t.Fatalf("Parse failed: %v", err)
 	}

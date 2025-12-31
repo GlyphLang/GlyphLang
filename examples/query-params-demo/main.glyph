@@ -29,7 +29,7 @@
 
 # Basic search endpoint with typed query params
 # GET /api/search?q=laptop&page=2&limit=25
-@ GET /api/search -> SearchResult
+@ GET /api/search -> SearchResult {
   ? q: str!              # Required - search query
   ? page: int = 1        # Optional with default
   ? limit: int = 10      # Optional with default
@@ -41,10 +41,11 @@
     limit: query.limit,
     total: 100
   }
+}
 
 # Product listing with filters and sorting
 # GET /api/products?category=electronics&category=computers&minPrice=100&inStock=true
-@ GET /api/products -> ProductList
+@ GET /api/products -> ProductList {
   ? category: str[]      # Multi-value: ?category=a&category=b
   ? minPrice: float = 0
   ? maxPrice: float = 10000
@@ -60,10 +61,11 @@
     page: query.page,
     hasMore: true
   }
+}
 
 # User search with boolean flags
 # GET /api/users?active=true&verified=yes&role=admin&role=moderator
-@ GET /api/users
+@ GET /api/users {
   ? active: bool = true    # Accepts: true/false, yes/no, 1/0, on/off
   ? verified: bool = false
   ? role: str[]            # Multi-value roles
@@ -80,10 +82,11 @@
     },
     users: []
   }
+}
 
 # Pagination example
 # GET /api/posts?page=3&perPage=20&tags=go&tags=tutorial
-@ GET /api/posts
+@ GET /api/posts {
   ? page: int = 1
   ? perPage: int = 10
   ? tags: str[]
@@ -99,10 +102,11 @@
     },
     posts: []
   }
+}
 
 # Combining query params with path params
 # GET /api/users/42/orders?status=pending&status=shipped&limit=5
-@ GET /api/users/:userId/orders
+@ GET /api/users/:userId/orders {
   ? status: str[]
   ? limit: int = 10
   ? includeItems: bool = true
@@ -114,10 +118,11 @@
     includeItems: query.includeItems,
     orders: []
   }
+}
 
 # Float values for geo/price queries
 # GET /api/locations?lat=40.7128&lng=-74.0060&radius=5.5
-@ GET /api/locations
+@ GET /api/locations {
   ? lat: float!
   ? lng: float!
   ? radius: float = 10.0
@@ -130,3 +135,4 @@
     radiusKm: query.radius,
     locations: []
   }
+}

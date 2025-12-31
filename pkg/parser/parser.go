@@ -990,14 +990,25 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 
 	p.skipNewlines()
 
-	// Parse route body
+	// Parse route body - braces required
 	var auth *interpreter.AuthConfig
 	var rateLimit *interpreter.RateLimit
 	var injections []interpreter.Injection
 	var queryParams []interpreter.QueryParamDecl
 	var body []interpreter.Statement
 
-	for !p.isAtEnd() {
+	if !p.check(LBRACE) {
+		return nil, p.errorWithHint(
+			"Expected '{' to start route body",
+			p.current(),
+			"Route bodies must be enclosed in braces: @ GET /path { ... }",
+		)
+	}
+	p.advance() // consume '{'
+	p.skipNewlines()
+
+	// Parse route body contents until '}'
+	for !p.check(RBRACE) && !p.isAtEnd() {
 		switch p.current().Type {
 		case PLUS:
 			// Middleware: + auth(jwt) or + ratelimit(100/min)
@@ -1058,21 +1069,8 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 			p.parseType()
 			p.skipNewlines()
 
-		case BANG:
-			// Validation: ! validate input { ... } (skip for now)
-			p.advance()
-			p.expectIdent()
-			p.expectIdent()
-			p.expect(LBRACE)
-			for !p.check(RBRACE) && !p.isAtEnd() {
-				p.advance()
-			}
-			p.expect(RBRACE)
-			p.skipNewlines()
-
 		case QUESTION:
 			// Check if this is query param declaration (? name: type) or validation (? validate_fn())
-			// Look ahead: after ?, if IDENT followed by COLON, it's a query param declaration
 			if p.peek(1).Type == IDENT && p.peek(2).Type == COLON {
 				p.advance() // consume ?
 				param, err := p.parseQueryParamDecl()
@@ -1099,44 +1097,26 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 			body = append(body, stmt)
 			p.skipNewlines()
 
-			// Return is typically the last statement
-			if _, ok := stmt.(interpreter.ReturnStatement); ok {
-				break
-			}
-
 		case IDENT:
-			// Check for "if" keyword - if statement in route body
-			if p.current().Literal == "if" {
+			// Check for control flow keywords
+			switch p.current().Literal {
+			case "if", "while", "for", "switch", "let", "return":
 				stmt, err := p.parseStatement()
 				if err != nil {
 					return nil, err
 				}
 				body = append(body, stmt)
-				p.skipNewlines()
-			} else {
-				goto endBody
+			default:
+				// Expression statement (like function calls)
+				stmt, err := p.parseStatement()
+				if err != nil {
+					return nil, err
+				}
+				body = append(body, stmt)
 			}
-
-		case WHILE:
-			// While loop in route body
-			stmt, err := p.parseStatement()
-			if err != nil {
-				return nil, err
-			}
-			body = append(body, stmt)
 			p.skipNewlines()
 
-		case FOR:
-			// For loop in route body
-			stmt, err := p.parseStatement()
-			if err != nil {
-				return nil, err
-			}
-			body = append(body, stmt)
-			p.skipNewlines()
-
-		case SWITCH:
-			// Switch statement in route body
+		case WHILE, FOR, SWITCH:
 			stmt, err := p.parseStatement()
 			if err != nil {
 				return nil, err
@@ -1147,76 +1127,22 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 		case NEWLINE:
 			p.advance()
 
-		case LBRACE:
-			// Block syntax: @ GET /path { statements }
-			p.advance() // consume '{'
-			p.skipNewlines()
-
-			// Parse statements until '}'
-			for !p.check(RBRACE) && !p.isAtEnd() {
-				// Handle different statement types
-				switch p.current().Type {
-				case DOLLAR:
-					stmt, err := p.parseStatement()
-					if err != nil {
-						return nil, err
-					}
-					body = append(body, stmt)
-				case GREATER:
-					stmt, err := p.parseStatement()
-					if err != nil {
-						return nil, err
-					}
-					body = append(body, stmt)
-				case IDENT:
-					// Could be 'if', 'while', 'for', 'let', 'return', or expression statement
-					switch p.current().Literal {
-					case "if", "while", "for", "switch", "let", "return":
-						stmt, err := p.parseStatement()
-						if err != nil {
-							return nil, err
-						}
-						body = append(body, stmt)
-					default:
-						// Expression statement (like function calls)
-						stmt, err := p.parseStatement()
-						if err != nil {
-							return nil, err
-						}
-						body = append(body, stmt)
-					}
-				case WHILE, FOR, SWITCH:
-					stmt, err := p.parseStatement()
-					if err != nil {
-						return nil, err
-					}
-					body = append(body, stmt)
-				case NEWLINE:
-					p.advance()
-					continue
-				default:
-					// Try to parse as statement
-					stmt, err := p.parseStatement()
-					if err != nil {
-						// Skip unknown tokens
-						p.advance()
-						continue
-					}
-					body = append(body, stmt)
-				}
-				p.skipNewlines()
-			}
-
-			if err := p.expect(RBRACE); err != nil {
-				return nil, err
-			}
-			goto endBody
-
 		default:
-			goto endBody
+			// Try to parse as statement
+			stmt, err := p.parseStatement()
+			if err != nil {
+				// Skip unknown tokens
+				p.advance()
+				continue
+			}
+			body = append(body, stmt)
+			p.skipNewlines()
 		}
 	}
-endBody:
+
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
+	}
 
 	return &interpreter.Route{
 		Path:        path,
@@ -2694,45 +2620,29 @@ func (p *Parser) parseCommand() (interpreter.Item, error) {
 
 	p.skipNewlines()
 
-	// Parse body
+	// Parse body - braces required
 	var body []interpreter.Statement
-	if p.check(LBRACE) {
-		p.advance()
-		p.skipNewlines()
+	if !p.check(LBRACE) {
+		return nil, p.errorWithHint(
+			"Expected '{' to start function body",
+			p.current(),
+			"Function bodies must be enclosed in braces: ! name(params) { ... }",
+		)
+	}
+	p.advance()
+	p.skipNewlines()
 
-		for !p.check(RBRACE) && !p.isAtEnd() {
-			stmt, err := p.parseStatement()
-			if err != nil {
-				return nil, err
-			}
-			body = append(body, stmt)
-			p.skipNewlines()
-		}
-
-		if err := p.expect(RBRACE); err != nil {
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		stmt, err := p.parseStatement()
+		if err != nil {
 			return nil, err
 		}
-	} else {
-		// Inline body (same as route)
-		for !p.isAtEnd() && !p.check(AT) && !p.check(COLON) {
-			if p.check(NEWLINE) {
-				p.advance()
-				continue
-			}
-			if p.check(DOLLAR) || p.check(GREATER) {
-				stmt, err := p.parseStatement()
-				if err != nil {
-					return nil, err
-				}
-				body = append(body, stmt)
-				if _, ok := stmt.(interpreter.ReturnStatement); ok {
-					break
-				}
-			} else {
-				break
-			}
-			p.skipNewlines()
-		}
+		body = append(body, stmt)
+		p.skipNewlines()
+	}
+
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
 	}
 
 	return &interpreter.Command{
@@ -2794,45 +2704,29 @@ func (p *Parser) parseGenericFunction(name string) (interpreter.Item, error) {
 
 	p.skipNewlines()
 
-	// Parse body
+	// Parse body - braces required
 	var body []interpreter.Statement
-	if p.check(LBRACE) {
-		p.advance()
-		p.skipNewlines()
+	if !p.check(LBRACE) {
+		return nil, p.errorWithHint(
+			"Expected '{' to start function body",
+			p.current(),
+			"Function bodies must be enclosed in braces: ! name<T>(params) { ... }",
+		)
+	}
+	p.advance()
+	p.skipNewlines()
 
-		for !p.check(RBRACE) && !p.isAtEnd() {
-			stmt, err := p.parseStatement()
-			if err != nil {
-				return nil, err
-			}
-			body = append(body, stmt)
-			p.skipNewlines()
-		}
-
-		if err := p.expect(RBRACE); err != nil {
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		stmt, err := p.parseStatement()
+		if err != nil {
 			return nil, err
 		}
-	} else {
-		// Inline body
-		for !p.isAtEnd() && !p.check(AT) && !p.check(COLON) && !p.check(BANG) {
-			if p.check(NEWLINE) {
-				p.advance()
-				continue
-			}
-			if p.check(DOLLAR) || p.check(GREATER) {
-				stmt, err := p.parseStatement()
-				if err != nil {
-					return nil, err
-				}
-				body = append(body, stmt)
-				if _, ok := stmt.(interpreter.ReturnStatement); ok {
-					break
-				}
-			} else {
-				break
-			}
-			p.skipNewlines()
-		}
+		body = append(body, stmt)
+		p.skipNewlines()
+	}
+
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
 	}
 
 	return &interpreter.Function{
@@ -2883,45 +2777,29 @@ func (p *Parser) parseRegularFunction(name string) (interpreter.Item, error) {
 
 	p.skipNewlines()
 
-	// Parse body
+	// Parse body - braces required
 	var body []interpreter.Statement
-	if p.check(LBRACE) {
-		p.advance()
-		p.skipNewlines()
+	if !p.check(LBRACE) {
+		return nil, p.errorWithHint(
+			"Expected '{' to start function body",
+			p.current(),
+			"Function bodies must be enclosed in braces: ! name(params) { ... }",
+		)
+	}
+	p.advance()
+	p.skipNewlines()
 
-		for !p.check(RBRACE) && !p.isAtEnd() {
-			stmt, err := p.parseStatement()
-			if err != nil {
-				return nil, err
-			}
-			body = append(body, stmt)
-			p.skipNewlines()
-		}
-
-		if err := p.expect(RBRACE); err != nil {
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		stmt, err := p.parseStatement()
+		if err != nil {
 			return nil, err
 		}
-	} else {
-		// Inline body
-		for !p.isAtEnd() && !p.check(AT) && !p.check(COLON) && !p.check(BANG) {
-			if p.check(NEWLINE) {
-				p.advance()
-				continue
-			}
-			if p.check(DOLLAR) || p.check(GREATER) {
-				stmt, err := p.parseStatement()
-				if err != nil {
-					return nil, err
-				}
-				body = append(body, stmt)
-				if _, ok := stmt.(interpreter.ReturnStatement); ok {
-					break
-				}
-			} else {
-				break
-			}
-			p.skipNewlines()
-		}
+		body = append(body, stmt)
+		p.skipNewlines()
+	}
+
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
 	}
 
 	return &interpreter.Function{

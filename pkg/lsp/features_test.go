@@ -13,8 +13,9 @@ func TestGetDiagnostics(t *testing.T) {
   name: str!
 }
 
-@ GET /api/users
+@ GET /api/users {
   > {users: []}
+}
 `
 
 	doc, _ := dm.Open("file:///valid.abc", 1, validSource)
@@ -57,8 +58,9 @@ func TestGetHover(t *testing.T) {
   age: int!
 }
 
-@ GET /api/users
+@ GET /api/users {
   > {users: []}
+}
 `
 
 	doc, _ := dm.Open("file:///test.abc", 1, source)
@@ -209,11 +211,13 @@ func TestGetDocumentSymbols(t *testing.T) {
   title: str!
 }
 
-@ GET /api/users
+@ GET /api/users {
   > {users: []}
+}
 
-@ POST /api/posts
+@ POST /api/posts {
   > {posts: []}
+}
 `
 
 	doc, _ := dm.Open("file:///test.abc", 1, source)
@@ -401,10 +405,11 @@ func TestFormatTypeDefHover(t *testing.T) {
 func TestFormatRouteHover(t *testing.T) {
 	dm := NewDocumentManager()
 
-	source := `@ GET /api/users
+	source := `@ GET /api/users {
   + auth(jwt)
   + ratelimit(100/min)
   > {users: []}
+}
 `
 
 	doc, _ := dm.Open("file:///test.abc", 1, source)
@@ -475,8 +480,9 @@ func TestDiagnosticsWithHint(t *testing.T) {
 	dm := NewDocumentManager()
 
 	// Create source that will generate an error with hint
-	invalidSource := `@ GET /test
-  > {}`
+	invalidSource := `@ GET /test {
+  > {}
+}`
 
 	doc, _ := dm.Open("file:///test.abc", 1, invalidSource)
 	diagnostics := GetDiagnostics(doc)

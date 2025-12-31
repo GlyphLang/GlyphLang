@@ -1,17 +1,20 @@
 # Hello World Example
 # Basic GlyphLang route demonstrating simple response
 
-@ GET /
+@ GET / {
   > {
     text: "Hello, World!",
     timestamp: 1234567890
   }
+}
 
 # Greeting with path parameter
-@ GET /hello/:name
+@ GET /hello/:name {
   $ greeting = "Hello, " + name + "!"
   > {message: greeting}
+}
 
 # Health check endpoint
-@ GET /health
+@ GET /health {
   > {status: "ok"}
+}

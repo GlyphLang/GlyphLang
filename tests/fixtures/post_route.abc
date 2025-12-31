@@ -4,15 +4,12 @@
   email: str!
 }
 
-@ route /api/users [POST]
+@ POST /api/users {
   < input: CreateUserInput
-  ! validate input {
-    name: str(min=1, max=100)
-    email: email_format
-  }
   > {
     id: 123,
     name: input.name,
     email: input.email,
     created: true
   }
+}

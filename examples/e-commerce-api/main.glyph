@@ -5,14 +5,15 @@
 # Health Check
 # =================
 
-@ GET /health
+@ GET /health {
   > {status: "ok", service: "E-Commerce API"}
+}
 
 # =================
 # Products
 # =================
 
-@ GET /products
+@ GET /products {
   $ page: int = 1
   $ limit: int = 20
   $ category: string = ""
@@ -84,8 +85,9 @@
       :total = 3
     }
   }
+}
 
-@ GET /products/:id
+@ GET /products/:id {
   $ product_id = int(id)
 
   $ product = {
@@ -108,8 +110,9 @@
   }
 
   > {product: product}
+}
 
-@ POST /products
+@ POST /products {
   $ name: string
   $ description: string
   $ price: float
@@ -139,12 +142,13 @@
     :message = "Product created",
     :product = new_product
   }
+}
 
 # =================
 # Shopping Cart
 # =================
 
-@ GET /cart/:userId
+@ GET /cart/:userId {
   $ user_id = int(userId)
 
   $ cart = {
@@ -172,8 +176,9 @@
   }
 
   > {cart: cart}
+}
 
-@ POST /cart/:userId/items
+@ POST /cart/:userId/items {
   $ user_id = int(userId)
   $ product_id: int
   $ quantity: int
@@ -187,8 +192,9 @@
     :product_id = product_id,
     :quantity = quantity
   }
+}
 
-@ PUT /cart/:userId/items/:productId
+@ PUT /cart/:userId/items/:productId {
   $ user_id = int(userId)
   $ product_id = int(productId)
   $ quantity: int
@@ -200,8 +206,9 @@
     :product_id = product_id,
     :quantity = quantity
   }
+}
 
-@ DELETE /cart/:userId/items/:productId
+@ DELETE /cart/:userId/items/:productId {
   $ user_id = int(userId)
   $ product_id = int(productId)
 
@@ -209,20 +216,22 @@
     :message = "Item removed from cart",
     :product_id = product_id
   }
+}
 
-@ POST /cart/:userId/clear
+@ POST /cart/:userId/clear {
   $ user_id = int(userId)
 
   > {
     :message = "Cart cleared",
     :user_id = user_id
   }
+}
 
 # =================
 # Orders
 # =================
 
-@ POST /orders
+@ POST /orders {
   $ user_id: int
   $ shipping_address: object
   $ payment_method: string
@@ -246,8 +255,9 @@
     :message = "Order created",
     :order = order
   }
+}
 
-@ GET /orders/:id
+@ GET /orders/:id {
   $ order_id = id
 
   $ order = {
@@ -264,8 +274,9 @@
   }
 
   > {order: order}
+}
 
-@ PUT /orders/:id/status
+@ PUT /orders/:id/status {
   $ order_id = id
   $ status: string
 
@@ -275,12 +286,13 @@
     :status = status,
     :updated_at = timestamp()
   }
+}
 
 # =================
 # Reviews
 # =================
 
-@ GET /products/:productId/reviews
+@ GET /products/:productId/reviews {
   $ product_id = int(productId)
 
   $ reviews = [
@@ -303,8 +315,9 @@
     :average_rating = 4.5,
     :total_reviews = 1
   }
+}
 
-@ POST /products/:productId/reviews
+@ POST /products/:productId/reviews {
   $ product_id = int(productId)
   $ user_id: int
   $ rating: int
@@ -331,12 +344,13 @@
     :message = "Review submitted",
     :review = review
   }
+}
 
 # =================
 # Categories
 # =================
 
-@ GET /categories
+@ GET /categories {
   $ categories = [
     {:id = 1, :name = "Electronics", :slug = "electronics", :count = 145},
     {:id = 2, :name = "Furniture", :slug = "furniture", :count = 67},
@@ -344,12 +358,13 @@
   ]
 
   > {categories: categories}
+}
 
 # =================
 # Wishlist
 # =================
 
-@ GET /wishlist/:userId
+@ GET /wishlist/:userId {
   $ user_id = int(userId)
 
   $ items = [
@@ -361,8 +376,9 @@
     :items = items,
     :count = 1
   }
+}
 
-@ POST /wishlist/:userId
+@ POST /wishlist/:userId {
   $ user_id = int(userId)
   $ product_id: int
 
@@ -371,3 +387,4 @@
     :user_id = user_id,
     :product_id = product_id
   }
+}

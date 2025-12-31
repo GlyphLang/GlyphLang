@@ -38,5 +38,6 @@ module "models"
 }
 
 # Validation helper function
-! isValidEmail(email: str): bool
+! isValidEmail(email: str): bool {
   > contains(email, "@")
+}

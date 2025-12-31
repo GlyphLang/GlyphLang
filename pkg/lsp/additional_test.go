@@ -267,9 +267,10 @@ func TestFormatDocument(t *testing.T) {
 func TestGetSignatureHelp(t *testing.T) {
 	dm := NewDocumentManager()
 
-	source := `@ GET /test
+	source := `@ GET /test {
   $ result = hash(
-  > {}`
+  > {}
+}`
 	doc, _ := dm.Open("file:///test.abc", 1, source)
 
 	sig := GetSignatureHelp(doc, Position{Line: 1, Character: 18})
@@ -475,9 +476,10 @@ func TestDocumentClose(t *testing.T) {
 func TestGetOptimizerHints(t *testing.T) {
 	dm := NewDocumentManager()
 
-	source := `@ GET /api/users
+	source := `@ GET /api/users {
   $ result = db.query()
   > {data: result}
+}
 `
 	doc, _ := dm.Open("file:///test.abc", 1, source)
 
@@ -492,10 +494,11 @@ func TestGetOptimizerHints(t *testing.T) {
 func TestAnalyzeRouteForOptimizations(t *testing.T) {
 	dm := NewDocumentManager()
 
-	source := `@ GET /api/users
+	source := `@ GET /api/users {
   $ x = 1 + 2
   $ y = x * 3
   > {result: y}
+}
 `
 	doc, _ := dm.Open("file:///test.abc", 1, source)
 
@@ -546,14 +549,17 @@ func TestCheckTypesWithArrays(t *testing.T) {
 func TestDocumentSymbolsWithRoutes(t *testing.T) {
 	dm := NewDocumentManager()
 
-	source := `@ GET /api/users
+	source := `@ GET /api/users {
   > {users: []}
+}
 
-@ GET /api/users/:id
+@ GET /api/users/:id {
   > {user: {}}
+}
 
-@ POST /api/users
+@ POST /api/users {
   > {created: true}
+}
 `
 	doc, _ := dm.Open("file:///test.abc", 1, source)
 
@@ -575,10 +581,11 @@ func TestDocumentSymbolsWithRoutes(t *testing.T) {
 func TestGetHoverOnMiddleware(t *testing.T) {
 	dm := NewDocumentManager()
 
-	source := `@ GET /api/users
+	source := `@ GET /api/users {
   + auth(jwt)
   + ratelimit(100/min)
   > {users: []}
+}
 `
 	doc, _ := dm.Open("file:///test.abc", 1, source)
 
@@ -649,9 +656,10 @@ func TestGetDiagnosticsWithWarnings(t *testing.T) {
   name: str!
 }
 
-@ GET /api/users
+@ GET /api/users {
   $ unused = "test"
   > {users: []}
+}
 `
 	doc, _ := dm.Open("file:///test.abc", 1, source)
 
@@ -1058,8 +1066,9 @@ func TestGenerateSourceActions(t *testing.T) {
   email: str!
 }
 
-@ GET /api/users
+@ GET /api/users {
   > {users: []}
+}
 `
 	doc, _ := dm.Open("file:///test.abc", 1, source)
 
@@ -1080,9 +1089,10 @@ func TestIsRenameableSymbol(t *testing.T) {
   name: str!
 }
 
-@ GET /api/users
+@ GET /api/users {
   $ x = 1
   > {result: x}
+}
 `
 	doc, _ := dm.Open("file:///test.abc", 1, source)
 
@@ -1236,8 +1246,9 @@ func TestGetDefinitionEdgeCases(t *testing.T) {
   author: User
 }
 
-@ GET /users/:id
+@ GET /users/:id {
   > {user: {}}
+}
 `
 	doc, _ := dm.Open("file:///test.abc", 1, source)
 
@@ -1348,16 +1359,18 @@ func TestGetSignatureHelpEdgeCases(t *testing.T) {
 	dm := NewDocumentManager()
 
 	t.Run("inside function call", func(t *testing.T) {
-		source := `@ GET /test
-  $ x = hash("test")`
+		source := `@ GET /test {
+  $ x = hash("test")
+}`
 		doc, _ := dm.Open("file:///test.abc", 1, source)
 		sig := GetSignatureHelp(doc, Position{Line: 1, Character: 14})
 		_ = sig
 	})
 
 	t.Run("outside function call", func(t *testing.T) {
-		source := `@ GET /test
-  $ x = 123`
+		source := `@ GET /test {
+  $ x = 123
+}`
 		doc, _ := dm.Open("file:///test2.abc", 1, source)
 		sig := GetSignatureHelp(doc, Position{Line: 1, Character: 6})
 		_ = sig
@@ -1620,9 +1633,10 @@ func TestGetReferencesWithRoutes(t *testing.T) {
   name: str!
 }
 
-@ GET /users/:id
+@ GET /users/:id {
   $ user = db.find(id)
   > {user: user}
+}
 `
 	doc, _ := dm.Open("file:///test.abc", 1, source)
 
@@ -1836,8 +1850,9 @@ func TestParseDocumentEdgeCases(t *testing.T) {
 	})
 
 	t.Run("syntax with route", func(t *testing.T) {
-		source := `@ GET /api/test
+		source := `@ GET /api/test {
   > {ok: true}
+}
 `
 		doc, err := dm.Open("file:///route.abc", 1, source)
 		if err != nil {
@@ -1864,8 +1879,9 @@ func TestGenerateRefactorActions(t *testing.T) {
   name: str!
 }
 
-@ GET /api/users
+@ GET /api/users {
   > {users: []}
+}
 `
 	doc, _ := dm.Open("file:///test.abc", 1, source)
 
@@ -1887,9 +1903,10 @@ func TestGetHoverOnVariousElements(t *testing.T) {
   name: str!
 }
 
-@ GET /api/users/:id
+@ GET /api/users/:id {
   $ result = db.find(id)
   > {user: result}
+}
 `
 	doc, _ := dm.Open("file:///test.abc", 1, source)
 
@@ -2115,8 +2132,9 @@ fn greet(name: str) -> str {
   > "Hello " + name
 }
 
-@ GET /users/:id
+@ GET /users/:id {
   > {user: {}}
+}
 `
 	doc, _ := dm.Open("file:///test.abc", 1, source)
 
@@ -2271,11 +2289,13 @@ func TestGetDocumentSymbolsAllTypes(t *testing.T) {
 
 	// Test with routes
 	t.Run("with routes", func(t *testing.T) {
-		source := `@ GET /api/users
+		source := `@ GET /api/users {
   > []
+}
 
-@ DELETE /api/users/:id
+@ DELETE /api/users/:id {
   > {}
+}
 `
 		doc, _ := dm.Open("file:///routes.abc", 1, source)
 		symbols := GetDocumentSymbols(doc)
@@ -2449,9 +2469,10 @@ func TestHandleNotificationMore(t *testing.T) {
 func TestFormatRouteHoverFull(t *testing.T) {
 	dm := NewDocumentManager()
 
-	source := `@ GET /api/users/:id
+	source := `@ GET /api/users/:id {
   + auth(jwt)
   > {user: {}}
+}
 `
 	doc, _ := dm.Open("file:///test.abc", 1, source)
 

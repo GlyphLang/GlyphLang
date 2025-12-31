@@ -984,8 +984,9 @@ func TestGenerateForFile(t *testing.T) {
   name: string!
 }
 
-@ GET /users/:id -> User
+@ GET /users/:id -> User {
   > {}
+}
 `
 	testFile := filepath.Join(tmpDir, "test.glyph")
 	if err := os.WriteFile(testFile, []byte(glyphContent), 0644); err != nil {
@@ -1084,14 +1085,17 @@ func TestGenerate(t *testing.T) {
 
 	// Create routes.glyph
 	routesContent := `
-@ GET /users
+@ GET /users {
   > []
+}
 
-@ POST /users
+@ POST /users {
   > {}
+}
 
-@ GET /posts
+@ GET /posts {
   > []
+}
 `
 	if err := os.WriteFile(filepath.Join(tmpDir, "routes.glyph"), []byte(routesContent), 0644); err != nil {
 		t.Fatalf("failed to write routes.glyph: %v", err)
@@ -1127,7 +1131,7 @@ func TestGenerateSkipsHiddenDirs(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create a regular file
-	if err := os.WriteFile(filepath.Join(tmpDir, "main.glyph"), []byte("@ GET /test\n  > {}"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "main.glyph"), []byte("@ GET /test {\n  > {}\n}"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1136,7 +1140,7 @@ func TestGenerateSkipsHiddenDirs(t *testing.T) {
 	if err := os.Mkdir(hiddenDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(hiddenDir, "hidden.glyph"), []byte("@ GET /hidden\n  > {}"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(hiddenDir, "hidden.glyph"), []byte("@ GET /hidden {\n  > {}\n}"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1145,7 +1149,7 @@ func TestGenerateSkipsHiddenDirs(t *testing.T) {
 	if err := os.Mkdir(nodeModules, 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(nodeModules, "module.glyph"), []byte("@ GET /module\n  > {}"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(nodeModules, "module.glyph"), []byte("@ GET /module {\n  > {}\n}"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1154,7 +1158,7 @@ func TestGenerateSkipsHiddenDirs(t *testing.T) {
 	if err := os.Mkdir(vendorDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(vendorDir, "vendor.glyph"), []byte("@ GET /vendor\n  > {}"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(vendorDir, "vendor.glyph"), []byte("@ GET /vendor {\n  > {}\n}"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1187,10 +1191,10 @@ func TestGenerateWithSubdirectories(t *testing.T) {
 	}
 
 	// Create files in root and subdirectory
-	if err := os.WriteFile(filepath.Join(tmpDir, "main.glyph"), []byte("@ GET /\n  > {}"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "main.glyph"), []byte("@ GET / {\n  > {}\n}"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(subDir, "users.glyph"), []byte("@ GET /users\n  > []"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(subDir, "users.glyph"), []byte("@ GET /users {\n  > []\n}"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1213,7 +1217,7 @@ func TestGenerateWithInvalidFile(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create valid file
-	if err := os.WriteFile(filepath.Join(tmpDir, "valid.glyph"), []byte("@ GET /test\n  > {}"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "valid.glyph"), []byte("@ GET /test {\n  > {}\n}"), 0644); err != nil {
 		t.Fatal(err)
 	}
 

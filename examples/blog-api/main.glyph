@@ -55,7 +55,7 @@
 }
 
 # Get all blog posts with pagination
-@ GET /api/posts -> PostList
+@ GET /api/posts -> PostList {
   + ratelimit(100/min)
   % db: Database
 
@@ -81,9 +81,10 @@
     page: page,
     per_page: perPage
   }
+}
 
 # Get a single post with all comments
-@ GET /api/posts/:id -> PostWithComments
+@ GET /api/posts/:id -> PostWithComments {
   + ratelimit(200/min)
   % db: Database
 
@@ -110,9 +111,10 @@
       comments_count: commentsCount
     }
   }
+}
 
 # Create a new blog post
-@ POST /api/posts -> ApiResponse
+@ POST /api/posts -> ApiResponse {
   + auth(jwt)
   + ratelimit(20/min)
   % db: Database
@@ -160,9 +162,10 @@
       }
     }
   }
+}
 
 # Update a blog post
-@ PUT /api/posts/:id -> ApiResponse
+@ PUT /api/posts/:id -> ApiResponse {
   + auth(jwt)
   + ratelimit(30/min)
   % db: Database
@@ -211,9 +214,10 @@
       }
     }
   }
+}
 
 # Delete a blog post
-@ DELETE /api/posts/:id -> ApiResponse
+@ DELETE /api/posts/:id -> ApiResponse {
   + auth(jwt, role: admin)
   + ratelimit(10/min)
   % db: Database
@@ -237,9 +241,10 @@
       data: post
     }
   }
+}
 
 # Add a comment to a post
-@ POST /api/posts/:id/comments -> ApiResponse
+@ POST /api/posts/:id/comments -> ApiResponse {
   + auth(jwt)
   + ratelimit(50/min)
   % db: Database
@@ -278,9 +283,10 @@
       }
     }
   }
+}
 
 # Get posts by tag
-@ GET /api/posts/tags/:tag -> PostList
+@ GET /api/posts/tags/:tag -> PostList {
   + ratelimit(100/min)
   % db: Database
 
@@ -294,9 +300,10 @@
     page: 1,
     per_page: total
   }
+}
 
 # Get posts by author
-@ GET /api/authors/:author/posts -> PostList
+@ GET /api/authors/:author/posts -> PostList {
   + ratelimit(100/min)
   % db: Database
 
@@ -309,9 +316,10 @@
     page: 1,
     per_page: total
   }
+}
 
 # Get published posts only
-@ GET /api/posts/published -> PostList
+@ GET /api/posts/published -> PostList {
   + ratelimit(200/min)
   % db: Database
 
@@ -327,9 +335,10 @@
     page: 1,
     per_page: total
   }
+}
 
 # Upvote a comment
-@ PATCH /api/comments/:id/upvote -> ApiResponse
+@ PATCH /api/comments/:id/upvote -> ApiResponse {
   + auth(jwt)
   + ratelimit(100/min)
   % db: Database
@@ -352,3 +361,4 @@
       data: updated
     }
   }
+}

@@ -5,14 +5,15 @@
 # Health & Info
 # =================
 
-@ GET /health
+@ GET /health {
   > {
     :status = "ok",
     :version = "1.0.0",
     :uptime = 3600
   }
+}
 
-@ GET /
+@ GET / {
   > {
     :name = "Blog API",
     :version = "1.0.0",
@@ -25,12 +26,13 @@
       :search = "/search"
     }
   }
+}
 
 # =================
 # Posts Management
 # =================
 
-@ GET /posts
+@ GET /posts {
   $ page: int = 1
   $ limit: int = 10
   $ author: string = ""
@@ -173,8 +175,9 @@
       }
     }
   }
+}
 
-@ GET /posts/:id
+@ GET /posts/:id {
   $ post_id = int(id)
 
   # Validation
@@ -205,8 +208,9 @@
   }
 
   > {post: post}
+}
 
-@ POST /posts
+@ POST /posts {
   $ title: string
   $ content: string
   $ excerpt: string
@@ -254,8 +258,9 @@
     :message = "Post created successfully",
     :post = new_post
   }
+}
 
-@ PUT /posts/:id
+@ PUT /posts/:id {
   $ post_id = int(id)
   $ title: string
   $ content: string
@@ -269,8 +274,9 @@
     :message = "Post updated successfully",
     :id = post_id
   }
+}
 
-@ DELETE /posts/:id
+@ DELETE /posts/:id {
   $ post_id = int(id)
   ? validate_range(post_id, 1, 1000000)
 
@@ -278,12 +284,13 @@
     :message = "Post deleted successfully",
     :id = post_id
   }
+}
 
 # =================
 # Post Actions
 # =================
 
-@ POST /posts/:id/like
+@ POST /posts/:id/like {
   $ post_id = int(id)
   $ new_likes = 6
 
@@ -292,8 +299,9 @@
     :post_id = post_id,
     :likes = new_likes
   }
+}
 
-@ POST /posts/:id/view
+@ POST /posts/:id/view {
   $ post_id = int(id)
   $ new_views = 101
 
@@ -302,12 +310,13 @@
     :post_id = post_id,
     :views = new_views
   }
+}
 
 # =================
 # Comments
 # =================
 
-@ GET /posts/:postId/comments
+@ GET /posts/:postId/comments {
   $ post_id = int(postId)
 
   $ comments = [
@@ -336,8 +345,9 @@
     :comments = comments,
     :count = 2
   }
+}
 
-@ POST /posts/:postId/comments
+@ POST /posts/:postId/comments {
   $ post_id = int(postId)
   $ author: string
   $ content: string
@@ -359,12 +369,13 @@
     :message = "Comment added successfully",
     :comment = new_comment
   }
+}
 
 # =================
 # Search
 # =================
 
-@ GET /search
+@ GET /search {
   $ query: string
   $ category: string = ""
 
@@ -382,12 +393,13 @@
     :count = 2,
     :took_ms = 12
   }
+}
 
 # =================
 # Categories & Tags
 # =================
 
-@ GET /categories
+@ GET /categories {
   $ categories = [
     {:name = "Tutorial", :slug = "tutorial", :count = 15},
     {:name = "Advanced", :slug = "advanced", :count = 8},
@@ -395,8 +407,9 @@
   ]
 
   > {categories: categories}
+}
 
-@ GET /tags
+@ GET /tags {
   $ tags = [
     {:name = "glyph", :slug = "glyph", :count = 25},
     {:name = "database", :slug = "database", :count = 10},
@@ -404,12 +417,13 @@
   ]
 
   > {tags: tags}
+}
 
 # =================
 # Statistics
 # =================
 
-@ GET /stats
+@ GET /stats {
   $ stats = {
     :total_posts = 50,
     :published_posts = 42,
@@ -422,3 +436,4 @@
   }
 
   > {stats: stats}
+}

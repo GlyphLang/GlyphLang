@@ -53,8 +53,9 @@ func TestConvertHTTPMethod(t *testing.T) {
 }
 
 func TestParseSource(t *testing.T) {
-	source := `@ GET /hello
-  > {text: "Hello, World!"}`
+	source := `@ GET /hello {
+  > {text: "Hello, World!"}
+}`
 
 	module, err := parseSource(source)
 	require.NoError(t, err)

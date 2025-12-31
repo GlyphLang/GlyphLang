@@ -1,3 +1,4 @@
 # Route with path parameters
-@ route /greet/:name
+@ GET /greet/:name {
   > {message: "Hello, " + name + "!"}
+}

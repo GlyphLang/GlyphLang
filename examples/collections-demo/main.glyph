@@ -53,7 +53,7 @@
 }
 
 # Get all products with filtering and pagination
-@ GET /api/products -> ApiResponse
+@ GET /api/products -> ApiResponse {
   + ratelimit(100/min)
   % db: Database
 
@@ -163,9 +163,10 @@
     },
     message: null
   }
+}
 
 # Get product statistics with aggregation
-@ GET /api/products/stats -> ApiResponse
+@ GET /api/products/stats -> ApiResponse {
   + auth(jwt)
   + ratelimit(50/min)
   % db: Database
@@ -275,9 +276,10 @@
     },
     message: null
   }
+}
 
 # Get shopping cart with calculated totals
-@ GET /api/cart -> ApiResponse
+@ GET /api/cart -> ApiResponse {
   + auth(jwt)
   + ratelimit(100/min)
   % db: Database
@@ -334,9 +336,10 @@
       message: null
     }
   }
+}
 
 # Add item to cart with quantity handling
-@ POST /api/cart/items -> ApiResponse
+@ POST /api/cart/items -> ApiResponse {
   + auth(jwt)
   + ratelimit(50/min)
   % db: Database
@@ -459,9 +462,10 @@
       }
     }
   }
+}
 
 # Get products by multiple IDs (batch lookup)
-@ POST /api/products/batch -> ApiResponse
+@ POST /api/products/batch -> ApiResponse {
   + ratelimit(50/min)
   % db: Database
 
@@ -498,9 +502,10 @@
       message: null
     }
   }
+}
 
 # Search products with complex filtering
-@ POST /api/products/search -> ApiResponse
+@ POST /api/products/search -> ApiResponse {
   + ratelimit(30/min)
   % db: Database
 
@@ -578,9 +583,10 @@
     },
     message: null
   }
+}
 
 # Get related products based on category and tags
-@ GET /api/products/:id/related -> ApiResponse
+@ GET /api/products/:id/related -> ApiResponse {
   + ratelimit(100/min)
   % db: Database
 
@@ -636,9 +642,10 @@
       message: null
     }
   }
+}
 
 # Clear cart (remove all items)
-@ DELETE /api/cart -> ApiResponse
+@ DELETE /api/cart -> ApiResponse {
   + auth(jwt)
   + ratelimit(20/min)
   % db: Database
@@ -668,9 +675,10 @@
       message: "Cart cleared"
     }
   }
+}
 
 # Health check endpoint
-@ GET /health
+@ GET /health {
   > {
     success: true,
     data: {
@@ -679,3 +687,4 @@
     },
     message: null
   }
+}

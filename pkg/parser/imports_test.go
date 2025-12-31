@@ -253,8 +253,9 @@ import "./utils"
   name: str!
 }
 
-@ GET /users
+@ GET /users {
   > {status: "ok"}
+}
 `
 	lexer := NewLexer(input)
 	tokens, err := lexer.Tokenize()

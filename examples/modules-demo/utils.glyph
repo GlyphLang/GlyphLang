@@ -2,23 +2,28 @@
 module "utils"
 
 # Get all users from the database
-! getAllUsers(db: Database): [User]
+! getAllUsers(db: Database): [User] {
   $ users = db.users.all()
   > users
+}
 
 # Get a user by ID
-! getUserById(db: Database, id: int): User?
+! getUserById(db: Database, id: int): User? {
   $ user = db.users.find(id)
   > user
+}
 
 # Format a user's display name
-! formatDisplayName(firstName: str, lastName: str): str
+! formatDisplayName(firstName: str, lastName: str): str {
   > firstName + " " + lastName
+}
 
 # Calculate user age from birth year
-! calculateAge(birthYear: int, currentYear: int): int
+! calculateAge(birthYear: int, currentYear: int): int {
   > currentYear - birthYear
+}
 
 # Check if user is an adult
-! isAdult(age: int): bool
+! isAdult(age: int): bool {
   > age >= 18
+}

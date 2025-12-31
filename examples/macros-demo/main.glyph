@@ -17,18 +17,22 @@ macro! log(level, msg) {
 # Define a CRUD macro that generates multiple routes
 # This is useful for generating boilerplate code
 macro! crud(resource) {
-    @ GET /${resource}
+    @ GET /${resource} {
         > db.query("SELECT * FROM ${resource}")
+    }
 
-    @ GET /${resource}/:id
+    @ GET /${resource}/:id {
         > db.query("SELECT * FROM ${resource} WHERE id = ?", id)
+    }
 
-    @ POST /${resource}
+    @ POST /${resource} {
         $ result = db.insert("${resource}", input)
         > { id: result.lastInsertId }
+    }
 
-    @ DELETE /${resource}/:id
+    @ DELETE /${resource}/:id {
         > db.query("DELETE FROM ${resource} WHERE id = ?", id)
+    }
 }
 
 # Define a validation macro
@@ -66,17 +70,19 @@ crud!(users)
 crud!(posts)
 
 # Custom endpoint that uses other macros
-@ GET /admin/stats
+@ GET /admin/stats {
     + auth(jwt)
     require_auth!("admin")
     $ userCount = db.query("SELECT COUNT(*) FROM users")
     $ postCount = db.query("SELECT COUNT(*) FROM posts")
     json_response!({ users: userCount, posts: postCount }, 200)
+}
 
 # Endpoint with logging and validation
-@ POST /feedback
+@ POST /feedback {
     validate_required!(input.email)
     validate_required!(input.message)
     log!("INFO", "New feedback from " + input.email)
     $ result = db.insert("feedback", input)
     json_response!({ success: true, id: result.lastInsertId }, 201)
+}

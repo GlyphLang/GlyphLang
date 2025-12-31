@@ -8,7 +8,7 @@ import (
 )
 
 func TestNewValidator(t *testing.T) {
-	source := "@ GET /hello\n  > {message: \"Hello\"}"
+	source := "@ GET /hello {\n  > {message: \"Hello\"}\n}"
 	v := NewValidator(source, "test.glyph")
 
 	if v == nil {
@@ -20,8 +20,8 @@ func TestNewValidator(t *testing.T) {
 	if v.filePath != "test.glyph" {
 		t.Error("filePath not set correctly")
 	}
-	if len(v.lines) != 2 {
-		t.Errorf("expected 2 lines, got %d", len(v.lines))
+	if len(v.lines) != 3 {
+		t.Errorf("expected 3 lines, got %d", len(v.lines))
 	}
 }
 
@@ -32,9 +32,10 @@ func TestValidateValidSource(t *testing.T) {
   name: string!
 }
 
-@ GET /users/:id -> User
+@ GET /users/:id -> User {
   $ user = db.find(id)
   > user
+}
 `
 	v := NewValidator(source, "test.glyph")
 	result := v.Validate()
@@ -52,7 +53,7 @@ func TestValidateValidSource(t *testing.T) {
 
 func TestValidateLexerError(t *testing.T) {
 	// Unterminated string
-	source := `@ GET /test
+	source := `@ GET /test {
   $ message = "unterminated`
 
 	v := NewValidator(source, "test.glyph")
@@ -120,8 +121,9 @@ func TestValidateDuplicateType(t *testing.T) {
 
 func TestValidateUndefinedType(t *testing.T) {
 	source := `
-@ GET /users -> NonExistentType
+@ GET /users -> NonExistentType {
   > {}
+}
 `
 	v := NewValidator(source, "test.glyph")
 	result := v.Validate()
@@ -144,8 +146,9 @@ func TestValidateUndefinedType(t *testing.T) {
 
 func TestValidateInvalidRoutePath(t *testing.T) {
 	source := `
-@ GET users
+@ GET users {
   > {}
+}
 `
 	v := NewValidator(source, "test.glyph")
 	result := v.Validate()
@@ -168,11 +171,13 @@ func TestValidateInvalidRoutePath(t *testing.T) {
 
 func TestValidateDuplicateRoute(t *testing.T) {
 	source := `
-@ GET /users
+@ GET /users {
   > {}
+}
 
-@ GET /users
+@ GET /users {
   > {}
+}
 `
 	v := NewValidator(source, "test.glyph")
 	result := v.Validate()
@@ -195,8 +200,9 @@ func TestValidateDuplicateRoute(t *testing.T) {
 
 func TestValidateDuplicatePathParam(t *testing.T) {
 	source := `
-@ GET /users/:id/posts/:id
+@ GET /users/:id/posts/:id {
   > {}
+}
 `
 	v := NewValidator(source, "test.glyph")
 	result := v.Validate()
@@ -225,8 +231,9 @@ func TestValidateBuiltinTypes(t *testing.T) {
   data: any!
 }
 
-@ GET /test -> Response
+@ GET /test -> Response {
   > {}
+}
 `
 	v := NewValidator(source, "test.glyph")
 	result := v.Validate()
@@ -293,9 +300,10 @@ func TestValidateFunction(t *testing.T) {
   id: int!
 }
 
-! getUser(id: int!): User
+! getUser(id: int!): User {
   $ user = db.find(id)
   > user
+}
 `
 	v := NewValidator(source, "test.glyph")
 	result := v.Validate()
@@ -310,8 +318,9 @@ func TestValidateFunction(t *testing.T) {
 
 func TestValidateFunctionUndefinedReturnType(t *testing.T) {
 	source := `
-! getUser(id: int!): NonExistent
+! getUser(id: int!): NonExistent {
   > {}
+}
 `
 	v := NewValidator(source, "test.glyph")
 	result := v.Validate()
@@ -323,8 +332,9 @@ func TestValidateFunctionUndefinedReturnType(t *testing.T) {
 
 func TestValidateFunctionUndefinedParamType(t *testing.T) {
 	source := `
-! process(data: UnknownType!): string
+! process(data: UnknownType!): string {
   > "done"
+}
 `
 	v := NewValidator(source, "test.glyph")
 	result := v.Validate()
@@ -617,14 +627,17 @@ func TestValidateComplexFile(t *testing.T) {
   success: bool!
 }
 
-@ GET /users
+@ GET /users {
   > []
+}
 
-@ GET /users/:id
+@ GET /users/:id {
   > {}
+}
 
-@ POST /users
+@ POST /users {
   > {}
+}
 `
 	v := NewValidator(source, "complex.glyph")
 	result := v.Validate()
@@ -753,10 +766,11 @@ func TestValidationErrorFields(t *testing.T) {
 
 func TestValidateWithDatabaseType(t *testing.T) {
 	source := `
-@ GET /data
+@ GET /data {
   % db: Database
   $ result = db.query("SELECT * FROM data")
   > result
+}
 `
 	v := NewValidator(source, "test.glyph")
 	result := v.Validate()

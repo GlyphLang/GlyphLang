@@ -60,7 +60,7 @@
 }
 
 # Public endpoint - no auth required
-@ GET /api/health
+@ GET /api/health {
   + ratelimit(1000/min)
 
   > {
@@ -68,9 +68,10 @@
     timestamp: now(),
     version: "1.0.0"
   }
+}
 
 # Register new user
-@ POST /api/auth/register -> AuthResponse
+@ POST /api/auth/register -> AuthResponse {
   + ratelimit(10/min)
   % db: Database
 
@@ -160,9 +161,10 @@
       }
     }
   }
+}
 
 # Login endpoint
-@ POST /api/auth/login -> AuthResponse
+@ POST /api/auth/login -> AuthResponse {
   + ratelimit(20/min)
   % db: Database
 
@@ -232,9 +234,10 @@
       }
     }
   }
+}
 
 # Logout endpoint (client-side token removal, server can blacklist if needed)
-@ POST /api/auth/logout -> ApiResponse
+@ POST /api/auth/logout -> ApiResponse {
   + auth(jwt)
   + ratelimit(50/min)
 
@@ -246,9 +249,10 @@
     message: "Logged out successfully",
     data: null
   }
+}
 
 # Get current user profile (protected route)
-@ GET /api/auth/me -> UserProfile
+@ GET /api/auth/me -> UserProfile {
   + auth(jwt)
   + ratelimit(100/min)
   % db: Database
@@ -276,9 +280,10 @@
       created_at: user.created_at
     }
   }
+}
 
 # Update user profile (protected route)
-@ PUT /api/auth/profile -> ApiResponse
+@ PUT /api/auth/profile -> ApiResponse {
   + auth(jwt)
   + ratelimit(30/min)
   % db: Database
@@ -323,9 +328,10 @@
       data: updated
     }
   }
+}
 
 # Change password (protected route)
-@ PUT /api/auth/password -> ApiResponse
+@ PUT /api/auth/password -> ApiResponse {
   + auth(jwt)
   + ratelimit(10/min)
   % db: Database
@@ -370,9 +376,10 @@
       }
     }
   }
+}
 
 # Refresh JWT token (protected route)
-@ POST /api/auth/refresh -> TokenRefreshResponse
+@ POST /api/auth/refresh -> TokenRefreshResponse {
   + auth(jwt)
   + ratelimit(50/min)
 
@@ -394,9 +401,10 @@
     token: newToken,
     expires_at: expiresAt
   }
+}
 
 # Admin-only endpoint - get all users
-@ GET /api/admin/users
+@ GET /api/admin/users {
   + auth(jwt, role: admin)
   + ratelimit(50/min)
   % db: Database
@@ -411,9 +419,10 @@
     users: allUsers,
     total: allUsers.length()
   }
+}
 
 # Admin-only endpoint - delete user
-@ DELETE /api/admin/users/:id -> ApiResponse
+@ DELETE /api/admin/users/:id -> ApiResponse {
   + auth(jwt, role: admin)
   + ratelimit(10/min)
   % db: Database
@@ -448,9 +457,10 @@
       }
     }
   }
+}
 
 # Moderator-only endpoint - update user role
-@ PUT /api/admin/users/:id/role -> ApiResponse
+@ PUT /api/admin/users/:id/role -> ApiResponse {
   + auth(jwt, role: moderator)
   + ratelimit(20/min)
   % db: Database
@@ -506,3 +516,4 @@
       }
     }
   }
+}

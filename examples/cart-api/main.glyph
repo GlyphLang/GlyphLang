@@ -65,7 +65,7 @@
 }
 
 # Get all products with optional category filtering
-@ GET /api/products -> ProductList
+@ GET /api/products -> ProductList {
   + ratelimit(100/min)
   % db: Database
 
@@ -86,9 +86,10 @@
     total: total,
     category: category
   }
+}
 
 # Get product by ID
-@ GET /api/products/:id -> Product
+@ GET /api/products/:id -> Product {
   + ratelimit(200/min)
   % db: Database
 
@@ -103,9 +104,10 @@
   } else {
     > product
   }
+}
 
 # Get user's shopping cart
-@ GET /api/cart -> Cart
+@ GET /api/cart -> Cart {
   + auth(jwt)
   + ratelimit(100/min)
   % db: Database
@@ -131,9 +133,10 @@
   } else {
     > cart[0]
   }
+}
 
 # Add item to cart
-@ POST /api/cart/items -> CartResponse
+@ POST /api/cart/items -> CartResponse {
   + auth(jwt)
   + ratelimit(50/min)
   % db: Database
@@ -215,9 +218,10 @@
       }
     }
   }
+}
 
 # Update cart item quantity
-@ PUT /api/cart/items/:product_id -> CartResponse
+@ PUT /api/cart/items/:product_id -> CartResponse {
   + auth(jwt)
   + ratelimit(50/min)
   % db: Database
@@ -287,9 +291,10 @@
       }
     }
   }
+}
 
 # Remove item from cart
-@ DELETE /api/cart/items/:product_id -> CartResponse
+@ DELETE /api/cart/items/:product_id -> CartResponse {
   + auth(jwt)
   + ratelimit(50/min)
   % db: Database
@@ -329,9 +334,10 @@
       cart: updated
     }
   }
+}
 
 # Clear entire cart
-@ DELETE /api/cart/clear -> CartResponse
+@ DELETE /api/cart/clear -> CartResponse {
   + auth(jwt)
   + ratelimit(20/min)
   % db: Database
@@ -362,9 +368,10 @@
       cart: updated
     }
   }
+}
 
 # Apply discount code
-@ POST /api/cart/discount -> CartResponse
+@ POST /api/cart/discount -> CartResponse {
   + auth(jwt)
   + ratelimit(30/min)
   % db: Database
@@ -433,9 +440,10 @@
       }
     }
   }
+}
 
 # Checkout - create order from cart
-@ POST /api/cart/checkout -> ApiResponse
+@ POST /api/cart/checkout -> ApiResponse {
   + auth(jwt)
   + ratelimit(10/min)
   % db: Database
@@ -488,9 +496,10 @@
       }
     }
   }
+}
 
 # Get product categories
-@ GET /api/categories
+@ GET /api/categories {
   + ratelimit(100/min)
   % db: Database
 
@@ -506,3 +515,4 @@
     categories: categories,
     total: 5
   }
+}

@@ -430,8 +430,9 @@ func TestCompilerBasicFlow(t *testing.T) {
 	helper := NewTestHelper(t)
 
 	// Test with minimal valid program
-	source := `@ GET /test
-  > {status: "ok"}`
+	source := `@ GET /test {
+  > {status: "ok"}
+}`
 
 	module, err := parseSourceE2E(source)
 	if err != nil {
@@ -457,8 +458,9 @@ func TestVMBasicFlow(t *testing.T) {
 	helper := NewTestHelper(t)
 
 	// Use compiler to generate valid bytecode from simple source
-	source := `@ GET /test
-  > {status: "ok"}`
+	source := `@ GET /test {
+  > {status: "ok"}
+}`
 
 	module, err := parseSourceE2E(source)
 	if err != nil {

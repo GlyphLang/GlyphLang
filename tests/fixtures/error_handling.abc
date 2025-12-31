@@ -8,7 +8,8 @@
   data: str!
 }
 
-@ route /api/data/:id -> DataResponse
+@ GET /api/data/:id -> DataResponse {
   % db: Database
   $ result = db.data.get(id)
   > result
+}

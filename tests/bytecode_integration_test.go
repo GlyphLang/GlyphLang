@@ -14,8 +14,9 @@ import (
 
 // TestCompileHelloWorld tests compiling a simple hello-world route to bytecode
 func TestCompileHelloWorld(t *testing.T) {
-	source := `@ GET /hello
-  > {message: "Hello, World!"}`
+	source := `@ GET /hello {
+  > {message: "Hello, World!"}
+}`
 
 	// Parse source to module
 	module, err := parseSource(source)
@@ -49,8 +50,9 @@ func TestCompileHelloWorld(t *testing.T) {
 
 // TestExecuteBytecode tests executing bytecode with the VM
 func TestExecuteBytecode(t *testing.T) {
-	source := `@ GET /hello
-  > {message: "Hello, World!"}`
+	source := `@ GET /hello {
+  > {message: "Hello, World!"}
+}`
 
 	// Parse source to module
 	module, err := parseSource(source)
@@ -90,8 +92,9 @@ func TestExecuteBytecode(t *testing.T) {
 
 // TestCompareInterpreterVsBytecode tests that interpreter and bytecode produce same results
 func TestCompareInterpreterVsBytecode(t *testing.T) {
-	source := `@ GET /hello
-  > {message: "Hello, World!"}`
+	source := `@ GET /hello {
+  > {message: "Hello, World!"}
+}`
 
 	// Parse with interpreter
 	lexer := parser.NewLexer(source)
@@ -165,11 +168,12 @@ func TestCompareInterpreterVsBytecode(t *testing.T) {
 
 // TestBenchmarkInterpreterVsBytecode benchmarks interpreter vs bytecode execution
 func TestBenchmarkInterpreterVsBytecode(t *testing.T) {
-	source := `@ GET /api/users/:id
+	source := `@ GET /api/users/:id {
   + auth(jwt)
   % db: Database
   $ user = db.users.get(id)
-  > user`
+  > user
+}`
 
 	iterations := 100
 
@@ -236,21 +240,24 @@ func TestCompilationSpeed(t *testing.T) {
   email: str!
 }
 
-@ GET /api/users -> List[User]
+@ GET /api/users -> List[User] {
   + auth(jwt)
   + ratelimit(100/min)
   % db: Database
   $ users = db.users.all()
   > users
+}
 
-@ GET /api/users/:id -> User
+@ GET /api/users/:id -> User {
   + auth(jwt)
   % db: Database
   $ user = db.users.get(id)
   > user
+}
 
-@ GET /health
+@ GET /health {
   > {status: "ok"}
+}
 `
 
 	// Parse source to module
@@ -327,8 +334,9 @@ func TestRoundTrip(t *testing.T) {
 
 // TestCompileAndSaveBytecode tests the full compile workflow
 func TestCompileAndSaveBytecode(t *testing.T) {
-	source := `@ GET /test
-  > {status: "ok"}`
+	source := `@ GET /test {
+  > {status: "ok"}
+}`
 
 	// Create temp directory
 	tmpDir := t.TempDir()
@@ -383,8 +391,9 @@ func TestCompileAndSaveBytecode(t *testing.T) {
 
 // TestVMPerformanceTarget tests that VM execution meets performance targets
 func TestVMPerformanceTarget(t *testing.T) {
-	source := `@ GET /hello
-  > {message: "Hello!"}`
+	source := `@ GET /hello {
+  > {message: "Hello!"}
+}`
 
 	// Parse source to module
 	module, err := parseSource(source)
