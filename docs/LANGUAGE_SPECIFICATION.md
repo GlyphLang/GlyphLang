@@ -336,13 +336,14 @@ Route definitions create HTTP endpoints.
 
 **Syntax:**
 ```
-"@" "route" path [ "[" method "]" ] [ "->" returnType ]
+"@" "route" path [ "[" method "]" ] [ "->" returnType ] "{"
   [ middlewares ]
   [ injections ]
   body
+"}"
 ```
 
-Or block syntax:
+All routes require braces:
 ```
 "@" method path "{" body "}"
 ```
@@ -350,14 +351,16 @@ Or block syntax:
 **Examples:**
 ```glyph
 # Basic route
-@ route /api/health
+@ route /api/health {
   > {status: "ok"}
+}
 
 # Route with method and return type
-@ route /api/users/:id [GET] -> User
+@ route /api/users/:id [GET] -> User {
   % db: Database
   $ user = db.users.get(id)
   > user
+}
 
 # Block syntax
 @ GET /api/info {
@@ -900,16 +903,24 @@ Routes are defined with paths that can include static segments and parameters.
 
 ```glyph
 # Static path
-@ route /api/health
+@ route /api/health {
+  > {status: "ok"}
+}
 
 # Path with parameter
-@ route /api/users/:id
+@ route /api/users/:id {
+  > {id: id}
+}
 
 # Multiple parameters
-@ route /api/users/:userId/posts/:postId
+@ route /api/users/:userId/posts/:postId {
+  > {userId: userId, postId: postId}
+}
 
 # Hyphenated segments
-@ route /api/order-status/:orderId
+@ route /api/order-status/:orderId {
+  > {orderId: orderId}
+}
 ```
 
 ### 6.2 HTTP Methods
@@ -918,11 +929,21 @@ Specify HTTP methods using bracket notation or method keywords.
 
 **Bracket Syntax:**
 ```glyph
-@ route /api/users [GET]
-@ route /api/users [POST]
-@ route /api/users/:id [PUT]
-@ route /api/users/:id [PATCH]
-@ route /api/users/:id [DELETE]
+@ route /api/users [GET] {
+  > {users: []}
+}
+@ route /api/users [POST] {
+  > {created: true}
+}
+@ route /api/users/:id [PUT] {
+  > {updated: true}
+}
+@ route /api/users/:id [PATCH] {
+  > {patched: true}
+}
+@ route /api/users/:id [DELETE] {
+  > {deleted: true}
+}
 ```
 
 **Method Keyword Syntax:**
@@ -946,15 +967,17 @@ Supported methods:
 Path parameters are denoted with a colon prefix and are available as variables in the route body.
 
 ```glyph
-@ route /api/users/:id [GET]
+@ route /api/users/:id [GET] {
   % db: Database
   $ user = db.users.get(id)  # 'id' is the path parameter
   > user
+}
 
-@ route /api/users/:userId/posts/:postId [GET]
+@ route /api/users/:userId/posts/:postId [GET] {
   % db: Database
   $ post = db.posts.getByUserAndId(userId, postId)
   > post
+}
 ```
 
 ### 6.4 Query Parameters
@@ -962,11 +985,12 @@ Path parameters are denoted with a colon prefix and are available as variables i
 Query parameters are accessed via the `input` object.
 
 ```glyph
-@ route /api/search [GET]
+@ route /api/search [GET] {
   $ query = input.q          # ?q=search+term
   $ page = input.page        # ?page=1
   $ limit = input.limit      # ?limit=20
   > {query: query, page: page, limit: limit}
+}
 ```
 
 ### 6.5 Request Body
@@ -974,11 +998,12 @@ Query parameters are accessed via the `input` object.
 Request body data is accessed via the `input` object for POST, PUT, and PATCH requests.
 
 ```glyph
-@ route /api/users [POST]
+@ route /api/users [POST] {
   $ username = input.username
   $ email = input.email
   $ password = input.password
   > {created: true}
+}
 ```
 
 ### 6.6 Return Types
@@ -986,18 +1011,21 @@ Request body data is accessed via the `input` object for POST, PUT, and PATCH re
 Specify the return type using the arrow syntax.
 
 ```glyph
-@ route /api/users/:id [GET] -> User
+@ route /api/users/:id [GET] -> User {
   % db: Database
   $ user = db.users.get(id)
   > user
+}
 
-@ route /api/users [GET] -> List[User]
+@ route /api/users [GET] -> List[User] {
   % db: Database
   $ users = db.users.all()
   > users
+}
 
-@ route /api/auth/login [POST] -> AuthResponse | Error
+@ route /api/auth/login [POST] -> AuthResponse | Error {
   # ...
+}
 ```
 
 ---
@@ -1016,19 +1044,22 @@ Require authentication for a route.
 **Examples:**
 ```glyph
 # Basic JWT authentication
-@ route /api/users [GET]
+@ route /api/users [GET] {
   + auth(jwt)
   > {users: []}
+}
 
 # Role-based authentication
-@ route /api/admin/users [GET]
+@ route /api/admin/users [GET] {
   + auth(jwt, role: admin)
   > {users: []}
+}
 
 # Moderator access
-@ route /api/posts/:id [DELETE]
+@ route /api/posts/:id [DELETE] {
   + auth(jwt, role: moderator)
   > {deleted: true}
+}
 ```
 
 When auth middleware is applied, the `auth` object is available with user information:
@@ -1054,17 +1085,20 @@ Limit request frequency.
 
 **Examples:**
 ```glyph
-@ route /api/search [GET]
+@ route /api/search [GET] {
   + ratelimit(10/sec)        # 10 requests per second
   > {results: []}
+}
 
-@ route /api/users [GET]
+@ route /api/users [GET] {
   + ratelimit(100/min)       # 100 requests per minute
   > {users: []}
+}
 
-@ route /api/export [POST]
+@ route /api/export [POST] {
   + ratelimit(5/hour)        # 5 requests per hour
   > {exported: true}
+}
 ```
 
 ### 7.3 Combining Middleware
@@ -1072,12 +1106,13 @@ Limit request frequency.
 Multiple middleware can be applied to a single route.
 
 ```glyph
-@ route /api/admin/reports [GET]
+@ route /api/admin/reports [GET] {
   + auth(jwt, role: admin)
   + ratelimit(50/min)
   % db: Database
   $ reports = db.reports.all()
   > reports
+}
 ```
 
 ---
@@ -1095,17 +1130,19 @@ Inject services into routes using the `%` symbol.
 
 **Examples:**
 ```glyph
-@ route /api/users [GET]
+@ route /api/users [GET] {
   % db: Database
   $ users = db.users.all()
   > users
+}
 
 # Multiple injections
-@ route /api/checkout [POST]
+@ route /api/checkout [POST] {
   % db: Database
   % cache: Cache
   % payment: PaymentService
   # ...
+}
 ```
 
 ### 8.2 Database Operations
@@ -1317,8 +1354,7 @@ TypeDef     = ":" Identifier "{" Field* "}"
             | "type" Identifier "{" Field* "}"
 Field       = Identifier ":" Type ["!"]
 
-Route       = "@" "route" Path ["[" Method "]"] ["->" Type]
-              Middleware* Injection* Statement*
+Route       = "@" "route" Path ["[" Method "]"] ["->" Type] "{" Middleware* Injection* Statement* "}"
             | "@" Method Path "{" Statement* "}"
 
 Command     = "!" Identifier [String] Param* ["->" Type] "{" Statement* "}"
@@ -1392,20 +1428,22 @@ String      = '"' Character* '"' | "'" Character* "'"
 }
 
 # Health check
-@ route /api/health [GET]
+@ route /api/health [GET] {
   > {status: "ok", timestamp: now()}
+}
 
 # Get all users
-@ route /api/users [GET]
+@ route /api/users [GET] {
   + auth(jwt)
   + ratelimit(100/min)
   % db: Database
 
   $ users = db.users.all()
   > {users: users, count: users.length()}
+}
 
 # Get user by ID
-@ route /api/users/:id [GET]
+@ route /api/users/:id [GET] {
   + auth(jwt)
   % db: Database
 
@@ -1415,9 +1453,10 @@ String      = '"' Character* '"' | "'" Character* "'"
   } else {
     > user
   }
+}
 
 # Create user
-@ route /api/users [POST]
+@ route /api/users [POST] {
   + auth(jwt, role: admin)
   + ratelimit(10/min)
   % db: Database
@@ -1432,9 +1471,10 @@ String      = '"' Character* '"' | "'" Character* "'"
     created_at: now()
   })
   > {success: true, user: user}
+}
 
 # Update user
-@ route /api/users/:id [PUT]
+@ route /api/users/:id [PUT] {
   + auth(jwt)
   % db: Database
 
@@ -1448,9 +1488,10 @@ String      = '"' Character* '"' | "'" Character* "'"
     })
     > {success: true, user: updated}
   }
+}
 
 # Delete user
-@ route /api/users/:id [DELETE]
+@ route /api/users/:id [DELETE] {
   + auth(jwt, role: admin)
   % db: Database
 
@@ -1461,6 +1502,7 @@ String      = '"' Character* '"' | "'" Character* "'"
     $ result = db.users.delete(id)
     > {success: true, message: "User deleted"}
   }
+}
 ```
 
 ### 13.2 Event-Driven Example

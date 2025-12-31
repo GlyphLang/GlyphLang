@@ -23,9 +23,10 @@ Java:   @GetMapping("/users/{id}")...  (74 tokens)
 - More context (fit more business logic in context windows)
 
 ```glyph
-@ GET /hello/:name
+@ GET /hello/:name {
   $ greeting = "Hello, " + name + "!"
   > {message: greeting}
+}
 ```
 
 ## Features
@@ -99,11 +100,13 @@ cd GlyphLang && go build -o glyph ./cmd/glyph
 Create `hello.glyph`:
 
 ```glyph
-@ GET /hello
+@ GET /hello {
   > {message: "Hello, World!"}
+}
 
-@ GET /greet/:name
+@ GET /greet/:name {
   > {message: "Hello, " + name + "!"}
+}
 ```
 
 Run it:
@@ -136,7 +139,7 @@ Visit http://localhost:3000/hello
 ### Routes with Authentication
 
 ```glyph
-@ GET /api/users/:id -> User | Error
+@ GET /api/users/:id -> User | Error {
   + auth(jwt)
   + ratelimit(100/min)
   % db: Database
@@ -146,12 +149,13 @@ Visit http://localhost:3000/hello
     > {error: "User not found", code: 404}
   }
   > user
+}
 ```
 
 ### Pattern Matching
 
 ```glyph
-@ GET /status/:code
+@ GET /status/:code {
   $ result = match code {
     200 => "OK"
     201 => "Created"
@@ -161,13 +165,14 @@ Visit http://localhost:3000/hello
     _ => "Unknown"
   }
   > {status: code, message: result}
+}
 ```
 
 ### Async/Await
 
 ```glyph
 # Basic async block - executes in background, returns Future
-@ GET /compute
+@ GET /compute {
   $ future = async {
     $ x = 10
     $ y = 20
@@ -175,9 +180,10 @@ Visit http://localhost:3000/hello
   }
   $ result = await future
   > {value: result}
+}
 
 # Parallel execution - all requests run concurrently
-@ GET /dashboard
+@ GET /dashboard {
   $ userFuture = async { > db.getUser(userId) }
   $ ordersFuture = async { > db.getOrders(userId) }
   $ statsFuture = async { > db.getStats(userId) }
@@ -188,6 +194,7 @@ Visit http://localhost:3000/hello
   $ stats = await statsFuture
 
   > {user: user, orders: orders, stats: stats}
+}
 ```
 
 ### Generics
@@ -222,23 +229,27 @@ Visit http://localhost:3000/hello
 # main.glyph
 import "./utils"
 
-@ GET /user/:id
+@ GET /user/:id {
   $ name = utils.formatName(user.first, user.last)
   > {displayName: name}
+}
 ```
 
 ### Macros
 
 ```glyph
 macro! crud(resource) {
-  @ GET /${resource}
+  @ GET /${resource} {
     > db.query("SELECT * FROM ${resource}")
+  }
 
-  @ GET /${resource}/:id
+  @ GET /${resource}/:id {
     > db.query("SELECT * FROM ${resource} WHERE id = ?", id)
+  }
 
-  @ POST /${resource}
+  @ POST /${resource} {
     > db.insert("${resource}", input)
+  }
 }
 
 crud!(users)

@@ -102,18 +102,21 @@ Open `main.glyph` and replace its contents with:
 # My First GlyphLang API
 # A simple hello world example
 
-@ route /
+@ route / {
   > {
     message: "Hello, World!",
     status: "ok"
   }
+}
 
-@ route /hello/:name
+@ route /hello/:name {
   $ greeting = "Hello, " + name + "!"
   > {message: greeting}
+}
 
-@ route /health
+@ route /health {
   > {status: "healthy"}
+}
 ```
 
 ### Understanding the Syntax
@@ -217,7 +220,7 @@ Add the following routes to your file:
 
 ```glyph
 # Get all todos
-@ route /api/todos [GET] -> TodoListResponse
+@ route /api/todos [GET] -> TodoListResponse {
   + ratelimit(100/min)
   % db: Database
 
@@ -229,9 +232,10 @@ Add the following routes to your file:
     todos: todos,
     total: total
   }
+}
 
 # Get a single todo by ID
-@ route /api/todos/:id [GET] -> TodoResponse
+@ route /api/todos/:id [GET] -> TodoResponse {
   + ratelimit(200/min)
   % db: Database
 
@@ -250,9 +254,10 @@ Add the following routes to your file:
       todo: todo
     }
   }
+}
 
 # Create a new todo
-@ route /api/todos [POST] -> TodoResponse
+@ route /api/todos [POST] -> TodoResponse {
   + ratelimit(50/min)
   % db: Database
 
@@ -280,9 +285,10 @@ Add the following routes to your file:
       todo: saved
     }
   }
+}
 
 # Update a todo
-@ route /api/todos/:id [PUT] -> TodoResponse
+@ route /api/todos/:id [PUT] -> TodoResponse {
   + ratelimit(50/min)
   % db: Database
 
@@ -315,9 +321,10 @@ Add the following routes to your file:
       todo: updated
     }
   }
+}
 
 # Delete a todo
-@ route /api/todos/:id [DELETE] -> TodoResponse
+@ route /api/todos/:id [DELETE] -> TodoResponse {
   + ratelimit(50/min)
   % db: Database
 
@@ -338,6 +345,7 @@ Add the following routes to your file:
       todo: todo
     }
   }
+}
 ```
 
 ### Understanding Route Syntax
@@ -408,7 +416,7 @@ Add these types to your file:
 
 ```glyph
 # Login endpoint (public)
-@ route /api/auth/login [POST] -> AuthResponse
+@ route /api/auth/login [POST] -> AuthResponse {
   + ratelimit(20/min)
   % db: Database
 
@@ -459,6 +467,7 @@ Add these types to your file:
       }
     }
   }
+}
 ```
 
 ### Step 3: Protect Routes with JWT
@@ -467,7 +476,7 @@ Add the `+ auth(jwt)` middleware to protect routes:
 
 ```glyph
 # Protected route - requires valid JWT token
-@ route /api/todos [POST] -> TodoResponse
+@ route /api/todos [POST] -> TodoResponse {
   + auth(jwt)
   + ratelimit(50/min)
   % db: Database
@@ -475,6 +484,7 @@ Add the `+ auth(jwt)` middleware to protect routes:
   # ... rest of the handler
   # The authenticated user is available via auth.user
   $ userId = auth.user.id
+}
 ```
 
 ### Step 4: Role-Based Access Control
@@ -483,7 +493,7 @@ For admin-only routes, specify the required role:
 
 ```glyph
 # Admin only - delete any todo
-@ route /api/admin/todos/:id [DELETE] -> TodoResponse
+@ route /api/admin/todos/:id [DELETE] -> TodoResponse {
   + auth(jwt, role: admin)
   + ratelimit(10/min)
   % db: Database
@@ -505,6 +515,7 @@ For admin-only routes, specify the required role:
       todo: todo
     }
   }
+}
 ```
 
 ### Step 5: Handle Unauthorized Access
@@ -639,7 +650,7 @@ $ nextId = db.users.nextId()
 }
 
 # Get all users
-@ route /api/users [GET] -> UserListResponse
+@ route /api/users [GET] -> UserListResponse {
   + ratelimit(100/min)
   % db: Database
 
@@ -651,9 +662,10 @@ $ nextId = db.users.nextId()
     users: users,
     total: total
   }
+}
 
 # Get active users only
-@ route /api/users/active [GET] -> UserListResponse
+@ route /api/users/active [GET] -> UserListResponse {
   + ratelimit(100/min)
   % db: Database
 
@@ -665,9 +677,10 @@ $ nextId = db.users.nextId()
     users: activeUsers,
     total: total
   }
+}
 
 # Search users by username
-@ route /api/users/search/:query [GET] -> UserListResponse
+@ route /api/users/search/:query [GET] -> UserListResponse {
   + ratelimit(100/min)
   % db: Database
 
@@ -685,9 +698,10 @@ $ nextId = db.users.nextId()
     users: results,
     total: results.length()
   }
+}
 
 # Create a new user
-@ route /api/users [POST] -> UserResponse
+@ route /api/users [POST] -> UserResponse {
   + auth(jwt)
   + ratelimit(50/min)
   % db: Database
@@ -725,6 +739,7 @@ $ nextId = db.users.nextId()
       }
     }
   }
+}
 ```
 
 ---

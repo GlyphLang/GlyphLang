@@ -63,36 +63,49 @@ GlyphLang uses symbolic tokens instead of English keywords for efficiency and la
 ### Basic Route
 
 ```glyph
-@ route /api/users/:id -> User | Error
+@ route /api/users/:id -> User | Error {
   % db: Database
   $ user = db.users.get(id)
   > user
+}
 ```
 
 ### HTTP Methods
 
 ```glyph
-@ route /api/users [GET]       # GET request
-@ route /api/users [POST]      # POST request
-@ route /api/users/:id [PUT]   # PUT request
-@ route /api/users/:id [DELETE] # DELETE request
+@ route /api/users [GET] {       # GET request
+  > {users: []}
+}
+@ route /api/users [POST] {      # POST request
+  > {created: true}
+}
+@ route /api/users/:id [PUT] {   # PUT request
+  > {updated: true}
+}
+@ route /api/users/:id [DELETE] { # DELETE request
+  > {deleted: true}
+}
 ```
 
 ### Authentication
 
 ```glyph
-@ route /api/admin/users
+@ route /api/admin/users {
   + auth(jwt)                  # Require JWT
   + auth(jwt, role: admin)     # Require admin role
+  > {users: []}
+}
 ```
 
 ### Rate Limiting
 
 ```glyph
-@ route /api/search
+@ route /api/search {
   + ratelimit(10/sec)          # 10 requests per second
   + ratelimit(100/min)         # 100 requests per minute
   + ratelimit(1000/hour)       # 1000 requests per hour
+  > {results: []}
+}
 ```
 
 ## Database Operations
@@ -132,7 +145,7 @@ $ db.users.delete(id)
 ## Input Validation
 
 ```glyph
-@ route /api/users [POST]
+@ route /api/users [POST] {
   < input: CreateUserInput
   ! validate input {
     name: str(min=1, max=100)
@@ -142,6 +155,7 @@ $ db.users.delete(id)
   % db: Database
   $ user = db.users.create(input)
   > user
+}
 ```
 
 ## Functions
@@ -159,7 +173,7 @@ $ db.users.delete(id)
 ## Error Handling
 
 ```glyph
-@ route /api/users/:id
+@ route /api/users/:id {
   % db: Database
   try {
     $ user = db.users.get(id)
@@ -167,6 +181,7 @@ $ db.users.delete(id)
   } catch Error {
     > {error: "User not found"}
   }
+}
 ```
 
 ## CLI Commands
