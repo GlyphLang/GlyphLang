@@ -384,6 +384,44 @@ crud!(posts)
 }
 ```
 
+### CLI Commands (In-Language)
+
+```glyph
+# Simple command with required argument
+! hello name: str! {
+  $ greeting = "Hello, " + name + "!"
+  > {message: greeting}
+}
+
+# Command with multiple arguments
+! add a: int! b: int! {
+  $ result = a + b
+  > {sum: result}
+}
+
+# Command with optional flag
+! greet name: str! --formal: bool = false {
+  if formal {
+    > {greeting: "Good day, " + name}
+  } else {
+    > {greeting: "Hey " + name + "!"}
+  }
+}
+
+# Command with description
+! version "Show version information" {
+  > {name: "MyApp", version: "1.0.0"}
+}
+```
+
+Run commands with:
+```bash
+glyph exec app.glyph hello --name Alice
+glyph exec app.glyph add --a 5 --b 3
+glyph exec app.glyph greet --name Bob --formal
+glyph commands app.glyph  # List all commands
+```
+
 ## CLI Commands
 
 ### AI Agent Commands
