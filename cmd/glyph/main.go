@@ -31,7 +31,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var version = "0.1.6"
+var version = "0.1.7"
 
 func main() {
 	// Check if invoked with just a .glyph file (e.g., double-click on Windows)
