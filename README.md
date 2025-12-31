@@ -2,7 +2,7 @@
 
 [![AI Token Savings](https://img.shields.io/badge/AI%20tokens-45%25%20fewer%20than%20Python-blueviolet)]()
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)]()
-[![Tests](https://img.shields.io/badge/tests-3503%20passing-success)]()
+[![Tests](https://img.shields.io/badge/tests-3661%20passing-success)]()
 [![Coverage](https://img.shields.io/badge/coverage-80%25%2B-green)]()
 [![Version](https://img.shields.io/badge/version-v0.2.0-blue)](https://github.com/GlyphLang/GlyphLang/releases/latest)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
