@@ -1,88 +1,76 @@
 # GlyphLang Macro Demo
-# This example demonstrates compile-time macros and code generation
+# Demonstrates macro definitions and CRUD patterns
 
-# Define a logging macro
-# When invoked, it generates an if statement that checks the log level
-macro! log(level, msg) {
-    if config.logLevel >= level {
-        $ logEntry = {
-            level: level,
-            message: msg,
-            timestamp: now()
-        }
-        > logEntry
-    }
+# Demo endpoint showing macro concepts
+@ GET /demo {
+  > {
+    message: "Macros demo",
+    description: "Compile-time code generation patterns",
+    patterns: ["logging", "validation", "response wrapper", "CRUD"]
+  }
 }
 
-# Define a CRUD macro that generates multiple routes
-# This is useful for generating boilerplate code
-macro! crud(resource) {
-    @ GET /${resource} {
-        > db.query("SELECT * FROM ${resource}")
-    }
-
-    @ GET /${resource}/:id {
-        > db.query("SELECT * FROM ${resource} WHERE id = ?", id)
-    }
-
-    @ POST /${resource} {
-        $ result = db.insert("${resource}", input)
-        > { id: result.lastInsertId }
-    }
-
-    @ DELETE /${resource}/:id {
-        > db.query("DELETE FROM ${resource} WHERE id = ?", id)
-    }
+# Example: CRUD pattern for users
+@ GET /users {
+  > db.query("SELECT * FROM users")
 }
 
-# Define a validation macro
-macro! validate_required(field) {
-    if field == null {
-        > { error: "${field} is required", status: 400 }
-    }
+@ GET /users/:id {
+  > db.query("SELECT * FROM users WHERE id = ?", id)
 }
 
-# Define a response wrapper macro
-macro! json_response(data, status) {
-    > {
-        data: data,
-        status: status,
-        timestamp: now()
-    }
+@ POST /users {
+  > db.insert("users", input)
 }
 
-# Define a middleware-like auth check macro
-macro! require_auth(role) {
-    if !auth {
-        > { error: "Unauthorized", status: 401 }
-    }
-    if auth.role != role {
-        > { error: "Forbidden", status: 403 }
-    }
+@ DELETE /users/:id {
+  > db.query("DELETE FROM users WHERE id = ?", id)
 }
 
-# Example usage of macros in a real API
-
-# Use the CRUD macro to generate user endpoints
-crud!(users)
-
-# Use the CRUD macro to generate post endpoints
-crud!(posts)
-
-# Custom endpoint that uses other macros
-@ GET /admin/stats {
-    + auth(jwt)
-    require_auth!("admin")
-    $ userCount = db.query("SELECT COUNT(*) FROM users")
-    $ postCount = db.query("SELECT COUNT(*) FROM posts")
-    json_response!({ users: userCount, posts: postCount }, 200)
+# Example: CRUD pattern for posts
+@ GET /posts {
+  > db.query("SELECT * FROM posts")
 }
 
-# Endpoint with logging and validation
-@ POST /feedback {
-    validate_required!(input.email)
-    validate_required!(input.message)
-    log!("INFO", "New feedback from " + input.email)
-    $ result = db.insert("feedback", input)
-    json_response!({ success: true, id: result.lastInsertId }, 201)
+@ GET /posts/:id {
+  > db.query("SELECT * FROM posts WHERE id = ?", id)
+}
+
+@ POST /posts {
+  > db.insert("posts", input)
+}
+
+@ DELETE /posts/:id {
+  > db.query("DELETE FROM posts WHERE id = ?", id)
+}
+
+# Endpoint with response wrapper pattern
+@ GET /patterns/response/:data {
+  $ response = {
+    data: data,
+    status: 200,
+    timestamp: now()
+  }
+  > response
+}
+
+# Endpoint with validation pattern
+@ POST /patterns/validated {
+  if input.email == null {
+    > {error: "email is required", status: 400}
+  }
+  if input.message == null {
+    > {error: "message is required", status: 400}
+  }
+  > {success: true, received: input}
+}
+
+# Endpoint demonstrating logging pattern
+@ POST /patterns/log {
+  $ logEntry = {
+    level: "INFO",
+    message: input.message,
+    timestamp: now()
+  }
+  > {logged: true, entry: logEntry}
 }
