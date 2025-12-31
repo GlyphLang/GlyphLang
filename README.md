@@ -62,6 +62,32 @@ Java:   @GetMapping("/users/{id}")...  (74 tokens)
 - **[VS Code Extension](https://github.com/GlyphLang/vscode-glyph)** - syntax highlighting, error checking
 - **CLI** - compile, run, REPL, decompile, AI context commands
 
+## Symbol Reference
+
+GlyphLang uses symbols instead of keywords for token efficiency:
+
+| Symbol | Name | Usage | Example |
+|--------|------|-------|---------|
+| `@` | Route | HTTP endpoint definition | `@ GET /users` |
+| `:` | Type | Type definition | `: User { id: int }` |
+| `$` | Variable | Variable declaration | `$ name = "Alice"` |
+| `!` | Function | Function/CLI command definition | `! greet(name: string)` |
+| `>` | Return | Return statement | `> {message: "ok"}` |
+| `+` | Middleware | Apply middleware | `+ auth(jwt)` |
+| `%` | Inject | Dependency injection | `% db: Database` |
+| `?` | Optional | Optional type modifier | `email: string?` |
+| `*` | Cron | Scheduled task definition | `* "0 * * * *" cleanup` |
+| `~` | Event | Event handler definition | `~ user.created` |
+| `&` | Queue | Queue worker definition | `& emails processEmail` |
+| `#` | Comment | Single-line comment | `# This is a comment` |
+| `->` | Arrow | Return type annotation | `-> User` |
+| `\|` | Union | Union type separator | `string \| int` |
+
+**Type Modifiers:**
+- `T!` - Required (non-null)
+- `T?` - Optional (nullable)
+- `[T]` - Array of T
+
 ## Installation
 
 **Windows Installer (Recommended):**
