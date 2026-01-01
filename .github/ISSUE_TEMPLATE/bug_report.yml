@@ -1,0 +1,130 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the information below to help us investigate.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the bug
+      placeholder: Describe what happened...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this issue?
+      placeholder: |
+        1. Create a file with this code...
+        2. Run `glyph compile ...`
+        3. See error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: Describe what you expected...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: Describe what actually happened...
+    validations:
+      required: true
+
+  - type: textarea
+    id: code
+    attributes:
+      label: Code Sample
+      description: If applicable, provide a minimal code sample that reproduces the issue
+      render: glyph
+      placeholder: |
+        @ GET /example {
+          $ x = "test"
+          > {value: x}
+        }
+
+  - type: textarea
+    id: error
+    attributes:
+      label: Error Output
+      description: If applicable, paste the full error message or stack trace
+      render: shell
+
+  - type: dropdown
+    id: version
+    attributes:
+      label: GlyphLang Version
+      description: What version of GlyphLang are you using?
+      options:
+        - v0.2.1 (latest)
+        - v0.2.0
+        - v0.1.x
+        - Built from source
+        - Other (specify in description)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - Windows
+        - macOS (Intel)
+        - macOS (Apple Silicon)
+        - Linux
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of GlyphLang is affected?
+      options:
+        - Compiler
+        - Parser
+        - VM / Runtime
+        - CLI
+        - LSP Server
+        - Database
+        - HTTP Server
+        - WebSocket
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other information that might help us investigate
+      placeholder: Add any other context, screenshots, or related issues...
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues to ensure this bug hasn't been reported
+          required: true
+        - label: I have tested with the latest version
+          required: false

@@ -1,0 +1,107 @@
+name: Feature Request
+description: Suggest a new feature or enhancement
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Please provide as much detail as possible.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Feature Summary
+      description: A brief summary of the feature you'd like to see
+      placeholder: Describe the feature in one or two sentences...
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve? What use case does it address?
+      placeholder: |
+        I want to be able to...
+        Currently, I have to...
+        This would help when...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: How do you think this should work?
+      placeholder: Describe your ideal solution...
+    validations:
+      required: true
+
+  - type: textarea
+    id: syntax
+    attributes:
+      label: Proposed Syntax (if applicable)
+      description: If this involves new syntax, show what it might look like
+      render: glyph
+      placeholder: |
+        # Example of proposed syntax
+        @ GET /example {
+          # new feature here
+        }
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: What other solutions have you considered?
+      placeholder: Describe any alternative approaches...
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of GlyphLang would this affect?
+      options:
+        - Language / Syntax
+        - Compiler
+        - VM / Runtime
+        - CLI
+        - LSP Server
+        - Database
+        - HTTP Server
+        - WebSocket
+        - Tooling
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you?
+      options:
+        - Nice to have
+        - Would improve my workflow
+        - Blocking my use case
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other information, examples from other languages, or references
+      placeholder: Add links, screenshots, or examples...
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues to ensure this hasn't been requested
+          required: true
+        - label: I would be willing to help implement this feature
+          required: false
