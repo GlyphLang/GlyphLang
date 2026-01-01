@@ -1,4 +1,4 @@
-# GlyphLang
+# GlyphLang™
 
 [![AI Token Savings](https://img.shields.io/badge/AI%20tokens-45%25%20fewer%20than%20Python-blueviolet)]()
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)]()
@@ -8,7 +8,7 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![CLA](https://cla-assistant.io/readme/badge/GlyphLang/GlyphLang)](https://cla-assistant.io/GlyphLang/GlyphLang)
 
-**GlyphLang** is the AI-first language for REST APIs. Symbol-based syntax uses 45% fewer tokens than Python and 63% fewer than Java, making LLM code generation faster, cheaper, and more reliable.
+**GlyphLang™** is the AI-first language for REST APIs. Symbol-based syntax uses 45% fewer tokens than Python and 63% fewer than Java, making LLM code generation faster, cheaper, and more reliable.
 
 ```
 Glyph:  @ GET /users/:id -> User     (17 tokens)
