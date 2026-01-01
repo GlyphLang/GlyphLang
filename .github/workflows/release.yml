@@ -125,7 +125,7 @@ jobs:
           cp glyph-${VERSION}-${{ matrix.os }}-${{ matrix.arch }}.zip glyph-${{ matrix.os }}-${{ matrix.arch }}.zip
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: glyph-${{ matrix.os }}-${{ matrix.arch }}
           path: glyph-*${{ matrix.os }}-${{ matrix.arch }}.zip
@@ -177,7 +177,7 @@ jobs:
         run: Get-ChildItem -Path dist
 
       - name: Upload installer artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: windows-installer
           path: dist/glyph-*windows-setup.exe
