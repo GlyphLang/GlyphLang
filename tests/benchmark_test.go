@@ -24,8 +24,9 @@ func parseSource(source string) (*interpreter.Module, error) {
 
 // BenchmarkCompilation benchmarks the compilation process
 func BenchmarkCompilation(b *testing.B) {
-	source := `@ GET /test
-  > {status: "ok"}`
+	source := `@ GET /test {
+  > {status: "ok"}
+}`
 
 	module, err := parseSource(source)
 	if err != nil {
@@ -45,11 +46,13 @@ func BenchmarkCompilation(b *testing.B) {
 // BenchmarkCompilationSmallProgram benchmarks small program compilation
 func BenchmarkCompilationSmallProgram(b *testing.B) {
 	source := `
-@ GET /hello
+@ GET /hello {
   > {message: "Hello, World!"}
+}
 
-@ GET /greet/:name
+@ GET /greet/:name {
   > {message: "Hello, " + name + "!"}
+}
 `
 
 	module, err := parseSource(source)
@@ -82,29 +85,28 @@ func BenchmarkCompilationMediumProgram(b *testing.B) {
   message: str!
 }
 
-@ GET /api/users -> List[User]
+@ GET /api/users {
   + auth(jwt)
   + ratelimit(100/min)
   % db: Database
   $ users = db.users.all()
   > users
+}
 
-@ GET /api/users/:id -> User | Error
+@ GET /api/users/:id {
   + auth(jwt)
   % db: Database
   $ user = db.users.get(id)
   > user
+}
 
-@ POST /api/users -> User | Error
+@ POST /api/users {
   + auth(jwt, role: admin)
   < input: CreateUserInput
-  ! validate input {
-    name: str(min=1, max=100)
-    email: email_format
-  }
   % db: Database
   $ user = db.users.create(input)
   > user
+}
 `
 
 	module, err := parseSource(source)
@@ -144,8 +146,21 @@ func BenchmarkCompilationLargeProgram(b *testing.B) {
 
 // BenchmarkVMExecution benchmarks VM bytecode execution
 func BenchmarkVMExecution(b *testing.B) {
-	// Create simple bytecode
-	bytecode := []byte{0x41, 0x49, 0x42, 0x43, 0x01, 0x00, 0x00, 0x00}
+	// First compile a simple program to get valid bytecode
+	source := `@ GET /test {
+  > {status: "ok"}
+}`
+
+	module, err := parseSource(source)
+	if err != nil {
+		b.Fatalf("Parse failed: %v", err)
+	}
+
+	c := compiler.NewCompiler()
+	bytecode, err := c.Compile(module)
+	if err != nil {
+		b.Fatalf("Compilation failed: %v", err)
+	}
 
 	v := vm.NewVM()
 
@@ -205,8 +220,9 @@ func BenchmarkStackPop(b *testing.B) {
 
 // BenchmarkCompileAndExecute benchmarks full compile + execute cycle
 func BenchmarkCompileAndExecute(b *testing.B) {
-	source := `@ GET /test
-  > {status: "ok"}`
+	source := `@ GET /test {
+  > {status: "ok"}
+}`
 
 	module, err := parseSource(source)
 	if err != nil {
@@ -242,14 +258,15 @@ func BenchmarkVMCreation(b *testing.B) {
 func BenchmarkCompilerCreation(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		// No compiler instance needed with FFI
+		_ = compiler.NewCompiler()
 	}
 }
 
 // BenchmarkParallelCompilation benchmarks parallel compilation
 func BenchmarkParallelCompilation(b *testing.B) {
-	source := `@ GET /test
-  > {status: "ok"}`
+	source := `@ GET /test {
+  > {status: "ok"}
+}`
 
 	module, err := parseSource(source)
 	if err != nil {
@@ -269,8 +286,23 @@ func BenchmarkParallelCompilation(b *testing.B) {
 
 // BenchmarkParallelExecution benchmarks parallel VM execution
 func BenchmarkParallelExecution(b *testing.B) {
-	bytecode := []byte{0x41, 0x49, 0x42, 0x43, 0x01, 0x00, 0x00, 0x00}
+	// First compile a simple program to get valid bytecode
+	source := `@ GET /test {
+  > {status: "ok"}
+}`
 
+	module, err := parseSource(source)
+	if err != nil {
+		b.Fatalf("Parse failed: %v", err)
+	}
+
+	c := compiler.NewCompiler()
+	bytecode, err := c.Compile(module)
+	if err != nil {
+		b.Fatalf("Compilation failed: %v", err)
+	}
+
+	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		v := vm.NewVM()
 		for pb.Next() {
@@ -282,93 +314,11 @@ func BenchmarkParallelExecution(b *testing.B) {
 	})
 }
 
-// BenchmarkRouteMatching benchmarks route matching (when implemented)
-func BenchmarkRouteMatching(b *testing.B) {
-	b.Skip("Skipping until router is implemented")
-
-	// TODO: When router is ready:
-	// - Benchmark simple route matching
-	// - Benchmark parameterized route matching
-	// - Benchmark route matching with many routes
-	// - Benchmark route matching with nested paths
-}
-
-// BenchmarkHTTPHandler benchmarks HTTP request handling (when implemented)
-func BenchmarkHTTPHandler(b *testing.B) {
-	b.Skip("Skipping until server is implemented")
-
-	// TODO: When server is ready:
-	// - Benchmark single request handling
-	// - Benchmark concurrent request handling
-	// - Benchmark with middleware chain
-	// - Benchmark with database queries
-	// - Benchmark JSON serialization
-}
-
-// BenchmarkJSONSerialization benchmarks JSON response serialization
-func BenchmarkJSONSerialization(b *testing.B) {
-	b.Skip("Skipping until JSON serialization is implemented")
-
-	// TODO: When JSON serialization is ready:
-	// - Benchmark simple object serialization
-	// - Benchmark complex nested object
-	// - Benchmark array serialization
-	// - Benchmark large response bodies
-}
-
-// BenchmarkMiddleware benchmarks middleware execution
-func BenchmarkMiddleware(b *testing.B) {
-	b.Skip("Skipping until middleware is implemented")
-
-	// TODO: When middleware is ready:
-	// - Benchmark single middleware
-	// - Benchmark middleware chain (3 middlewares)
-	// - Benchmark middleware chain (10 middlewares)
-	// - Benchmark auth middleware
-	// - Benchmark rate limit middleware
-}
-
-// BenchmarkDatabaseQuery benchmarks database operations
-func BenchmarkDatabaseQuery(b *testing.B) {
-	b.Skip("Skipping until database integration is ready")
-
-	// TODO: When database is integrated:
-	// - Benchmark SELECT query
-	// - Benchmark INSERT query
-	// - Benchmark UPDATE query
-	// - Benchmark DELETE query
-	// - Benchmark query with joins
-	// - Benchmark connection pool overhead
-}
-
-// BenchmarkTypeChecking benchmarks type checking performance
-func BenchmarkTypeChecking(b *testing.B) {
-	b.Skip("Skipping until type checker is implemented")
-
-	source := `
-: User { id: int!, name: str! }
-@ GET /user -> User
-  > {id: 123, name: "test"}
-`
-
-	// TODO: When type checker is ready:
-	// Benchmark type checking overhead
-	module, err := parseSource(source)
-	if err != nil {
-		b.Fatalf("Parse failed: %v", err)
-	}
-
-	c := compiler.NewCompiler()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = c.Compile(module)
-	}
-}
-
 // BenchmarkMemoryAllocation tracks memory allocation patterns
 func BenchmarkMemoryAllocation(b *testing.B) {
-	source := `@ GET /test
-  > {status: "ok"}`
+	source := `@ GET /test {
+  > {status: "ok"}
+}`
 
 	module, err := parseSource(source)
 	if err != nil {
@@ -387,37 +337,6 @@ func BenchmarkMemoryAllocation(b *testing.B) {
 	}
 }
 
-// BenchmarkLexing benchmarks just the lexing phase
-func BenchmarkLexing(b *testing.B) {
-	b.Skip("Skipping until lexer FFI is implemented")
-
-	source := `@ GET /test
-  > {status: "ok"}`
-
-	// TODO: When lexer is accessible:
-	// Benchmark just tokenization
-	_ = source
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		// lexer.Tokenize(source)
-	}
-}
-
-// BenchmarkParsing benchmarks just the parsing phase
-func BenchmarkParsing(b *testing.B) {
-	b.Skip("Skipping until parser FFI is implemented")
-
-	// TODO: When parser is accessible:
-	// Pre-tokenize source
-	// Benchmark just AST building
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		// parser.Parse(tokens)
-	}
-}
-
 // BenchmarkComparisonWithExamples benchmarks real example programs
 func BenchmarkComparisonWithExamples(b *testing.B) {
 	// This will be useful for tracking performance regressions
@@ -427,25 +346,33 @@ func BenchmarkComparisonWithExamples(b *testing.B) {
 	}{
 		{
 			name: "HelloWorld",
-			source: `@ GET /hello
-  > {message: "Hello, World!"}`,
+			source: `@ GET /hello {
+  > {message: "Hello, World!"}
+}`,
 		},
 		{
 			name: "PathParam",
-			source: `@ GET /greet/:name
-  > {message: "Hello, " + name + "!"}`,
+			source: `@ GET /greet/:name {
+  > {message: "Hello, " + name + "!"}
+}`,
 		},
 		{
 			name: "WithAuth",
-			source: `@ GET /protected
+			source: `@ GET /protected {
   + auth(jwt)
-  > {data: "secret"}`,
+  > {data: "secret"}
+}`,
 		},
 		{
 			name: "TypeDefinition",
-			source: `: User { id: int!, name: str! }
-@ GET /user -> User
-  > {id: 1, name: "test"}`,
+			source: `: User {
+  id: int!
+  name: str!
+}
+
+@ GET /user {
+  > {id: 1, name: "test"}
+}`,
 		},
 	}
 
@@ -514,63 +441,15 @@ func generateLargeProgram(numRoutes int) string {
 
 	// Add routes
 	for i := 0; i < numRoutes; i++ {
-		program += fmt.Sprintf(`@ GET /api/resource%d/:id -> User | Error
+		program += fmt.Sprintf(`@ GET /api/resource%d/:id {
   + auth(jwt)
   %% db: Database
   $ result = db.resource%d.get(id)
   > result
+}
 
 `, i, i)
 	}
 
 	return program
-}
-
-// BenchmarkContextSwitching benchmarks goroutine context switching
-func BenchmarkContextSwitching(b *testing.B) {
-	b.Skip("Skipping until concurrent request handling is implemented")
-
-	// TODO: When server supports concurrent requests:
-	// Benchmark overhead of context switching
-	// Compare single-threaded vs multi-threaded performance
-}
-
-// BenchmarkCachePerformance benchmarks context cache (when implemented)
-func BenchmarkCachePerformance(b *testing.B) {
-	b.Skip("Skipping until context cache is implemented")
-
-	// TODO: When context cache is ready:
-	// - Benchmark cache hit
-	// - Benchmark cache miss
-	// - Benchmark cache with different sizes
-	// - Compare compilation with/without cache
-}
-
-// BenchmarkErrorHandling benchmarks error path performance
-func BenchmarkErrorHandling(b *testing.B) {
-	b.Skip("Skipping until error handling is implemented")
-
-	// TODO: When error handling is ready:
-	// - Benchmark success path vs error path
-	// - Benchmark error propagation
-	// - Benchmark error conversion
-}
-
-// BenchmarkValidation benchmarks input validation performance
-func BenchmarkValidation(b *testing.B) {
-	b.Skip("Skipping until validation is implemented")
-
-	// TODO: When validation is ready:
-	// - Benchmark simple validation rules
-	// - Benchmark complex validation rules
-	// - Benchmark validation with large inputs
-}
-
-// BenchmarkCompilationVsInterpretation compares compilation vs interpretation
-func BenchmarkCompilationVsInterpretation(b *testing.B) {
-	b.Skip("Skipping until both paths are implemented")
-
-	// TODO: When both are available:
-	// Compare bytecode compilation + execution vs direct interpretation
-	// Measure break-even point
 }
