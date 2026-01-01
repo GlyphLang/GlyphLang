@@ -2,34 +2,34 @@
 # These owners will be automatically requested for review on PRs
 
 # Default owners for everything
-* @GlyphLang/maintainers
+* @GlyphLang
 
 # Core compiler and VM
-/pkg/compiler/ @GlyphLang/maintainers
-/pkg/vm/ @GlyphLang/maintainers
-/pkg/parser/ @GlyphLang/maintainers
+/pkg/compiler/ @GlyphLang
+/pkg/vm/ @GlyphLang
+/pkg/parser/ @GlyphLang
 
 # Runtime and server
-/pkg/server/ @GlyphLang/maintainers
-/pkg/interpreter/ @GlyphLang/maintainers
+/pkg/server/ @GlyphLang
+/pkg/interpreter/ @GlyphLang
 
 # Database and infrastructure
-/pkg/database/ @GlyphLang/maintainers
-/pkg/tracing/ @GlyphLang/maintainers
-/pkg/metrics/ @GlyphLang/maintainers
-/pkg/logging/ @GlyphLang/maintainers
+/pkg/database/ @GlyphLang
+/pkg/tracing/ @GlyphLang
+/pkg/metrics/ @GlyphLang
+/pkg/logging/ @GlyphLang
 
 # Security-sensitive areas
-/pkg/security/ @GlyphLang/maintainers
-/pkg/validation/ @GlyphLang/maintainers
+/pkg/security/ @GlyphLang
+/pkg/validation/ @GlyphLang
 
 # CLI and tooling
-/cmd/glyph/ @GlyphLang/maintainers
-/pkg/lsp/ @GlyphLang/maintainers
+/cmd/glyph/ @GlyphLang
+/pkg/lsp/ @GlyphLang
 
 # Documentation
-/docs/ @GlyphLang/maintainers
-*.md @GlyphLang/maintainers
+/docs/ @GlyphLang
+*.md @GlyphLang
 
 # CI/CD and GitHub config
-/.github/ @GlyphLang/maintainers
+/.github/ @GlyphLang

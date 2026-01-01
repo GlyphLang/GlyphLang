@@ -13,7 +13,7 @@ updates:
       - "dependencies"
       - "go"
     reviewers:
-      - "GlyphLang/maintainers"
+      - "GlyphLang"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
@@ -28,4 +28,4 @@ updates:
       - "dependencies"
       - "github-actions"
     reviewers:
-      - "GlyphLang/maintainers"
+      - "GlyphLang"
