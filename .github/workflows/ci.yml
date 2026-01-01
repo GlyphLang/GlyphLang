@@ -34,7 +34,7 @@ jobs:
         run: go vet ./...
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         continue-on-error: true  # Don't fail CI on lint issues for now
         with:
           version: latest
