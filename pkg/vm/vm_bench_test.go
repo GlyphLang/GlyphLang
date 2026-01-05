@@ -76,32 +76,34 @@ func BenchmarkVMArrayCreation(b *testing.B) {
 	}
 }
 
-// BenchmarkVMRouteExecution benchmarks executing a simple route
+// BenchmarkVMRouteExecution benchmarks executing a simple route with valid bytecode
 func BenchmarkVMRouteExecution(b *testing.B) {
 	vm := NewVM()
 
-	// Create simple bytecode for a route that returns a JSON response
-	// Magic: GLYPH (4 bytes)
-	// Version: 1 (4 bytes)
-	// ... minimal route bytecode
+	// Create valid bytecode that matches VM's expected format:
+	// Magic: GLYP (4 bytes)
+	// Version: 1 (4 bytes, little-endian)
+	// Constant count: 1 (4 bytes, little-endian)
+	// Constant 0: String "Hello" (type=0x04, len=5, data)
+	// Instruction count: 2 (4 bytes, little-endian)
+	// Instructions: PUSH 0, RETURN
 	bytecode := []byte{
-		0x47, 0x4C, 0x59, 0x50, // Magic: "GLYP"
-		0x01, 0x00, 0x00, 0x00, // Version: 1
-		// Minimal route data
-		0x02, // ROUTE type
-		0x06, 0x00, // String length: 6
-		0x2f, 0x68, 0x65, 0x6c, 0x6c, 0x6f, // "/hello"
-		0x50, // GET method
-		0x11, // String type for return
-		0x00, // No auth
-		0x00, // No rate limit
-		0x01, 0x00, // Body count: 1
-		0x31, // RETURN statement
-		0x20, // LITERAL expression
-		0x61, // LIT_STRING
-		0x05, 0x00, // String length: 5
+		// Magic bytes
+		0x47, 0x4C, 0x59, 0x50, // "GLYP"
+		// Version (uint32 LE)
+		0x01, 0x00, 0x00, 0x00, // Version 1
+		// Constant count (uint32 LE)
+		0x01, 0x00, 0x00, 0x00, // 1 constant
+		// Constant 0: String "Hello"
+		0x04,                         // Type: String
+		0x05, 0x00, 0x00, 0x00,       // Length: 5 (uint32 LE)
 		0x48, 0x65, 0x6c, 0x6c, 0x6f, // "Hello"
-		0x00, 0x00, 0x00, 0x00, // CRC32 (placeholder)
+		// Instruction count (uint32 LE)
+		0x06, 0x00, 0x00, 0x00, // 6 bytes of instructions
+		// Instructions
+		0x01,                   // OpPush
+		0x00, 0x00, 0x00, 0x00, // Constant index 0
+		0x61,                   // OpReturn (0x61)
 	}
 
 	b.ResetTimer()
