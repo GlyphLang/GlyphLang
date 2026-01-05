@@ -94,6 +94,8 @@ GlyphLang uses symbols instead of keywords for token efficiency:
 
 Download and run the installer: [glyph-windows-setup.exe](https://github.com/GlyphLang/GlyphLang/releases/latest/download/glyph-windows-setup.exe)
 
+> **Note:** Code signing via SignPath is pending approval. You may see a Windows SmartScreen warning when running the installer - click "More info" then "Run anyway" to proceed.
+
 **Download binary:**
 ```bash
 # Linux
