@@ -19,7 +19,7 @@ func TestChangeExtension(t *testing.T) {
 		newExt   string
 		expected string
 	}{
-		{"main.abc", ".glyph", "main.glyph"},
+		{"main.old", ".glyph", "main.glyph"},
 		{"test.txt", ".md", "test.md"},
 		{"/path/to/file.go", ".txt", "/path/to/file.txt"},
 	}
