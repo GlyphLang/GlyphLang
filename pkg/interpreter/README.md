@@ -204,7 +204,7 @@ The test suite includes:
 
 ## Example: Hello World Route
 
-This interpreter can execute the hello world example from `examples/hello-world/main.abc`:
+This interpreter can execute the hello world example from `examples/hello-world/main.glyph`:
 
 ```glyph
 # @ route /hello

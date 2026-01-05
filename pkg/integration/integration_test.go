@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Test parsing and executing a complete .abc file
+// Test parsing and executing a complete .glyph file
 func TestIntegration_HelloWorldFile(t *testing.T) {
 	source := `: Message {
   text: str!

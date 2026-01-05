@@ -312,14 +312,14 @@ func TestInitializeResult(t *testing.T) {
 
 func TestTextDocumentItem(t *testing.T) {
 	doc := TextDocumentItem{
-		URI:        "file:///test.abc",
+		URI:        "file:///test.glyph",
 		LanguageID: "glyph",
 		Version:    1,
 		Text:       ": User { name: str! }",
 	}
 
-	if doc.URI != "file:///test.abc" {
-		t.Errorf("Expected URI 'file:///test.abc', got '%s'", doc.URI)
+	if doc.URI != "file:///test.glyph" {
+		t.Errorf("Expected URI 'file:///test.glyph', got '%s'", doc.URI)
 	}
 
 	if doc.LanguageID != "glyph" {
@@ -360,15 +360,15 @@ func TestRange(t *testing.T) {
 
 func TestLocation(t *testing.T) {
 	loc := Location{
-		URI: "file:///test.abc",
+		URI: "file:///test.glyph",
 		Range: Range{
 			Start: Position{Line: 0, Character: 0},
 			End:   Position{Line: 0, Character: 10},
 		},
 	}
 
-	if loc.URI != "file:///test.abc" {
-		t.Errorf("Expected URI 'file:///test.abc', got '%s'", loc.URI)
+	if loc.URI != "file:///test.glyph" {
+		t.Errorf("Expected URI 'file:///test.glyph', got '%s'", loc.URI)
 	}
 }
 
@@ -434,7 +434,7 @@ func TestSymbolInformation(t *testing.T) {
 		Name: "User",
 		Kind: SymbolKindStruct,
 		Location: Location{
-			URI: "file:///test.abc",
+			URI: "file:///test.glyph",
 			Range: Range{
 				Start: Position{Line: 0, Character: 0},
 				End:   Position{Line: 5, Character: 0},
@@ -497,15 +497,15 @@ func TestDocumentSymbol(t *testing.T) {
 func TestDidOpenParams(t *testing.T) {
 	params := DidOpenTextDocumentParams{
 		TextDocument: TextDocumentItem{
-			URI:        "file:///test.abc",
+			URI:        "file:///test.glyph",
 			LanguageID: "glyph",
 			Version:    1,
 			Text:       ": User { name: str! }",
 		},
 	}
 
-	if params.TextDocument.URI != "file:///test.abc" {
-		t.Errorf("Expected URI 'file:///test.abc', got '%s'", params.TextDocument.URI)
+	if params.TextDocument.URI != "file:///test.glyph" {
+		t.Errorf("Expected URI 'file:///test.glyph', got '%s'", params.TextDocument.URI)
 	}
 
 	if params.TextDocument.Version != 1 {
@@ -517,7 +517,7 @@ func TestDidChangeParams(t *testing.T) {
 	params := DidChangeTextDocumentParams{
 		TextDocument: VersionedTextDocumentIdentifier{
 			TextDocumentIdentifier: TextDocumentIdentifier{
-				URI: "file:///test.abc",
+				URI: "file:///test.glyph",
 			},
 			Version: 2,
 		},
@@ -540,18 +540,18 @@ func TestDidChangeParams(t *testing.T) {
 func TestDidCloseParams(t *testing.T) {
 	params := DidCloseTextDocumentParams{
 		TextDocument: TextDocumentIdentifier{
-			URI: "file:///test.abc",
+			URI: "file:///test.glyph",
 		},
 	}
 
-	if params.TextDocument.URI != "file:///test.abc" {
-		t.Errorf("Expected URI 'file:///test.abc', got '%s'", params.TextDocument.URI)
+	if params.TextDocument.URI != "file:///test.glyph" {
+		t.Errorf("Expected URI 'file:///test.glyph', got '%s'", params.TextDocument.URI)
 	}
 }
 
 func TestPublishDiagnosticsParams(t *testing.T) {
 	params := PublishDiagnosticsParams{
-		URI:     "file:///test.abc",
+		URI:     "file:///test.glyph",
 		Version: 1,
 		Diagnostics: []Diagnostic{
 			{
@@ -565,8 +565,8 @@ func TestPublishDiagnosticsParams(t *testing.T) {
 		},
 	}
 
-	if params.URI != "file:///test.abc" {
-		t.Errorf("Expected URI 'file:///test.abc', got '%s'", params.URI)
+	if params.URI != "file:///test.glyph" {
+		t.Errorf("Expected URI 'file:///test.glyph', got '%s'", params.URI)
 	}
 
 	if len(params.Diagnostics) != 1 {

@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Test that examples/hello-world/main.abc parses correctly
+// Test that examples/hello-world/main.glyph parses correctly
 func TestExamples_HelloWorld(t *testing.T) {
 	// Read the hello world example file
 	examplePath := filepath.Join("..", "..", "examples", "hello-world", "main.glyph")
@@ -54,7 +54,7 @@ func TestExamples_HelloWorld(t *testing.T) {
 	assert.True(t, paths["/health"], "should have /health route")
 }
 
-// Test that examples/rest-api/main.abc parses correctly
+// Test that examples/rest-api/main.glyph parses correctly
 func TestExamples_RestApi(t *testing.T) {
 	// Read the rest-api example file
 	examplePath := filepath.Join("..", "..", "examples", "rest-api", "main.glyph")
@@ -135,8 +135,8 @@ func TestExamples_FixtureFiles(t *testing.T) {
 		return
 	}
 
-	// Read all .abc files in fixtures
-	files, err := filepath.Glob(filepath.Join(fixturesPath, "*.abc"))
+	// Read all .glyph files in fixtures
+	files, err := filepath.Glob(filepath.Join(fixturesPath, "*.glyph"))
 	if err != nil {
 		t.Fatalf("Failed to read fixtures: %v", err)
 	}
@@ -152,7 +152,7 @@ func TestExamples_FixtureFiles(t *testing.T) {
 			tokens, err := lexer.Tokenize()
 
 			// Skip files with "invalid" in the name if they produce lex errors
-			if filepath.Base(file) == "invalid_syntax.abc" {
+			if filepath.Base(file) == "invalid_syntax.glyph" {
 				if err != nil {
 					t.Skip("Invalid syntax file - expected to fail")
 				}
@@ -165,7 +165,7 @@ func TestExamples_FixtureFiles(t *testing.T) {
 			module, err := parser.Parse()
 
 			// Skip files with "invalid" in the name if they produce parse errors
-			if filepath.Base(file) == "invalid_syntax.abc" {
+			if filepath.Base(file) == "invalid_syntax.glyph" {
 				if err != nil {
 					t.Skip("Invalid syntax file - expected to fail")
 				}

@@ -366,7 +366,7 @@ go tool cover -html=coverage.out
 interp := interpreter.NewInterpreter()
 
 // 2. Load module (from parser)
-module := parser.ParseFile("main.abc")
+module := parser.ParseFile("main.glyph")
 err := interp.LoadModule(module)
 
 // 3. Find route

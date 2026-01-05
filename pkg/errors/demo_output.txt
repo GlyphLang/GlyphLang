@@ -46,7 +46,7 @@ Variables in scope:
 
 Stack trace:
   1. calculateAverage at /calculate POST:12
-  2. main at main.abc:5
+  2. main at main.glyph:5
 
 Suggestion: Add a check to ensure 'count' is not zero before performing division
 
@@ -118,7 +118,7 @@ division by zero
 Suggestion: Check that 'count' is not zero before dividing
 
 Step 3 - Add filename:
-Error in calculations.abc at line 2, column 13
+Error in calculations.glyph at line 2, column 13
 
      1 | $ count: int = getUserCount()
      2 | $ average = total / count

@@ -127,7 +127,7 @@ func Example_arithmetic() {
 	// Output: 60
 }
 
-// Test: Complete Hello World Example from examples/hello-world/main.abc
+// Test: Complete Hello World Example from examples/hello-world/main.glyph
 func TestInterpreter_HelloWorldExample(t *testing.T) {
 	interp := NewInterpreter()
 

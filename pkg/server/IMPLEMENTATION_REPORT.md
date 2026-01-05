@@ -279,7 +279,7 @@ The server is ready to integrate with the Glyph compiler and interpreter:
 
 ```go
 // Parse Glyph file
-ast := parser.Parse("main.abc")
+ast := parser.Parse("main.glyph")
 
 // Extract routes from AST
 routes := extractRoutes(ast)
