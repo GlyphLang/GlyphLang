@@ -18,8 +18,6 @@ Cargo.lock
 # Build artifacts
 /build/
 /dist/
-# Legacy extensions (no longer used)
-# *.abcx
 *.glyphx
 *.glyphc
 
@@ -64,7 +62,6 @@ PROJECT_COMPLETE.txt
 *_COMPLETE.md
 
 # Test artifacts
-# test_*.abc  # Legacy extension
 test_*.glyph
 nul
 test_output.txt
@@ -87,9 +84,6 @@ coverage/
 
 # Docker
 .dockerignore
-
-# Website (if needed to be excluded from main repo)
-# website/
 
 # Database
 *.db
