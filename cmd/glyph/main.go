@@ -896,7 +896,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	// Create main.abc file with template
+	// Create main.glyph file with template
 	var content string
 	switch template {
 	case "hello-world":
@@ -907,13 +907,13 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unknown template: %s", template)
 	}
 
-	mainFile := filepath.Join(name, "main.abc")
+	mainFile := filepath.Join(name, "main.glyph")
 	if err := os.WriteFile(mainFile, []byte(content), 0600); err != nil {
-		return fmt.Errorf("failed to write main.abc: %w", err)
+		return fmt.Errorf("failed to write main.glyph: %w", err)
 	}
 
 	printSuccess(fmt.Sprintf("Project created successfully in %s/", name))
-	printInfo(fmt.Sprintf("Run: cd %s && glyph dev main.abc", name))
+	printInfo(fmt.Sprintf("Run: cd %s && glyph dev main.glyph", name))
 	return nil
 }
 

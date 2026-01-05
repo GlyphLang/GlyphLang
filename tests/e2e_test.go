@@ -137,7 +137,7 @@ func TestSimpleRouteE2E(t *testing.T) {
 	helper := NewTestHelper(t)
 
 	// Load fixture
-	source := helper.LoadFixture("simple_route.abc")
+	source := helper.LoadFixture("simple_route.glyph")
 
 	// Parse source
 	module, err := parseSourceE2E(source)
@@ -170,7 +170,7 @@ func TestSimpleRouteE2E(t *testing.T) {
 func TestPathParametersE2E(t *testing.T) {
 	helper := NewTestHelper(t)
 
-	source := helper.LoadFixture("path_param.abc")
+	source := helper.LoadFixture("path_param.glyph")
 
 	module, err := parseSourceE2E(source)
 	if err != nil {
@@ -196,7 +196,7 @@ func TestPathParametersE2E(t *testing.T) {
 func TestJSONSerializationE2E(t *testing.T) {
 	helper := NewTestHelper(t)
 
-	source := helper.LoadFixture("json_response.abc")
+	source := helper.LoadFixture("json_response.glyph")
 
 	module, err := parseSourceE2E(source)
 	if err != nil {
@@ -222,7 +222,7 @@ func TestJSONSerializationE2E(t *testing.T) {
 func TestMultipleRoutesE2E(t *testing.T) {
 	helper := NewTestHelper(t)
 
-	source := helper.LoadFixture("multiple_routes.abc")
+	source := helper.LoadFixture("multiple_routes.glyph")
 
 	module, err := parseSourceE2E(source)
 	if err != nil {
@@ -248,7 +248,7 @@ func TestMultipleRoutesE2E(t *testing.T) {
 func TestHTTPMethodsE2E(t *testing.T) {
 	helper := NewTestHelper(t)
 
-	source := helper.LoadFixture("post_route.abc")
+	source := helper.LoadFixture("post_route.glyph")
 
 	module, err := parseSourceE2E(source)
 	if err != nil {
@@ -274,7 +274,7 @@ func TestHTTPMethodsE2E(t *testing.T) {
 func TestAuthenticationE2E(t *testing.T) {
 	helper := NewTestHelper(t)
 
-	source := helper.LoadFixture("with_auth.abc")
+	source := helper.LoadFixture("with_auth.glyph")
 
 	module, err := parseSourceE2E(source)
 	if err != nil {
@@ -299,7 +299,7 @@ func TestAuthenticationE2E(t *testing.T) {
 func TestErrorHandlingE2E(t *testing.T) {
 	helper := NewTestHelper(t)
 
-	source := helper.LoadFixture("error_handling.abc")
+	source := helper.LoadFixture("error_handling.glyph")
 
 	module, err := parseSourceE2E(source)
 	if err != nil {
@@ -324,7 +324,7 @@ func TestErrorHandlingE2E(t *testing.T) {
 func TestInvalidSyntaxE2E(t *testing.T) {
 	helper := NewTestHelper(t)
 
-	source := helper.LoadFixture("invalid_syntax.abc")
+	source := helper.LoadFixture("invalid_syntax.glyph")
 
 	module, err := parseSourceE2E(source)
 	if err != nil {
