@@ -78,4 +78,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 # Default command
 ENTRYPOINT ["/usr/local/bin/glyph"]
-CMD ["run", "examples/rest-api/main.abc", "--port", "8080"]
+CMD ["run", "examples/rest-api/main.glyph", "--port", "8080"]

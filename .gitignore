@@ -18,7 +18,8 @@ Cargo.lock
 # Build artifacts
 /build/
 /dist/
-*.abcx
+# Legacy extensions (no longer used)
+# *.abcx
 *.glyphx
 *.glybc
 
@@ -63,7 +64,7 @@ PROJECT_COMPLETE.txt
 *_COMPLETE.md
 
 # Test artifacts
-test_*.abc
+# test_*.abc  # Legacy extension
 test_*.glyph
 nul
 test_output.txt

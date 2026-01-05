@@ -18,7 +18,7 @@ func TestGetWordRangeAtPosition(t *testing.T) {
   email: str!
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	tests := []struct {
 		name    string
@@ -61,7 +61,7 @@ func TestGetTextInRange(t *testing.T) {
 	dm := NewDocumentManager()
 
 	source := "line one\nline two\nline three"
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	tests := []struct {
 		name     string
@@ -99,7 +99,7 @@ func TestGetLineMethod(t *testing.T) {
 	dm := NewDocumentManager()
 
 	source := "first line\nsecond line\nthird line"
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	tests := []struct {
 		name     string
@@ -146,7 +146,7 @@ func TestGetReferences(t *testing.T) {
   creator: User
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	// Get references for "User" at line 0 (include declaration)
 	refs := GetReferences(doc, Position{Line: 0, Character: 3}, true)
@@ -165,7 +165,7 @@ func TestPrepareRename(t *testing.T) {
   name: str!
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	t.Run("renameable position", func(t *testing.T) {
 		result := PrepareRename(doc, Position{Line: 0, Character: 3})
@@ -194,7 +194,7 @@ func TestRename(t *testing.T) {
   author: User
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	// Try to rename User to Person
 	edits := Rename(doc, Position{Line: 0, Character: 3}, "Person")
@@ -218,7 +218,7 @@ func TestGetCodeActions(t *testing.T) {
   name str!
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	// Get diagnostics first
 	diagnostics := GetDiagnostics(doc)
@@ -246,7 +246,7 @@ func TestFormatDocument(t *testing.T) {
 	dm := NewDocumentManager()
 
 	source := `:User{name:str!}`
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	options := FormattingOptions{
 		TabSize:      2,
@@ -271,7 +271,7 @@ func TestGetSignatureHelp(t *testing.T) {
   $ result = hash(
   > {}
 }`
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	sig := GetSignatureHelp(doc, Position{Line: 1, Character: 18})
 
@@ -387,7 +387,7 @@ func TestFormatCronTaskHover(t *testing.T) {
 	source := `# cron cleanup 0 0 * * *
   $ db.cleanup()
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	// Try to get hover on cron task
 	hover := GetHover(doc, Position{Line: 0, Character: 5})
@@ -400,7 +400,7 @@ func TestOffsetToPositionEdgeCases(t *testing.T) {
 	dm := NewDocumentManager()
 
 	source := "line1\nline2\nline3"
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	t.Run("negative offset", func(t *testing.T) {
 		pos := doc.OffsetToPosition(-1)
@@ -424,7 +424,7 @@ func TestPositionToOffsetEdgeCases(t *testing.T) {
 	dm := NewDocumentManager()
 
 	source := "line1\nline2\nline3"
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	t.Run("negative line", func(t *testing.T) {
 		offset := doc.PositionToOffset(Position{Line: -1, Character: 0})
@@ -444,9 +444,9 @@ func TestPositionToOffsetEdgeCases(t *testing.T) {
 func TestGetAllDocuments(t *testing.T) {
 	dm := NewDocumentManager()
 
-	dm.Open("file:///doc1.abc", 1, "content1")
-	dm.Open("file:///doc2.abc", 1, "content2")
-	dm.Open("file:///doc3.abc", 1, "content3")
+	dm.Open("file:///doc1.glyph", 1, "content1")
+	dm.Open("file:///doc2.glyph", 1, "content2")
+	dm.Open("file:///doc3.glyph", 1, "content3")
 
 	all := dm.GetAll()
 
@@ -459,14 +459,14 @@ func TestGetAllDocuments(t *testing.T) {
 func TestDocumentClose(t *testing.T) {
 	dm := NewDocumentManager()
 
-	dm.Open("file:///test.abc", 1, "content")
+	dm.Open("file:///test.glyph", 1, "content")
 
-	err := dm.Close("file:///test.abc")
+	err := dm.Close("file:///test.glyph")
 	if err != nil {
 		t.Errorf("Close failed: %v", err)
 	}
 
-	_, exists := dm.Get("file:///test.abc")
+	_, exists := dm.Get("file:///test.glyph")
 	if exists {
 		t.Error("Document should not exist after close")
 	}
@@ -481,7 +481,7 @@ func TestGetOptimizerHints(t *testing.T) {
   > {data: result}
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	if doc.AST != nil {
 		hints := getOptimizerHints(doc.AST)
@@ -500,7 +500,7 @@ func TestAnalyzeRouteForOptimizations(t *testing.T) {
   > {result: y}
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	if doc.AST != nil && len(doc.AST.Items) > 0 {
 		// analyzeRouteForOptimizations expects []interpreter.Statement
@@ -530,7 +530,7 @@ func TestCheckTypesWithArrays(t *testing.T) {
   authors: [User]
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	if doc.AST != nil {
 		diagnostics := checkTypes(doc.AST)
@@ -561,7 +561,7 @@ func TestDocumentSymbolsWithRoutes(t *testing.T) {
   > {created: true}
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	symbols := GetDocumentSymbols(doc)
 
@@ -587,7 +587,7 @@ func TestGetHoverOnMiddleware(t *testing.T) {
   > {users: []}
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	// Try to get hover on middleware
 	hover := GetHover(doc, Position{Line: 1, Character: 5})
@@ -608,7 +608,7 @@ func TestDefinitionForFieldType(t *testing.T) {
   title: str!
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	// Get definition of User on line 6
 	defs := GetDefinition(doc, Position{Line: 6, Character: 11})
@@ -629,7 +629,7 @@ func TestCompletionInTypeField(t *testing.T) {
   name:
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	completions := GetCompletion(doc, Position{Line: 1, Character: 8})
 
@@ -661,7 +661,7 @@ func TestGetDiagnosticsWithWarnings(t *testing.T) {
   > {users: []}
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	diagnostics := GetDiagnostics(doc)
 
@@ -690,7 +690,7 @@ func TestServerRequestTypes(t *testing.T) {
 	// Test completion request
 	t.Run("textDocument/completion", func(t *testing.T) {
 		params := TextDocumentPositionParams{
-			TextDocument: TextDocumentIdentifier{URI: "file:///test.abc"},
+			TextDocument: TextDocumentIdentifier{URI: "file:///test.glyph"},
 			Position:     Position{Line: 0, Character: 0},
 		}
 		paramsJSON, _ := json.Marshal(params)
@@ -709,7 +709,7 @@ func TestServerRequestTypes(t *testing.T) {
 	// Test definition request
 	t.Run("textDocument/definition", func(t *testing.T) {
 		params := TextDocumentPositionParams{
-			TextDocument: TextDocumentIdentifier{URI: "file:///test.abc"},
+			TextDocument: TextDocumentIdentifier{URI: "file:///test.glyph"},
 			Position:     Position{Line: 0, Character: 2},
 		}
 		paramsJSON, _ := json.Marshal(params)
@@ -728,7 +728,7 @@ func TestServerRequestTypes(t *testing.T) {
 	// Test hover request
 	t.Run("textDocument/hover", func(t *testing.T) {
 		params := TextDocumentPositionParams{
-			TextDocument: TextDocumentIdentifier{URI: "file:///test.abc"},
+			TextDocument: TextDocumentIdentifier{URI: "file:///test.glyph"},
 			Position:     Position{Line: 0, Character: 2},
 		}
 		paramsJSON, _ := json.Marshal(params)
@@ -747,7 +747,7 @@ func TestServerRequestTypes(t *testing.T) {
 	// Test document symbol request
 	t.Run("textDocument/documentSymbol", func(t *testing.T) {
 		params := DocumentSymbolParams{
-			TextDocument: TextDocumentIdentifier{URI: "file:///test.abc"},
+			TextDocument: TextDocumentIdentifier{URI: "file:///test.glyph"},
 		}
 		paramsJSON, _ := json.Marshal(params)
 
@@ -766,7 +766,7 @@ func TestServerRequestTypes(t *testing.T) {
 	t.Run("textDocument/references", func(t *testing.T) {
 		params := ReferenceParams{
 			TextDocumentPositionParams: TextDocumentPositionParams{
-				TextDocument: TextDocumentIdentifier{URI: "file:///test.abc"},
+				TextDocument: TextDocumentIdentifier{URI: "file:///test.glyph"},
 				Position:     Position{Line: 0, Character: 2},
 			},
 		}
@@ -789,7 +789,7 @@ func TestGetWordAtPositionBoundary(t *testing.T) {
 	dm := NewDocumentManager()
 
 	source := "word1 word2 word3"
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	tests := []struct {
 		name     string
@@ -826,7 +826,7 @@ func TestReferencesWithDeclaration(t *testing.T) {
   ref: MyType
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	// Get references with declaration
 	refsWithDecl := GetReferences(doc, Position{Line: 0, Character: 3}, true)
@@ -859,7 +859,7 @@ func TestServerNotifications(t *testing.T) {
 	t.Run("handleDidOpen", func(t *testing.T) {
 		params := DidOpenTextDocumentParams{
 			TextDocument: TextDocumentItem{
-				URI:        "file:///test.abc",
+				URI:        "file:///test.glyph",
 				LanguageID: "glyph",
 				Version:    1,
 				Text:       ": User { name: str! }",
@@ -875,7 +875,7 @@ func TestServerNotifications(t *testing.T) {
 	t.Run("handleDidChange", func(t *testing.T) {
 		params := DidChangeTextDocumentParams{
 			TextDocument: VersionedTextDocumentIdentifier{
-				TextDocumentIdentifier: TextDocumentIdentifier{URI: "file:///test.abc"},
+				TextDocumentIdentifier: TextDocumentIdentifier{URI: "file:///test.glyph"},
 				Version:                2,
 			},
 			ContentChanges: []TextDocumentContentChangeEvent{
@@ -891,7 +891,7 @@ func TestServerNotifications(t *testing.T) {
 
 	t.Run("handleDidClose", func(t *testing.T) {
 		params := DidCloseTextDocumentParams{
-			TextDocument: TextDocumentIdentifier{URI: "file:///test.abc"},
+			TextDocument: TextDocumentIdentifier{URI: "file:///test.glyph"},
 		}
 		paramsJSON, _ := json.Marshal(params)
 		err := server.handleDidClose(paramsJSON)
@@ -984,7 +984,7 @@ func TestPublishDiagnostics(t *testing.T) {
 	server := NewServer(input, output, "")
 
 	// Open a document first
-	doc, _ := server.docManager.Open("file:///test.abc", 1, ": User { name: str! }")
+	doc, _ := server.docManager.Open("file:///test.glyph", 1, ": User { name: str! }")
 
 	err := server.publishDiagnostics(doc)
 	if err != nil {
@@ -1034,7 +1034,7 @@ func TestGenerateQuickFixes(t *testing.T) {
   name str!
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	diagnostics := GetDiagnostics(doc)
 
@@ -1070,7 +1070,7 @@ func TestGenerateSourceActions(t *testing.T) {
   > {users: []}
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	actions := generateSourceActions(doc)
 
@@ -1094,7 +1094,7 @@ func TestIsRenameableSymbol(t *testing.T) {
   > {result: x}
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	t.Run("type name is renameable", func(t *testing.T) {
 		result := isRenameableSymbol(doc, "User")
@@ -1250,7 +1250,7 @@ func TestGetDefinitionEdgeCases(t *testing.T) {
   > {user: {}}
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	t.Run("definition of builtin type", func(t *testing.T) {
 		defs := GetDefinition(doc, Position{Line: 1, Character: 8}) // "str"
@@ -1327,7 +1327,7 @@ func TestFormatDocumentEdgeCases(t *testing.T) {
 	dm := NewDocumentManager()
 
 	t.Run("empty document", func(t *testing.T) {
-		doc, _ := dm.Open("file:///empty.abc", 1, "")
+		doc, _ := dm.Open("file:///empty.glyph", 1, "")
 		options := FormattingOptions{TabSize: 2, InsertSpaces: true}
 		edits := FormatDocument(doc, options)
 		_ = edits
@@ -1339,7 +1339,7 @@ func TestFormatDocumentEdgeCases(t *testing.T) {
   email: str!
 }
 `
-		doc, _ := dm.Open("file:///formatted.abc", 1, source)
+		doc, _ := dm.Open("file:///formatted.glyph", 1, source)
 		options := FormattingOptions{TabSize: 2, InsertSpaces: true}
 		edits := FormatDocument(doc, options)
 		_ = edits
@@ -1347,7 +1347,7 @@ func TestFormatDocumentEdgeCases(t *testing.T) {
 
 	t.Run("with tabs", func(t *testing.T) {
 		source := ": User {\n\tname: str!\n}"
-		doc, _ := dm.Open("file:///tabs.abc", 1, source)
+		doc, _ := dm.Open("file:///tabs.glyph", 1, source)
 		options := FormattingOptions{TabSize: 4, InsertSpaces: false}
 		edits := FormatDocument(doc, options)
 		_ = edits
@@ -1362,7 +1362,7 @@ func TestGetSignatureHelpEdgeCases(t *testing.T) {
 		source := `@ GET /test {
   $ x = hash("test")
 }`
-		doc, _ := dm.Open("file:///test.abc", 1, source)
+		doc, _ := dm.Open("file:///test.glyph", 1, source)
 		sig := GetSignatureHelp(doc, Position{Line: 1, Character: 14})
 		_ = sig
 	})
@@ -1371,7 +1371,7 @@ func TestGetSignatureHelpEdgeCases(t *testing.T) {
 		source := `@ GET /test {
   $ x = 123
 }`
-		doc, _ := dm.Open("file:///test2.abc", 1, source)
+		doc, _ := dm.Open("file:///test2.glyph", 1, source)
 		sig := GetSignatureHelp(doc, Position{Line: 1, Character: 6})
 		_ = sig
 	})
@@ -1561,7 +1561,7 @@ func TestFindReferencesInStatements(t *testing.T) {
 		},
 	}
 
-	locs := findReferencesInStatements(stmts, "x", "file:///test.abc")
+	locs := findReferencesInStatements(stmts, "x", "file:///test.glyph")
 	// Should find references to x
 	_ = locs
 }
@@ -1573,7 +1573,7 @@ func TestFindReferencesInStatement(t *testing.T) {
 			Target: "x",
 			Value:  interpreter.VariableExpr{Name: "y"},
 		}
-		locs := findReferencesInStatement(stmt, "y", "file:///test.abc")
+		locs := findReferencesInStatement(stmt, "y", "file:///test.glyph")
 		_ = locs
 	})
 
@@ -1581,7 +1581,7 @@ func TestFindReferencesInStatement(t *testing.T) {
 		stmt := interpreter.ReturnStatement{
 			Value: interpreter.VariableExpr{Name: "x"},
 		}
-		locs := findReferencesInStatement(stmt, "x", "file:///test.abc")
+		locs := findReferencesInStatement(stmt, "x", "file:///test.glyph")
 		_ = locs
 	})
 
@@ -1590,7 +1590,7 @@ func TestFindReferencesInStatement(t *testing.T) {
 			Condition: interpreter.VariableExpr{Name: "flag"},
 			ThenBlock: []interpreter.Statement{},
 		}
-		locs := findReferencesInStatement(stmt, "flag", "file:///test.abc")
+		locs := findReferencesInStatement(stmt, "flag", "file:///test.glyph")
 		_ = locs
 	})
 }
@@ -1599,7 +1599,7 @@ func TestFindReferencesInStatement(t *testing.T) {
 func TestFindReferencesInExpression(t *testing.T) {
 	t.Run("variable expression", func(t *testing.T) {
 		expr := interpreter.VariableExpr{Name: "x"}
-		locs := findReferencesInExpression(expr, "x", "file:///test.abc")
+		locs := findReferencesInExpression(expr, "x", "file:///test.glyph")
 		if len(locs) == 0 {
 			t.Skip("Variable expression references might not be found")
 		}
@@ -1611,7 +1611,7 @@ func TestFindReferencesInExpression(t *testing.T) {
 			Op:    interpreter.Add,
 			Right: interpreter.VariableExpr{Name: "b"},
 		}
-		locs := findReferencesInExpression(expr, "a", "file:///test.abc")
+		locs := findReferencesInExpression(expr, "a", "file:///test.glyph")
 		_ = locs
 	})
 
@@ -1620,7 +1620,7 @@ func TestFindReferencesInExpression(t *testing.T) {
 			Name: "myFunc",
 			Args: []interpreter.Expr{interpreter.VariableExpr{Name: "x"}},
 		}
-		locs := findReferencesInExpression(expr, "x", "file:///test.abc")
+		locs := findReferencesInExpression(expr, "x", "file:///test.glyph")
 		_ = locs
 	})
 }
@@ -1638,7 +1638,7 @@ func TestGetReferencesWithRoutes(t *testing.T) {
   > {user: user}
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	// Get references for User type
 	refs := GetReferences(doc, Position{Line: 0, Character: 3}, true)
@@ -1658,7 +1658,7 @@ func TestIsRenameableSymbolEdgeCases(t *testing.T) {
   name: str!
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	// Skip if AST is nil (parsing failed)
 	if doc.AST == nil {
@@ -1742,7 +1742,7 @@ func TestGetDocumentSymbolsWithCronAndEvents(t *testing.T) {
   content: str!
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	symbols := GetDocumentSymbols(doc)
 
@@ -1778,7 +1778,7 @@ func TestFindReferencesInStatementMoreTypes(t *testing.T) {
 			Condition: interpreter.VariableExpr{Name: "running"},
 			Body:      []interpreter.Statement{},
 		}
-		locs := findReferencesInStatement(stmt, "running", "file:///test.abc")
+		locs := findReferencesInStatement(stmt, "running", "file:///test.glyph")
 		_ = locs
 	})
 
@@ -1788,7 +1788,7 @@ func TestFindReferencesInStatementMoreTypes(t *testing.T) {
 			Iterable: interpreter.VariableExpr{Name: "items"},
 			Body:     []interpreter.Statement{},
 		}
-		locs := findReferencesInStatement(stmt, "items", "file:///test.abc")
+		locs := findReferencesInStatement(stmt, "items", "file:///test.glyph")
 		_ = locs
 	})
 
@@ -1797,7 +1797,7 @@ func TestFindReferencesInStatementMoreTypes(t *testing.T) {
 			Value: interpreter.VariableExpr{Name: "choice"},
 			Cases: []interpreter.SwitchCase{},
 		}
-		locs := findReferencesInStatement(stmt, "choice", "file:///test.abc")
+		locs := findReferencesInStatement(stmt, "choice", "file:///test.glyph")
 		_ = locs
 	})
 }
@@ -1809,7 +1809,7 @@ func TestFindReferencesInExpressionMoreTypes(t *testing.T) {
 			Op:    interpreter.Not,
 			Right: interpreter.VariableExpr{Name: "flag"},
 		}
-		locs := findReferencesInExpression(expr, "flag", "file:///test.abc")
+		locs := findReferencesInExpression(expr, "flag", "file:///test.glyph")
 		_ = locs
 	})
 
@@ -1819,7 +1819,7 @@ func TestFindReferencesInExpressionMoreTypes(t *testing.T) {
 				{Key: "name", Value: interpreter.VariableExpr{Name: "userName"}},
 			},
 		}
-		locs := findReferencesInExpression(expr, "userName", "file:///test.abc")
+		locs := findReferencesInExpression(expr, "userName", "file:///test.glyph")
 		_ = locs
 	})
 
@@ -1830,7 +1830,7 @@ func TestFindReferencesInExpressionMoreTypes(t *testing.T) {
 				interpreter.VariableExpr{Name: "y"},
 			},
 		}
-		locs := findReferencesInExpression(expr, "x", "file:///test.abc")
+		locs := findReferencesInExpression(expr, "x", "file:///test.glyph")
 		_ = locs
 	})
 }
@@ -1840,7 +1840,7 @@ func TestParseDocumentEdgeCases(t *testing.T) {
 	dm := NewDocumentManager()
 
 	t.Run("valid syntax", func(t *testing.T) {
-		doc, err := dm.Open("file:///valid.abc", 1, ": User { name: str! }")
+		doc, err := dm.Open("file:///valid.glyph", 1, ": User { name: str! }")
 		if err != nil {
 			t.Errorf("Open failed: %v", err)
 		}
@@ -1854,7 +1854,7 @@ func TestParseDocumentEdgeCases(t *testing.T) {
   > {ok: true}
 }
 `
-		doc, err := dm.Open("file:///route.abc", 1, source)
+		doc, err := dm.Open("file:///route.glyph", 1, source)
 		if err != nil {
 			t.Errorf("Open failed: %v", err)
 		}
@@ -1862,7 +1862,7 @@ func TestParseDocumentEdgeCases(t *testing.T) {
 	})
 
 	t.Run("empty source", func(t *testing.T) {
-		doc, err := dm.Open("file:///empty2.abc", 1, "")
+		doc, err := dm.Open("file:///empty2.glyph", 1, "")
 		if err != nil {
 			t.Errorf("Open failed: %v", err)
 		}
@@ -1883,7 +1883,7 @@ func TestGenerateRefactorActions(t *testing.T) {
   > {users: []}
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	rangeParam := Range{
 		Start: Position{Line: 0, Character: 0},
@@ -1908,7 +1908,7 @@ func TestGetHoverOnVariousElements(t *testing.T) {
   > {user: result}
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	// Test hover on type name
 	hover := GetHover(doc, Position{Line: 0, Character: 2})
@@ -2136,7 +2136,7 @@ fn greet(name: str) -> str {
   > {user: {}}
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	if doc.AST == nil {
 		t.Skip("Document did not parse correctly")
@@ -2168,7 +2168,7 @@ func TestGenerateQuickFixesMore(t *testing.T) {
 	dm := NewDocumentManager()
 
 	source := `: User { name: str! }`
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	t.Run("undefined type diagnostic", func(t *testing.T) {
 		diag := Diagnostic{
@@ -2282,7 +2282,7 @@ func TestGetDocumentSymbolsAllTypes(t *testing.T) {
   > a + b
 }
 `
-		doc, _ := dm.Open("file:///fn.abc", 1, source)
+		doc, _ := dm.Open("file:///fn.glyph", 1, source)
 		symbols := GetDocumentSymbols(doc)
 		_ = symbols
 	})
@@ -2297,14 +2297,14 @@ func TestGetDocumentSymbolsAllTypes(t *testing.T) {
   > {}
 }
 `
-		doc, _ := dm.Open("file:///routes.abc", 1, source)
+		doc, _ := dm.Open("file:///routes.glyph", 1, source)
 		symbols := GetDocumentSymbols(doc)
 		_ = symbols
 	})
 
 	// Test with empty document
 	t.Run("empty document", func(t *testing.T) {
-		doc, _ := dm.Open("file:///empty.abc", 1, "")
+		doc, _ := dm.Open("file:///empty.glyph", 1, "")
 		symbols := GetDocumentSymbols(doc)
 		if len(symbols) != 0 {
 			t.Errorf("Expected 0 symbols for empty doc, got %d", len(symbols))
@@ -2325,7 +2325,7 @@ func TestGetReferencesMore(t *testing.T) {
   mentions: [User]
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	t.Run("type used in array", func(t *testing.T) {
 		refs := GetReferences(doc, Position{Line: 0, Character: 2}, true)
@@ -2346,14 +2346,14 @@ func TestGetHoverMore(t *testing.T) {
 
 	t.Run("hover on builtin type", func(t *testing.T) {
 		source := `: User { name: str! }`
-		doc, _ := dm.Open("file:///test.abc", 1, source)
+		doc, _ := dm.Open("file:///test.glyph", 1, source)
 		hover := GetHover(doc, Position{Line: 0, Character: 16}) // on "str"
 		_ = hover
 	})
 
 	t.Run("hover on whitespace", func(t *testing.T) {
 		source := `   : User { name: str! }`
-		doc, _ := dm.Open("file:///test2.abc", 1, source)
+		doc, _ := dm.Open("file:///test2.glyph", 1, source)
 		hover := GetHover(doc, Position{Line: 0, Character: 0}) // on whitespace
 		// Should return nil
 		_ = hover
@@ -2364,7 +2364,7 @@ func TestGetHoverMore(t *testing.T) {
   > "Hello"
 }
 `
-		doc, _ := dm.Open("file:///test3.abc", 1, source)
+		doc, _ := dm.Open("file:///test3.glyph", 1, source)
 		hover := GetHover(doc, Position{Line: 0, Character: 5}) // on "greet"
 		_ = hover
 	})
@@ -2378,7 +2378,7 @@ func TestRenameMore(t *testing.T) {
   name: str!
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	t.Run("rename with invalid identifier", func(t *testing.T) {
 		edits := Rename(doc, Position{Line: 0, Character: 2}, "123invalid")
@@ -2411,7 +2411,7 @@ func TestPrepareRenameMore(t *testing.T) {
   name: str!
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	t.Run("prepare rename on keyword", func(t *testing.T) {
 		// Find position of a keyword if present
@@ -2431,7 +2431,7 @@ func TestHandleNotificationMore(t *testing.T) {
 	// First open a document
 	openParams := DidOpenTextDocumentParams{
 		TextDocument: TextDocumentItem{
-			URI:        "file:///test.abc",
+			URI:        "file:///test.glyph",
 			LanguageID: "glyph",
 			Version:    1,
 			Text:       ": User { name: str! }",
@@ -2474,7 +2474,7 @@ func TestFormatRouteHoverFull(t *testing.T) {
   > {user: {}}
 }
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	// Get hover on route
 	hover := GetHover(doc, Position{Line: 0, Character: 10})
@@ -2492,7 +2492,7 @@ func TestFormatCommandHover(t *testing.T) {
 	source := `# command greet --name <name>
   > "Hello " + name
 `
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	// Get hover on command
 	hover := GetHover(doc, Position{Line: 0, Character: 12})
@@ -2504,13 +2504,13 @@ func TestUpdateDocumentEdgeCases(t *testing.T) {
 	dm := NewDocumentManager()
 
 	// Open a document
-	doc, _ := dm.Open("file:///test.abc", 1, "initial content")
+	doc, _ := dm.Open("file:///test.glyph", 1, "initial content")
 
 	t.Run("update with new version", func(t *testing.T) {
 		changes := []TextDocumentContentChangeEvent{
 			{Text: "updated content"},
 		}
-		updatedDoc, err := dm.Update("file:///test.abc", 2, changes)
+		updatedDoc, err := dm.Update("file:///test.glyph", 2, changes)
 		if err != nil {
 			t.Errorf("Update failed: %v", err)
 		}
@@ -2526,7 +2526,7 @@ func TestUpdateDocumentEdgeCases(t *testing.T) {
 		changes := []TextDocumentContentChangeEvent{
 			{Text: "content"},
 		}
-		_, err := dm.Update("file:///nonexistent.abc", 1, changes)
+		_, err := dm.Update("file:///nonexistent.glyph", 1, changes)
 		if err == nil {
 			t.Error("Expected error for non-existent document")
 		}
@@ -2539,7 +2539,7 @@ func TestUpdateDocumentEdgeCases(t *testing.T) {
 func TestCloseNonExistentDocument(t *testing.T) {
 	dm := NewDocumentManager()
 
-	err := dm.Close("file:///nonexistent.abc")
+	err := dm.Close("file:///nonexistent.glyph")
 	if err == nil {
 		t.Error("Expected error when closing non-existent document")
 	}

@@ -14,7 +14,7 @@ Visual representation of the test infrastructure and how it validates the Glyph 
 │  │                  (e2e_test.go)                            │ │
 │  │                                                           │ │
 │  │  ┌──────────────────────────────────────────────────┐   │ │
-│  │  │  Source Code (.abc)                              │   │ │
+│  │  │  Source Code (.glyph)                              │   │ │
 │  │  │          ↓                                       │   │ │
 │  │  │  Lexer → Parser → Type Check → Compile          │   │ │
 │  │  │          ↓                                       │   │ │
@@ -25,7 +25,7 @@ Visual representation of the test infrastructure and how it validates the Glyph 
 │  │  │  Response (JSON)                                │   │ │
 │  │  └──────────────────────────────────────────────────┘   │ │
 │  │                                                           │ │
-│  │  Tests: Full workflows from .abc to HTTP response        │ │
+│  │  Tests: Full workflows from .glyph to HTTP response        │ │
 │  │  Status: 6 passing, 11 skipped (awaiting components)     │ │
 │  └───────────────────────────────────────────────────────────┘ │
 │                                                                 │
@@ -86,12 +86,12 @@ Visual representation of the test infrastructure and how it validates the Glyph 
 │                                                                 │
 │  ┌───────────────────────────────────────────────────────────┐ │
 │  │                   Test Fixtures                           │ │
-│  │                  (fixtures/*.abc)                         │ │
+│  │                  (fixtures/*.glyph)                         │ │
 │  │                                                           │ │
-│  │  simple_route.abc      │  multiple_routes.abc            │ │
-│  │  path_param.abc        │  with_auth.abc                  │ │
-│  │  json_response.abc     │  post_route.abc                 │ │
-│  │  invalid_syntax.abc    │  error_handling.abc             │ │
+│  │  simple_route.glyph      │  multiple_routes.glyph            │ │
+│  │  path_param.glyph        │  with_auth.glyph                  │ │
+│  │  json_response.glyph     │  post_route.glyph                 │ │
+│  │  invalid_syntax.glyph    │  error_handling.glyph             │ │
 │  │                                                           │ │
 │  │  Fixtures: 8 realistic Glyph programs for testing         │ │
 │  └───────────────────────────────────────────────────────────┘ │
@@ -150,7 +150,7 @@ Token validation    AST validation   Bytecode            Response
 │            How Tests Validate Component Integration             │
 └─────────────────────────────────────────────────────────────────┘
 
-Source Code (.abc file)
+Source Code (.glyph file)
     │
     │ TestLexerIntegration
     ↓
@@ -325,7 +325,7 @@ TestSecurityFeaturesE2E
 │                  Fixture → Test → Assertion                     │
 └─────────────────────────────────────────────────────────────────┘
 
-fixtures/simple_route.abc
+fixtures/simple_route.glyph
     │
     │ LoadFixture()
     ↓
@@ -351,7 +351,7 @@ fixtures/simple_route.abc
 [Test Pass/Fail]
 
 
-fixtures/with_auth.abc
+fixtures/with_auth.glyph
     │
     │ LoadFixture()
     ↓

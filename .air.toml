@@ -4,7 +4,7 @@ testdata_dir = "testdata"
 tmp_dir = "tmp"
 
 [build]
-  args_bin = ["dev", "examples/rest-api/main.abc", "--port", "8080"]
+  args_bin = ["dev", "examples/rest-api/main.glyph", "--port", "8080"]
   bin = "./tmp/glyph"
   cmd = "go build -o ./tmp/glyph ./cmd/glyph"
   delay = 1000
@@ -15,7 +15,7 @@ tmp_dir = "tmp"
   follow_symlink = false
   full_bin = ""
   include_dir = []
-  include_ext = ["go", "abc"]
+  include_ext = ["go", "glyph"]
   include_file = []
   kill_delay = "0s"
   log = "build-errors.log"
