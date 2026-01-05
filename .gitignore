@@ -21,7 +21,7 @@ Cargo.lock
 # Legacy extensions (no longer used)
 # *.abcx
 *.glyphx
-*.glybc
+*.glyphc
 
 # IDE & Editors
 .vscode/

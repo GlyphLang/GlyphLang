@@ -84,7 +84,7 @@ to rapidly build high-performance, secure backend applications.`,
 		RunE:  runRun,
 	}
 	runCmd.Flags().Uint16P("port", "p", 3000, "Port to listen on")
-	runCmd.Flags().Bool("bytecode", false, "Execute bytecode (.glybc) file")
+	runCmd.Flags().Bool("bytecode", false, "Execute bytecode (.glyphc) file")
 	runCmd.Flags().Bool("interpret", false, "Use tree-walking interpreter instead of compiler (fallback mode)")
 
 	// Dev command
@@ -293,7 +293,7 @@ func runCompile(cmd *cobra.Command, args []string) error {
 
 	// Determine output path
 	if output == "" {
-		output = changeExtension(filePath, ".glybc")
+		output = changeExtension(filePath, ".glyphc")
 	}
 
 	// Write bytecode to file with restricted permissions (owner read/write only)
@@ -375,7 +375,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	// Check if file is bytecode based on extension or flag
 	if !useBytecode {
-		useBytecode = filepath.Ext(filePath) == ".glybc"
+		useBytecode = filepath.Ext(filePath) == ".glyphc"
 	}
 
 	if useBytecode {

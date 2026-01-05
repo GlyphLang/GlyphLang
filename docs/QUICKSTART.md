@@ -874,10 +874,10 @@ glyph dev examples/hello-world/main.glyph --open
 
 ```bash
 # Compile for production
-glyph compile main.glyph -o build/app.glybc -O 3
+glyph compile main.glyph -o build/app.glyphc -O 3
 
 # Run compiled bytecode
-glyph run build/app.glybc -p 80
+glyph run build/app.glyphc -p 80
 ```
 
 ### Getting Help

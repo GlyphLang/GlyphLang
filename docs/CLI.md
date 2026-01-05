@@ -71,7 +71,7 @@ glyph run examples/rest-api/main.glyph
 
 # Options:
 #   -p, --port <port>     Port to listen on (default: 3000)
-#   --bytecode            Execute bytecode (.glybc) file directly
+#   --bytecode            Execute bytecode (.glyphc) file directly
 #   --interpret           Use tree-walking interpreter instead of compiler
 ```
 
@@ -92,8 +92,8 @@ $ glyph run examples/rest-api/main.glyph
 [INFO] Press Ctrl+C to stop
 
 # Run pre-compiled bytecode
-$ glyph run build/app.glybc --bytecode
-[INFO] Running bytecode build/app.glybc...
+$ glyph run build/app.glyphc --bytecode
+[INFO] Running bytecode build/app.glyphc...
 [SUCCESS] Bytecode executed successfully
 
 # Force interpreter mode
@@ -110,7 +110,7 @@ Compile Glyph source code to bytecode.
 glyph compile examples/hello-world/main.glyph
 
 # Options:
-#   -o, --output <file>      Output file (default: source.glybc)
+#   -o, --output <file>      Output file (default: source.glyphc)
 #   -O, --opt-level <0-3>    Optimization level (default: 2)
 ```
 
@@ -121,9 +121,9 @@ glyph compile examples/hello-world/main.glyph
 
 **Example:**
 ```bash
-$ glyph compile examples/hello-world/main.glyph -o build/hello.glybc -O 3
+$ glyph compile examples/hello-world/main.glyph -o build/hello.glyphc -O 3
 [INFO] Compiling examples/hello-world/main.glyph (optimization level: 3)...
-[SUCCESS] Compiled successfully to build/hello.glybc (8 bytes)
+[SUCCESS] Compiled successfully to build/hello.glyphc (8 bytes)
 ```
 
 ### `glyph decompile <file>`
@@ -131,7 +131,7 @@ $ glyph compile examples/hello-world/main.glyph -o build/hello.glybc -O 3
 Decompile bytecode back to readable format.
 
 ```bash
-glyph decompile build/hello.glybc
+glyph decompile build/hello.glyphc
 
 # Options:
 #   -o, --output <file>   Output file (default: source.glyph)
@@ -149,8 +149,8 @@ glyph decompile build/hello.glybc
 **Example:**
 ```bash
 # Decompile to .glyph file with disassembly output
-$ glyph decompile build/hello.glybc
-[INFO] Decompiling build/hello.glybc...
+$ glyph decompile build/hello.glyphc
+[INFO] Decompiling build/hello.glyphc...
 [INFO] Bytecode version: 1
 [INFO] Constants: 7
 [INFO] Instructions: 7
@@ -173,7 +173,7 @@ INSTRUCTIONS:
   0016: HALT
 
 # Show only disassembly (no file output)
-$ glyph decompile --disasm build/hello.glybc
+$ glyph decompile --disasm build/hello.glyphc
 ```
 
 ### `glyph exec <file> <command> [args...]`
@@ -570,10 +570,10 @@ glyph exec examples/cli-demo/main.glyph greet --name="Bob" --formal
 
 ```bash
 # Compile to bytecode
-glyph compile main.glyph -o build/app.glybc -O 3
+glyph compile main.glyph -o build/app.glyphc -O 3
 
 # Run in production
-glyph run build/app.glybc -p 80
+glyph run build/app.glyphc -p 80
 ```
 
 ## Troubleshooting

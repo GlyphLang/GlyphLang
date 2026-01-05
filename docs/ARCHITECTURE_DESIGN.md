@@ -33,7 +33,7 @@ graph TB
         TC["Type Checker"]
         COMP["Compiler"]
         OPT["Optimizer"]
-        BC[".glybc Bytecode"]
+        BC[".glyphc Bytecode"]
     end
 
     subgraph "Runtime"
@@ -118,7 +118,7 @@ flowchart LR
     end
 
     subgraph Output
-        BYTECODE["Bytecode\n(.glybc)"]
+        BYTECODE["Bytecode\n(.glyphc)"]
     end
 
     SOURCE --> TOK
@@ -163,7 +163,7 @@ sequenceDiagram
     O->>B: Optimized bytecode
     B->>B: Add magic header
     B->>B: Calculate CRC32
-    B-->>S: .glybc file
+    B-->>S: .glyphc file
 ```
 
 ---
@@ -1045,7 +1045,7 @@ flowchart LR
 
     subgraph "Production"
         BUILD["glyph compile -O3"]
-        DEPLOY["Deploy .glybc"]
+        DEPLOY["Deploy .glyphc"]
     end
 
     CODE --> SAVE
