@@ -14,7 +14,7 @@
 
 ```
 ┌──────────────────────────────────────────────┐
-│ Glyph Binary Format (.glybc)                   │
+│ Glyph Binary Format (.glyphc)                   │
 ├──────────────────────────────────────────────┤
 │ [Magic Number: 4 bytes] "Glyph"               │
 │ [Version: 1 byte] 0x01                       │
@@ -95,7 +95,7 @@
   > {message: "Hello, World!"}
 ```
 
-**Binary format (.glybc) - Hex dump:**
+**Binary format (.glyphc) - Hex dump:**
 ```
 41 49 42 43        // Magic: "Glyph"
 01                 // Version: 1
@@ -143,8 +143,8 @@ Optional zstd compression (flag 0x01):
 ## Round-Trip Guarantee
 
 ```
-.glyph → parser → AST → serializer → .glybc
-.glybc → deserializer → AST → formatter → .glyph
+.glyph → parser → AST → serializer → .glyphc
+.glyphc → deserializer → AST → formatter → .glyph
 ```
 
 - Comments preserved in metadata
@@ -164,20 +164,20 @@ Optional zstd compression (flag 0x01):
 
 ```bash
 # Compile human to AI format
-glyph compile hello.glyph -o hello.glybc
+glyph compile hello.glyph -o hello.glyphc
 
 # Decompile AI to human format
-glyph decompile hello.glybc -o hello.glyph
+glyph decompile hello.glyphc -o hello.glyph
 
 # Show disassembly only (no file output)
-glyph decompile --disasm hello.glybc
+glyph decompile --disasm hello.glyphc
 
 # Run directly from binary
-glyph run hello.glybc
+glyph run hello.glyphc
 
 # AI generates binary directly
-curl ai-api.com/generate > api.glybc
-glyph run api.glybc
+curl ai-api.com/generate > api.glyphc
+glyph run api.glyphc
 ```
 
 ## Decompiler

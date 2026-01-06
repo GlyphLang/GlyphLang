@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Test parsing and executing a complete .abc file
+// Test parsing and executing a complete .glyph file
 func TestIntegration_HelloWorldFile(t *testing.T) {
 	source := `: Message {
   text: str!
@@ -219,40 +219,42 @@ func TestIntegration_ExampleFiles(t *testing.T) {
 	}{
 		{
 			name:     "hello-world example",
-			filePath: filepath.Join(projectRoot, "examples", "hello-world", "main.abc"),
+			filePath: filepath.Join(projectRoot, "examples", "hello-world", "main.glyph"),
 			validate: func(t *testing.T, module *interpreter.Module) {
-				assert.GreaterOrEqual(t, len(module.Items), 2, "should have at least 2 items")
+				assert.GreaterOrEqual(t, len(module.Items), 3, "should have at least 3 items")
 
-				// Find routes
+				// Find routes - hello-world has 3 routes
 				routeCount := 0
-				typeCount := 0
 				for _, item := range module.Items {
 					switch item.(type) {
 					case interpreter.Route:
 						routeCount++
-					case interpreter.TypeDef:
-						typeCount++
+					case *interpreter.Route:
+						routeCount++
 					}
 				}
 
-				assert.GreaterOrEqual(t, routeCount, 1, "should have at least 1 route")
-				assert.GreaterOrEqual(t, typeCount, 0, "may have type definitions")
+				assert.GreaterOrEqual(t, routeCount, 3, "should have at least 3 routes")
 			},
 		},
 		{
 			name:     "rest-api example",
-			filePath: filepath.Join(projectRoot, "examples", "rest-api", "main.abc"),
+			filePath: filepath.Join(projectRoot, "examples", "rest-api", "main.glyph"),
 			validate: func(t *testing.T, module *interpreter.Module) {
 				assert.Greater(t, len(module.Items), 0, "should have items")
 
-				// Find routes and types
+				// Find routes and types - rest-api has 6 routes and 3 types
 				routeCount := 0
 				typeCount := 0
 				for _, item := range module.Items {
 					switch item.(type) {
 					case interpreter.Route:
 						routeCount++
+					case *interpreter.Route:
+						routeCount++
 					case interpreter.TypeDef:
+						typeCount++
+					case *interpreter.TypeDef:
 						typeCount++
 					}
 				}

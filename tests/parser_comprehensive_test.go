@@ -53,7 +53,7 @@ func TestParserAllFixtures(t *testing.T) {
 	helper := NewTestHelper(t)
 	comp := compiler.NewCompiler()
 
-	fixtureFiles, err := filepath.Glob("fixtures/*.abc")
+	fixtureFiles, err := filepath.Glob("fixtures/*.glyph")
 	if err != nil {
 		t.Fatalf("Failed to list fixtures: %v", err)
 	}
@@ -68,19 +68,19 @@ func TestParserAllFixtures(t *testing.T) {
 
 			module, err := parseSource(string(source))
 
-			// invalid_syntax.abc is expected to fail parsing
-			if name == "invalid_syntax.abc" {
+			// invalid_syntax.glyph is expected to fail parsing
+			if name == "invalid_syntax.glyph" {
 				if err != nil {
-					t.Logf("✓ invalid_syntax.abc correctly failed to parse: %v", err)
+					t.Logf("✓ invalid_syntax.glyph correctly failed to parse: %v", err)
 					return // Expected failure
 				}
 				// If parsing succeeded, compilation should fail
 				_, compErr := comp.Compile(module)
 				if compErr != nil {
-					t.Logf("✓ invalid_syntax.abc correctly failed to compile: %v", compErr)
+					t.Logf("✓ invalid_syntax.glyph correctly failed to compile: %v", compErr)
 					return // Expected failure
 				}
-				t.Logf("Note: invalid_syntax.abc did not produce expected error")
+				t.Logf("Note: invalid_syntax.glyph did not produce expected error")
 				return
 			}
 

@@ -18,9 +18,8 @@ Cargo.lock
 # Build artifacts
 /build/
 /dist/
-*.abcx
 *.glyphx
-*.glybc
+*.glyphc
 
 # IDE & Editors
 .vscode/
@@ -63,7 +62,6 @@ PROJECT_COMPLETE.txt
 *_COMPLETE.md
 
 # Test artifacts
-test_*.abc
 test_*.glyph
 nul
 test_output.txt
@@ -86,9 +84,6 @@ coverage/
 
 # Docker
 .dockerignore
-
-# Website (if needed to be excluded from main repo)
-# website/
 
 # Database
 *.db

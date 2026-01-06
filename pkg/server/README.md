@@ -316,7 +316,7 @@ When integrated with the Glyph compiler and interpreter, routes will be register
 
 ```go
 // Parse Glyph file
-routes := parser.Parse("main.abc")
+routes := parser.Parse("main.glyph")
 
 // Register with server
 srv.RegisterRoutes(routes)

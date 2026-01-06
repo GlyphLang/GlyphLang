@@ -260,10 +260,10 @@ Test programs in `fixtures/`:
 ls tests/fixtures/
 
 # View a fixture
-cat tests/fixtures/simple_route.abc
+cat tests/fixtures/simple_route.glyph
 
 # Use in tests
-helper.LoadFixture("simple_route.abc")
+helper.LoadFixture("simple_route.glyph")
 ```
 
 ## Continuous Integration

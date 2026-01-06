@@ -462,14 +462,14 @@ func TestFixturesIntegration(t *testing.T) {
 		name        string
 		shouldError bool
 	}{
-		{"simple_route.abc", false},
-		{"path_param.abc", false},
-		{"json_response.abc", false},
-		{"multiple_routes.abc", false},
-		{"post_route.abc", false},
-		{"with_auth.abc", false},
-		{"error_handling.abc", false},
-		{"invalid_syntax.abc", true},
+		{"simple_route.glyph", false},
+		{"path_param.glyph", false},
+		{"json_response.glyph", false},
+		{"multiple_routes.glyph", false},
+		{"post_route.glyph", false},
+		{"with_auth.glyph", false},
+		{"error_handling.glyph", false},
+		{"invalid_syntax.glyph", true},
 	}
 
 	comp := compiler.NewCompiler()

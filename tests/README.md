@@ -12,14 +12,14 @@ tests/
 ├── integration_test.go         # Component integration tests
 ├── benchmark_test.go           # Performance benchmarks
 └── fixtures/                   # Test Glyph programs
-    ├── simple_route.abc
-    ├── path_param.abc
-    ├── json_response.abc
-    ├── multiple_routes.abc
-    ├── with_auth.abc
-    ├── post_route.abc
-    ├── invalid_syntax.abc
-    └── error_handling.abc
+    ├── simple_route.glyph
+    ├── path_param.glyph
+    ├── json_response.glyph
+    ├── multiple_routes.glyph
+    ├── with_auth.glyph
+    ├── post_route.glyph
+    ├── invalid_syntax.glyph
+    └── error_handling.glyph
 ```
 
 ## Running Tests
@@ -131,14 +131,14 @@ Measures performance of various operations:
 
 Test fixtures are small Glyph programs in `fixtures/` directory:
 
-1. **simple_route.abc**: Basic route returning JSON
-2. **path_param.abc**: Route with path parameter (`:name`)
-3. **json_response.abc**: Route with type definition and JSON response
-4. **multiple_routes.abc**: Multiple routes in one program
-5. **with_auth.abc**: Route with authentication and rate limiting
-6. **post_route.abc**: POST route with input validation
-7. **invalid_syntax.abc**: Invalid syntax (for error testing)
-8. **error_handling.abc**: Route with Result type (success | error)
+1. **simple_route.glyph**: Basic route returning JSON
+2. **path_param.glyph**: Route with path parameter (`:name`)
+3. **json_response.glyph**: Route with type definition and JSON response
+4. **multiple_routes.glyph**: Multiple routes in one program
+5. **with_auth.glyph**: Route with authentication and rate limiting
+6. **post_route.glyph**: POST route with input validation
+7. **invalid_syntax.glyph**: Invalid syntax (for error testing)
+8. **error_handling.glyph**: Route with Result type (success | error)
 
 ## Test Helpers
 
@@ -272,7 +272,7 @@ func BenchmarkNewOperation(b *testing.B) {
 ```bash
 # Create new fixture
 echo '@ route /new-feature
-  > {status: "ok"}' > tests/fixtures/new_feature.abc
+  > {status: "ok"}' > tests/fixtures/new_feature.glyph
 ```
 
 ### 3. Use Test Helpers
@@ -281,7 +281,7 @@ echo '@ route /new-feature
 helper := NewTestHelper(t)
 
 // Load fixture
-source := helper.LoadFixture("new_feature.abc")
+source := helper.LoadFixture("new_feature.glyph")
 
 // Make assertions
 helper.AssertEqual(got, want, "value comparison")

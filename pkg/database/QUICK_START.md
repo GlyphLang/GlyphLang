@@ -356,7 +356,7 @@ export DATABASE_URL="postgres://user:pass@prod-host:5432/proddb?sslmode=require"
 ## Next Steps
 
 1. See `pkg/database/README.md` for full documentation
-2. Check `examples/database-demo/main.abc` for complete example
+2. Check `examples/database-demo/main.glyph` for complete example
 3. Review tests in `pkg/database/*_test.go` for usage patterns
 4. Read integration guide in README for production deployment
 

@@ -20,13 +20,13 @@ func TestDocumentManager(t *testing.T) {
 }
 `
 
-	doc, err := dm.Open("file:///test.abc", 1, source)
+	doc, err := dm.Open("file:///test.glyph", 1, source)
 	if err != nil {
 		t.Fatalf("Failed to open document: %v", err)
 	}
 
-	if doc.URI != "file:///test.abc" {
-		t.Errorf("Expected URI 'file:///test.abc', got '%s'", doc.URI)
+	if doc.URI != "file:///test.glyph" {
+		t.Errorf("Expected URI 'file:///test.glyph', got '%s'", doc.URI)
 	}
 
 	if doc.Version != 1 {
@@ -38,7 +38,7 @@ func TestDocumentManager(t *testing.T) {
 	}
 
 	// Test getting a document
-	retrieved, exists := dm.Get("file:///test.abc")
+	retrieved, exists := dm.Get("file:///test.glyph")
 	if !exists {
 		t.Fatal("Document should exist")
 	}
@@ -59,7 +59,7 @@ func TestDocumentManager(t *testing.T) {
 		{Text: newSource},
 	}
 
-	updated, err := dm.Update("file:///test.abc", 2, changes)
+	updated, err := dm.Update("file:///test.glyph", 2, changes)
 	if err != nil {
 		t.Fatalf("Failed to update document: %v", err)
 	}
@@ -73,11 +73,11 @@ func TestDocumentManager(t *testing.T) {
 	}
 
 	// Test closing a document
-	if err := dm.Close("file:///test.abc"); err != nil {
+	if err := dm.Close("file:///test.glyph"); err != nil {
 		t.Fatalf("Failed to close document: %v", err)
 	}
 
-	_, exists = dm.Get("file:///test.abc")
+	_, exists = dm.Get("file:///test.glyph")
 	if exists {
 		t.Error("Document should not exist after closing")
 	}
@@ -95,7 +95,7 @@ func TestDocumentParsing(t *testing.T) {
 }
 `
 
-	doc, err := dm.Open("file:///valid.abc", 1, validSource)
+	doc, err := dm.Open("file:///valid.glyph", 1, validSource)
 	if err != nil {
 		t.Fatalf("Failed to open document: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestDocumentParsingErrors(t *testing.T) {
 }
 `
 
-	doc, err := dm.Open("file:///invalid.abc", 1, invalidSource)
+	doc, err := dm.Open("file:///invalid.glyph", 1, invalidSource)
 	if err != nil {
 		t.Fatalf("Failed to open document: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestGetWordAtPosition(t *testing.T) {
 `
 
 	dm := NewDocumentManager()
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	tests := []struct {
 		name     string
@@ -248,7 +248,7 @@ line 2
 line 3`
 
 	dm := NewDocumentManager()
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	tests := []struct {
 		line     int
@@ -275,7 +275,7 @@ def
 ghi`
 
 	dm := NewDocumentManager()
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	tests := []struct {
 		name     string
@@ -356,9 +356,9 @@ func TestDocumentGetAll(t *testing.T) {
 	dm := NewDocumentManager()
 
 	// Open multiple documents
-	dm.Open("file:///test1.abc", 1, ": User { name: str! }")
-	dm.Open("file:///test2.abc", 1, "@ GET /test {\n  > {}\n}")
-	dm.Open("file:///test3.abc", 1, ": Product { price: int! }")
+	dm.Open("file:///test1.glyph", 1, ": User { name: str! }")
+	dm.Open("file:///test2.glyph", 1, "@ GET /test {\n  > {}\n}")
+	dm.Open("file:///test3.glyph", 1, ": Product { price: int! }")
 
 	all := dm.GetAll()
 	if len(all) != 3 {
@@ -366,7 +366,7 @@ func TestDocumentGetAll(t *testing.T) {
 	}
 
 	// Close one document
-	dm.Close("file:///test2.abc")
+	dm.Close("file:///test2.glyph")
 
 	all = dm.GetAll()
 	if len(all) != 2 {
@@ -381,7 +381,7 @@ func TestDocumentUpdateNonExistent(t *testing.T) {
 		{Text: "new content"},
 	}
 
-	_, err := dm.Update("file:///nonexistent.abc", 2, changes)
+	_, err := dm.Update("file:///nonexistent.glyph", 2, changes)
 	if err == nil {
 		t.Error("Expected error when updating non-existent document")
 	}
@@ -390,7 +390,7 @@ func TestDocumentUpdateNonExistent(t *testing.T) {
 func TestDocumentCloseNonExistent(t *testing.T) {
 	dm := NewDocumentManager()
 
-	err := dm.Close("file:///nonexistent.abc")
+	err := dm.Close("file:///nonexistent.glyph")
 	if err == nil {
 		t.Error("Expected error when closing non-existent document")
 	}

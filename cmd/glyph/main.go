@@ -84,7 +84,7 @@ to rapidly build high-performance, secure backend applications.`,
 		RunE:  runRun,
 	}
 	runCmd.Flags().Uint16P("port", "p", 3000, "Port to listen on")
-	runCmd.Flags().Bool("bytecode", false, "Execute bytecode (.glybc) file")
+	runCmd.Flags().Bool("bytecode", false, "Execute bytecode (.glyphc) file")
 	runCmd.Flags().Bool("interpret", false, "Use tree-walking interpreter instead of compiler (fallback mode)")
 
 	// Dev command
@@ -293,7 +293,7 @@ func runCompile(cmd *cobra.Command, args []string) error {
 
 	// Determine output path
 	if output == "" {
-		output = changeExtension(filePath, ".glybc")
+		output = changeExtension(filePath, ".glyphc")
 	}
 
 	// Write bytecode to file with restricted permissions (owner read/write only)
@@ -375,7 +375,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	// Check if file is bytecode based on extension or flag
 	if !useBytecode {
-		useBytecode = filepath.Ext(filePath) == ".glybc"
+		useBytecode = filepath.Ext(filePath) == ".glyphc"
 	}
 
 	if useBytecode {
@@ -896,7 +896,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	// Create main.abc file with template
+	// Create main.glyph file with template
 	var content string
 	switch template {
 	case "hello-world":
@@ -907,13 +907,13 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unknown template: %s", template)
 	}
 
-	mainFile := filepath.Join(name, "main.abc")
+	mainFile := filepath.Join(name, "main.glyph")
 	if err := os.WriteFile(mainFile, []byte(content), 0600); err != nil {
-		return fmt.Errorf("failed to write main.abc: %w", err)
+		return fmt.Errorf("failed to write main.glyph: %w", err)
 	}
 
 	printSuccess(fmt.Sprintf("Project created successfully in %s/", name))
-	printInfo(fmt.Sprintf("Run: cd %s && glyph dev main.abc", name))
+	printInfo(fmt.Sprintf("Run: cd %s && glyph dev main.glyph", name))
 	return nil
 }
 

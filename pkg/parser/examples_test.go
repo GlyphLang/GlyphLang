@@ -10,10 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Test that examples/hello-world/main.abc parses correctly
+// Test that examples/hello-world/main.glyph parses correctly
 func TestExamples_HelloWorld(t *testing.T) {
 	// Read the hello world example file
-	examplePath := filepath.Join("..", "..", "examples", "hello-world", "main.abc")
+	examplePath := filepath.Join("..", "..", "examples", "hello-world", "main.glyph")
 	content, err := os.ReadFile(examplePath)
 	if err != nil {
 		t.Skipf("Could not read example file: %v", err)
@@ -32,20 +32,8 @@ func TestExamples_HelloWorld(t *testing.T) {
 	require.NoError(t, err, "hello-world example should parse without errors")
 	require.NotNil(t, module)
 
-	// Validate structure
-	assert.GreaterOrEqual(t, len(module.Items), 2, "should have at least 2 items")
-
-	// Check for Message type
-	hasMessageType := false
-	for _, item := range module.Items {
-		if typeDef, ok := item.(*interpreter.TypeDef); ok {
-			if typeDef.Name == "Message" {
-				hasMessageType = true
-				assert.GreaterOrEqual(t, len(typeDef.Fields), 2, "Message should have at least 2 fields")
-			}
-		}
-	}
-	assert.True(t, hasMessageType, "should have Message type definition")
+	// Validate structure - hello-world has 3 routes: /, /hello/:name, /health
+	assert.GreaterOrEqual(t, len(module.Items), 3, "should have at least 3 items")
 
 	// Check for routes
 	routes := []*interpreter.Route{}
@@ -54,20 +42,22 @@ func TestExamples_HelloWorld(t *testing.T) {
 			routes = append(routes, route)
 		}
 	}
-	assert.GreaterOrEqual(t, len(routes), 2, "should have at least 2 routes")
+	assert.GreaterOrEqual(t, len(routes), 3, "should have at least 3 routes")
 
 	// Verify route paths
 	paths := make(map[string]bool)
 	for _, route := range routes {
 		paths[route.Path] = true
 	}
-	assert.True(t, paths["/hello"], "should have /hello route")
+	assert.True(t, paths["/"], "should have / route")
+	assert.True(t, paths["/hello/:name"], "should have /hello/:name route")
+	assert.True(t, paths["/health"], "should have /health route")
 }
 
-// Test that examples/rest-api/main.abc parses correctly
+// Test that examples/rest-api/main.glyph parses correctly
 func TestExamples_RestApi(t *testing.T) {
 	// Read the rest-api example file
-	examplePath := filepath.Join("..", "..", "examples", "rest-api", "main.abc")
+	examplePath := filepath.Join("..", "..", "examples", "rest-api", "main.glyph")
 	content, err := os.ReadFile(examplePath)
 	if err != nil {
 		t.Skipf("Could not read example file: %v", err)
@@ -145,8 +135,8 @@ func TestExamples_FixtureFiles(t *testing.T) {
 		return
 	}
 
-	// Read all .abc files in fixtures
-	files, err := filepath.Glob(filepath.Join(fixturesPath, "*.abc"))
+	// Read all .glyph files in fixtures
+	files, err := filepath.Glob(filepath.Join(fixturesPath, "*.glyph"))
 	if err != nil {
 		t.Fatalf("Failed to read fixtures: %v", err)
 	}
@@ -162,7 +152,7 @@ func TestExamples_FixtureFiles(t *testing.T) {
 			tokens, err := lexer.Tokenize()
 
 			// Skip files with "invalid" in the name if they produce lex errors
-			if filepath.Base(file) == "invalid_syntax.abc" {
+			if filepath.Base(file) == "invalid_syntax.glyph" {
 				if err != nil {
 					t.Skip("Invalid syntax file - expected to fail")
 				}
@@ -175,7 +165,7 @@ func TestExamples_FixtureFiles(t *testing.T) {
 			module, err := parser.Parse()
 
 			// Skip files with "invalid" in the name if they produce parse errors
-			if filepath.Base(file) == "invalid_syntax.abc" {
+			if filepath.Base(file) == "invalid_syntax.glyph" {
 				if err != nil {
 					t.Skip("Invalid syntax file - expected to fail")
 				}

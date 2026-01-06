@@ -116,7 +116,7 @@ func TestRuntimeErrorWithContext(t *testing.T) {
 			"total": 10,
 		}).
 		WithStackFrame("handler", "/users GET", 5).
-		WithStackFrame("main", "main.abc", 1)
+		WithStackFrame("main", "main.glyph", 1)
 
 	if err.Route != "/users GET" {
 		t.Errorf("Expected route '/users GET', got '%s'", err.Route)

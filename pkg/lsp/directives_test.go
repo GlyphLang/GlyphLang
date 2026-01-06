@@ -106,7 +106,7 @@ func TestDirectiveKeywordInfo(t *testing.T) {
 func TestDirectiveCompletionSnippets(t *testing.T) {
 	dm := NewDocumentManager()
 	source := ""
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	completions := GetCompletion(doc, Position{Line: 0, Character: 0})
 
@@ -271,7 +271,7 @@ func TestDirectiveTriggerCharacters(t *testing.T) {
 	// We can't directly test the server configuration here, but we can verify
 	// that the completion function works when called
 	dm := NewDocumentManager()
-	doc, _ := dm.Open("file:///test.abc", 1, "")
+	doc, _ := dm.Open("file:///test.glyph", 1, "")
 
 	completions := GetCompletion(doc, Position{Line: 0, Character: 0})
 

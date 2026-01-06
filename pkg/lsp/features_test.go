@@ -18,7 +18,7 @@ func TestGetDiagnostics(t *testing.T) {
 }
 `
 
-	doc, _ := dm.Open("file:///valid.abc", 1, validSource)
+	doc, _ := dm.Open("file:///valid.glyph", 1, validSource)
 	diagnostics := GetDiagnostics(doc)
 
 	if len(diagnostics) > 0 {
@@ -31,7 +31,7 @@ func TestGetDiagnostics(t *testing.T) {
 }
 `
 
-	doc2, _ := dm.Open("file:///invalid.abc", 1, invalidSource)
+	doc2, _ := dm.Open("file:///invalid.glyph", 1, invalidSource)
 	diagnostics2 := GetDiagnostics(doc2)
 
 	if len(diagnostics2) == 0 {
@@ -63,7 +63,7 @@ func TestGetHover(t *testing.T) {
 }
 `
 
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	tests := []struct {
 		name        string
@@ -122,7 +122,7 @@ func TestGetCompletion(t *testing.T) {
 }
 `
 
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	// Get completions
 	completions := GetCompletion(doc, Position{Line: 0, Character: 0})
@@ -182,7 +182,7 @@ func TestGetDefinition(t *testing.T) {
 }
 `
 
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	// Try to find definition of "User" type
 	definitions := GetDefinition(doc, Position{Line: 5, Character: 11})
@@ -220,7 +220,7 @@ func TestGetDocumentSymbols(t *testing.T) {
 }
 `
 
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	symbols := GetDocumentSymbols(doc)
 
@@ -263,7 +263,7 @@ func TestFormatType(t *testing.T) {
 }
 `
 
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	if doc.AST == nil {
 		t.Fatal("Expected AST to be parsed")
@@ -326,7 +326,7 @@ func TestCheckTypes(t *testing.T) {
 }
 `
 
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	if doc.AST == nil {
 		t.Fatal("Expected AST to be parsed")
@@ -361,7 +361,7 @@ func TestCheckTypesValid(t *testing.T) {
 }
 `
 
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	if doc.AST == nil {
 		t.Fatal("Expected AST to be parsed")
@@ -385,7 +385,7 @@ func TestFormatTypeDefHover(t *testing.T) {
 }
 `
 
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	hover := GetHover(doc, Position{Line: 0, Character: 2})
 	if hover == nil {
@@ -412,7 +412,7 @@ func TestFormatRouteHover(t *testing.T) {
 }
 `
 
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	hover := GetHover(doc, Position{Line: 0, Character: 10})
 	if hover == nil {
@@ -429,7 +429,7 @@ func TestCompletionSnippets(t *testing.T) {
 	dm := NewDocumentManager()
 
 	source := ""
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	completions := GetCompletion(doc, Position{Line: 0, Character: 0})
 
@@ -457,7 +457,7 @@ func TestCompletionHTTPMethods(t *testing.T) {
 	dm := NewDocumentManager()
 
 	source := ""
-	doc, _ := dm.Open("file:///test.abc", 1, source)
+	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	completions := GetCompletion(doc, Position{Line: 0, Character: 0})
 
@@ -484,7 +484,7 @@ func TestDiagnosticsWithHint(t *testing.T) {
   > {}
 }`
 
-	doc, _ := dm.Open("file:///test.abc", 1, invalidSource)
+	doc, _ := dm.Open("file:///test.glyph", 1, invalidSource)
 	diagnostics := GetDiagnostics(doc)
 
 	if len(diagnostics) == 0 {

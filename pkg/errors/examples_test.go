@@ -52,7 +52,7 @@ func ExampleRuntimeError_divisionByZero() {
 		}).
 		WithSuggestion("Add a check to ensure 'count' is not zero before performing division").
 		WithStackFrame("calculateAverage", "/calculate POST", 12).
-		WithStackFrame("main", "main.abc", 5)
+		WithStackFrame("main", "main.glyph", 5)
 
 	output := err.FormatError(false)
 	fmt.Print(output)
@@ -208,7 +208,7 @@ return average`
 	fmt.Println(FormatError(err2))
 
 	// Add a filename
-	err3 := WithFileName(err2, "calculations.abc")
+	err3 := WithFileName(err2, "calculations.glyph")
 	fmt.Println("\n=== Error with filename ===")
 	fmt.Println(FormatError(err3))
 }

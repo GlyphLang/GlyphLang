@@ -1259,6 +1259,33 @@ func (vm *VM) SetLocal(name string, value Value) {
 	vm.locals[name] = value
 }
 
+// StackSize returns the current size of the stack
+func (vm *VM) StackSize() int {
+	return len(vm.stack)
+}
+
+// IteratorCount returns the number of active iterators
+func (vm *VM) IteratorCount() int {
+	return len(vm.iterators)
+}
+
+// LocalsCount returns the number of local variables
+func (vm *VM) LocalsCount() int {
+	return len(vm.locals)
+}
+
+// Reset clears the VM state for reuse
+func (vm *VM) Reset() {
+	vm.stack = vm.stack[:0]
+	vm.locals = make(map[string]Value)
+	vm.constants = vm.constants[:0]
+	vm.iterators = make(map[int]*Iterator)
+	vm.nextIterID = 0
+	vm.pc = 0
+	vm.code = nil
+	vm.halted = false
+}
+
 // registerBuiltins registers all built-in functions
 func (vm *VM) registerBuiltins() {
 	// time.now() - returns current Unix timestamp

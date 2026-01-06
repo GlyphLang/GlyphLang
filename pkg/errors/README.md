@@ -130,7 +130,7 @@ err := NewRuntimeError("Division by zero").
         "denominator": 0,
     }).
     WithStackFrame("calculateResult", "/calculate POST", 5).
-    WithStackFrame("handleRequest", "main.glybc", 12)
+    WithStackFrame("handleRequest", "main.glyphc", 12)
 ```
 
 **Output:**
@@ -150,7 +150,7 @@ Variables in scope:
 
 Stack trace:
   1. calculateResult at /calculate POST:5
-  2. handleRequest at main.glybc:12
+  2. handleRequest at main.glyphc:12
 
 Suggestion: Add a check to ensure the divisor is not zero before dividing: if (divisor != 0) { ... }
 ```
@@ -219,7 +219,7 @@ err := WithLineInfo(baseErr, 2, 13, source)
 err = WithSuggestion(err, "Check the value type")
 
 // Add filename
-err = WithFileName(err, "main.glybc")
+err = WithFileName(err, "main.glyphc")
 
 // Format and display
 fmt.Println(FormatError(err))

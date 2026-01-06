@@ -296,7 +296,7 @@ DATABASE_URL="postgres://user:pass@localhost:5432/testdb" go test ./pkg/database
 
 ## Examples
 
-See `examples/database-demo/main.abc` for a complete CRUD application example.
+See `examples/database-demo/main.glyph` for a complete CRUD application example.
 
 ## API Reference
 

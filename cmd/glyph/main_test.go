@@ -19,7 +19,7 @@ func TestChangeExtension(t *testing.T) {
 		newExt   string
 		expected string
 	}{
-		{"main.abc", ".glyph", "main.glyph"},
+		{"main.old", ".glyph", "main.glyph"},
 		{"test.txt", ".md", "test.md"},
 		{"/path/to/file.go", ".txt", "/path/to/file.txt"},
 	}
@@ -101,7 +101,7 @@ func TestRunInitCommand(t *testing.T) {
 	err = os.MkdirAll(projectName, 0755)
 	require.NoError(t, err)
 
-	mainFile := filepath.Join(projectName, "main.abc")
+	mainFile := filepath.Join(projectName, "main.glyph")
 	err = os.WriteFile(mainFile, []byte(getHelloWorldTemplate()), 0644)
 	require.NoError(t, err)
 
