@@ -25,7 +25,7 @@ jobs:
           path-to-signatures: 'signatures/version1/cla.json'
           path-to-document: 'https://github.com/${{ github.repository }}/blob/main/.github/CLA.md'
           branch: 'main'
-          allowlist: bot*,dependabot*
+          allowlist: bot*,dependabot*,GlyphLang
 
           remote-organization-name: false
           remote-repository-name: false
