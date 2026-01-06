@@ -288,7 +288,7 @@ func TestLexer_Comments(t *testing.T) {
 	}
 }
 
-// Test boolean literals
+// Test boolean literals and null
 func TestLexer_BooleanLiterals(t *testing.T) {
 	tests := []struct {
 		input        string
@@ -297,6 +297,7 @@ func TestLexer_BooleanLiterals(t *testing.T) {
 	}{
 		{"true", TRUE, "true"},
 		{"false", FALSE, "false"},
+		{"null", NULL, "null"},
 	}
 
 	for _, tt := range tests {

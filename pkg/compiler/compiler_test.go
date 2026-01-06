@@ -38,6 +38,11 @@ func TestCompileLiteral(t *testing.T) {
 			expr: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: false}},
 			expected: vm.BoolValue{Val: false},
 		},
+		{
+			name:     "null literal",
+			expr:     &interpreter.LiteralExpr{Value: interpreter.NullLiteral{}},
+			expected: vm.NullValue{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -111,6 +116,33 @@ func TestCompileBinaryOp(t *testing.T) {
 				Op:    interpreter.Gt,
 				Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
 				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+			},
+			expected: vm.BoolValue{Val: true},
+		},
+		{
+			name: "null == null",
+			expr: &interpreter.BinaryOpExpr{
+				Op:    interpreter.Eq,
+				Left:  &interpreter.LiteralExpr{Value: interpreter.NullLiteral{}},
+				Right: &interpreter.LiteralExpr{Value: interpreter.NullLiteral{}},
+			},
+			expected: vm.BoolValue{Val: true},
+		},
+		{
+			name: "null != 42",
+			expr: &interpreter.BinaryOpExpr{
+				Op:    interpreter.Ne,
+				Left:  &interpreter.LiteralExpr{Value: interpreter.NullLiteral{}},
+				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+			},
+			expected: vm.BoolValue{Val: true},
+		},
+		{
+			name: "42 != null",
+			expr: &interpreter.BinaryOpExpr{
+				Op:    interpreter.Ne,
+				Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+				Right: &interpreter.LiteralExpr{Value: interpreter.NullLiteral{}},
 			},
 			expected: vm.BoolValue{Val: true},
 		},
