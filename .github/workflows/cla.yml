@@ -22,9 +22,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PERSONAL_ACCESS_TOKEN: ${{ secrets.CLA_PAT }}
         with:
-          path-to-signatures: 'signatures/version1/cla.json'
+          path-to-signatures: 'cla-signatures.json'
           path-to-document: 'https://github.com/${{ github.repository }}/blob/main/.github/CLA.md'
-          branch: 'main'
+          branch: 'cla-signatures'
           allowlist: bot*,dependabot*,GlyphLang
 
           remote-organization-name: false
