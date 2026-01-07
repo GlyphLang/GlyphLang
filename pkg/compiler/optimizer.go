@@ -727,6 +727,25 @@ func getModifiedVariablesInStmt(stmt interpreter.Statement, modified map[string]
 		for _, bodyStmt := range s.Body {
 			getModifiedVariablesInStmt(bodyStmt, modified)
 		}
+	case *interpreter.ForStatement:
+		// Mark loop variables as modified
+		modified[s.ValueVar] = true
+		if s.KeyVar != "" {
+			modified[s.KeyVar] = true
+		}
+		// Recursively check body for modified variables
+		for _, bodyStmt := range s.Body {
+			getModifiedVariablesInStmt(bodyStmt, modified)
+		}
+	case interpreter.ForStatement:
+		// Same as *interpreter.ForStatement
+		modified[s.ValueVar] = true
+		if s.KeyVar != "" {
+			modified[s.KeyVar] = true
+		}
+		for _, bodyStmt := range s.Body {
+			getModifiedVariablesInStmt(bodyStmt, modified)
+		}
 	}
 }
 

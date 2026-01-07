@@ -1430,6 +1430,75 @@ func TestCompileForLoopArrayConcatenation(t *testing.T) {
 	}
 }
 
+func TestCompileForLoopNested(t *testing.T) {
+	// Test: $ sum = 0, for row in [[1,2],[3,4]] { for cell in row { $ sum = sum + cell } }, > sum
+	// Expected: 10 (1+2+3+4)
+	route := &interpreter.Route{
+		Body: []interpreter.Statement{
+			&interpreter.AssignStatement{
+				Target: "sum",
+				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+			},
+			&interpreter.ForStatement{
+				ValueVar: "row",
+				Iterable: &interpreter.ArrayExpr{
+					Elements: []interpreter.Expr{
+						&interpreter.ArrayExpr{
+							Elements: []interpreter.Expr{
+								&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+								&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+							},
+						},
+						&interpreter.ArrayExpr{
+							Elements: []interpreter.Expr{
+								&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+								&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 4}},
+							},
+						},
+					},
+				},
+				Body: []interpreter.Statement{
+					&interpreter.ForStatement{
+						ValueVar: "cell",
+						Iterable: &interpreter.VariableExpr{Name: "row"},
+						Body: []interpreter.Statement{
+							&interpreter.AssignStatement{
+								Target: "sum",
+								Value: &interpreter.BinaryOpExpr{
+									Op:    interpreter.Add,
+									Left:  &interpreter.VariableExpr{Name: "sum"},
+									Right: &interpreter.VariableExpr{Name: "cell"},
+								},
+							},
+						},
+					},
+				},
+			},
+			&interpreter.ReturnStatement{
+				Value: &interpreter.VariableExpr{Name: "sum"},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	bytecode, err := c.CompileRoute(route)
+	if err != nil {
+		t.Fatalf("CompileRoute() error: %v", err)
+	}
+
+	// Execute
+	vmInstance := vm.NewVM()
+	result, err := vmInstance.Execute(bytecode)
+	if err != nil {
+		t.Fatalf("Execute() error: %v", err)
+	}
+
+	expected := vm.IntValue{Val: 10}
+	if !valuesEqual(result, expected) {
+		t.Errorf("Expected %v, got %v", expected, result)
+	}
+}
+
 // Switch statement tests
 
 func TestCompileSwitchSimpleStringMatch(t *testing.T) {

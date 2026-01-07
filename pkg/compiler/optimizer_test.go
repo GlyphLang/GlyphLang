@@ -1323,3 +1323,116 @@ func exprsEqual(a, b interpreter.Expr) bool {
 	return false
 }
 
+// TestOptimizer_NestedForLoopConstantInvalidation tests that constants are properly
+// invalidated when modified inside nested for-loops
+func TestOptimizer_NestedForLoopConstantInvalidation(t *testing.T) {
+	// Test: $ sum = 0, for row in matrix { for cell in row { $ sum = sum + cell } }, > sum
+	// The optimizer should NOT replace the return "sum" with constant 0
+	stmts := []interpreter.Statement{
+		&interpreter.AssignStatement{
+			Target: "sum",
+			Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+		},
+		&interpreter.ForStatement{
+			ValueVar: "row",
+			Iterable: &interpreter.VariableExpr{Name: "matrix"},
+			Body: []interpreter.Statement{
+				&interpreter.ForStatement{
+					ValueVar: "cell",
+					Iterable: &interpreter.VariableExpr{Name: "row"},
+					Body: []interpreter.Statement{
+						&interpreter.AssignStatement{
+							Target: "sum",
+							Value: &interpreter.BinaryOpExpr{
+								Op:    interpreter.Add,
+								Left:  &interpreter.VariableExpr{Name: "sum"},
+								Right: &interpreter.VariableExpr{Name: "cell"},
+							},
+						},
+					},
+				},
+			},
+		},
+		&interpreter.ReturnStatement{
+			Value: &interpreter.VariableExpr{Name: "sum"},
+		},
+	}
+
+	opt := NewOptimizer(OptBasic)
+	result := opt.OptimizeStatements(stmts)
+
+	// Should have 3 statements
+	if len(result) != 3 {
+		t.Fatalf("Expected 3 statements after optimization, got %d", len(result))
+	}
+
+	// The return statement should still reference the variable "sum", NOT a constant
+	retStmt, ok := result[2].(*interpreter.ReturnStatement)
+	if !ok {
+		t.Fatalf("Expected ReturnStatement, got %T", result[2])
+	}
+
+	// The return value should be a VariableExpr, not a LiteralExpr
+	varExpr, ok := retStmt.Value.(*interpreter.VariableExpr)
+	if !ok {
+		// If it's a literal, the bug is present
+		if litExpr, isLit := retStmt.Value.(*interpreter.LiteralExpr); isLit {
+			t.Errorf("Bug: Return value was incorrectly optimized to constant %v instead of variable 'sum'", litExpr.Value)
+		} else {
+			t.Fatalf("Expected VariableExpr for return value, got %T", retStmt.Value)
+		}
+		return
+	}
+
+	if varExpr.Name != "sum" {
+		t.Errorf("Expected variable 'sum', got '%s'", varExpr.Name)
+	}
+}
+
+// TestOptimizer_ForLoopConstantInvalidation tests that constants are properly
+// invalidated when modified inside a single for-loop
+func TestOptimizer_ForLoopConstantInvalidation(t *testing.T) {
+	// Test: $ count = 0, for item in items { $ count = count + 1 }, > count
+	stmts := []interpreter.Statement{
+		&interpreter.AssignStatement{
+			Target: "count",
+			Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+		},
+		&interpreter.ForStatement{
+			ValueVar: "item",
+			Iterable: &interpreter.VariableExpr{Name: "items"},
+			Body: []interpreter.Statement{
+				&interpreter.AssignStatement{
+					Target: "count",
+					Value: &interpreter.BinaryOpExpr{
+						Op:    interpreter.Add,
+						Left:  &interpreter.VariableExpr{Name: "count"},
+						Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+					},
+				},
+			},
+		},
+		&interpreter.ReturnStatement{
+			Value: &interpreter.VariableExpr{Name: "count"},
+		},
+	}
+
+	opt := NewOptimizer(OptBasic)
+	result := opt.OptimizeStatements(stmts)
+
+	// The return statement should still reference the variable "count"
+	retStmt, ok := result[2].(*interpreter.ReturnStatement)
+	if !ok {
+		t.Fatalf("Expected ReturnStatement, got %T", result[2])
+	}
+
+	varExpr, ok := retStmt.Value.(*interpreter.VariableExpr)
+	if !ok {
+		t.Fatalf("Expected VariableExpr for return value, got %T", retStmt.Value)
+	}
+
+	if varExpr.Name != "count" {
+		t.Errorf("Expected variable 'count', got '%s'", varExpr.Name)
+	}
+}
+
