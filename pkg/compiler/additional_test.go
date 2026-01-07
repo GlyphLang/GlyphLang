@@ -666,6 +666,44 @@ func TestGetModifiedVariablesInStmt(t *testing.T) {
 			},
 			expected: []string{"i"},
 		},
+		{
+			name: "for statement with value var",
+			stmt: &interpreter.ForStatement{
+				ValueVar: "item",
+				Iterable: &interpreter.ArrayExpr{Elements: []interpreter.Expr{}},
+				Body: []interpreter.Statement{
+					&interpreter.AssignStatement{Target: "sum", Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}}},
+				},
+			},
+			expected: []string{"item", "sum"},
+		},
+		{
+			name: "for statement with key and value var",
+			stmt: &interpreter.ForStatement{
+				KeyVar:   "idx",
+				ValueVar: "item",
+				Iterable: &interpreter.ArrayExpr{Elements: []interpreter.Expr{}},
+				Body:     []interpreter.Statement{},
+			},
+			expected: []string{"idx", "item"},
+		},
+		{
+			name: "nested for statement",
+			stmt: &interpreter.ForStatement{
+				ValueVar: "row",
+				Iterable: &interpreter.ArrayExpr{Elements: []interpreter.Expr{}},
+				Body: []interpreter.Statement{
+					&interpreter.ForStatement{
+						ValueVar: "cell",
+						Iterable: &interpreter.VariableExpr{Name: "row"},
+						Body: []interpreter.Statement{
+							&interpreter.AssignStatement{Target: "total", Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}}},
+						},
+					},
+				},
+			},
+			expected: []string{"row", "cell", "total"},
+		},
 	}
 
 	for _, tt := range tests {
