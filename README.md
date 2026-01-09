@@ -1,9 +1,9 @@
 # GlyphLang™
 
 [![AI Token Savings](https://img.shields.io/badge/AI%20tokens-45%25%20fewer%20than%20Python-blueviolet)]()
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)]()
-[![Tests](https://img.shields.io/badge/tests-3661%20passing-success)]()
-[![Coverage](https://img.shields.io/badge/coverage-80%25%2B-green)]()
+[![Build](https://img.shields.io/github/actions/workflow/status/GlyphLang/GlyphLang/ci.yml?branch=main&label=build)](https://github.com/GlyphLang/GlyphLang/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/github/actions/workflow/status/GlyphLang/GlyphLang/ci.yml?branch=main&label=tests)](https://github.com/GlyphLang/GlyphLang/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/codecov/c/github/GlyphLang/GlyphLang?label=coverage)](https://codecov.io/gh/GlyphLang/GlyphLang)
 [![Version](https://img.shields.io/github/v/release/GlyphLang/GlyphLang?label=version&color=blue)](https://github.com/GlyphLang/GlyphLang/releases/latest)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![CLA](https://cla-assistant.io/readme/badge/GlyphLang/GlyphLang)](https://cla-assistant.io/GlyphLang/GlyphLang)
