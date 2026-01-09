@@ -19,6 +19,7 @@ import (
 	"github.com/glyphlang/glyph/pkg/compiler"
 	glyphcontext "github.com/glyphlang/glyph/pkg/context"
 	"github.com/glyphlang/glyph/pkg/decompiler"
+	"github.com/glyphlang/glyph/pkg/formatter"
 	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/lsp"
 	"github.com/glyphlang/glyph/pkg/parser"
@@ -202,6 +203,48 @@ Examples:
 	validateCmd.Flags().Bool("strict", false, "Treat warnings as errors")
 	validateCmd.Flags().Bool("quiet", false, "Only output errors, no stats")
 
+	// Expand command - convert compact glyph to human-readable syntax
+	var expandCmd = &cobra.Command{
+		Use:   "expand <file>",
+		Short: "Convert compact glyph syntax to human-readable expanded syntax",
+		Long: `Expand converts compact glyph syntax (using symbols like @, $, >) to
+human-readable expanded syntax (using keywords like route, let, return).
+
+This is useful for:
+- Making AI-generated code easier to read and modify
+- Learning the glyph language by seeing keyword equivalents
+- Code review and documentation
+
+The expanded syntax can be converted back using 'glyph compact'.
+
+Examples:
+  glyph expand main.glyph                    # Print expanded to stdout
+  glyph expand main.glyph -o main.expanded   # Write to file`,
+		Args: cobra.ExactArgs(1),
+		RunE: runExpand,
+	}
+	expandCmd.Flags().StringP("output", "o", "", "Output file (default: stdout)")
+
+	// Compact command - convert human-readable syntax to compact glyph
+	var compactCmd = &cobra.Command{
+		Use:   "compact <file>",
+		Short: "Convert human-readable syntax to compact glyph syntax",
+		Long: `Compact converts human-readable expanded syntax (using keywords like route,
+let, return) back to compact glyph syntax (using symbols like @, $, >).
+
+This is useful for:
+- Converting edited human-readable code back to canonical glyph format
+- Minimizing file size for AI token efficiency
+- Standardizing code format
+
+Examples:
+  glyph compact main.expanded                 # Print compact to stdout
+  glyph compact main.expanded -o main.glyph   # Write to file`,
+		Args: cobra.ExactArgs(1),
+		RunE: runCompact,
+	}
+	compactCmd.Flags().StringP("output", "o", "", "Output file (default: stdout)")
+
 	// Version command
 	var versionCmd = &cobra.Command{
 		Use:   "version",
@@ -226,6 +269,8 @@ Examples:
 	rootCmd.AddCommand(listCmdsCmd)
 	rootCmd.AddCommand(contextCmd)
 	rootCmd.AddCommand(validateCmd)
+	rootCmd.AddCommand(expandCmd)
+	rootCmd.AddCommand(compactCmd)
 	rootCmd.AddCommand(versionCmd)
 
 	if err := rootCmd.Execute(); err != nil {
@@ -2100,4 +2145,107 @@ func validateFile(filePath string) *validate.ValidationResult {
 
 	validator := validate.NewValidator(string(source), filePath)
 	return validator.Validate()
+}
+
+// runExpand handles the expand command - converts compact .glyph to human-readable .glyphx
+func runExpand(cmd *cobra.Command, args []string) error {
+	filePath := args[0]
+	output, _ := cmd.Flags().GetString("output")
+
+	// Validate input file extension
+	if filepath.Ext(filePath) != ".glyph" {
+		printWarning(fmt.Sprintf("Input file %s is not a .glyph file", filePath))
+	}
+
+	printInfo(fmt.Sprintf("Expanding %s to human-readable .glyphx syntax...", filePath))
+
+	// Read source file
+	source, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Parse source code using standard glyph lexer
+	module, err := parseSource(string(source))
+	if err != nil {
+		return fmt.Errorf("parse failed: %w", err)
+	}
+
+	// Format in expanded mode
+	f := formatter.New(formatter.Expanded)
+	result := f.Format(module)
+
+	// Determine output path (default: change .glyph to .glyphx)
+	if output == "" {
+		output = changeExtension(filePath, ".glyphx")
+	}
+
+	if err := os.WriteFile(output, []byte(result), 0600); err != nil {
+		return fmt.Errorf("failed to write output: %w", err)
+	}
+
+	printSuccess(fmt.Sprintf("Expanded output written to %s", output))
+	printInfo(fmt.Sprintf("Original: %d bytes -> Expanded: %d bytes", len(source), len(result)))
+
+	return nil
+}
+
+// runCompact handles the compact command - converts human-readable .glyphx to compact .glyph
+func runCompact(cmd *cobra.Command, args []string) error {
+	filePath := args[0]
+	output, _ := cmd.Flags().GetString("output")
+
+	// Validate input file extension
+	if filepath.Ext(filePath) != ".glyphx" {
+		printWarning(fmt.Sprintf("Input file %s is not a .glyphx file", filePath))
+	}
+
+	printInfo(fmt.Sprintf("Compacting %s to .glyph syntax...", filePath))
+
+	// Read source file
+	source, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Parse source code using expanded lexer for .glyphx files
+	module, err := parseExpandedSource(string(source))
+	if err != nil {
+		return fmt.Errorf("parse failed: %w", err)
+	}
+
+	// Format in compact mode
+	f := formatter.New(formatter.Compact)
+	result := f.Format(module)
+
+	// Determine output path (default: change .glyphx to .glyph)
+	if output == "" {
+		output = changeExtension(filePath, ".glyph")
+	}
+
+	if err := os.WriteFile(output, []byte(result), 0600); err != nil {
+		return fmt.Errorf("failed to write output: %w", err)
+	}
+
+	printSuccess(fmt.Sprintf("Compact output written to %s", output))
+	printInfo(fmt.Sprintf("Original: %d bytes -> Compact: %d bytes", len(source), len(result)))
+
+	return nil
+}
+
+// parseExpandedSource parses .glyphx source using the expanded lexer
+func parseExpandedSource(source string) (*interpreter.Module, error) {
+	lexer := parser.NewExpandedLexer(source)
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		return nil, fmt.Errorf("lexer error: %w", err)
+	}
+
+	p := parser.NewParser(tokens)
+	module, err := p.Parse()
+	if err != nil {
+		return nil, fmt.Errorf("parser error: %w", err)
+	}
+
+	return module, nil
 }
