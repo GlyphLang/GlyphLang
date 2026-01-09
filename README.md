@@ -4,7 +4,7 @@
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)]()
 [![Tests](https://img.shields.io/badge/tests-3661%20passing-success)]()
 [![Coverage](https://img.shields.io/badge/coverage-80%25%2B-green)]()
-[![Version](https://img.shields.io/badge/version-v0.2.2-blue)](https://github.com/GlyphLang/GlyphLang/releases/latest)
+[![Version](https://img.shields.io/badge/version-v0.2.4-blue)](https://github.com/GlyphLang/GlyphLang/releases/latest)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![CLA](https://cla-assistant.io/readme/badge/GlyphLang/GlyphLang)](https://cla-assistant.io/GlyphLang/GlyphLang)
 
@@ -59,7 +59,7 @@ Java:   @GetMapping("/users/{id}")...  (74 tokens)
 
 ### Tooling
 - **LSP Server** - full IDE support with completions, diagnostics, rename
-- **[VS Code Extension](https://github.com/GlyphLang/vscode-glyph)** - syntax highlighting, error checking
+- **[VS Code Extension](https://marketplace.visualstudio.com/items?itemName=GlyphLang.GlyphLang)** - syntax highlighting, LSP support, error checking
 - **CLI** - compile, run, REPL, decompile, AI context commands
 
 ## Symbol Reference
@@ -121,6 +121,27 @@ Expand-Archive glyph.zip -DestinationPath . ; Move-Item glyph-windows-amd64.exe 
 ```bash
 git clone https://github.com/GlyphLang/GlyphLang.git
 cd GlyphLang && go build -o glyph ./cmd/glyph
+```
+
+## Editor Support
+
+### VS Code Extension
+
+The official GlyphLang extension is available on the Visual Studio Code Marketplace:
+
+**[Install from Marketplace](https://marketplace.visualstudio.com/items?itemName=GlyphLang.GlyphLang)**
+
+**Features:**
+- **Syntax Highlighting** - Full semantic highlighting for all GlyphLang symbols and constructs
+- **LSP Integration** - Real-time error checking, code completion, and hover documentation
+- **Go to Definition** - Navigate to type definitions, functions, and imports
+- **Find References** - Locate all usages of symbols across your project
+- **Rename Symbol** - Safely rename variables, functions, and types
+- **Diagnostics** - Inline error and warning messages as you type
+
+To install, search for "GlyphLang" in the VS Code Extensions panel or run:
+```
+ext install GlyphLang.GlyphLang
 ```
 
 ## Quick Start
