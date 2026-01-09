@@ -22,17 +22,27 @@ func (TypeDef) isItem() {}
 
 // Route represents an HTTP route
 type Route struct {
-	Path        string
-	Method      HttpMethod
-	ReturnType  Type
-	Auth        *AuthConfig
-	RateLimit   *RateLimit
-	Injections  []Injection
-	QueryParams []QueryParamDecl
-	Body        []Statement
+	Path           string
+	Method         HttpMethod
+	ReturnType     Type
+	ResponseFormat string // "json", "html", "text", "file", or "" for default (json)
+	Auth           *AuthConfig
+	RateLimit      *RateLimit
+	Injections     []Injection
+	QueryParams    []QueryParamDecl
+	Body           []Statement
 }
 
 func (Route) isItem() {}
+
+// StaticRoute represents a static file serving route
+// Example: @ static /assets -> "./public/"
+type StaticRoute struct {
+	URLPath  string // URL path prefix (e.g., "/assets")
+	FilePath string // Filesystem path (e.g., "./public/")
+}
+
+func (StaticRoute) isItem() {}
 
 // Function represents a function definition
 // Example: ! map<T, U>(arr: [T], fn: (T) -> U): [U]

@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -61,6 +64,18 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				return err
 			}
+
+			// Check for special response objects (from html(), file(), template(), text() functions)
+			if responseType, content, ok := IsSpecialResponse(result); ok {
+				return SendResponse(ctx, responseType, content)
+			}
+
+			// Check route's response format
+			if route.ResponseFormat != "" {
+				return SendResponse(ctx, route.ResponseFormat, result)
+			}
+
+			// Default to JSON
 			return sendJSONResponse(ctx, result)
 		}
 	}
@@ -139,6 +154,141 @@ func SendError(ctx *Context, statusCode int, message string) error {
 		"message": message,
 		"code":    statusCode,
 	})
+}
+
+// SendHTML sends an HTML response
+func SendHTML(ctx *Context, statusCode int, html string) error {
+	ctx.ResponseWriter.Header().Set("Content-Type", "text/html; charset=utf-8")
+	ctx.ResponseWriter.WriteHeader(statusCode)
+	_, err := ctx.ResponseWriter.Write([]byte(html))
+	if err != nil {
+		return fmt.Errorf("failed to write HTML response: %w", err)
+	}
+	return nil
+}
+
+// SendText sends a plain text response
+func SendText(ctx *Context, statusCode int, text string) error {
+	ctx.ResponseWriter.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	ctx.ResponseWriter.WriteHeader(statusCode)
+	_, err := ctx.ResponseWriter.Write([]byte(text))
+	if err != nil {
+		return fmt.Errorf("failed to write text response: %w", err)
+	}
+	return nil
+}
+
+// SendBytes sends a raw byte response with specified content type
+func SendBytes(ctx *Context, statusCode int, contentType string, data []byte) error {
+	ctx.ResponseWriter.Header().Set("Content-Type", contentType)
+	ctx.ResponseWriter.WriteHeader(statusCode)
+	_, err := ctx.ResponseWriter.Write(data)
+	if err != nil {
+		return fmt.Errorf("failed to write bytes response: %w", err)
+	}
+	return nil
+}
+
+// SendFile serves a file from the filesystem
+func SendFile(ctx *Context, filePath string) error {
+	// Clean the path to prevent directory traversal
+	cleanPath := filepath.Clean(filePath)
+
+	// Check if file exists
+	info, err := os.Stat(cleanPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return SendError(ctx, http.StatusNotFound, "file not found")
+		}
+		return fmt.Errorf("failed to stat file: %w", err)
+	}
+
+	// Don't serve directories
+	if info.IsDir() {
+		return SendError(ctx, http.StatusForbidden, "cannot serve directory")
+	}
+
+	// Open the file
+	file, err := os.Open(cleanPath)
+	if err != nil {
+		return fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	// Detect content type from extension
+	ext := filepath.Ext(cleanPath)
+	contentType := mime.TypeByExtension(ext)
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	// Set headers
+	ctx.ResponseWriter.Header().Set("Content-Type", contentType)
+	ctx.ResponseWriter.Header().Set("Content-Length", fmt.Sprintf("%d", info.Size()))
+	ctx.ResponseWriter.WriteHeader(http.StatusOK)
+
+	// Stream the file
+	_, err = io.Copy(ctx.ResponseWriter, file)
+	if err != nil {
+		return fmt.Errorf("failed to send file: %w", err)
+	}
+
+	return nil
+}
+
+// ResponseType constants for special response handling
+const (
+	ResponseTypeJSON = "json"
+	ResponseTypeHTML = "html"
+	ResponseTypeText = "text"
+	ResponseTypeFile = "file"
+)
+
+// IsSpecialResponse checks if the result is a special response object
+func IsSpecialResponse(result interface{}) (string, interface{}, bool) {
+	m, ok := result.(map[string]interface{})
+	if !ok {
+		return "", nil, false
+	}
+
+	responseType, ok := m["__responseType"].(string)
+	if !ok {
+		return "", nil, false
+	}
+
+	content := m["content"]
+	return responseType, content, true
+}
+
+// SendResponse sends a response based on the response type
+func SendResponse(ctx *Context, responseType string, result interface{}) error {
+	switch responseType {
+	case ResponseTypeHTML:
+		html, ok := result.(string)
+		if !ok {
+			return fmt.Errorf("HTML response content must be a string")
+		}
+		return SendHTML(ctx, ctx.StatusCode, html)
+
+	case ResponseTypeText:
+		text, ok := result.(string)
+		if !ok {
+			return fmt.Errorf("text response content must be a string")
+		}
+		return SendText(ctx, ctx.StatusCode, text)
+
+	case ResponseTypeFile:
+		filePath, ok := result.(string)
+		if !ok {
+			return fmt.Errorf("file response content must be a file path string")
+		}
+		return SendFile(ctx, filePath)
+
+	case ResponseTypeJSON:
+		fallthrough
+	default:
+		return sendJSONResponse(ctx, result)
+	}
 }
 
 // handleError logs and sends an error response

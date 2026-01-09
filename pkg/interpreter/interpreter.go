@@ -6,17 +6,18 @@ import (
 
 // Interpreter is the main interpreter struct
 type Interpreter struct {
-	globalEnv      *Environment
-	functions      map[string]Function
-	typeDefs       map[string]TypeDef
-	commands       map[string]Command
-	cronTasks      []CronTask
-	eventHandlers  map[string][]EventHandler
-	queueWorkers   map[string]QueueWorker
-	typeChecker    *TypeChecker
-	dbHandler      interface{}       // Database handler for dependency injection
-	moduleResolver *ModuleResolver   // Module resolver for handling imports
+	globalEnv       *Environment
+	functions       map[string]Function
+	typeDefs        map[string]TypeDef
+	commands        map[string]Command
+	cronTasks       []CronTask
+	eventHandlers   map[string][]EventHandler
+	queueWorkers    map[string]QueueWorker
+	typeChecker     *TypeChecker
+	dbHandler       interface{}              // Database handler for dependency injection
+	moduleResolver  *ModuleResolver          // Module resolver for handling imports
 	importedModules map[string]*LoadedModule // Imported modules by alias/name
+	templateEngine  *TemplateEngine          // Template engine for HTML rendering
 }
 
 // NewInterpreter creates a new interpreter instance

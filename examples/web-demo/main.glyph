@@ -1,0 +1,56 @@
+# Web Demo - Demonstrating web page support in Glyph
+# This example shows HTML responses, templates, and static file serving
+
+# Type definition for a user
+: User {
+  id: int!
+  name: str!
+  email: str
+}
+
+# HTML route - returns raw HTML
+@ GET / [html] {
+  > html("<html><head><title>Glyph Web Demo</title><link rel='stylesheet' href='/assets/style.css'></head><body><h1>Welcome to Glyph</h1><p>This page is rendered as HTML!</p><nav><a href='/about'>About</a> | <a href='/users'>Users</a> | <a href='/api/data'>API (JSON)</a></nav></body></html>")
+}
+
+# Template route - renders a template with data
+@ GET /about [html] {
+  $ data = {
+    title: "About Glyph",
+    description: "Glyph is a declarative language for building APIs and web applications.",
+    features: ["Symbolic syntax", "Type safety", "Built-in templates", "Static file serving"]
+  }
+  > template("templates/about.html", data)
+}
+
+# Template with dynamic data
+@ GET /users [html] {
+  $ users = [
+    {id: 1, name: "Alice", email: "alice@example.com"},
+    {id: 2, name: "Bob", email: "bob@example.com"},
+    {id: 3, name: "Charlie", email: "charlie@example.com"}
+  ]
+  > template("templates/users.html", {users: users, count: 3})
+}
+
+# JSON API endpoint (default behavior)
+@ GET /api/data {
+  > {
+    message: "This is a JSON response",
+    timestamp: now(),
+    version: "1.0.0"
+  }
+}
+
+# File download
+@ GET /download/:filename [file] {
+  > file("./public/" + filename)
+}
+
+# Text response
+@ GET /robots.txt [text] {
+  > text("User-agent: *\nAllow: /")
+}
+
+# Static file serving
+@ static /assets -> "./public/"

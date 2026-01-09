@@ -15,10 +15,11 @@ const (
 
 // Route represents a parsed GLYPH route definition
 type Route struct {
-	Method      HTTPMethod
-	Path        string
-	Handler     RouteHandler
-	Middlewares []Middleware
+	Method         HTTPMethod
+	Path           string
+	Handler        RouteHandler
+	Middlewares    []Middleware
+	ResponseFormat string // "json", "html", "text", "file", or "" for default (json)
 }
 
 // RouteHandler is a function that handles a matched route

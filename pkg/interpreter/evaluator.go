@@ -1028,6 +1028,93 @@ func (i *Interpreter) evaluateFunctionCall(expr FunctionCallExpr, env *Environme
 		default:
 			return nil, fmt.Errorf("max() expects numeric arguments, got %T", leftArg)
 		}
+
+	case "html":
+		// Mark content as HTML for response handling
+		if len(expr.Args) != 1 {
+			return nil, fmt.Errorf("html() expects 1 argument, got %d", len(expr.Args))
+		}
+		arg, err := i.EvaluateExpression(expr.Args[0], env)
+		if err != nil {
+			return nil, err
+		}
+		htmlStr, ok := arg.(string)
+		if !ok {
+			return nil, fmt.Errorf("html() expects a string argument, got %T", arg)
+		}
+		return map[string]interface{}{
+			"__responseType": "html",
+			"content":        htmlStr,
+		}, nil
+
+	case "text":
+		// Mark content as plain text for response handling
+		if len(expr.Args) != 1 {
+			return nil, fmt.Errorf("text() expects 1 argument, got %d", len(expr.Args))
+		}
+		arg, err := i.EvaluateExpression(expr.Args[0], env)
+		if err != nil {
+			return nil, err
+		}
+		textStr, ok := arg.(string)
+		if !ok {
+			return nil, fmt.Errorf("text() expects a string argument, got %T", arg)
+		}
+		return map[string]interface{}{
+			"__responseType": "text",
+			"content":        textStr,
+		}, nil
+
+	case "file":
+		// Return file content for response handling
+		if len(expr.Args) != 1 {
+			return nil, fmt.Errorf("file() expects 1 argument, got %d", len(expr.Args))
+		}
+		arg, err := i.EvaluateExpression(expr.Args[0], env)
+		if err != nil {
+			return nil, err
+		}
+		filePath, ok := arg.(string)
+		if !ok {
+			return nil, fmt.Errorf("file() expects a string argument, got %T", arg)
+		}
+		return map[string]interface{}{
+			"__responseType": "file",
+			"content":        filePath,
+		}, nil
+
+	case "template":
+		// Render a template with data
+		if len(expr.Args) < 1 || len(expr.Args) > 2 {
+			return nil, fmt.Errorf("template() expects 1 or 2 arguments, got %d", len(expr.Args))
+		}
+		pathArg, err := i.EvaluateExpression(expr.Args[0], env)
+		if err != nil {
+			return nil, err
+		}
+		templatePath, ok := pathArg.(string)
+		if !ok {
+			return nil, fmt.Errorf("template() expects first argument to be a string, got %T", pathArg)
+		}
+
+		var data interface{}
+		if len(expr.Args) == 2 {
+			data, err = i.EvaluateExpression(expr.Args[1], env)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// Render the template
+		rendered, err := i.RenderTemplate(templatePath, data)
+		if err != nil {
+			return nil, fmt.Errorf("template() failed: %w", err)
+		}
+
+		return map[string]interface{}{
+			"__responseType": "html",
+			"content":        rendered,
+		}, nil
 	}
 
 	// Check if this is a method call (contains a dot)

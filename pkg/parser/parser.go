@@ -860,6 +860,8 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 		return p.parseEventHandler()
 	case "queue", "worker":
 		return p.parseQueueWorker()
+	case "static":
+		return p.parseStaticRoute()
 	}
 
 	// Check for HTTP method shorthand: @ GET /path
@@ -984,6 +986,29 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 		p.advance()
 		returnType, _, err = p.parseType()
 		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Parse optional response format [json|html|text|file]
+	var responseFormat string
+	if p.check(LBRACKET) {
+		p.advance()
+		format, err := p.expectIdent()
+		if err != nil {
+			return nil, err
+		}
+		switch strings.ToLower(format) {
+		case "json", "html", "text", "file":
+			responseFormat = strings.ToLower(format)
+		default:
+			return nil, p.errorWithHint(
+				fmt.Sprintf("Unknown response format '%s'", format),
+				p.tokens[p.position-1],
+				"Valid formats are: json, html, text, file",
+			)
+		}
+		if err := p.expect(RBRACKET); err != nil {
 			return nil, err
 		}
 	}
@@ -1145,14 +1170,15 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 	}
 
 	return &interpreter.Route{
-		Path:        path,
-		Method:      method,
-		ReturnType:  returnType,
-		Auth:        auth,
-		RateLimit:   rateLimit,
-		Injections:  injections,
-		QueryParams: queryParams,
-		Body:        body,
+		Path:           path,
+		Method:         method,
+		ReturnType:     returnType,
+		ResponseFormat: responseFormat,
+		Auth:           auth,
+		RateLimit:      rateLimit,
+		Injections:     injections,
+		QueryParams:    queryParams,
+		Body:           body,
 	}, nil
 }
 
@@ -3153,6 +3179,73 @@ func (p *Parser) parseQueueWorker() (interpreter.Item, error) {
 		Timeout:     timeout,
 		Injections:  injections,
 		Body:        body,
+	}, nil
+}
+
+// parseStaticRoute parses a static file serving route: @ static /url-path -> "filesystem-path"
+// Examples:
+//   @ static /assets -> "./public/"
+//   @ static /images -> "/var/www/images"
+func (p *Parser) parseStaticRoute() (interpreter.Item, error) {
+	// Parse URL path
+	var urlPath string
+	if p.check(IDENT) {
+		urlPath = p.current().Literal
+		p.advance()
+	} else if p.check(SLASH) {
+		// Build path from slash-separated identifiers
+		var pathBuilder strings.Builder
+		for p.check(SLASH) {
+			pathBuilder.WriteByte('/')
+			p.advance()
+			if p.isPathSegmentToken() {
+				pathBuilder.WriteString(p.current().Literal)
+				p.advance()
+				// Handle hyphenated segments
+				for p.check(MINUS) {
+					pathBuilder.WriteByte('-')
+					p.advance()
+					if p.isPathSegmentToken() {
+						pathBuilder.WriteString(p.current().Literal)
+						p.advance()
+					} else {
+						break
+					}
+				}
+			}
+		}
+		urlPath = pathBuilder.String()
+	} else {
+		return nil, p.errorWithHint(
+			"Expected URL path for static route",
+			p.current(),
+			"Example: @ static /assets -> \"./public/\"",
+		)
+	}
+
+	// Expect arrow
+	if err := p.expect(ARROW); err != nil {
+		return nil, p.errorWithHint(
+			"Expected '->' after static route path",
+			p.current(),
+			"Example: @ static /assets -> \"./public/\"",
+		)
+	}
+
+	// Parse filesystem path (string)
+	if !p.check(STRING) {
+		return nil, p.errorWithHint(
+			"Expected filesystem path string",
+			p.current(),
+			"Example: @ static /assets -> \"./public/\"",
+		)
+	}
+	filePath := p.current().Literal
+	p.advance()
+
+	return &interpreter.StaticRoute{
+		URLPath:  urlPath,
+		FilePath: filePath,
 	}, nil
 }
 

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Users List</title>
+    <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+    <h1>Users ({{.count}} total)</h1>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .users}}
+            <tr>
+                <td>{{.id}}</td>
+                <td>{{.name}}</td>
+                <td>{{.email}}</td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+
+    <nav>
+        <a href="/">Home</a> |
+        <a href="/about">About</a> |
+        <a href="/api/data">API (JSON)</a>
+    </nav>
+</body>
+</html>
