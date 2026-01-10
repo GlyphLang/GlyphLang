@@ -76,6 +76,7 @@ type NamedType struct {
 }
 
 type DatabaseType struct{}
+type RedisType struct{}
 
 type UnionType struct {
 	Types []Type
@@ -116,6 +117,7 @@ func (ArrayType) isType()         {}
 func (OptionalType) isType()      {}
 func (NamedType) isType()         {}
 func (DatabaseType) isType()      {}
+func (RedisType) isType()         {}
 func (UnionType) isType()         {}
 func (GenericType) isType()       {}
 func (TypeParameterType) isType() {}

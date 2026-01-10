@@ -893,6 +893,89 @@ func TestParseDatabaseType(t *testing.T) {
 	if route.Injections[0].Name != "db" {
 		t.Errorf("expected injection name 'db', got %s", route.Injections[0].Name)
 	}
+
+	// Verify it's parsed as DatabaseType, not NamedType
+	if _, ok := route.Injections[0].Type.(interpreter.DatabaseType); !ok {
+		t.Errorf("expected DatabaseType, got %T", route.Injections[0].Type)
+	}
+}
+
+// TestParseRedisType tests parsing Redis type injection
+func TestParseRedisType(t *testing.T) {
+	source := `@ GET /cache {
+  % redis: Redis
+  > redis
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		t.Fatalf("lexer error: %v", err)
+	}
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("parser error: %v", err)
+	}
+
+	route := module.Items[0].(*interpreter.Route)
+
+	if len(route.Injections) != 1 {
+		t.Fatalf("expected 1 injection, got %d", len(route.Injections))
+	}
+
+	if route.Injections[0].Name != "redis" {
+		t.Errorf("expected injection name 'redis', got %s", route.Injections[0].Name)
+	}
+
+	// Verify it's parsed as RedisType, not NamedType
+	if _, ok := route.Injections[0].Type.(interpreter.RedisType); !ok {
+		t.Errorf("expected RedisType, got %T", route.Injections[0].Type)
+	}
+}
+
+// TestParseBothDatabaseAndRedisInjection tests parsing both Database and Redis injections
+func TestParseBothDatabaseAndRedisInjection(t *testing.T) {
+	source := `@ GET /data {
+  % db: Database
+  % redis: Redis
+  > db
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		t.Fatalf("lexer error: %v", err)
+	}
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("parser error: %v", err)
+	}
+
+	route := module.Items[0].(*interpreter.Route)
+
+	if len(route.Injections) != 2 {
+		t.Fatalf("expected 2 injections, got %d", len(route.Injections))
+	}
+
+	// First injection should be db: Database
+	if route.Injections[0].Name != "db" {
+		t.Errorf("expected first injection name 'db', got %s", route.Injections[0].Name)
+	}
+	if _, ok := route.Injections[0].Type.(interpreter.DatabaseType); !ok {
+		t.Errorf("expected first injection to be DatabaseType, got %T", route.Injections[0].Type)
+	}
+
+	// Second injection should be redis: Redis
+	if route.Injections[1].Name != "redis" {
+		t.Errorf("expected second injection name 'redis', got %s", route.Injections[1].Name)
+	}
+	if _, ok := route.Injections[1].Type.(interpreter.RedisType); !ok {
+		t.Errorf("expected second injection to be RedisType, got %T", route.Injections[1].Type)
+	}
 }
 
 // Tests for expression parsing

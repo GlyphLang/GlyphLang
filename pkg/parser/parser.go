@@ -334,6 +334,10 @@ func (p *Parser) parseType() (interpreter.Type, bool, error) {
 		baseType = interpreter.BoolType{}
 	case "float":
 		baseType = interpreter.FloatType{}
+	case "Database":
+		baseType = interpreter.DatabaseType{}
+	case "Redis":
+		baseType = interpreter.RedisType{}
 	default:
 		baseType = interpreter.NamedType{Name: typeName}
 	}
@@ -397,6 +401,10 @@ func (p *Parser) parseType() (interpreter.Type, bool, error) {
 				nextType = interpreter.BoolType{}
 			case "float":
 				nextType = interpreter.FloatType{}
+			case "Database":
+				nextType = interpreter.DatabaseType{}
+			case "Redis":
+				nextType = interpreter.RedisType{}
 			default:
 				nextType = interpreter.NamedType{Name: nextTypeName}
 			}
@@ -494,6 +502,10 @@ func (p *Parser) parseSingleType(typeParamNames []string) (interpreter.Type, err
 				baseType = interpreter.BoolType{}
 			case "float":
 				baseType = interpreter.FloatType{}
+			case "Database":
+				baseType = interpreter.DatabaseType{}
+			case "Redis":
+				baseType = interpreter.RedisType{}
 			default:
 				baseType = interpreter.NamedType{Name: typeName}
 			}
@@ -611,6 +623,10 @@ func (p *Parser) parseTypeWithContext(typeParamNames []string) (interpreter.Type
 				baseType = interpreter.BoolType{}
 			case "float":
 				baseType = interpreter.FloatType{}
+			case "Database":
+				baseType = interpreter.DatabaseType{}
+			case "Redis":
+				baseType = interpreter.RedisType{}
 			default:
 				baseType = interpreter.NamedType{Name: typeName}
 			}

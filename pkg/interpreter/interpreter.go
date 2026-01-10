@@ -15,6 +15,7 @@ type Interpreter struct {
 	queueWorkers   map[string]QueueWorker
 	typeChecker    *TypeChecker
 	dbHandler      interface{}       // Database handler for dependency injection
+	redisHandler   interface{}       // Redis handler for dependency injection
 	moduleResolver *ModuleResolver   // Module resolver for handling imports
 	importedModules map[string]*LoadedModule // Imported modules by alias/name
 }
@@ -215,6 +216,11 @@ func (i *Interpreter) SetDatabaseHandler(handler interface{}) {
 	i.dbHandler = handler
 }
 
+// SetRedisHandler sets the Redis handler for dependency injection
+func (i *Interpreter) SetRedisHandler(handler interface{}) {
+	i.redisHandler = handler
+}
+
 // ExecuteRoute executes a route with the given request
 func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, error) {
 	// Create a new environment for the route
@@ -278,6 +284,11 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 		if _, ok := injection.Type.(DatabaseType); ok {
 			if i.dbHandler != nil {
 				routeEnv.Define(injection.Name, i.dbHandler)
+			}
+		}
+		if _, ok := injection.Type.(RedisType); ok {
+			if i.redisHandler != nil {
+				routeEnv.Define(injection.Name, i.redisHandler)
 			}
 		}
 	}
@@ -355,6 +366,11 @@ func (i *Interpreter) ExecuteRouteSimple(route *Route, pathParams map[string]str
 		if _, ok := injection.Type.(DatabaseType); ok {
 			if i.dbHandler != nil {
 				routeEnv.Define(injection.Name, i.dbHandler)
+			}
+		}
+		if _, ok := injection.Type.(RedisType); ok {
+			if i.redisHandler != nil {
+				routeEnv.Define(injection.Name, i.redisHandler)
 			}
 		}
 	}
@@ -496,6 +512,11 @@ func (i *Interpreter) ExecuteCronTask(task *CronTask) (interface{}, error) {
 				taskEnv.Define(injection.Name, i.dbHandler)
 			}
 		}
+		if _, ok := injection.Type.(RedisType); ok {
+			if i.redisHandler != nil {
+				taskEnv.Define(injection.Name, i.redisHandler)
+			}
+		}
 	}
 
 	// Execute task body
@@ -525,6 +546,11 @@ func (i *Interpreter) ExecuteEventHandler(handler *EventHandler, eventData inter
 		if _, ok := injection.Type.(DatabaseType); ok {
 			if i.dbHandler != nil {
 				handlerEnv.Define(injection.Name, i.dbHandler)
+			}
+		}
+		if _, ok := injection.Type.(RedisType); ok {
+			if i.redisHandler != nil {
+				handlerEnv.Define(injection.Name, i.redisHandler)
 			}
 		}
 	}
@@ -575,6 +601,11 @@ func (i *Interpreter) ExecuteQueueWorker(worker *QueueWorker, message interface{
 		if _, ok := injection.Type.(DatabaseType); ok {
 			if i.dbHandler != nil {
 				workerEnv.Define(injection.Name, i.dbHandler)
+			}
+		}
+		if _, ok := injection.Type.(RedisType); ok {
+			if i.redisHandler != nil {
+				workerEnv.Define(injection.Name, i.redisHandler)
 			}
 		}
 	}

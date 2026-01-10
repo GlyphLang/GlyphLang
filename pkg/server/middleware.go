@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"runtime/debug"
@@ -391,6 +392,52 @@ func RateLimitMiddleware(config RateLimiterConfig) Middleware {
 			limit.tokens--
 			limit.requestCount++
 			mu.Unlock()
+
+			return next(ctx)
+		}
+	}
+}
+
+// RedisRateLimiter defines the interface for Redis-based rate limiting
+type RedisRateLimiter interface {
+	Incr(key string) (int64, error)
+	Expire(key string, seconds int64) (bool, error)
+}
+
+// RateLimitMiddlewareWithRedis implements distributed rate limiting using Redis
+// This is production-ready and works across multiple server instances
+func RateLimitMiddlewareWithRedis(redisHandler RedisRateLimiter, config RateLimiterConfig) Middleware {
+	return func(next RouteHandler) RouteHandler {
+		return func(ctx *Context) error {
+			clientIP := getClientIP(ctx.Request)
+
+			// Use a sliding window with minute-based keys
+			// Key format: "ratelimit:{ip}:{minute_timestamp}"
+			windowKey := fmt.Sprintf("ratelimit:%s:%d", clientIP, time.Now().Unix()/60)
+
+			// Increment the counter atomically
+			count, err := redisHandler.Incr(windowKey)
+			if err != nil {
+				// On Redis error, fail open (allow the request) and log the error
+				log.Printf("[RATE_LIMIT] Redis error: %v, allowing request for %s", err, clientIP)
+				return next(ctx)
+			}
+
+			// Set expiration on first request in this window
+			if count == 1 {
+				// Expire after 2 minutes to ensure cleanup (1 minute window + 1 minute buffer)
+				_, expErr := redisHandler.Expire(windowKey, 120)
+				if expErr != nil {
+					log.Printf("[RATE_LIMIT] Redis expire error: %v", expErr)
+				}
+			}
+
+			// Check if rate limit exceeded
+			if count > int64(config.RequestsPerMinute) {
+				log.Printf("[RATE_LIMIT] Redis rate limit exceeded for %s (count: %d, limit: %d)",
+					clientIP, count, config.RequestsPerMinute)
+				return SendError(ctx, 429, "rate limit exceeded")
+			}
 
 			return next(ctx)
 		}
