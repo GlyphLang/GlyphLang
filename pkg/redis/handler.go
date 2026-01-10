@@ -407,6 +407,284 @@ func (m *MockHandler) Expire(key string, seconds int64) (bool, error) {
 	return ok, nil
 }
 
+// TTL returns -1 for mock (no TTL tracking)
+func (m *MockHandler) TTL(key string) (int64, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if _, ok := m.data[key]; ok {
+		return -1, nil // Key exists but no TTL
+	}
+	return -2, nil // Key does not exist
+}
+
+// SetNX sets a value only if the key does not exist
+func (m *MockHandler) SetNX(key string, value interface{}, ttlSeconds ...int64) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.data[key]; exists {
+		return false, nil
+	}
+	m.data[key] = value
+	return true, nil
+}
+
+// IncrBy increments a value by a specific amount
+func (m *MockHandler) IncrBy(key string, increment int64) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	val, ok := m.data[key]
+	if !ok {
+		m.data[key] = increment
+		return increment, nil
+	}
+	if intVal, ok := val.(int64); ok {
+		intVal += increment
+		m.data[key] = intVal
+		return intVal, nil
+	}
+	return 0, fmt.Errorf("value is not an integer")
+}
+
+// DecrBy decrements a value by a specific amount
+func (m *MockHandler) DecrBy(key string, decrement int64) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	val, ok := m.data[key]
+	if !ok {
+		m.data[key] = -decrement
+		return -decrement, nil
+	}
+	if intVal, ok := val.(int64); ok {
+		intVal -= decrement
+		m.data[key] = intVal
+		return intVal, nil
+	}
+	return 0, fmt.Errorf("value is not an integer")
+}
+
+// Hash operations
+
+// HGet gets a field from a hash
+func (m *MockHandler) HGet(key, field string) (interface{}, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if hash, ok := m.hashes[key]; ok {
+		if val, ok := hash[field]; ok {
+			return val, nil
+		}
+	}
+	return nil, nil
+}
+
+// HSet sets a field in a hash
+func (m *MockHandler) HSet(key, field string, value interface{}) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.hashes[key] == nil {
+		m.hashes[key] = make(map[string]string)
+	}
+	_, exists := m.hashes[key][field]
+	m.hashes[key][field] = fmt.Sprintf("%v", value)
+	if exists {
+		return 0, nil // Field was updated
+	}
+	return 1, nil // Field was created
+}
+
+// HGetAll gets all fields from a hash
+func (m *MockHandler) HGetAll(key string) (map[string]string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if hash, ok := m.hashes[key]; ok {
+		result := make(map[string]string)
+		for k, v := range hash {
+			result[k] = v
+		}
+		return result, nil
+	}
+	return make(map[string]string), nil
+}
+
+// HDel deletes fields from a hash
+func (m *MockHandler) HDel(key string, fields ...string) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var count int64
+	if hash, ok := m.hashes[key]; ok {
+		for _, field := range fields {
+			if _, exists := hash[field]; exists {
+				delete(hash, field)
+				count++
+			}
+		}
+	}
+	return count, nil
+}
+
+// HExists checks if a field exists in a hash
+func (m *MockHandler) HExists(key, field string) (bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if hash, ok := m.hashes[key]; ok {
+		_, exists := hash[field]
+		return exists, nil
+	}
+	return false, nil
+}
+
+// List operations
+
+// LPush prepends values to a list
+// In Redis, LPUSH key a b c pushes each value from left to right to the head
+// resulting in [c, b, a] (last value ends up at the head)
+func (m *MockHandler) LPush(key string, values ...interface{}) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, v := range values {
+		m.lists[key] = append([]string{fmt.Sprintf("%v", v)}, m.lists[key]...)
+	}
+	return int64(len(m.lists[key])), nil
+}
+
+// RPush appends values to a list
+func (m *MockHandler) RPush(key string, values ...interface{}) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, v := range values {
+		m.lists[key] = append(m.lists[key], fmt.Sprintf("%v", v))
+	}
+	return int64(len(m.lists[key])), nil
+}
+
+// LPop removes and returns the first element
+func (m *MockHandler) LPop(key string) (interface{}, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if list, ok := m.lists[key]; ok && len(list) > 0 {
+		val := list[0]
+		m.lists[key] = list[1:]
+		return val, nil
+	}
+	return nil, nil
+}
+
+// RPop removes and returns the last element
+func (m *MockHandler) RPop(key string) (interface{}, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if list, ok := m.lists[key]; ok && len(list) > 0 {
+		val := list[len(list)-1]
+		m.lists[key] = list[:len(list)-1]
+		return val, nil
+	}
+	return nil, nil
+}
+
+// LRange gets a range of elements from a list
+func (m *MockHandler) LRange(key string, start, stop int64) ([]string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	list, ok := m.lists[key]
+	if !ok || len(list) == 0 {
+		return []string{}, nil
+	}
+
+	length := int64(len(list))
+
+	// Handle negative indices
+	if start < 0 {
+		start = length + start
+	}
+	if stop < 0 {
+		stop = length + stop
+	}
+
+	// Bounds checking
+	if start < 0 {
+		start = 0
+	}
+	if stop >= length {
+		stop = length - 1
+	}
+	if start > stop || start >= length {
+		return []string{}, nil
+	}
+
+	return list[start : stop+1], nil
+}
+
+// LLen returns the length of a list
+func (m *MockHandler) LLen(key string) (int64, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return int64(len(m.lists[key])), nil
+}
+
+// Set operations
+
+// SAdd adds members to a set
+func (m *MockHandler) SAdd(key string, members ...interface{}) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.sets[key] == nil {
+		m.sets[key] = make(map[string]bool)
+	}
+	var added int64
+	for _, member := range members {
+		memberStr := fmt.Sprintf("%v", member)
+		if !m.sets[key][memberStr] {
+			m.sets[key][memberStr] = true
+			added++
+		}
+	}
+	return added, nil
+}
+
+// SRem removes members from a set
+func (m *MockHandler) SRem(key string, members ...interface{}) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var removed int64
+	if set, ok := m.sets[key]; ok {
+		for _, member := range members {
+			memberStr := fmt.Sprintf("%v", member)
+			if set[memberStr] {
+				delete(set, memberStr)
+				removed++
+			}
+		}
+	}
+	return removed, nil
+}
+
+// SMembers returns all members of a set
+func (m *MockHandler) SMembers(key string) ([]string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var members []string
+	if set, ok := m.sets[key]; ok {
+		for member := range set {
+			members = append(members, member)
+		}
+	}
+	return members, nil
+}
+
+// SIsMember checks if a value is a member of a set
+func (m *MockHandler) SIsMember(key string, member interface{}) (bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if set, ok := m.sets[key]; ok {
+		return set[fmt.Sprintf("%v", member)], nil
+	}
+	return false, nil
+}
+
+// Publish is a no-op for mock (returns 0 subscribers)
+func (m *MockHandler) Publish(channel string, message interface{}) (int64, error) {
+	return 0, nil
+}
+
 // Close is a no-op for mock
 func (m *MockHandler) Close() error {
 	return nil

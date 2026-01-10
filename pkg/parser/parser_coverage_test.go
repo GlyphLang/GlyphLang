@@ -2839,3 +2839,147 @@ func TestParseSubtractionExpression(t *testing.T) {
 		t.Errorf("expected Sub op, got %v", binExpr.Op)
 	}
 }
+
+// TestParseRedisInjectionInCronTask tests Redis injection in cron tasks
+func TestParseRedisInjectionInCronTask(t *testing.T) {
+	source := `* "0 * * * *" {
+  % redis: Redis
+  $ count = redis.get("counter")
+  > count
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		t.Fatalf("lexer error: %v", err)
+	}
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("parser error: %v", err)
+	}
+
+	cron := module.Items[0].(*interpreter.CronTask)
+
+	if len(cron.Injections) != 1 {
+		t.Fatalf("expected 1 injection, got %d", len(cron.Injections))
+	}
+
+	if cron.Injections[0].Name != "redis" {
+		t.Errorf("expected injection name 'redis', got %s", cron.Injections[0].Name)
+	}
+
+	if _, ok := cron.Injections[0].Type.(interpreter.RedisType); !ok {
+		t.Errorf("expected RedisType, got %T", cron.Injections[0].Type)
+	}
+}
+
+// TestParseRedisInjectionInEventHandler tests Redis injection in event handlers
+func TestParseRedisInjectionInEventHandler(t *testing.T) {
+	source := `~ "cache.invalidate" {
+  % redis: Redis
+  $ result = redis.del("key")
+  > result
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		t.Fatalf("lexer error: %v", err)
+	}
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("parser error: %v", err)
+	}
+
+	event := module.Items[0].(*interpreter.EventHandler)
+
+	if len(event.Injections) != 1 {
+		t.Fatalf("expected 1 injection, got %d", len(event.Injections))
+	}
+
+	if event.Injections[0].Name != "redis" {
+		t.Errorf("expected injection name 'redis', got %s", event.Injections[0].Name)
+	}
+
+	if _, ok := event.Injections[0].Type.(interpreter.RedisType); !ok {
+		t.Errorf("expected RedisType, got %T", event.Injections[0].Type)
+	}
+}
+
+// TestParseRedisInjectionInQueueWorker tests Redis injection in queue workers
+func TestParseRedisInjectionInQueueWorker(t *testing.T) {
+	source := `& "emails" {
+  % redis: Redis
+  $ cached = redis.get("template")
+  > cached
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		t.Fatalf("lexer error: %v", err)
+	}
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("parser error: %v", err)
+	}
+
+	worker := module.Items[0].(*interpreter.QueueWorker)
+
+	if len(worker.Injections) != 1 {
+		t.Fatalf("expected 1 injection, got %d", len(worker.Injections))
+	}
+
+	if worker.Injections[0].Name != "redis" {
+		t.Errorf("expected injection name 'redis', got %s", worker.Injections[0].Name)
+	}
+
+	if _, ok := worker.Injections[0].Type.(interpreter.RedisType); !ok {
+		t.Errorf("expected RedisType, got %T", worker.Injections[0].Type)
+	}
+}
+
+// TestParseBothDatabaseAndRedisInCronTask tests both Database and Redis in cron task
+func TestParseBothDatabaseAndRedisInCronTask(t *testing.T) {
+	source := `* "0 0 * * *" {
+  % db: Database
+  % redis: Redis
+  $ users = db.query("SELECT * FROM users")
+  $ _ = redis.set("users_cache", users)
+  > users
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		t.Fatalf("lexer error: %v", err)
+	}
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("parser error: %v", err)
+	}
+
+	cron := module.Items[0].(*interpreter.CronTask)
+
+	if len(cron.Injections) != 2 {
+		t.Fatalf("expected 2 injections, got %d", len(cron.Injections))
+	}
+
+	// First should be Database
+	if _, ok := cron.Injections[0].Type.(interpreter.DatabaseType); !ok {
+		t.Errorf("expected first injection to be DatabaseType, got %T", cron.Injections[0].Type)
+	}
+
+	// Second should be Redis
+	if _, ok := cron.Injections[1].Type.(interpreter.RedisType); !ok {
+		t.Errorf("expected second injection to be RedisType, got %T", cron.Injections[1].Type)
+	}
+}

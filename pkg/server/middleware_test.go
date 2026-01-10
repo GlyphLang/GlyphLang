@@ -948,3 +948,323 @@ func TestDefaultAuthRateLimitConfig(t *testing.T) {
 		t.Errorf("ResetAfter = %v, want 15 minutes", config.ResetAfter)
 	}
 }
+
+// mockRedisRateLimiter implements RedisRateLimiter for testing
+type mockRedisRateLimiter struct {
+	counts     map[string]int64
+	expireErr  error
+	incrErr    error
+	incrCalled int
+}
+
+func newMockRedisRateLimiter() *mockRedisRateLimiter {
+	return &mockRedisRateLimiter{
+		counts: make(map[string]int64),
+	}
+}
+
+func (m *mockRedisRateLimiter) Incr(key string) (int64, error) {
+	m.incrCalled++
+	if m.incrErr != nil {
+		return 0, m.incrErr
+	}
+	m.counts[key]++
+	return m.counts[key], nil
+}
+
+func (m *mockRedisRateLimiter) Expire(key string, seconds int64) (bool, error) {
+	if m.expireErr != nil {
+		return false, m.expireErr
+	}
+	return true, nil
+}
+
+// mockRedisRateLimiterWithExpireTracking tracks Expire calls
+type mockRedisRateLimiterWithExpireTracking struct {
+	counts       map[string]int64
+	expireCalled bool
+}
+
+func newMockRedisRateLimiterWithExpireTracking() *mockRedisRateLimiterWithExpireTracking {
+	return &mockRedisRateLimiterWithExpireTracking{
+		counts: make(map[string]int64),
+	}
+}
+
+func (m *mockRedisRateLimiterWithExpireTracking) Incr(key string) (int64, error) {
+	m.counts[key]++
+	return m.counts[key], nil
+}
+
+func (m *mockRedisRateLimiterWithExpireTracking) Expire(key string, seconds int64) (bool, error) {
+	m.expireCalled = true
+	return true, nil
+}
+
+// TestRateLimitMiddlewareWithRedis tests Redis-based rate limiting
+func TestRateLimitMiddlewareWithRedis(t *testing.T) {
+	t.Run("allows requests within limit", func(t *testing.T) {
+		mockRedis := newMockRedisRateLimiter()
+		config := RateLimiterConfig{
+			RequestsPerMinute: 10,
+			BurstSize:         5,
+		}
+
+		middleware := RateLimitMiddlewareWithRedis(mockRedis, config)
+		handler := func(ctx *Context) error {
+			ctx.StatusCode = 200
+			return nil
+		}
+
+		// Make requests within limit
+		for i := 0; i < 10; i++ {
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			req.RemoteAddr = "192.168.1.1:12345"
+			w := httptest.NewRecorder()
+			ctx := &Context{
+				Request:        req,
+				ResponseWriter: w,
+				StatusCode:     http.StatusOK,
+			}
+
+			wrappedHandler := middleware(handler)
+			err := wrappedHandler(ctx)
+			if err != nil {
+				t.Errorf("Request %d: unexpected error: %v", i+1, err)
+			}
+			if w.Code == 429 {
+				t.Errorf("Request %d should succeed, got rate limited", i+1)
+			}
+		}
+	})
+
+	t.Run("rate limits after exceeding limit", func(t *testing.T) {
+		mockRedis := newMockRedisRateLimiter()
+		config := RateLimiterConfig{
+			RequestsPerMinute: 5,
+			BurstSize:         5,
+		}
+
+		middleware := RateLimitMiddlewareWithRedis(mockRedis, config)
+		handler := func(ctx *Context) error {
+			ctx.StatusCode = 200
+			return nil
+		}
+
+		// Make requests up to limit
+		for i := 0; i < 5; i++ {
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			req.RemoteAddr = "192.168.1.2:12345"
+			w := httptest.NewRecorder()
+			ctx := &Context{
+				Request:        req,
+				ResponseWriter: w,
+				StatusCode:     http.StatusOK,
+			}
+
+			wrappedHandler := middleware(handler)
+			wrappedHandler(ctx)
+		}
+
+		// Next request should be rate limited
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.RemoteAddr = "192.168.1.2:12345"
+		w := httptest.NewRecorder()
+		ctx := &Context{
+			Request:        req,
+			ResponseWriter: w,
+			StatusCode:     http.StatusOK,
+		}
+
+		wrappedHandler := middleware(handler)
+		wrappedHandler(ctx)
+
+		if w.Code != 429 {
+			t.Errorf("Expected status 429, got %d", w.Code)
+		}
+	})
+
+	t.Run("different IPs have separate limits", func(t *testing.T) {
+		mockRedis := newMockRedisRateLimiter()
+		config := RateLimiterConfig{
+			RequestsPerMinute: 2,
+			BurstSize:         2,
+		}
+
+		middleware := RateLimitMiddlewareWithRedis(mockRedis, config)
+		handler := func(ctx *Context) error {
+			ctx.StatusCode = 200
+			return nil
+		}
+
+		// Exhaust limit for IP1
+		for i := 0; i < 3; i++ {
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			req.RemoteAddr = "192.168.1.10:12345"
+			w := httptest.NewRecorder()
+			ctx := &Context{
+				Request:        req,
+				ResponseWriter: w,
+				StatusCode:     http.StatusOK,
+			}
+
+			middleware(handler)(ctx)
+		}
+
+		// IP2 should still be able to make requests
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.RemoteAddr = "192.168.1.20:12345"
+		w := httptest.NewRecorder()
+		ctx := &Context{
+			Request:        req,
+			ResponseWriter: w,
+			StatusCode:     http.StatusOK,
+		}
+
+		middleware(handler)(ctx)
+
+		if w.Code == 429 {
+			t.Error("Different IP should not be rate limited")
+		}
+	})
+
+	t.Run("fails open on Redis error", func(t *testing.T) {
+		mockRedis := newMockRedisRateLimiter()
+		mockRedis.incrErr = errors.New("redis connection failed")
+
+		config := RateLimiterConfig{
+			RequestsPerMinute: 5,
+			BurstSize:         5,
+		}
+
+		middleware := RateLimitMiddlewareWithRedis(mockRedis, config)
+		handler := func(ctx *Context) error {
+			ctx.StatusCode = 200
+			return nil
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.RemoteAddr = "192.168.1.30:12345"
+		w := httptest.NewRecorder()
+		ctx := &Context{
+			Request:        req,
+			ResponseWriter: w,
+			StatusCode:     http.StatusOK,
+		}
+
+		wrappedHandler := middleware(handler)
+		err := wrappedHandler(ctx)
+
+		// Should fail open (allow the request)
+		if err != nil {
+			t.Errorf("Expected request to succeed on Redis error, got: %v", err)
+		}
+		if ctx.StatusCode != 200 {
+			t.Errorf("Expected status 200 (fail open), got %d", ctx.StatusCode)
+		}
+	})
+
+	t.Run("handles Expire error gracefully", func(t *testing.T) {
+		mockRedis := newMockRedisRateLimiter()
+		mockRedis.expireErr = errors.New("expire failed")
+
+		config := RateLimiterConfig{
+			RequestsPerMinute: 10,
+			BurstSize:         10,
+		}
+
+		middleware := RateLimitMiddlewareWithRedis(mockRedis, config)
+		handler := func(ctx *Context) error {
+			ctx.StatusCode = 200
+			return nil
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.RemoteAddr = "192.168.1.40:12345"
+		w := httptest.NewRecorder()
+		ctx := &Context{
+			Request:        req,
+			ResponseWriter: w,
+			StatusCode:     http.StatusOK,
+		}
+
+		wrappedHandler := middleware(handler)
+		err := wrappedHandler(ctx)
+
+		// Expire error should not affect the request
+		if err != nil {
+			t.Errorf("Expire error should not fail request: %v", err)
+		}
+		if ctx.StatusCode != 200 {
+			t.Errorf("Expected status 200, got %d", ctx.StatusCode)
+		}
+	})
+
+	t.Run("uses X-Forwarded-For for client IP", func(t *testing.T) {
+		mockRedis := newMockRedisRateLimiter()
+		config := RateLimiterConfig{
+			RequestsPerMinute: 5,
+			BurstSize:         5,
+		}
+
+		middleware := RateLimitMiddlewareWithRedis(mockRedis, config)
+		handler := func(ctx *Context) error {
+			ctx.StatusCode = 200
+			return nil
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.RemoteAddr = "10.0.0.1:12345"
+		req.Header.Set("X-Forwarded-For", "203.0.113.195")
+		w := httptest.NewRecorder()
+		ctx := &Context{
+			Request:        req,
+			ResponseWriter: w,
+			StatusCode:     http.StatusOK,
+		}
+
+		middleware(handler)(ctx)
+
+		// Check that the key uses the X-Forwarded-For IP
+		foundForwardedIP := false
+		for key := range mockRedis.counts {
+			if strings.Contains(key, "203.0.113.195") {
+				foundForwardedIP = true
+				break
+			}
+		}
+		if !foundForwardedIP {
+			t.Error("Expected rate limit key to use X-Forwarded-For IP")
+		}
+	})
+
+	t.Run("sets expiration on first request", func(t *testing.T) {
+		mockRedis := newMockRedisRateLimiterWithExpireTracking()
+
+		config := RateLimiterConfig{
+			RequestsPerMinute: 10,
+			BurstSize:         10,
+		}
+
+		middleware := RateLimitMiddlewareWithRedis(mockRedis, config)
+		handler := func(ctx *Context) error {
+			ctx.StatusCode = 200
+			return nil
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.RemoteAddr = "192.168.1.50:12345"
+		w := httptest.NewRecorder()
+		ctx := &Context{
+			Request:        req,
+			ResponseWriter: w,
+			StatusCode:     http.StatusOK,
+		}
+
+		middleware(handler)(ctx)
+
+		if !mockRedis.expireCalled {
+			t.Error("Expected Expire to be called on first request")
+		}
+	})
+}
