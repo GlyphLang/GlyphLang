@@ -937,6 +937,50 @@ func startServerWithInterpreter(filePath string, port int) (*http.Server, error)
 		return nil, fmt.Errorf("failed to load module: %w", err)
 	}
 
+	// Initialize JSON database
+	sourceDir := filepath.Dir(filePath)
+	dataDir := filepath.Join(sourceDir, "data")
+	db := interpreter.NewJSONDatabase(dataDir)
+
+	// Try to load seed data if it exists
+	seedPath := filepath.Join(sourceDir, "seed.json")
+	if _, err := os.Stat(seedPath); err == nil {
+		if err := db.LoadSeed(seedPath); err != nil {
+			printWarning(fmt.Sprintf("Failed to load seed data: %v", err))
+		} else {
+			printInfo("Loaded seed data from seed.json")
+		}
+	}
+
+	// Set database handler on interpreter
+	interp.SetDatabaseHandler(db)
+
+	// Set template directory to source directory
+	interp.SetTemplateDir(sourceDir)
+
+	// Create HTTP server mux
+	mux := http.NewServeMux()
+
+	// Register static routes first (they need to be handled separately from the router)
+	for _, item := range module.Items {
+		if staticRoute, ok := item.(*interpreter.StaticRoute); ok {
+			// Resolve static file path relative to source directory
+			staticPath := staticRoute.FilePath
+			if !filepath.IsAbs(staticPath) {
+				staticPath = filepath.Join(sourceDir, staticPath)
+			}
+			// Create static file handler
+			staticHandler := server.NewStaticFileHandler(staticPath)
+			urlPath := staticRoute.URLPath
+			// Ensure URL path ends with / for directory serving
+			if urlPath[len(urlPath)-1] != '/' {
+				urlPath += "/"
+			}
+			mux.Handle(urlPath, http.StripPrefix(urlPath, staticHandler))
+			printInfo(fmt.Sprintf("Static route: %s -> %s", staticRoute.URLPath, staticPath))
+		}
+	}
+
 	// Create router and register routes
 	router := server.NewRouter()
 	for _, item := range module.Items {
@@ -948,8 +992,7 @@ func startServerWithInterpreter(filePath string, port int) (*http.Server, error)
 		}
 	}
 
-	// Create HTTP server
-	mux := http.NewServeMux()
+	// Main application handler (for non-static routes)
 	mux.HandleFunc("/", createHandler(router))
 
 	srv := &http.Server{
@@ -1255,7 +1298,19 @@ func createRouteHandler(route *interpreter.Route, interp *interpreter.Interprete
 			})
 		}
 
-		// Set response
+		// Check for special response objects (from html(), file(), template(), text() functions)
+		if responseType, content, ok := server.IsSpecialResponse(result); ok {
+			ctx.StatusCode = http.StatusOK
+			return server.SendResponse(ctx, responseType, content)
+		}
+
+		// Check route's response format
+		if route.ResponseFormat != "" {
+			ctx.StatusCode = http.StatusOK
+			return server.SendResponse(ctx, route.ResponseFormat, result)
+		}
+
+		// Default: Set JSON response
 		ctx.StatusCode = http.StatusOK
 		ctx.ResponseWriter.Header().Set("Content-Type", "application/json")
 		return json.NewEncoder(ctx.ResponseWriter).Encode(result)
@@ -1267,14 +1322,30 @@ func executeRoute(route *interpreter.Route, ctx *server.Context, interp *interpr
 	// Parse request body for POST/PUT/PATCH requests
 	var requestBody interface{}
 	if ctx.Request.Method == "POST" || ctx.Request.Method == "PUT" || ctx.Request.Method == "PATCH" {
-		// Only parse if there's a content type that suggests JSON
 		contentType := ctx.Request.Header.Get("Content-Type")
-		// Accept empty content-type or application/json
-		shouldParseJSON := contentType == "" ||
+
+		// Check for form-urlencoded data (from HTML forms)
+		isFormData := len(contentType) >= 33 && contentType[:33] == "application/x-www-form-urlencoded"
+
+		// Check for JSON data
+		isJSON := contentType == "" ||
 			contentType == "application/json" ||
 			(len(contentType) >= 16 && contentType[:16] == "application/json")
 
-		if shouldParseJSON && ctx.Request.Body != nil {
+		if isFormData {
+			// Parse form data
+			if err := ctx.Request.ParseForm(); err == nil {
+				bodyMap := make(map[string]interface{})
+				for key, values := range ctx.Request.PostForm {
+					if len(values) == 1 {
+						bodyMap[key] = values[0]
+					} else {
+						bodyMap[key] = values
+					}
+				}
+				requestBody = bodyMap
+			}
+		} else if isJSON && ctx.Request.Body != nil {
 			// Limit request body size to 10MB to prevent DoS attacks
 			const maxBodySize = 10 * 1024 * 1024
 			limitedReader := io.LimitReader(ctx.Request.Body, maxBodySize)
@@ -1293,12 +1364,14 @@ func executeRoute(route *interpreter.Route, ctx *server.Context, interp *interpr
 	}
 
 	// Create request object for interpreter
+	// Use RequestURI to include query parameters in the path
 	request := &interpreter.Request{
-		Path:    ctx.Request.URL.Path,
+		Path:    ctx.Request.URL.RequestURI(),
 		Method:  ctx.Request.Method,
 		Params:  ctx.PathParams,
 		Body:    requestBody,
 		Headers: make(map[string]string),
+		Cookies: make(map[string]string),
 	}
 
 	// Copy headers
@@ -1308,10 +1381,38 @@ func executeRoute(route *interpreter.Route, ctx *server.Context, interp *interpr
 		}
 	}
 
+	// Copy cookies from HTTP request
+	for _, cookie := range ctx.Request.Cookies() {
+		request.Cookies[cookie.Name] = cookie.Value
+	}
+
 	// Use ExecuteRoute instead of ExecuteRouteSimple to handle request body
 	response, err := interp.ExecuteRoute(route, request)
 	if err != nil {
 		return nil, fmt.Errorf("route execution failed: %w", err)
+	}
+
+	// Process response cookies (set them on the HTTP response)
+	for _, cookie := range response.Cookies {
+		httpCookie := &http.Cookie{
+			Name:     cookie.Name,
+			Value:    cookie.Value,
+			Path:     cookie.Options.Path,
+			MaxAge:   cookie.Options.MaxAge,
+			HttpOnly: cookie.Options.HttpOnly,
+			Secure:   cookie.Options.Secure,
+		}
+		switch cookie.Options.SameSite {
+		case "strict":
+			httpCookie.SameSite = http.SameSiteStrictMode
+		case "lax":
+			httpCookie.SameSite = http.SameSiteLaxMode
+		case "none":
+			httpCookie.SameSite = http.SameSiteNoneMode
+		default:
+			httpCookie.SameSite = http.SameSiteLaxMode
+		}
+		http.SetCookie(ctx.ResponseWriter, httpCookie)
 	}
 
 	return response.Body, nil

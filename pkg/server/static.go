@@ -170,3 +170,105 @@ func CreateStaticMiddleware(handler *StaticHandler) func(http.Handler) http.Hand
 		})
 	}
 }
+
+// NewStaticFileHandler creates a simple static file handler for a single directory
+// This returns an http.Handler that serves files from the specified directory
+func NewStaticFileHandler(dir string) http.Handler {
+	return &singleDirStaticHandler{
+		basePath: dir,
+	}
+}
+
+// singleDirStaticHandler serves static files from a single directory
+type singleDirStaticHandler struct {
+	basePath string
+}
+
+func (h *singleDirStaticHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Get the requested file path
+	requestPath := r.URL.Path
+	if requestPath == "" || requestPath == "/" {
+		requestPath = "index.html"
+	}
+
+	// Build full filesystem path
+	fullPath := filepath.Join(h.basePath, requestPath)
+	fullPath = filepath.Clean(fullPath)
+
+	// Security: Ensure the path is still within the base directory
+	absBase, err := filepath.Abs(h.basePath)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	absPath, err := filepath.Abs(fullPath)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !strings.HasPrefix(absPath, absBase) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	// Check if path exists
+	info, err := os.Stat(fullPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// If it's a directory, try to serve index.html
+	if info.IsDir() {
+		indexPath := filepath.Join(fullPath, "index.html")
+		if indexInfo, err := os.Stat(indexPath); err == nil && !indexInfo.IsDir() {
+			fullPath = indexPath
+			info = indexInfo
+		} else {
+			// No index.html, return forbidden (no directory listing)
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+	}
+
+	// Open the file
+	file, err := os.Open(fullPath)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer file.Close()
+
+	// Detect content type
+	ext := filepath.Ext(fullPath)
+	contentType := mime.TypeByExtension(ext)
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	// Set headers
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", info.Size()))
+
+	// Handle caching headers
+	modTime := info.ModTime()
+	w.Header().Set("Last-Modified", modTime.UTC().Format(http.TimeFormat))
+
+	// Check If-Modified-Since header
+	if ifModSince := r.Header.Get("If-Modified-Since"); ifModSince != "" {
+		if t, err := http.ParseTime(ifModSince); err == nil {
+			if modTime.Before(t.Add(1 * 1e9)) { // Within 1 second
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
+		}
+	}
+
+	// Serve content
+	w.WriteHeader(http.StatusOK)
+	io.Copy(w, file)
+}

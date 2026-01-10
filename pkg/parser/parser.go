@@ -334,6 +334,8 @@ func (p *Parser) parseType() (interpreter.Type, bool, error) {
 		baseType = interpreter.BoolType{}
 	case "float":
 		baseType = interpreter.FloatType{}
+	case "Database":
+		baseType = interpreter.DatabaseType{}
 	default:
 		baseType = interpreter.NamedType{Name: typeName}
 	}
@@ -494,6 +496,8 @@ func (p *Parser) parseSingleType(typeParamNames []string) (interpreter.Type, err
 				baseType = interpreter.BoolType{}
 			case "float":
 				baseType = interpreter.FloatType{}
+			case "Database":
+				baseType = interpreter.DatabaseType{}
 			default:
 				baseType = interpreter.NamedType{Name: typeName}
 			}
@@ -611,6 +615,8 @@ func (p *Parser) parseTypeWithContext(typeParamNames []string) (interpreter.Type
 				baseType = interpreter.BoolType{}
 			case "float":
 				baseType = interpreter.FloatType{}
+			case "Database":
+				baseType = interpreter.DatabaseType{}
 			default:
 				baseType = interpreter.NamedType{Name: typeName}
 			}

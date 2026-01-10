@@ -741,8 +741,10 @@ func TestUnsupportedStatementType(t *testing.T) {
 	env := NewEnvironment()
 
 	// WsSendStatement is a statement but not in the switch
-	// Actually let's test with ExpressionStatement which should be unsupported
-	stmt := ExpressionStatement{Expr: LiteralExpr{Value: IntLiteral{Value: 42}}}
+	stmt := WsSendStatement{
+		Client:  LiteralExpr{Value: StringLiteral{Value: "client1"}},
+		Message: LiteralExpr{Value: StringLiteral{Value: "hello"}},
+	}
 
 	_, err := interp.ExecuteStatement(stmt, env)
 	if err == nil {

@@ -18,6 +18,8 @@ type Interpreter struct {
 	moduleResolver  *ModuleResolver          // Module resolver for handling imports
 	importedModules map[string]*LoadedModule // Imported modules by alias/name
 	templateEngine  *TemplateEngine          // Template engine for HTML rendering
+	currentRequest  *Request                 // Current request being processed (for cookie access)
+	pendingCookies  []SetCookieAction        // Cookies to set on response
 }
 
 // NewInterpreter creates a new interpreter instance
@@ -54,7 +56,24 @@ type Request struct {
 	Params   map[string]string
 	Body     interface{}
 	Headers  map[string]string
-	AuthData map[string]interface{} // Authenticated user data from JWT
+	Cookies  map[string]string            // Cookie name -> value
+	AuthData map[string]interface{}       // Authenticated user data from JWT
+}
+
+// CookieOptions represents options for setting a cookie
+type CookieOptions struct {
+	MaxAge   int
+	Path     string
+	HttpOnly bool
+	Secure   bool
+	SameSite string // "strict", "lax", "none"
+}
+
+// SetCookieAction represents a cookie to be set on the response
+type SetCookieAction struct {
+	Name    string
+	Value   string
+	Options CookieOptions
 }
 
 // Response represents an HTTP response
@@ -62,6 +81,7 @@ type Response struct {
 	StatusCode int
 	Body       interface{}
 	Headers    map[string]string
+	Cookies    []SetCookieAction // Cookies to set on the response
 }
 
 // LoadModule loads a module into the interpreter
@@ -110,6 +130,10 @@ func (i *Interpreter) LoadModuleWithPath(module Module, basePath string) error {
 
 		case *QueueWorker:
 			i.queueWorkers[it.QueueName] = *it
+
+		case *StaticRoute:
+			// Static routes are handled by the server
+			continue
 
 		default:
 			return fmt.Errorf("unsupported item type: %T", item)
@@ -218,6 +242,10 @@ func (i *Interpreter) SetDatabaseHandler(handler interface{}) {
 
 // ExecuteRoute executes a route with the given request
 func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, error) {
+	// Set up request context for cookie access
+	i.currentRequest = request
+	i.pendingCookies = nil
+
 	// Create a new environment for the route
 	routeEnv := NewChildEnvironment(i.globalEnv)
 
@@ -336,7 +364,12 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 		StatusCode: 200,
 		Body:       result,
 		Headers:    make(map[string]string),
+		Cookies:    i.pendingCookies,
 	}
+
+	// Clear request context
+	i.currentRequest = nil
+	i.pendingCookies = nil
 
 	return response, nil
 }

@@ -238,10 +238,11 @@ func SendFile(ctx *Context, filePath string) error {
 
 // ResponseType constants for special response handling
 const (
-	ResponseTypeJSON = "json"
-	ResponseTypeHTML = "html"
-	ResponseTypeText = "text"
-	ResponseTypeFile = "file"
+	ResponseTypeJSON     = "json"
+	ResponseTypeHTML     = "html"
+	ResponseTypeText     = "text"
+	ResponseTypeFile     = "file"
+	ResponseTypeRedirect = "redirect"
 )
 
 // IsSpecialResponse checks if the result is a special response object
@@ -254,6 +255,11 @@ func IsSpecialResponse(result interface{}) (string, interface{}, bool) {
 	responseType, ok := m["__responseType"].(string)
 	if !ok {
 		return "", nil, false
+	}
+
+	// For redirect, return the url; for others, return content
+	if responseType == ResponseTypeRedirect {
+		return responseType, m["url"], true
 	}
 
 	content := m["content"]
@@ -284,11 +290,25 @@ func SendResponse(ctx *Context, responseType string, result interface{}) error {
 		}
 		return SendFile(ctx, filePath)
 
+	case ResponseTypeRedirect:
+		redirectURL, ok := result.(string)
+		if !ok {
+			return fmt.Errorf("redirect URL must be a string")
+		}
+		return SendRedirect(ctx, redirectURL)
+
 	case ResponseTypeJSON:
 		fallthrough
 	default:
 		return sendJSONResponse(ctx, result)
 	}
+}
+
+// SendRedirect sends an HTTP redirect response
+func SendRedirect(ctx *Context, url string) error {
+	ctx.ResponseWriter.Header().Set("Location", url)
+	ctx.ResponseWriter.WriteHeader(http.StatusFound) // 302 redirect
+	return nil
 }
 
 // handleError logs and sends an error response

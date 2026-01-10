@@ -54,6 +54,11 @@ func (i *Interpreter) ExecuteStatement(stmt Statement, env *Environment) (interf
 	case ValidationStatement:
 		return i.executeValidation(s, env)
 
+	case ExpressionStatement:
+		// Execute expression for side effects (e.g., console() calls)
+		_, err := i.EvaluateExpression(s.Expr, env)
+		return nil, err
+
 	default:
 		return nil, fmt.Errorf("unsupported statement type: %T", stmt)
 	}

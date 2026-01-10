@@ -1,8 +1,12 @@
 package interpreter
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
+	"log"
 	"strings"
+	"time"
 )
 
 // EvaluateExpression evaluates an expression and returns its value
@@ -158,6 +162,8 @@ func (i *Interpreter) evaluateLiteral(lit Literal) (interface{}, error) {
 		return l.Value, nil
 	case FloatLiteral:
 		return l.Value, nil
+	case NullLiteral:
+		return nil, nil
 	default:
 		return nil, fmt.Errorf("unsupported literal type: %T", lit)
 	}
@@ -552,13 +558,155 @@ func (i *Interpreter) evaluateFieldAccess(expr FieldAccessExpr, env *Environment
 func (i *Interpreter) evaluateFunctionCall(expr FunctionCallExpr, env *Environment) (interface{}, error) {
 	// Handle built-in functions first (before checking for method calls)
 	switch expr.Name {
-	case "time.now":
-		// Return a mock timestamp for now
-		return int64(1234567890), nil
+	case "time.now", "now", "timestamp":
+		// Return current Unix timestamp in seconds
+		return time.Now().Unix(), nil
 
-	case "now":
-		// Return a mock timestamp
-		return int64(1234567890), nil
+	case "timestampAdd":
+		// Add seconds to a timestamp
+		if len(expr.Args) != 2 {
+			return nil, fmt.Errorf("timestampAdd() expects 2 arguments (timestamp, seconds), got %d", len(expr.Args))
+		}
+		tsArg, err := i.EvaluateExpression(expr.Args[0], env)
+		if err != nil {
+			return nil, err
+		}
+		secsArg, err := i.EvaluateExpression(expr.Args[1], env)
+		if err != nil {
+			return nil, err
+		}
+		var ts int64
+		switch v := tsArg.(type) {
+		case int64:
+			ts = v
+		case int:
+			ts = int64(v)
+		case float64:
+			ts = int64(v)
+		default:
+			return nil, fmt.Errorf("timestampAdd() expects first argument to be a number, got %T", tsArg)
+		}
+		var secs int64
+		switch v := secsArg.(type) {
+		case int64:
+			secs = v
+		case int:
+			secs = int64(v)
+		case float64:
+			secs = int64(v)
+		default:
+			return nil, fmt.Errorf("timestampAdd() expects second argument to be a number, got %T", secsArg)
+		}
+		return ts + secs, nil
+
+	case "generateToken":
+		// Generate a 32-character random hex token
+		bytes := make([]byte, 16)
+		if _, err := rand.Read(bytes); err != nil {
+			return nil, fmt.Errorf("generateToken() failed: %v", err)
+		}
+		return hex.EncodeToString(bytes), nil
+
+	case "console":
+		// Log a message to the server console
+		if len(expr.Args) != 1 {
+			return nil, fmt.Errorf("console() expects 1 argument, got %d", len(expr.Args))
+		}
+		arg, err := i.EvaluateExpression(expr.Args[0], env)
+		if err != nil {
+			return nil, err
+		}
+		log.Printf("[CONSOLE] %v", arg)
+		return nil, nil
+
+	case "getCookie":
+		// Get a cookie value from the request
+		if len(expr.Args) != 1 {
+			return nil, fmt.Errorf("getCookie() expects 1 argument, got %d", len(expr.Args))
+		}
+		nameArg, err := i.EvaluateExpression(expr.Args[0], env)
+		if err != nil {
+			return nil, err
+		}
+		name, ok := nameArg.(string)
+		if !ok {
+			return nil, fmt.Errorf("getCookie() expects a string argument, got %T", nameArg)
+		}
+		if i.currentRequest == nil || i.currentRequest.Cookies == nil {
+			return nil, nil
+		}
+		if val, exists := i.currentRequest.Cookies[name]; exists {
+			return val, nil
+		}
+		return nil, nil
+
+	case "setCookie":
+		// Set a cookie on the response
+		// Usage: setCookie(name, value, {maxAge: 3600, httpOnly: true, path: "/", sameSite: "lax"})
+		if len(expr.Args) < 2 || len(expr.Args) > 3 {
+			return nil, fmt.Errorf("setCookie() expects 2 or 3 arguments, got %d", len(expr.Args))
+		}
+		nameArg, err := i.EvaluateExpression(expr.Args[0], env)
+		if err != nil {
+			return nil, err
+		}
+		name, ok := nameArg.(string)
+		if !ok {
+			return nil, fmt.Errorf("setCookie() expects first argument to be a string, got %T", nameArg)
+		}
+		valueArg, err := i.EvaluateExpression(expr.Args[1], env)
+		if err != nil {
+			return nil, err
+		}
+		value, ok := valueArg.(string)
+		if !ok {
+			return nil, fmt.Errorf("setCookie() expects second argument to be a string, got %T", valueArg)
+		}
+
+		// Parse options if provided
+		options := CookieOptions{
+			Path:     "/",
+			HttpOnly: true,
+			SameSite: "lax",
+		}
+		if len(expr.Args) == 3 {
+			optArg, err := i.EvaluateExpression(expr.Args[2], env)
+			if err != nil {
+				return nil, err
+			}
+			if optMap, ok := optArg.(map[string]interface{}); ok {
+				if maxAge, ok := optMap["maxAge"]; ok {
+					switch v := maxAge.(type) {
+					case int64:
+						options.MaxAge = int(v)
+					case int:
+						options.MaxAge = v
+					case float64:
+						options.MaxAge = int(v)
+					}
+				}
+				if path, ok := optMap["path"].(string); ok {
+					options.Path = path
+				}
+				if httpOnly, ok := optMap["httpOnly"].(bool); ok {
+					options.HttpOnly = httpOnly
+				}
+				if secure, ok := optMap["secure"].(bool); ok {
+					options.Secure = secure
+				}
+				if sameSite, ok := optMap["sameSite"].(string); ok {
+					options.SameSite = sameSite
+				}
+			}
+		}
+
+		// Add to pending cookies
+		i.pendingCookies = append(i.pendingCookies, SetCookieAction{
+			Name:    name,
+			Value:   value,
+			Options: options,
+		})
+		return nil, nil
 
 	case "upper":
 		// Convert string to uppercase
@@ -780,6 +928,8 @@ func (i *Interpreter) evaluateFunctionCall(expr FunctionCallExpr, env *Environme
 		case string:
 			return int64(len(v)), nil
 		case []interface{}:
+			return int64(len(v)), nil
+		case []map[string]interface{}:
 			return int64(len(v)), nil
 		default:
 			return nil, fmt.Errorf("length() expects a string or array argument, got %T", arg)
@@ -1115,6 +1265,25 @@ func (i *Interpreter) evaluateFunctionCall(expr FunctionCallExpr, env *Environme
 			"__responseType": "html",
 			"content":        rendered,
 		}, nil
+
+	case "redirect":
+		// Redirect to a URL
+		if len(expr.Args) != 1 {
+			return nil, fmt.Errorf("redirect() expects 1 argument, got %d", len(expr.Args))
+		}
+		urlArg, err := i.EvaluateExpression(expr.Args[0], env)
+		if err != nil {
+			return nil, err
+		}
+		redirectURL, ok := urlArg.(string)
+		if !ok {
+			return nil, fmt.Errorf("redirect() expects a string argument, got %T", urlArg)
+		}
+
+		return map[string]interface{}{
+			"__responseType": "redirect",
+			"url":            redirectURL,
+		}, nil
 	}
 
 	// Check if this is a method call (contains a dot)
@@ -1184,8 +1353,159 @@ func (i *Interpreter) evaluateFunctionCall(expr FunctionCallExpr, env *Environme
 			}
 		}
 
+		// Handle JSONTable methods directly
+		if table, ok := obj.(*JSONTable); ok {
+			switch methodName {
+			case "find":
+				if len(args) == 0 {
+					return table.Find(map[string]interface{}{}), nil
+				}
+				if query, ok := args[0].(map[string]interface{}); ok {
+					return table.Find(query), nil
+				}
+				return nil, fmt.Errorf("find() expects a query object")
+			case "findOne":
+				if len(args) == 0 {
+					return table.FindOne(map[string]interface{}{}), nil
+				}
+				if query, ok := args[0].(map[string]interface{}); ok {
+					return table.FindOne(query), nil
+				}
+				return nil, fmt.Errorf("findOne() expects a query object")
+			case "findAll", "where":
+				if len(args) == 0 {
+					return table.FindAll(map[string]interface{}{}), nil
+				}
+				if query, ok := args[0].(map[string]interface{}); ok {
+					return table.FindAll(query), nil
+				}
+				return nil, fmt.Errorf("findAll() expects a query object")
+			case "create":
+				if len(args) != 1 {
+					return nil, fmt.Errorf("create() expects 1 argument")
+				}
+				if data, ok := args[0].(map[string]interface{}); ok {
+					return table.Create(data), nil
+				}
+				return nil, fmt.Errorf("create() expects an object argument")
+			case "update":
+				if len(args) != 2 {
+					return nil, fmt.Errorf("update() expects 2 arguments (query, updates)")
+				}
+				query, ok1 := args[0].(map[string]interface{})
+				updates, ok2 := args[1].(map[string]interface{})
+				if !ok1 || !ok2 {
+					return nil, fmt.Errorf("update() expects object arguments")
+				}
+				return table.Update(query, updates), nil
+			case "delete":
+				if len(args) != 1 {
+					return nil, fmt.Errorf("delete() expects 1 argument")
+				}
+				if query, ok := args[0].(map[string]interface{}); ok {
+					return table.Delete(query), nil
+				}
+				return nil, fmt.Errorf("delete() expects a query object")
+			case "count":
+				if len(args) == 0 {
+					return table.Count(map[string]interface{}{}), nil
+				}
+				if query, ok := args[0].(map[string]interface{}); ok {
+					return table.Count(query), nil
+				}
+				return nil, fmt.Errorf("count() expects a query object")
+			case "all":
+				return table.All(), nil
+			}
+		}
+
 		// Call the method using reflection
 		return CallMethod(obj, strings.Title(methodName), args...)
+	}
+
+	// Check if this is a method call where the object was passed as first argument
+	// (happens when parser parses "db.users.find({...})" - object is first arg)
+	if len(expr.Args) > 0 {
+		// Evaluate the first argument to see if it's a JSONTable
+		firstArg, err := i.EvaluateExpression(expr.Args[0], env)
+		if err == nil {
+			if table, ok := firstArg.(*JSONTable); ok {
+				// This is a method call on a JSONTable
+				methodName := expr.Name
+				// Get remaining args (skip the object)
+				args := make([]interface{}, len(expr.Args)-1)
+				for idx, arg := range expr.Args[1:] {
+					val, err := i.EvaluateExpression(arg, env)
+					if err != nil {
+						return nil, err
+					}
+					args[idx] = val
+				}
+
+				switch methodName {
+				case "find":
+					if len(args) == 0 {
+						return table.Find(map[string]interface{}{}), nil
+					}
+					if query, ok := args[0].(map[string]interface{}); ok {
+						return table.Find(query), nil
+					}
+					return nil, fmt.Errorf("find() expects a query object")
+				case "findOne":
+					if len(args) == 0 {
+						return table.FindOne(map[string]interface{}{}), nil
+					}
+					if query, ok := args[0].(map[string]interface{}); ok {
+						return table.FindOne(query), nil
+					}
+					return nil, fmt.Errorf("findOne() expects a query object")
+				case "findAll", "where":
+					if len(args) == 0 {
+						return table.FindAll(map[string]interface{}{}), nil
+					}
+					if query, ok := args[0].(map[string]interface{}); ok {
+						return table.FindAll(query), nil
+					}
+					return nil, fmt.Errorf("findAll() expects a query object")
+				case "create":
+					if len(args) != 1 {
+						return nil, fmt.Errorf("create() expects 1 argument")
+					}
+					if data, ok := args[0].(map[string]interface{}); ok {
+						return table.Create(data), nil
+					}
+					return nil, fmt.Errorf("create() expects an object argument")
+				case "update":
+					if len(args) != 2 {
+						return nil, fmt.Errorf("update() expects 2 arguments (query, updates)")
+					}
+					query, ok1 := args[0].(map[string]interface{})
+					updates, ok2 := args[1].(map[string]interface{})
+					if !ok1 || !ok2 {
+						return nil, fmt.Errorf("update() expects object arguments")
+					}
+					return table.Update(query, updates), nil
+				case "delete":
+					if len(args) != 1 {
+						return nil, fmt.Errorf("delete() expects 1 argument")
+					}
+					if query, ok := args[0].(map[string]interface{}); ok {
+						return table.Delete(query), nil
+					}
+					return nil, fmt.Errorf("delete() expects a query object")
+				case "count":
+					if len(args) == 0 {
+						return table.Count(map[string]interface{}{}), nil
+					}
+					if query, ok := args[0].(map[string]interface{}); ok {
+						return table.Count(query), nil
+					}
+					return nil, fmt.Errorf("count() expects a query object")
+				case "all":
+					return table.All(), nil
+				}
+			}
+		}
 	}
 
 	// Check if it's a user-defined function

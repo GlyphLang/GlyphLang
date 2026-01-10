@@ -447,7 +447,7 @@ func TestMoreBuiltinFunctions(t *testing.T) {
 	interp := NewInterpreter()
 	env := NewEnvironment()
 
-	// Test time.now function
+	// Test time.now function - returns current Unix timestamp
 	result, err := interp.EvaluateExpression(FunctionCallExpr{
 		Name: "time.now",
 		Args: []Expr{},
@@ -455,11 +455,12 @@ func TestMoreBuiltinFunctions(t *testing.T) {
 	if err != nil {
 		t.Errorf("time.now failed: %v", err)
 	}
-	if result != int64(1234567890) {
-		t.Errorf("time.now = %v, want 1234567890", result)
+	timestamp, ok := result.(int64)
+	if !ok || timestamp < 1700000000 {
+		t.Errorf("time.now should return valid timestamp, got %v", result)
 	}
 
-	// Test now function
+	// Test now function - returns current Unix timestamp
 	result, err = interp.EvaluateExpression(FunctionCallExpr{
 		Name: "now",
 		Args: []Expr{},
@@ -467,8 +468,9 @@ func TestMoreBuiltinFunctions(t *testing.T) {
 	if err != nil {
 		t.Errorf("now failed: %v", err)
 	}
-	if result != int64(1234567890) {
-		t.Errorf("now = %v, want 1234567890", result)
+	timestamp, ok = result.(int64)
+	if !ok || timestamp < 1700000000 {
+		t.Errorf("now should return valid timestamp, got %v", result)
 	}
 
 	// Test split function

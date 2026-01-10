@@ -217,7 +217,10 @@ func TestInterpreter_HelloWorldExample(t *testing.T) {
 	obj2, ok := result2.(map[string]interface{})
 	require.True(t, ok)
 	assert.Equal(t, "Hello, World!", obj2["text"])
-	assert.Equal(t, int64(1234567890), obj2["timestamp"])
+	// time.now returns current Unix timestamp
+	timestamp2, ok := obj2["timestamp"].(int64)
+	assert.True(t, ok, "timestamp should be int64")
+	assert.Greater(t, timestamp2, int64(1700000000), "timestamp should be after 2023")
 }
 
 // Test: Conditional Logic

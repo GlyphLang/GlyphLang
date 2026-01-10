@@ -307,7 +307,10 @@ func TestEvaluateFunctionCall_TimeNow(t *testing.T) {
 	result, err := interp.EvaluateExpression(expr, env)
 
 	require.NoError(t, err)
-	assert.Equal(t, int64(1234567890), result)
+	// time.now returns current Unix timestamp, which should be a reasonable value
+	timestamp, ok := result.(int64)
+	assert.True(t, ok, "time.now should return int64")
+	assert.Greater(t, timestamp, int64(1700000000), "timestamp should be after 2023")
 }
 
 func TestEvaluateObject_Empty(t *testing.T) {
@@ -837,7 +840,10 @@ func TestExecuteRoute_GreetWithObjectAndParams(t *testing.T) {
 	obj, ok := result.(map[string]interface{})
 	assert.True(t, ok)
 	assert.Equal(t, "Hello, World!", obj["text"])
-	assert.Equal(t, int64(1234567890), obj["timestamp"])
+	// time.now returns current Unix timestamp
+	timestamp, ok := obj["timestamp"].(int64)
+	assert.True(t, ok, "timestamp should be int64")
+	assert.Greater(t, timestamp, int64(1700000000), "timestamp should be after 2023")
 }
 
 func TestExecuteRoute_ObjectFieldAccess(t *testing.T) {
