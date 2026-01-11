@@ -1,4 +1,8 @@
 
+# Macros
+
+GlyphLang supports compile-time macros for reusable patterns.
+
 ```glyph
 # Define reusable patterns with macros
 macro! validate_required(field) {
