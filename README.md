@@ -227,25 +227,10 @@ Compile-time code generation using macros.
 
 ### Cron Tasks
 
-```glyph
-# Daily cleanup at midnight
-* "0 0 * * *" daily_cleanup {
-  % db: Database
-  > {task: "cleanup", timestamp: now()}
-}
+Scheduled background tasks using cron expressions.
 
-# Every 5 minutes health check
-* "*/5 * * * *" health_check {
-  > {status: "healthy", checked_at: now()}
-}
+→ See: [Cron Tasks Documentation](docs/CRON.md)
 
-# Weekly report on Sundays at 9am with retries
-* "0 9 * * 0" weekly_report {
-  + retries(3)
-  % db: Database
-  > {week: "current", generated_at: now()}
-}
-```
 
 ### Event Handlers
 
@@ -290,42 +275,10 @@ Compile-time code generation using macros.
 ```
 
 ### WebSockets
+WebSocket route definitions for real-time communication.
 
-```glyph
-# Basic WebSocket chat
-@ ws /chat {
-  on connect {
-    ws.join("lobby")
-    ws.broadcast("User joined the chat")
-  }
+→ See: [WebSockets Documentation](docs/WEBSOCKETS.md)
 
-  on message {
-    ws.broadcast(input)
-  }
-
-  on disconnect {
-    ws.broadcast("User left the chat")
-    ws.leave("lobby")
-  }
-}
-
-# WebSocket with room parameter
-@ ws /chat/:room {
-  on connect {
-    ws.join(room)
-    ws.broadcast_to_room(room, "User joined")
-  }
-
-  on message {
-    ws.broadcast_to_room(room, input)
-  }
-
-  on disconnect {
-    ws.broadcast_to_room(room, "User left")
-    ws.leave(room)
-  }
-}
-```
 
 ### CLI Commands (In-Language)
 
