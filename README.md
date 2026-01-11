@@ -234,21 +234,10 @@ Scheduled background tasks using cron expressions.
 
 ### Event Handlers
 
-```glyph
-# Handle user creation event
-~ "user.created" {
-  $ user_id = event.id
-  $ email = event.email
-  > {handled: true, user_id: user_id}
-}
+Event-driven handlers for asynchronous workflows.
 
-# Async event handler
-~ "order.completed" async {
-  $ order_id = event.order_id
-  $ total = event.total
-  > {processed: true, order_id: order_id}
-}
-```
+→ See: [Event Handlers Documentation](docs/EVENTS.md)
+
 
 ### Queue Workers
 
