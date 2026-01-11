@@ -196,24 +196,10 @@ Concurrency support using async blocks and futures.
 
 ### Generics
 
-```glyph
-! identity<T>(x: T): T {
-  > x
-}
+Support for type parameters, inference, and constraints.
 
-! first<T>(a: T, b: T): T {
-  > a
-}
+→ See: [Generics Documentation](docs/GENERICS.md)
 
-! map<T, U>(arr: [T], fn: (T) -> U): [U] {
-  $ result = []
-  for item in arr {
-    $ mapped = fn(item)
-    result = append(result, mapped)
-  }
-  > result
-}
-```
 
 ### Modules
 
