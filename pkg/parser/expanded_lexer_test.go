@@ -15,7 +15,7 @@ func TestExpandedLexerKeywords(t *testing.T) {
 		{"return", GREATER},
 		{"middleware", PLUS},
 		{"inject", PERCENT},
-		{"input", LESS},
+		// Note: "input" is NOT a keyword - it conflicts with the built-in variable
 		{"validate", QUESTION},
 		{"event", TILDE},
 		{"cron", STAR},
