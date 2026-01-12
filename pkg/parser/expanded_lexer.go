@@ -342,9 +342,8 @@ func (l *ExpandedLexer) readIdentifier() Token {
 		tok.Type = PLUS
 	case "inject":
 		tok.Type = PERCENT
-	// Note: "input" is NOT a keyword here because it conflicts with the
-	// built-in "input" variable that holds request body data.
-	// Use "<" directly for input type declarations in expanded syntax.
+	case "expects":
+		tok.Type = LESS
 	case "validate":
 		tok.Type = QUESTION
 	case "event":
