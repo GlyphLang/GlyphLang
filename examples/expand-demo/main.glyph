@@ -1,0 +1,50 @@
+# Expand/Compact Demo
+# A simple API that demonstrates the expand/compact feature
+
+: Message {
+  text: str!
+  timestamp: int!
+}
+
+# Simple hello endpoint
+@ GET / {
+  > {
+    message: "Welcome to Glyph!",
+    version: "1.0.0"
+  }
+}
+
+# Greeting with name parameter
+@ GET /hello/:name {
+  $ greeting = "Hello, " + name + "!"
+  > {text: greeting, timestamp: 1234567890}
+}
+
+# Personalized greeting with title
+@ GET /greet/:title/:name {
+  $ full = title + " " + name
+  $ msg = "Greetings, " + full + "!"
+  > {greeting: msg}
+}
+
+# Health check
+@ GET /health {
+  > {status: "ok", uptime: 12345}
+}
+
+# Status endpoint with conditional
+@ GET /status/:code {
+  if code == "ok" {
+    > {status: "healthy", code: 200}
+  }
+  if code == "error" {
+    > {status: "unhealthy", code: 500}
+  }
+  > {status: "unknown", code: 0}
+}
+
+# Command line tool
+! greet --name {
+  $ msg = "Hello from CLI, " + name + "!"
+  > {greeting: msg}
+}
