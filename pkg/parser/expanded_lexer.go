@@ -87,9 +87,7 @@ func (l *ExpandedLexer) Tokenize() ([]Token, error) {
 		tok := l.nextToken()
 		if tok.Type == ILLEGAL {
 			if strings.HasPrefix(tok.Literal, "unterminated_string:") {
-				quote := tok.Literal[len("unterminated_string:"):]
 				return nil, fmt.Errorf("unterminated string at line %d, column %d", tok.Line, tok.Column)
-				_ = quote // silence unused variable
 			}
 			return nil, fmt.Errorf("invalid character '%c' at line %d, column %d", tok.Literal[0], tok.Line, tok.Column)
 		}
