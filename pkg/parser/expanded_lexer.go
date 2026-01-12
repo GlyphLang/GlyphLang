@@ -340,7 +340,7 @@ func (l *ExpandedLexer) readIdentifier() Token {
 		tok.Type = GREATER
 	case "middleware":
 		tok.Type = PLUS
-	case "inject":
+	case "use":
 		tok.Type = PERCENT
 	case "expects":
 		tok.Type = LESS

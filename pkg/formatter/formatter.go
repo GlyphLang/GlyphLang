@@ -195,7 +195,7 @@ func (f *Formatter) formatRoute(r *interpreter.Route) {
 	for _, inj := range r.Injections {
 		f.writeIndent()
 		if f.mode == Expanded {
-			f.write("inject ")
+			f.write("use ")
 		} else {
 			f.write("% ")
 		}
@@ -282,7 +282,7 @@ func (f *Formatter) formatCronTask(ct *interpreter.CronTask) {
 	for _, inj := range ct.Injections {
 		f.writeIndent()
 		if f.mode == Expanded {
-			f.write("inject ")
+			f.write("use ")
 		} else {
 			f.write("% ")
 		}
@@ -322,7 +322,7 @@ func (f *Formatter) formatEventHandler(eh *interpreter.EventHandler) {
 	for _, inj := range eh.Injections {
 		f.writeIndent()
 		if f.mode == Expanded {
-			f.write("inject ")
+			f.write("use ")
 		} else {
 			f.write("% ")
 		}
@@ -391,7 +391,7 @@ func (f *Formatter) formatQueueWorker(qw *interpreter.QueueWorker) {
 	for _, inj := range qw.Injections {
 		f.writeIndent()
 		if f.mode == Expanded {
-			f.write("inject ")
+			f.write("use ")
 		} else {
 			f.write("% ")
 		}

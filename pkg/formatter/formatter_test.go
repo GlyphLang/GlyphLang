@@ -370,8 +370,8 @@ func TestFormatMiddlewareAndInjection(t *testing.T) {
 	if !strings.Contains(expanded, "middleware ratelimit(100/min)") {
 		t.Errorf("Expanded output should contain 'middleware ratelimit(100/min)', got: %s", expanded)
 	}
-	if !strings.Contains(expanded, "inject db: Database") {
-		t.Errorf("Expanded output should contain 'inject db: Database', got: %s", expanded)
+	if !strings.Contains(expanded, "use db: Database") {
+		t.Errorf("Expanded output should contain 'use db: Database', got: %s", expanded)
 	}
 }
 

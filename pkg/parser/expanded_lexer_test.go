@@ -14,7 +14,7 @@ func TestExpandedLexerKeywords(t *testing.T) {
 		{"let", DOLLAR},
 		{"return", GREATER},
 		{"middleware", PLUS},
-		{"inject", PERCENT},
+		{"use", PERCENT},
 		{"expects", LESS},
 		{"validate", QUESTION},
 		{"handle", TILDE},
@@ -188,10 +188,10 @@ func TestExpandedLexerQueueWorker(t *testing.T) {
 	}
 }
 
-func TestExpandedLexerMiddlewareAndInject(t *testing.T) {
+func TestExpandedLexerMiddlewareAndUse(t *testing.T) {
 	input := `route GET /api/admin {
   middleware auth(jwt)
-  inject db: Database
+  use db: Database
   return {}
 }`
 
@@ -203,21 +203,21 @@ func TestExpandedLexerMiddlewareAndInject(t *testing.T) {
 
 	// Find middleware token (should be PLUS)
 	foundMiddleware := false
-	foundInject := false
+	foundUse := false
 	for _, tok := range tokens {
 		if tok.Type == PLUS && tok.Literal == "middleware" {
 			foundMiddleware = true
 		}
-		if tok.Type == PERCENT && tok.Literal == "inject" {
-			foundInject = true
+		if tok.Type == PERCENT && tok.Literal == "use" {
+			foundUse = true
 		}
 	}
 
 	if !foundMiddleware {
 		t.Error("Expected to find PLUS token for 'middleware'")
 	}
-	if !foundInject {
-		t.Error("Expected to find PERCENT token for 'inject'")
+	if !foundUse {
+		t.Error("Expected to find PERCENT token for 'use'")
 	}
 }
 
