@@ -194,8 +194,8 @@ func TestFormatEventHandler(t *testing.T) {
 	expandedFormatter := New(Expanded)
 	expanded := expandedFormatter.Format(module)
 
-	if !strings.Contains(expanded, "event \"user.created\" async") {
-		t.Errorf("Expanded output should contain 'event \"user.created\" async', got: %s", expanded)
+	if !strings.Contains(expanded, "handle \"user.created\" async") {
+		t.Errorf("Expanded output should contain 'handle \"user.created\" async', got: %s", expanded)
 	}
 }
 

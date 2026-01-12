@@ -1,0 +1,7 @@
+{
+  "tasks": [
+    {"id": 1, "title": "Learn Glyph", "completed": false, "priority": 1},
+    {"id": 2, "title": "Build an API", "completed": false, "priority": 2},
+    {"id": 3, "title": "Test expand/compact", "completed": true, "priority": 1}
+  ]
+}

@@ -303,7 +303,7 @@ func (f *Formatter) formatCronTask(ct *interpreter.CronTask) {
 
 func (f *Formatter) formatEventHandler(eh *interpreter.EventHandler) {
 	if f.mode == Expanded {
-		f.write("event ")
+		f.write("handle ")
 	} else {
 		f.write("~ ")
 	}

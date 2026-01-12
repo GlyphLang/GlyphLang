@@ -17,7 +17,7 @@ func TestExpandedLexerKeywords(t *testing.T) {
 		{"inject", PERCENT},
 		{"expects", LESS},
 		{"validate", QUESTION},
-		{"event", TILDE},
+		{"handle", TILDE},
 		{"cron", STAR},
 		{"command", BANG},
 		{"queue", AMPERSAND},
@@ -154,7 +154,7 @@ func TestExpandedLexerCronTask(t *testing.T) {
 }
 
 func TestExpandedLexerEventHandler(t *testing.T) {
-	input := `event "user.created" async {
+	input := `handle "user.created" async {
   return {handled: true}
 }`
 
@@ -164,9 +164,9 @@ func TestExpandedLexerEventHandler(t *testing.T) {
 		t.Fatalf("Tokenize error: %v", err)
 	}
 
-	// First token should be TILDE (event keyword)
+	// First token should be TILDE (handle keyword)
 	if tokens[0].Type != TILDE {
-		t.Errorf("First token should be TILDE (event), got %v", tokens[0].Type)
+		t.Errorf("First token should be TILDE (handle), got %v", tokens[0].Type)
 	}
 }
 

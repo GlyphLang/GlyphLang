@@ -346,7 +346,10 @@ func (l *ExpandedLexer) readIdentifier() Token {
 		tok.Type = LESS
 	case "validate":
 		tok.Type = QUESTION
-	case "event":
+	case "handle":
+		// "handle" maps to ~ for event handlers
+		// Note: "event" is NOT a keyword because it conflicts with the
+		// built-in "event" variable that holds event data in handlers
 		tok.Type = TILDE
 	case "cron":
 		tok.Type = STAR
