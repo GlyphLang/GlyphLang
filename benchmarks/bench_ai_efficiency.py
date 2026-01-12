@@ -477,7 +477,7 @@ def run_analysis():
 | 1. TOKEN EFFICIENCY                                                         |
 |    - Symbol-based syntax (@, $, >, :) = fewer tokens than keywords          |
 |    - Implicit patterns reduce boilerplate                                   |
-|    - ~45% fewer tokens than Python, ~63% fewer than Java                    |
+|    - ~35% fewer tokens than Python, ~56% fewer than Java                    |
 |                                                                             |
 | 2. GENERATION SPEED                                                         |
 |    - Fewer tokens = faster LLM response time                                |

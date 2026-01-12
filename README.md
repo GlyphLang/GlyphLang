@@ -1,23 +1,23 @@
 # GlyphLang™
 
-[![AI Token Savings](https://img.shields.io/badge/AI%20tokens-45%25%20fewer%20than%20Python-blueviolet)]()
+[![AI Token Savings](https://img.shields.io/badge/AI%20tokens-35%25%20fewer%20than%20Python-blueviolet)]()
 [![CI](https://img.shields.io/github/actions/workflow/status/GlyphLang/GlyphLang/ci.yml?branch=main&label=CI)](https://github.com/GlyphLang/GlyphLang/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-80%25%2B-green)]()
 [![Version](https://img.shields.io/github/v/release/GlyphLang/GlyphLang?label=version&color=blue)](https://github.com/GlyphLang/GlyphLang/releases/latest)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![CLA](https://cla-assistant.io/readme/badge/GlyphLang/GlyphLang)](https://cla-assistant.io/GlyphLang/GlyphLang)
 
-**GlyphLang™** is the AI-first language for REST APIs. Symbol-based syntax uses 45% fewer tokens than Python and 63% fewer than Java, making LLM code generation faster, cheaper, and more reliable.
+**GlyphLang™** is the AI-first language for REST APIs. Symbol-based syntax uses 35% fewer tokens than Python and 56% fewer than Java, making LLM code generation faster, cheaper, and more reliable.
 
 ```
-Glyph:  @ GET /users/:id -> User     (17 tokens)
-Python: @app.route('/users/<id>')... (60 tokens)
-Java:   @GetMapping("/users/{id}")...  (74 tokens)
+Glyph:  @ GET /users/:id -> User     (21 tokens)
+Python: @app.route('/users/<id>')... (35 tokens)
+Java:   @GetMapping("/users/{id}")...  (28 tokens)
 ```
 
 **Why AI-first matters:**
 - Faster generation (fewer tokens = faster LLM response)
-- Lower cost (55% savings on API calls at scale)
+- Lower cost (35-56% savings on API calls at scale)
 - Fewer errors (less code = less hallucination)
 - More context (fit more business logic in context windows)
 
@@ -512,19 +512,52 @@ glyph version           # Show version
 
 ### AI Token Efficiency
 
-| Comparison | Glyph Tokens | Other Tokens | Savings |
-|------------|--------------|--------------|---------|
-| vs Python | 463 | 842 | 45% fewer |
-| vs Java | 463 | 1252 | 63% fewer |
+Token counts measured with [tiktoken](https://github.com/openai/tiktoken) on equivalent code samples.
 
-| Use Case | Glyph | Python | Java |
-|----------|-------|--------|------|
-| Hello World API | 17 | 60 | 74 |
-| CRUD API | 172 | 273 | 285 |
-| WebSocket Handler | 111 | 203 | 396 |
-| Type Definition | 31 | 55 | 235 |
+#### GPT-4 / GPT-3.5 (cl100k_base encoding)
 
-*Benchmark: 7 equivalent API implementations. Run `python benchmarks/bench_ai_efficiency.py` to reproduce.*
+| Sample | Glyph | Python | Java | vs Python | vs Java |
+|--------|-------|--------|------|-----------|---------|
+| Hello World API | 16 | 37 | 45 | 2.3x fewer | 2.8x fewer |
+| User GET with Param | 21 | 35 | 28 | 1.7x fewer | 1.3x fewer |
+| Protected Route | 20 | 27 | 32 | 1.4x fewer | 1.6x fewer |
+| Type Definition | 29 | 49 | 152 | 1.7x fewer | 5.2x fewer |
+| CRUD API (5 routes) | 107 | 148 | 186 | 1.4x fewer | 1.7x fewer |
+| **Total** | **193** | **296** | **443** | **35% fewer** | **56% fewer** |
+
+#### GPT-4o (o200k_base encoding)
+
+| Sample | Glyph | Python | Java | vs Python | vs Java |
+|--------|-------|--------|------|-----------|---------|
+| Hello World API | 16 | 37 | 47 | 2.3x fewer | 2.9x fewer |
+| User GET with Param | 21 | 35 | 34 | 1.7x fewer | 1.6x fewer |
+| Protected Route | 19 | 27 | 35 | 1.4x fewer | 1.8x fewer |
+| Type Definition | 29 | 48 | 160 | 1.7x fewer | 5.5x fewer |
+| CRUD API (5 routes) | 107 | 152 | 208 | 1.4x fewer | 1.9x fewer |
+| **Total** | **192** | **299** | **484** | **36% fewer** | **60% fewer** |
+
+#### Claude / Gemini
+
+Claude and Gemini use proprietary tokenizers with similar BPE-based characteristics. Expect comparable results to the GPT-4 benchmarks above.
+
+#### Where the Savings Come From
+
+The savings are not from symbol replacement alone (`>` vs `return` saves ~1 token). They come from **structural elimination**:
+
+```
+Python Hello World (37 tokens):
+  from flask import Flask, jsonify     # 6 tokens (eliminated)
+  app = Flask(__name__)                # 6 tokens (eliminated)
+  @app.route('/hello', methods=['GET'])# 9 tokens -> @ GET /hello (4 tokens)
+  def hello():                         # 3 tokens (implicit)
+  return jsonify({...})                # jsonify() 3 tokens (implicit)
+
+Glyph Hello World (16 tokens):
+  @ GET /hello
+    > {message: "Hello, World!"}
+```
+
+*Run `python benchmarks/bench_ai_efficiency.py` to reproduce. Verify with tiktoken.*
 
 ### Runtime Performance
 

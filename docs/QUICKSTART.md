@@ -1,6 +1,6 @@
 # GlyphLang Quick Start Guide
 
-GlyphLang is the AI-first language for REST APIs. Its symbol-based syntax uses 45% fewer tokens than Python, making it ideal for AI code generation and agent workflows.
+GlyphLang is the AI-first language for REST APIs. Its symbol-based syntax uses 35% fewer tokens than Python, making it ideal for AI code generation and agent workflows.
 
 This guide will help you get started with GlyphLang in under 45 minutes. You will learn how to install GlyphLang, create your first API, add authentication, and connect to a database.
 
@@ -819,7 +819,7 @@ glyph context --changed
 
 ### Why This Matters
 
-- **45% fewer tokens** than Python for equivalent code
+- **35% fewer tokens** than Python for equivalent code
 - **Structured errors** agents can parse and fix automatically
 - **Compact context** fits more project info in context windows
 - **Consistent syntax** reduces hallucination errors
