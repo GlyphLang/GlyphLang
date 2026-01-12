@@ -1,101 +1,50 @@
 # Expand/Compact Demo
-# This file demonstrates the compact .glyph syntax
+# A simple API that demonstrates the expand/compact feature
 
-: Task {
-  id: int!
-  title: str!
-  completed: bool!
-  priority: int
+: Message {
+  text: str!
+  timestamp: int!
 }
 
-: TaskList {
-  tasks: List[Task]
-  total: int!
-}
-
-@ GET /api/tasks -> TaskList {
-  + auth(jwt)
-  + ratelimit(100/min)
-  % db: Database
-
-  $ tasks = db.tasks.find()
-  $ total = tasks.length()
-
+# Simple hello endpoint
+@ GET / {
   > {
-    tasks: tasks,
-    total: total
+    message: "Welcome to Glyph!",
+    version: "1.0.0"
   }
 }
 
-@ GET /api/tasks/:id -> Task {
-  + auth(jwt)
-  % db: Database
-
-  $ task = db.tasks.get(id)
-  if task == null {
-    > {error: "Task not found", code: 404}
-  }
-  > task
+# Greeting with name parameter
+@ GET /hello/:name {
+  $ greeting = "Hello, " + name + "!"
+  > {text: greeting, timestamp: 1234567890}
 }
 
-@ POST /api/tasks -> Task {
-  + auth(jwt)
-  + ratelimit(20/min)
-  % db: Database
-
-  ? validateRequired(input.title)
-
-  $ newTask = {
-    id: nextId(db.tasks),
-    title: input.title,
-    completed: false,
-    priority: input.priority || 0
-  }
-
-  $ saved = db.tasks.create(newTask)
-  > saved
+# Personalized greeting with title
+@ GET /greet/:title/:name {
+  $ full = title + " " + name
+  $ msg = "Greetings, " + full + "!"
+  > {greeting: msg}
 }
 
-@ PUT /api/tasks/:id -> Task {
-  + auth(jwt)
-  % db: Database
-
-  $ task = db.tasks.get(id)
-  if task == null {
-    > {error: "Task not found", code: 404}
-  }
-
-  if input.title != null {
-    $ task.title = input.title
-  }
-  if input.completed != null {
-    $ task.completed = input.completed
-  }
-  if input.priority != null {
-    $ task.priority = input.priority
-  }
-
-  $ updated = db.tasks.update(id, task)
-  > updated
+# Health check
+@ GET /health {
+  > {status: "ok", uptime: 12345}
 }
 
-@ DELETE /api/tasks/:id {
-  + auth(jwt)
-  % db: Database
-
-  $ result = db.tasks.delete(id)
-  > {success: true, message: "Task deleted"}
+# Status endpoint with conditional
+@ GET /status/:code {
+  if code == "ok" {
+    > {status: "healthy", code: 200}
+  }
+  if code == "error" {
+    > {status: "unhealthy", code: 500}
+  }
+  > {status: "unknown", code: 0}
 }
 
-! cleanup --all {
-  > {message: "Cleanup complete"}
-}
-
-* "0 0 * * *" daily_report {
-  > {report: "Daily summary", generated_at: now()}
-}
-
-~ "task.completed" async {
-  $ taskId = event.data.id
-  > {notified: true, task_id: taskId}
+# Command line tool
+! greet --name {
+  $ msg = "Hello from CLI, " + name + "!"
+  > {greeting: msg}
 }
