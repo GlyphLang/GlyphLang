@@ -2165,15 +2165,8 @@ func runExpand(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to read file: %w", err)
 	}
 
-	// Parse source code using standard glyph lexer
-	module, err := parseSource(string(source))
-	if err != nil {
-		return fmt.Errorf("parse failed: %w", err)
-	}
-
-	// Format in expanded mode
-	f := formatter.New(formatter.Expanded)
-	result := f.Format(module)
+	// Token-level transformation (preserves comments and formatting)
+	result := formatter.ExpandSource(string(source))
 
 	// Determine output path (default: change .glyph to .glyphx)
 	if output == "" {
@@ -2208,15 +2201,8 @@ func runCompact(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to read file: %w", err)
 	}
 
-	// Parse source code using expanded lexer for .glyphx files
-	module, err := parseExpandedSource(string(source))
-	if err != nil {
-		return fmt.Errorf("parse failed: %w", err)
-	}
-
-	// Format in compact mode
-	f := formatter.New(formatter.Compact)
-	result := f.Format(module)
+	// Token-level transformation (preserves comments and formatting)
+	result := formatter.CompactSource(string(source))
 
 	// Determine output path (default: change .glyphx to .glyph)
 	if output == "" {
