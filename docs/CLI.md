@@ -649,6 +649,286 @@ glyph lsp
 
 The [VS Code extension](https://github.com/GlyphLang/vscode-glyph) automatically starts the LSP server.
 
+## JIT Compilation
+
+Glyph includes a JIT (Just-In-Time) compiler that automatically optimizes frequently executed routes for better performance.
+
+### How It Works
+
+The JIT compiler uses a tiered compilation strategy:
+
+| Tier | Description | When Applied |
+|------|-------------|--------------|
+| **Baseline** | Basic compilation, no optimization | First execution |
+| **Optimized** | Standard optimizations | After ~50 executions |
+| **Highly Optimized** | Aggressive optimizations | After ~100 executions (hot paths) |
+
+### Automatic Optimization
+
+JIT compilation is **enabled by default** in production mode. The runtime automatically:
+
+1. Profiles route execution frequency
+2. Identifies "hot paths" (frequently executed routes)
+3. Recompiles hot paths with increasing optimization levels
+4. Performs type specialization for monomorphic code
+
+### Configuration
+
+JIT behavior can be tuned programmatically when embedding Glyph:
+
+```go
+import "github.com/glyphlang/glyph/pkg/jit"
+
+// Create JIT compiler with custom settings
+jitCompiler := jit.NewJITCompilerWithConfig(
+    100,              // Hot path threshold (execution count)
+    10 * time.Second, // Recompile window
+)
+
+// Adjust at runtime
+jitCompiler.SetHotPathThreshold(50)
+jitCompiler.SetRecompileWindow(5 * time.Second)
+```
+
+### Monitoring JIT Statistics
+
+Access JIT statistics programmatically:
+
+```go
+stats := jitCompiler.GetDetailedStats()
+// Returns compilation counts, cache hits/misses, specialization stats
+```
+
+### Type Specialization
+
+The JIT compiler tracks runtime types and generates specialized code for monomorphic variables (variables that consistently use the same type). This eliminates type checks in hot paths.
+
+### Best Practices
+
+1. **Let it warm up**: JIT benefits appear after routes are executed multiple times
+2. **Avoid polymorphic code in hot paths**: Consistent types enable better optimization
+3. **Monitor statistics**: Use `GetDetailedStats()` to understand JIT behavior
+
+---
+
+## Observability
+
+Glyph provides built-in observability through Prometheus metrics and OpenTelemetry tracing.
+
+### Prometheus Metrics
+
+Glyph exposes metrics at the `/metrics` endpoint in Prometheus format.
+
+#### Enabling Metrics
+
+```go
+import "github.com/glyphlang/glyph/pkg/metrics"
+
+// Create metrics with default configuration
+m := metrics.NewMetrics(metrics.DefaultConfig())
+
+// Expose metrics endpoint
+http.Handle("/metrics", m.Handler())
+```
+
+#### Available Metrics
+
+**HTTP Metrics:**
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `glyphlang_http_requests_total` | Counter | Total HTTP requests (by method, path, status) |
+| `glyphlang_http_request_duration_seconds` | Histogram | Request latency in seconds |
+| `glyphlang_http_request_errors_total` | Counter | HTTP errors (status >= 400) |
+
+**Runtime Metrics:**
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `glyphlang_runtime_goroutines` | Gauge | Current goroutine count |
+| `glyphlang_runtime_memory_alloc_bytes` | Gauge | Bytes currently allocated |
+| `glyphlang_runtime_memory_sys_bytes` | Gauge | Bytes obtained from system |
+| `glyphlang_runtime_gc_pause_ns` | Gauge | Most recent GC pause time |
+| `glyphlang_runtime_gc_runs_total` | Gauge | Total GC runs |
+
+#### Custom Configuration
+
+```go
+config := metrics.Config{
+    Namespace: "myapp",
+    Subsystem: "api",
+    DurationBuckets: []float64{0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0},
+}
+m := metrics.NewMetrics(config)
+```
+
+#### Middleware Integration
+
+```go
+import "github.com/glyphlang/glyph/pkg/metrics"
+
+m := metrics.NewMetrics(metrics.DefaultConfig())
+metricsMiddleware := metrics.MetricsMiddleware(m)
+
+// Apply to routes
+handler := metricsMiddleware(yourHandler)
+```
+
+#### Prometheus Configuration
+
+Add to your `prometheus.yml`:
+
+```yaml
+scrape_configs:
+  - job_name: 'glyphlang'
+    static_configs:
+      - targets: ['localhost:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+```
+
+### OpenTelemetry Tracing
+
+Glyph supports distributed tracing via OpenTelemetry with W3C Trace Context propagation.
+
+#### Enabling Tracing
+
+```go
+import "github.com/glyphlang/glyph/pkg/tracing"
+
+// Initialize with default config (stdout exporter for development)
+tp, err := tracing.InitTracing(tracing.DefaultConfig())
+if err != nil {
+    log.Fatal(err)
+}
+defer tp.Shutdown(context.Background())
+```
+
+#### Production Configuration
+
+```go
+config := &tracing.Config{
+    ServiceName:    "my-glyph-app",
+    ServiceVersion: "1.0.0",
+    Environment:    "production",
+    ExporterType:   "otlp",           // "stdout" for dev, "otlp" for production
+    OTLPEndpoint:   "jaeger:4317",    // Your collector endpoint
+    SamplingRate:   0.1,              // Sample 10% of traces
+    Enabled:        true,
+}
+tp, err := tracing.InitTracing(config)
+```
+
+#### Environment Variables
+
+OpenTelemetry SDK respects standard environment variables:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `OTEL_SERVICE_NAME` | Service name | `my-glyph-app` |
+| `OTEL_SDK_DISABLED` | Disable tracing | `true` |
+| `OTEL_TRACES_EXPORTER` | Exporter type | `otlp`, `stdout` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP endpoint | `localhost:4317` |
+| `OTEL_TRACES_SAMPLER` | Sampler type | `always_on`, `traceidratio` |
+| `OTEL_TRACES_SAMPLER_ARG` | Sampler argument | `0.1` (for 10% sampling) |
+
+#### HTTP Middleware
+
+```go
+import "github.com/glyphlang/glyph/pkg/tracing"
+
+config := &tracing.MiddlewareConfig{
+    SpanNameFormatter: func(req *http.Request) string {
+        return fmt.Sprintf("HTTP %s %s", req.Method, req.URL.Path)
+    },
+    ExcludePaths: map[string]bool{
+        "/health":  true,
+        "/metrics": true,
+    },
+}
+
+middleware := tracing.HTTPTracingMiddleware(config)
+tracedHandler := middleware(yourHandler)
+```
+
+#### Trace Context Headers
+
+Traced responses include debug headers:
+- `X-Trace-ID`: The trace ID for correlation
+- `X-Span-ID`: The span ID
+
+#### Deployment with Jaeger
+
+```bash
+# Start Jaeger
+docker run -d --name jaeger \
+  -e COLLECTOR_OTLP_ENABLED=true \
+  -p 16686:16686 \
+  -p 4317:4317 \
+  jaegertracing/all-in-one:latest
+
+# Access UI at http://localhost:16686
+```
+
+---
+
+## Environment Variables
+
+Glyph applications can be configured via environment variables.
+
+### Core Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `Glyph_ENV` | Environment (development/production) | `production` |
+| `Glyph_PORT` | HTTP server port | `8080` |
+| `Glyph_LOG_LEVEL` | Log level (debug/info/warn/error) | `info` |
+
+### Database Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | `postgres://user:pass@localhost:5432/db` |
+| `REDIS_URL` | Redis connection string | `redis://localhost:6379` |
+
+### Observability Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `OTEL_SDK_DISABLED` | Disable OpenTelemetry | `false` |
+| `OTEL_SERVICE_NAME` | Service name for tracing | `glyphlang` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP collector endpoint | `localhost:4317` |
+
+### Example `.env` File
+
+```bash
+# Application
+Glyph_ENV=production
+Glyph_PORT=8080
+Glyph_LOG_LEVEL=info
+
+# Database
+DATABASE_URL=postgres://glyph:secret@localhost:5432/glyphdb
+
+# Observability
+OTEL_SERVICE_NAME=my-glyph-api
+OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
+```
+
+### Loading Environment Variables
+
+```bash
+# Using .env file (requires dotenv or similar)
+source .env && glyph run main.glyph
+
+# Or export directly
+export Glyph_PORT=3000
+export DATABASE_URL="postgres://..."
+glyph run main.glyph
+```
+
+---
+
 ## Contributing
 
 When adding new CLI commands:
