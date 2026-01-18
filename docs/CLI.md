@@ -388,7 +388,7 @@ Display Glyph version.
 
 ```bash
 $ glyph --version
-Glyph version 0.1.0-alpha
+Glyph version 0.3.1
 ```
 
 ### `glyph --help`
