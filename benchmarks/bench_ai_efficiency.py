@@ -1,22 +1,34 @@
 #!/usr/bin/env python3
 """
 AI Efficiency Benchmark - Compare token usage and generation efficiency
-across Glyph, Python, and Java for equivalent functionality.
+across Glyph, FastAPI, Flask, and Java for equivalent functionality.
 
-This measures the AI-first advantage of Glyph's symbol-based syntax.
+This measures the token efficiency of Glyph's minimal-ceremony design.
+Token counts are measured using tiktoken (OpenAI's tokenizer).
+
+Requirements:
+    pip install tiktoken
 """
 
 import json
-import re
 from dataclasses import dataclass
 from typing import List, Dict
+
+try:
+    import tiktoken
+    TIKTOKEN_AVAILABLE = True
+except ImportError:
+    TIKTOKEN_AVAILABLE = False
+    print("WARNING: tiktoken not installed. Install with: pip install tiktoken")
+    print("Falling back to character-based estimation.\n")
 
 @dataclass
 class CodeSample:
     name: str
     description: str
     glyph: str
-    python: str
+    fastapi: str
+    flask: str
     java: str
 
 # Equivalent code samples in each language
@@ -24,9 +36,13 @@ SAMPLES: List[CodeSample] = [
     CodeSample(
         name="Hello World API",
         description="Simple GET endpoint returning JSON",
-        glyph='''@ route /hello
-  > {message: "Hello, World!"}''',
-        python='''from flask import Flask, jsonify
+        glyph='''@ GET /hello {
+  > {message: "Hello, World!"}
+}''',
+        fastapi='''@app.get("/hello")
+def hello():
+    return {"message": "Hello, World!"}''',
+        flask='''from flask import Flask, jsonify
 
 app = Flask(__name__)
 
@@ -46,10 +62,14 @@ public class HelloController {
     CodeSample(
         name="User GET with Path Param",
         description="GET endpoint with path parameter and type",
-        glyph='''@ route /users/:id [GET] -> User
+        glyph='''@ GET /users/:id -> User {
   $ user = db.users.get(id)
-  > user''',
-        python='''@app.route('/users/<int:id>', methods=['GET'])
+  > user
+}''',
+        fastapi='''@app.get("/users/{id}")
+def get_user(id: int) -> User:
+    return db.users.get(id)''',
+        flask='''@app.route('/users/<int:id>', methods=['GET'])
 def get_user(id: int) -> User:
     user = db.users.get(id)
     return jsonify(user)''',
@@ -62,10 +82,14 @@ public User getUser(@PathVariable Long id) {
     CodeSample(
         name="Protected Route with Auth",
         description="Endpoint with JWT authentication",
-        glyph='''@ route /api/data [GET]
+        glyph='''@ GET /api/data {
   + auth(jwt)
-  > {data: "secret"}''',
-        python='''@app.route('/api/data', methods=['GET'])
+  > {data: "secret"}
+}''',
+        fastapi='''@app.get("/api/data")
+def get_data(user: User = Depends(get_current_user)):
+    return {"data": "secret"}''',
+        flask='''@app.route('/api/data', methods=['GET'])
 @jwt_required()
 def get_data():
     return jsonify({"data": "secret"})''',
@@ -78,7 +102,7 @@ public Map<String, String> getData() {
     CodeSample(
         name="POST with Validation",
         description="Create endpoint with input validation",
-        glyph='''@ route /users [POST] -> User
+        glyph='''@ POST /users -> User {
   + auth(jwt)
   < input: CreateUser
   ! validate input {
@@ -86,8 +110,16 @@ public Map<String, String> getData() {
     email: email
   }
   $ user = db.users.create(input)
-  > user''',
-        python='''@app.route('/users', methods=['POST'])
+  > user
+}''',
+        fastapi='''class CreateUser(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    email: EmailStr
+
+@app.post("/users")
+def create_user(input: CreateUser, user: User = Depends(get_current_user)) -> User:
+    return db.users.create(input)''',
+        flask='''@app.route('/users', methods=['POST'])
 @jwt_required()
 def create_user():
     data = request.get_json()
@@ -123,7 +155,13 @@ public ResponseEntity<User> createUser(@Valid @RequestBody CreateUserDto input) 
   age: int
   active: bool!
 }''',
-        python='''from dataclasses import dataclass
+        fastapi='''class User(BaseModel):
+    id: int
+    name: str
+    email: str
+    age: int | None = None
+    active: bool = True''',
+        flask='''from dataclasses import dataclass
 from typing import Optional
 
 @dataclass
@@ -162,23 +200,52 @@ class User:
   done: bool!
 }
 
-@ route /todos [GET] -> List[Todo]
+@ GET /todos -> List[Todo] {
   > db.todos.all()
+}
 
-@ route /todos/:id [GET] -> Todo
+@ GET /todos/:id -> Todo {
   > db.todos.get(id)
+}
 
-@ route /todos [POST] -> Todo
+@ POST /todos -> Todo {
   < input: Todo
   > db.todos.create(input)
+}
 
-@ route /todos/:id [PUT] -> Todo
+@ PUT /todos/:id -> Todo {
   < input: Todo
   > db.todos.update(id, input)
+}
 
-@ route /todos/:id [DELETE]
-  > db.todos.delete(id)''',
-        python='''from flask import Flask, request, jsonify
+@ DELETE /todos/:id {
+  > db.todos.delete(id)
+}''',
+        fastapi='''class Todo(BaseModel):
+    id: int
+    title: str
+    done: bool
+
+@app.get("/todos")
+def list_todos() -> list[Todo]:
+    return db.todos.all()
+
+@app.get("/todos/{id}")
+def get_todo(id: int) -> Todo:
+    return db.todos.get(id)
+
+@app.post("/todos", status_code=201)
+def create_todo(todo: Todo) -> Todo:
+    return db.todos.create(todo)
+
+@app.put("/todos/{id}")
+def update_todo(id: int, todo: Todo) -> Todo:
+    return db.todos.update(id, todo)
+
+@app.delete("/todos/{id}", status_code=204)
+def delete_todo(id: int):
+    db.todos.delete(id)''',
+        flask='''from flask import Flask, request, jsonify
 
 @app.route('/todos', methods=['GET'])
 def list_todos():
@@ -240,7 +307,7 @@ public class TodoController {
     CodeSample(
         name="WebSocket Handler",
         description="WebSocket endpoint with room support",
-        glyph='''@ websocket /chat/:room
+        glyph='''@ ws /chat/:room {
   on connect {
     ws.join(room)
     ws.broadcast(room, {event: "joined", user: ws.id})
@@ -250,8 +317,23 @@ public class TodoController {
   }
   on disconnect {
     ws.broadcast(room, {event: "left", user: ws.id})
-  }''',
-        python='''from flask_socketio import SocketIO, join_room, emit
+  }
+}''',
+        fastapi='''rooms: dict[str, set[WebSocket]] = {}
+
+@app.websocket("/chat/{room}")
+async def chat(websocket: WebSocket, room: str):
+    await websocket.accept()
+    rooms.setdefault(room, set()).add(websocket)
+    await broadcast(room, {"event": "joined", "user": id(websocket)})
+    try:
+        while True:
+            data = await websocket.receive_json()
+            await broadcast(room, {"user": id(websocket), "text": data["text"]})
+    except WebSocketDisconnect:
+        rooms[room].remove(websocket)
+        await broadcast(room, {"event": "left", "user": id(websocket)})''',
+        flask='''from flask_socketio import SocketIO, join_room, emit
 
 @socketio.on('connect')
 def handle_connect():
@@ -299,31 +381,25 @@ public class ChatEndpoint {
 ]
 
 
-def estimate_tokens(text: str) -> int:
+def count_tokens(text: str, encoding_name: str = "cl100k_base") -> int:
     """
-    Estimate token count using GPT-style tokenization rules.
-    Approximation: ~4 chars per token for code, with adjustments for:
-    - Whitespace (compressed)
-    - Common programming tokens
-    - Symbols (often single tokens)
+    Count tokens using tiktoken (OpenAI's tokenizer).
+
+    Args:
+        text: The text to tokenize
+        encoding_name: The encoding to use:
+            - "cl100k_base": GPT-4, GPT-3.5-turbo, text-embedding-ada-002
+            - "o200k_base": GPT-4o
+
+    Returns:
+        Actual token count from tiktoken
     """
-    # Remove excessive whitespace for token counting
-    text = re.sub(r'\n\s*\n', '\n', text)
-
-    # Count different token types
-    words = len(re.findall(r'\b\w+\b', text))
-    symbols = len(re.findall(r'[{}()\[\]<>@$%:;,\.!?=+\-*/&|]', text))
-    strings = len(re.findall(r'"[^"]*"', text))
-
-    # Rough estimation based on typical tokenizer behavior
-    # Words: ~1.3 tokens each (subword tokenization)
-    # Symbols: ~1 token each
-    # Strings: content / 4 + 2 (quotes)
-
-    char_estimate = len(text) / 4
-    token_estimate = int(words * 1.3 + symbols + char_estimate * 0.3)
-
-    return max(token_estimate, len(text) // 4)
+    if TIKTOKEN_AVAILABLE:
+        encoding = tiktoken.get_encoding(encoding_name)
+        return len(encoding.encode(text))
+    else:
+        # Fallback: rough estimation (~4 chars per token)
+        return len(text) // 4
 
 
 def count_lines(text: str) -> int:
@@ -331,12 +407,13 @@ def count_lines(text: str) -> int:
     return len([l for l in text.strip().split('\n') if l.strip()])
 
 
-def analyze_sample(sample: CodeSample) -> Dict:
-    """Analyze a code sample across all languages"""
+def analyze_sample(sample: CodeSample, encoding: str = "cl100k_base") -> Dict:
+    """Analyze a code sample across all languages using tiktoken"""
 
-    glyph_tokens = estimate_tokens(sample.glyph)
-    python_tokens = estimate_tokens(sample.python)
-    java_tokens = estimate_tokens(sample.java)
+    glyph_tokens = count_tokens(sample.glyph, encoding)
+    fastapi_tokens = count_tokens(sample.fastapi, encoding)
+    flask_tokens = count_tokens(sample.flask, encoding)
+    java_tokens = count_tokens(sample.java, encoding)
 
     return {
         'name': sample.name,
@@ -346,12 +423,19 @@ def analyze_sample(sample: CodeSample) -> Dict:
             'lines': count_lines(sample.glyph),
             'tokens': glyph_tokens,
         },
-        'python': {
-            'chars': len(sample.python),
-            'lines': count_lines(sample.python),
-            'tokens': python_tokens,
-            'vs_glyph_chars': round(len(sample.python) / len(sample.glyph), 2),
-            'vs_glyph_tokens': round(python_tokens / glyph_tokens, 2),
+        'fastapi': {
+            'chars': len(sample.fastapi),
+            'lines': count_lines(sample.fastapi),
+            'tokens': fastapi_tokens,
+            'vs_glyph_chars': round(len(sample.fastapi) / len(sample.glyph), 2),
+            'vs_glyph_tokens': round(fastapi_tokens / glyph_tokens, 2),
+        },
+        'flask': {
+            'chars': len(sample.flask),
+            'lines': count_lines(sample.flask),
+            'tokens': flask_tokens,
+            'vs_glyph_chars': round(len(sample.flask) / len(sample.glyph), 2),
+            'vs_glyph_tokens': round(flask_tokens / glyph_tokens, 2),
         },
         'java': {
             'chars': len(sample.java),
@@ -394,123 +478,130 @@ def calculate_ai_cost(tokens: int, model: str = "gpt-4") -> Dict:
 def run_analysis():
     """Run full analysis and print results"""
 
-    print("=" * 80)
-    print("AI EFFICIENCY BENCHMARK: Glyph vs Python vs Java")
-    print("=" * 80)
+    print("=" * 100)
+    print("AI EFFICIENCY BENCHMARK: Glyph vs FastAPI vs Flask vs Java")
+    print("=" * 100)
     print("\nMeasuring token efficiency for AI/LLM code generation")
-    print("Lower tokens = faster generation, lower cost, reduced errors\n")
-    print("-" * 80)
+    print("Lower tokens = faster generation, lower cost\n")
+
+    if TIKTOKEN_AVAILABLE:
+        print("Tokenizer: tiktoken (cl100k_base encoding - GPT-4/GPT-3.5)")
+    else:
+        print("Tokenizer: FALLBACK (character estimation - install tiktoken for accuracy)")
+
+    print("-" * 100)
 
     results = []
     totals = {'glyph': {'chars': 0, 'lines': 0, 'tokens': 0},
-              'python': {'chars': 0, 'lines': 0, 'tokens': 0},
+              'fastapi': {'chars': 0, 'lines': 0, 'tokens': 0},
+              'flask': {'chars': 0, 'lines': 0, 'tokens': 0},
               'java': {'chars': 0, 'lines': 0, 'tokens': 0}}
 
     for sample in SAMPLES:
         analysis = analyze_sample(sample)
         results.append(analysis)
 
-        for lang in ['glyph', 'python', 'java']:
+        for lang in ['glyph', 'fastapi', 'flask', 'java']:
             totals[lang]['chars'] += analysis[lang]['chars']
             totals[lang]['lines'] += analysis[lang]['lines']
             totals[lang]['tokens'] += analysis[lang]['tokens']
 
     # Print per-sample results
-    print(f"{'Sample':<30} {'Glyph':<12} {'Python':<12} {'Java':<12} {'Py/Glyph':<10} {'Java/Glyph':<10}")
-    print(f"{'(tokens)':<30} {'tokens':<12} {'tokens':<12} {'tokens':<12} {'ratio':<10} {'ratio':<10}")
-    print("-" * 80)
+    print(f"{'Sample':<25} {'Glyph':<8} {'FastAPI':<8} {'Flask':<8} {'Java':<8} {'Fast/Gly':<9} {'Flsk/Gly':<9} {'Java/Gly':<9}")
+    print(f"{'(tokens)':<25} {'tok':<8} {'tok':<8} {'tok':<8} {'tok':<8} {'ratio':<9} {'ratio':<9} {'ratio':<9}")
+    print("-" * 100)
 
     for r in results:
-        print(f"{r['name']:<30} {r['glyph']['tokens']:<12} {r['python']['tokens']:<12} {r['java']['tokens']:<12} {r['python']['vs_glyph_tokens']:<10} {r['java']['vs_glyph_tokens']:<10}")
+        print(f"{r['name']:<25} {r['glyph']['tokens']:<8} {r['fastapi']['tokens']:<8} {r['flask']['tokens']:<8} {r['java']['tokens']:<8} {r['fastapi']['vs_glyph_tokens']:<9} {r['flask']['vs_glyph_tokens']:<9} {r['java']['vs_glyph_tokens']:<9}")
 
-    print("-" * 80)
-    print(f"{'TOTAL':<30} {totals['glyph']['tokens']:<12} {totals['python']['tokens']:<12} {totals['java']['tokens']:<12} {round(totals['python']['tokens']/totals['glyph']['tokens'], 2):<10} {round(totals['java']['tokens']/totals['glyph']['tokens'], 2):<10}")
+    print("-" * 100)
+    print(f"{'TOTAL':<25} {totals['glyph']['tokens']:<8} {totals['fastapi']['tokens']:<8} {totals['flask']['tokens']:<8} {totals['java']['tokens']:<8} {round(totals['fastapi']['tokens']/totals['glyph']['tokens'], 2):<9} {round(totals['flask']['tokens']/totals['glyph']['tokens'], 2):<9} {round(totals['java']['tokens']/totals['glyph']['tokens'], 2):<9}")
 
     # Summary statistics
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 100)
     print("SUMMARY: TOKEN EFFICIENCY")
-    print("=" * 80)
+    print("=" * 100)
 
     print(f"\n{'Language':<15} {'Total Chars':<15} {'Total Lines':<15} {'Total Tokens':<15}")
     print("-" * 60)
     print(f"{'Glyph':<15} {totals['glyph']['chars']:<15} {totals['glyph']['lines']:<15} {totals['glyph']['tokens']:<15}")
-    print(f"{'Python':<15} {totals['python']['chars']:<15} {totals['python']['lines']:<15} {totals['python']['tokens']:<15}")
+    print(f"{'FastAPI':<15} {totals['fastapi']['chars']:<15} {totals['fastapi']['lines']:<15} {totals['fastapi']['tokens']:<15}")
+    print(f"{'Flask':<15} {totals['flask']['chars']:<15} {totals['flask']['lines']:<15} {totals['flask']['tokens']:<15}")
     print(f"{'Java':<15} {totals['java']['chars']:<15} {totals['java']['lines']:<15} {totals['java']['tokens']:<15}")
 
     # Token savings
-    py_savings = round((1 - totals['glyph']['tokens'] / totals['python']['tokens']) * 100, 1)
+    fastapi_savings = round((1 - totals['glyph']['tokens'] / totals['fastapi']['tokens']) * 100, 1)
+    flask_savings = round((1 - totals['glyph']['tokens'] / totals['flask']['tokens']) * 100, 1)
     java_savings = round((1 - totals['glyph']['tokens'] / totals['java']['tokens']) * 100, 1)
 
     print(f"\n{'TOKEN SAVINGS WITH Glyph:':<40}")
-    print(f"  vs Python: {py_savings}% fewer tokens")
-    print(f"  vs Java:   {java_savings}% fewer tokens")
+    print(f"  vs FastAPI: {fastapi_savings}% fewer tokens")
+    print(f"  vs Flask:   {flask_savings}% fewer tokens")
+    print(f"  vs Java:    {java_savings}% fewer tokens")
 
     # AI cost comparison
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 100)
     print("AI GENERATION COST COMPARISON (per 1000 API calls)")
-    print("=" * 80)
+    print("=" * 100)
 
     models = ['gpt-4', 'claude-opus', 'claude-sonnet', 'gpt-3.5']
 
-    print(f"\n{'Model':<20} {'Glyph':<15} {'Python':<15} {'Java':<15} {'Glyph Savings':<15}")
-    print("-" * 80)
+    print(f"\n{'Model':<18} {'Glyph':<12} {'FastAPI':<12} {'Flask':<12} {'Java':<12} {'Glyph Savings':<15}")
+    print("-" * 100)
 
     for model in models:
         glyph_cost = calculate_ai_cost(totals['glyph']['tokens'] * 1000, model)
-        python_cost = calculate_ai_cost(totals['python']['tokens'] * 1000, model)
+        fastapi_cost = calculate_ai_cost(totals['fastapi']['tokens'] * 1000, model)
+        flask_cost = calculate_ai_cost(totals['flask']['tokens'] * 1000, model)
         java_cost = calculate_ai_cost(totals['java']['tokens'] * 1000, model)
 
-        avg_savings = round((1 - glyph_cost['total_cost_usd'] / ((python_cost['total_cost_usd'] + java_cost['total_cost_usd']) / 2)) * 100, 1)
+        avg_savings = round((1 - glyph_cost['total_cost_usd'] / ((fastapi_cost['total_cost_usd'] + flask_cost['total_cost_usd'] + java_cost['total_cost_usd']) / 3)) * 100, 1)
 
-        print(f"{model:<20} ${glyph_cost['total_cost_usd']:<14.2f} ${python_cost['total_cost_usd']:<14.2f} ${java_cost['total_cost_usd']:<14.2f} {avg_savings}%")
+        print(f"{model:<18} ${glyph_cost['total_cost_usd']:<11.2f} ${fastapi_cost['total_cost_usd']:<11.2f} ${flask_cost['total_cost_usd']:<11.2f} ${java_cost['total_cost_usd']:<11.2f} {avg_savings}%")
 
     # AI utilization benefits
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 100)
     print("AI UTILIZATION BENEFITS")
-    print("=" * 80)
+    print("=" * 100)
 
     print("""
-+-----------------------------------------------------------------------------+
-| Glyph's AI-First Design Advantages:                                          |
-+-----------------------------------------------------------------------------+
-|                                                                             |
-| 1. TOKEN EFFICIENCY                                                         |
-|    - Symbol-based syntax (@, $, >, :) = fewer tokens than keywords          |
-|    - Implicit patterns reduce boilerplate                                   |
-|    - ~35% fewer tokens than Python, ~56% fewer than Java                    |
-|                                                                             |
-| 2. GENERATION SPEED                                                         |
-|    - Fewer tokens = faster LLM response time                                |
-|    - Reduced context window usage                                           |
-|    - More room for complex requirements in prompts                          |
-|                                                                             |
-| 3. ERROR REDUCTION                                                          |
-|    - Less code = fewer opportunities for mistakes                           |
-|    - Consistent patterns reduce hallucination                               |
-|    - Built-in validation catches errors early                               |
-|                                                                             |
-| 4. COST SAVINGS                                                             |
-|    - 50-70% reduction in API costs                                          |
-|    - Significant at scale (millions of generations)                         |
-|                                                                             |
-| 5. CONTEXT EFFICIENCY                                                       |
-|    - More business logic fits in context window                             |
-|    - Better for complex multi-file operations                               |
-|    - Enables larger refactoring tasks                                       |
-|                                                                             |
-+-----------------------------------------------------------------------------+
++--------------------------------------------------------------------------------------------------+
+| Glyph's AI-First Design Advantages:                                                              |
++--------------------------------------------------------------------------------------------------+
+|                                                                                                  |
+| 1. TOKEN EFFICIENCY                                                                              |
+|    - No imports or framework initialization required                                             |
+|    - Routes and types are the entire program                                                     |
+|    - Fewer tokens than FastAPI, Flask, and Java                                                  |
+|                                                                                                  |
+| 2. GENERATION SPEED                                                                              |
+|    - Fewer tokens = faster LLM response time                                                     |
+|    - Reduced context window usage                                                                |
+|    - More room for complex requirements in prompts                                               |
+|                                                                                                  |
+| 3. COST SAVINGS                                                                                  |
+|    - Significant reduction in token usage across all comparisons                                 |
+|    - Proportional savings on API costs at scale                                                  |
+|                                                                                                  |
+| 4. CONTEXT EFFICIENCY                                                                            |
+|    - More business logic fits in context window                                                  |
+|    - Better for complex multi-file operations                                                    |
+|    - Enables larger refactoring tasks                                                            |
+|                                                                                                  |
++--------------------------------------------------------------------------------------------------+
 """)
 
     # JSON output
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 100)
     print("JSON OUTPUT")
-    print("=" * 80)
+    print("=" * 100)
 
     output = {
         'samples': results,
         'totals': totals,
         'savings': {
-            'vs_python_percent': py_savings,
+            'vs_fastapi_percent': fastapi_savings,
+            'vs_flask_percent': flask_savings,
             'vs_java_percent': java_savings,
         }
     }
