@@ -205,7 +205,7 @@ Examples:
 
 	// Expand command - convert compact glyph to human-readable syntax
 	var expandCmd = &cobra.Command{
-		Use:   "expand <file>",
+		Use:   "expand <file|dir>",
 		Short: "Convert compact glyph syntax to human-readable expanded syntax",
 		Long: `Expand converts compact glyph syntax (using symbols like @, $, >) to
 human-readable expanded syntax (using keywords like route, let, return).
@@ -218,16 +218,20 @@ This is useful for:
 The expanded syntax can be converted back using 'glyph compact'.
 
 Examples:
-  glyph expand main.glyph                    # Print expanded to stdout
-  glyph expand main.glyph -o main.expanded   # Write to file`,
+  glyph expand main.glyph                    # Expand single file
+  glyph expand main.glyph -o main.glyphx     # Write to specific file
+  glyph expand ./src                         # Expand all .glyph files in directory
+  glyph expand main.glyph --watch            # Watch file and auto-expand on changes
+  glyph expand ./src --watch                 # Watch directory for changes`,
 		Args: cobra.ExactArgs(1),
 		RunE: runExpand,
 	}
 	expandCmd.Flags().StringP("output", "o", "", "Output file (default: stdout)")
+	expandCmd.Flags().BoolP("watch", "w", false, "Watch for file changes and auto-convert")
 
 	// Compact command - convert human-readable syntax to compact glyph
 	var compactCmd = &cobra.Command{
-		Use:   "compact <file>",
+		Use:   "compact <file|dir>",
 		Short: "Convert human-readable syntax to compact glyph syntax",
 		Long: `Compact converts human-readable expanded syntax (using keywords like route,
 let, return) back to compact glyph syntax (using symbols like @, $, >).
@@ -238,12 +242,16 @@ This is useful for:
 - Standardizing code format
 
 Examples:
-  glyph compact main.expanded                 # Print compact to stdout
-  glyph compact main.expanded -o main.glyph   # Write to file`,
+  glyph compact main.glyphx                   # Compact single file
+  glyph compact main.glyphx -o main.glyph     # Write to specific file
+  glyph compact ./src                         # Compact all .glyphx files in directory
+  glyph compact main.glyphx --watch           # Watch file and auto-compact on changes
+  glyph compact ./src --watch                 # Watch directory for changes`,
 		Args: cobra.ExactArgs(1),
 		RunE: runCompact,
 	}
 	compactCmd.Flags().StringP("output", "o", "", "Output file (default: stdout)")
+	compactCmd.Flags().BoolP("watch", "w", false, "Watch for file changes and auto-convert")
 
 	// Version command
 	var versionCmd = &cobra.Command{
@@ -2151,7 +2159,34 @@ func validateFile(filePath string) *validate.ValidationResult {
 func runExpand(cmd *cobra.Command, args []string) error {
 	filePath := args[0]
 	output, _ := cmd.Flags().GetString("output")
+	watch, _ := cmd.Flags().GetBool("watch")
 
+	// Get absolute path
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path: %w", err)
+	}
+
+	// Check if path is a directory
+	info, err := os.Stat(absPath)
+	if err != nil {
+		return fmt.Errorf("failed to access path: %w", err)
+	}
+
+	if watch {
+		return runWatchMode(absPath, output, info.IsDir(), "expand")
+	}
+
+	// Single file mode
+	if info.IsDir() {
+		return expandDirectory(absPath, output)
+	}
+
+	return expandFile(absPath, output)
+}
+
+// expandFile expands a single .glyph file to .glyphx
+func expandFile(filePath, output string) error {
 	// Validate input file extension
 	if filepath.Ext(filePath) != ".glyph" {
 		printWarning(fmt.Sprintf("Input file %s is not a .glyph file", filePath))
@@ -2183,11 +2218,65 @@ func runExpand(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// expandDirectory expands all .glyph files in a directory
+func expandDirectory(dirPath, outputDir string) error {
+	return filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() || filepath.Ext(path) != ".glyph" {
+			return nil
+		}
+
+		// Determine output path
+		var outPath string
+		if outputDir != "" {
+			relPath, _ := filepath.Rel(dirPath, path)
+			outPath = filepath.Join(outputDir, changeExtension(relPath, ".glyphx"))
+			// Ensure output directory exists
+			if err := os.MkdirAll(filepath.Dir(outPath), 0755); err != nil {
+				return fmt.Errorf("failed to create output directory: %w", err)
+			}
+		} else {
+			outPath = changeExtension(path, ".glyphx")
+		}
+
+		return expandFile(path, outPath)
+	})
+}
+
 // runCompact handles the compact command - converts human-readable .glyphx to compact .glyph
 func runCompact(cmd *cobra.Command, args []string) error {
 	filePath := args[0]
 	output, _ := cmd.Flags().GetString("output")
+	watch, _ := cmd.Flags().GetBool("watch")
 
+	// Get absolute path
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path: %w", err)
+	}
+
+	// Check if path is a directory
+	info, err := os.Stat(absPath)
+	if err != nil {
+		return fmt.Errorf("failed to access path: %w", err)
+	}
+
+	if watch {
+		return runWatchMode(absPath, output, info.IsDir(), "compact")
+	}
+
+	// Single file mode
+	if info.IsDir() {
+		return compactDirectory(absPath, output)
+	}
+
+	return compactFile(absPath, output)
+}
+
+// compactFile compacts a single .glyphx file to .glyph
+func compactFile(filePath, output string) error {
 	// Validate input file extension
 	if filepath.Ext(filePath) != ".glyphx" {
 		printWarning(fmt.Sprintf("Input file %s is not a .glyphx file", filePath))
@@ -2217,6 +2306,195 @@ func runCompact(cmd *cobra.Command, args []string) error {
 	printInfo(fmt.Sprintf("Original: %d bytes -> Compact: %d bytes", len(source), len(result)))
 
 	return nil
+}
+
+// compactDirectory compacts all .glyphx files in a directory
+func compactDirectory(dirPath, outputDir string) error {
+	return filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() || filepath.Ext(path) != ".glyphx" {
+			return nil
+		}
+
+		// Determine output path
+		var outPath string
+		if outputDir != "" {
+			relPath, _ := filepath.Rel(dirPath, path)
+			outPath = filepath.Join(outputDir, changeExtension(relPath, ".glyph"))
+			// Ensure output directory exists
+			if err := os.MkdirAll(filepath.Dir(outPath), 0755); err != nil {
+				return fmt.Errorf("failed to create output directory: %w", err)
+			}
+		} else {
+			outPath = changeExtension(path, ".glyph")
+		}
+
+		return compactFile(path, outPath)
+	})
+}
+
+// runWatchMode runs the expand or compact command in watch mode
+func runWatchMode(path, outputDir string, isDir bool, mode string) error {
+	// Determine source and target extensions based on mode
+	var sourceExt, targetExt string
+	if mode == "expand" {
+		sourceExt = ".glyph"
+		targetExt = ".glyphx"
+	} else {
+		sourceExt = ".glyphx"
+		targetExt = ".glyph"
+	}
+
+	// Create watcher
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return fmt.Errorf("failed to create watcher: %w", err)
+	}
+	defer watcher.Close()
+
+	// Setup signal handling for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigChan)
+
+	// Function to process a file
+	processFile := func(filePath string) {
+		var outPath string
+		if outputDir != "" {
+			if isDir {
+				relPath, _ := filepath.Rel(path, filePath)
+				outPath = filepath.Join(outputDir, changeExtension(relPath, targetExt))
+				// Ensure output directory exists
+				if err := os.MkdirAll(filepath.Dir(outPath), 0755); err != nil {
+					printError(fmt.Errorf("failed to create output directory: %w", err))
+					return
+				}
+			} else {
+				outPath = outputDir
+			}
+		} else {
+			outPath = changeExtension(filePath, targetExt)
+		}
+
+		var err error
+		if mode == "expand" {
+			err = expandFile(filePath, outPath)
+		} else {
+			err = compactFile(filePath, outPath)
+		}
+		if err != nil {
+			printError(err)
+		}
+	}
+
+	// Do initial conversion
+	if isDir {
+		if mode == "expand" {
+			if err := expandDirectory(path, outputDir); err != nil {
+				printError(err)
+			}
+		} else {
+			if err := compactDirectory(path, outputDir); err != nil {
+				printError(err)
+			}
+		}
+	} else {
+		processFile(path)
+	}
+
+	// Add paths to watcher
+	if isDir {
+		// Watch directory and subdirectories
+		err = filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
+			if err != nil {
+				return nil
+			}
+			if info.IsDir() {
+				return watcher.Add(p)
+			}
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("failed to watch directory: %w", err)
+		}
+		printInfo(fmt.Sprintf("Watching %s for %s file changes...", path, sourceExt))
+	} else {
+		// Watch the file's directory (more reliable for atomic saves)
+		dir := filepath.Dir(path)
+		if err := watcher.Add(dir); err != nil {
+			return fmt.Errorf("failed to watch directory: %w", err)
+		}
+		printInfo(fmt.Sprintf("Watching %s for changes...", path))
+	}
+
+	printInfo("Press Ctrl+C to stop")
+
+	// Debounce timer
+	var debounceTimer *time.Timer
+	debounceDelay := 100 * time.Millisecond
+	pendingFiles := make(map[string]bool)
+	var pendingMu sync.Mutex
+
+	// Watch loop
+	for {
+		select {
+		case <-sigChan:
+			printWarning("\nStopping watch mode...")
+			if debounceTimer != nil {
+				debounceTimer.Stop()
+			}
+			printSuccess("Watch mode stopped gracefully")
+			return nil
+
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return nil
+			}
+
+			// Check if the file matches our source extension
+			if filepath.Ext(event.Name) != sourceExt {
+				continue
+			}
+
+			// For single file mode, only react to our file
+			if !isDir && filepath.Base(event.Name) != filepath.Base(path) {
+				continue
+			}
+
+			// React to write or create events (create happens with atomic saves)
+			if event.Op&(fsnotify.Write|fsnotify.Create) != 0 {
+				pendingMu.Lock()
+				pendingFiles[event.Name] = true
+				pendingMu.Unlock()
+
+				// Reset debounce timer
+				if debounceTimer != nil {
+					debounceTimer.Stop()
+				}
+				debounceTimer = time.AfterFunc(debounceDelay, func() {
+					pendingMu.Lock()
+					filesToProcess := make([]string, 0, len(pendingFiles))
+					for f := range pendingFiles {
+						filesToProcess = append(filesToProcess, f)
+					}
+					pendingFiles = make(map[string]bool)
+					pendingMu.Unlock()
+
+					for _, f := range filesToProcess {
+						processFile(f)
+					}
+				})
+			}
+
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return nil
+			}
+			printError(fmt.Errorf("watcher error: %w", err))
+		}
+	}
 }
 
 // parseExpandedSource parses .glyphx source using the expanded lexer
