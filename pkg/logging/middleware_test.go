@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/glyphlang/glyph/pkg/server"
 )
@@ -49,7 +48,7 @@ func TestStructuredLoggingMiddleware(t *testing.T) {
 		t.Errorf("Handler returned error: %v", err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
+	logger.Sync()
 
 	// Check that request ID header was set
 	requestID := w.Header().Get(RequestIDHeader)
@@ -130,7 +129,7 @@ func TestStructuredLoggingMiddlewareWithExistingRequestID(t *testing.T) {
 	}
 
 	handler(ctx)
-	time.Sleep(50 * time.Millisecond)
+	logger.Sync()
 
 	// Check that existing request ID was preserved
 	if w.Header().Get(RequestIDHeader) != existingRequestID {
@@ -185,7 +184,7 @@ func TestStructuredLoggingMiddlewareError(t *testing.T) {
 		t.Errorf("Expected error %v, got %v", testError, err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
+	logger.Sync()
 
 	// Parse log entries
 	logs := strings.Split(strings.TrimSpace(buf.String()), "\n")
@@ -265,7 +264,7 @@ func TestStructuredLoggingMiddlewareStatusCodes(t *testing.T) {
 			}
 
 			handler(ctx)
-			time.Sleep(50 * time.Millisecond)
+			logger.Sync()
 
 			// Parse completion log entry
 			logs := strings.Split(strings.TrimSpace(buf.String()), "\n")
@@ -319,7 +318,7 @@ func TestStructuredLoggingMiddlewareWithBodyLogging(t *testing.T) {
 	}
 
 	handler(ctx)
-	time.Sleep(50 * time.Millisecond)
+	logger.Sync()
 
 	// Parse log entries
 	logs := strings.Split(strings.TrimSpace(buf.String()), "\n")
@@ -384,7 +383,7 @@ func TestStructuredRecoveryMiddleware(t *testing.T) {
 		t.Logf("Error returned: %v", err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
+	logger.Sync()
 
 	// Parse log entry
 	var entry LogEntry

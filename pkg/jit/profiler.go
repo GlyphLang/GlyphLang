@@ -144,11 +144,57 @@ func (p *Profiler) RecordCall(caller, callee string) {
 	calleeNode.Callers[caller]++
 }
 
-// GetProfile returns the execution profile for a route
+// GetProfile returns a copy of the execution profile for a route
 func (p *Profiler) GetProfile(name string) *ExecutionProfile {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
-	return p.profiles[name]
+
+	profile, exists := p.profiles[name]
+	if !exists {
+		return nil
+	}
+
+	// Return a copy to avoid race conditions when caller reads while RecordExecution writes
+	profileCopy := &ExecutionProfile{
+		Name:           profile.Name,
+		ExecutionCount: profile.ExecutionCount,
+		TotalTime:      profile.TotalTime,
+		AverageTime:    profile.AverageTime,
+		MinTime:        profile.MinTime,
+		MaxTime:        profile.MaxTime,
+		LastExecuted:   profile.LastExecuted,
+	}
+
+	// Deep copy TypeProfile
+	if profile.TypeProfile != nil {
+		profileCopy.TypeProfile = &TypeProfile{
+			VariableTypes: make(map[string]map[string]int64),
+			ReturnTypes:   make(map[string]int64),
+		}
+		for varName, types := range profile.TypeProfile.VariableTypes {
+			profileCopy.TypeProfile.VariableTypes[varName] = make(map[string]int64)
+			for typeName, count := range types {
+				profileCopy.TypeProfile.VariableTypes[varName][typeName] = count
+			}
+		}
+		for typeName, count := range profile.TypeProfile.ReturnTypes {
+			profileCopy.TypeProfile.ReturnTypes[typeName] = count
+		}
+	}
+
+	// Deep copy CalledBy
+	profileCopy.CalledBy = make(map[string]int64)
+	for k, v := range profile.CalledBy {
+		profileCopy.CalledBy[k] = v
+	}
+
+	// Deep copy Calls
+	profileCopy.Calls = make(map[string]int64)
+	for k, v := range profile.Calls {
+		profileCopy.Calls[k] = v
+	}
+
+	return profileCopy
 }
 
 // GetAllProfiles returns all execution profiles

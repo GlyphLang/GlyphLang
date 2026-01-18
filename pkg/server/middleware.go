@@ -401,22 +401,95 @@ func RateLimitMiddleware(config RateLimiterConfig) Middleware {
 func TimeoutMiddleware(timeout time.Duration) Middleware {
 	return func(next RouteHandler) RouteHandler {
 		return func(ctx *Context) error {
+			// Wrap the ResponseWriter to prevent concurrent writes
+			tw := &timeoutWriter{
+				ResponseWriter: ctx.ResponseWriter,
+				ctx:            ctx,
+			}
+			ctx.ResponseWriter = tw
+
 			done := make(chan error, 1)
 
 			go func() {
-				done <- next(ctx)
+				err := next(ctx)
+				// Claim the response when handler completes (if not already claimed by timeout)
+				tw.mu.Lock()
+				if !tw.claimed {
+					tw.claimed = true
+				}
+				tw.mu.Unlock()
+				done <- err
 			}()
 
 			select {
 			case err := <-done:
 				return err
 			case <-time.After(timeout):
-				log.Printf("[TIMEOUT] Request timeout after %v: %s %s",
-					timeout, ctx.Request.Method, ctx.Request.URL.Path)
-				return SendError(ctx, 504, "request timeout")
+				// Only send timeout error if handler hasn't started writing
+				if tw.tryClaimResponse() {
+					log.Printf("[TIMEOUT] Request timeout after %v: %s %s",
+						timeout, ctx.Request.Method, ctx.Request.URL.Path)
+					// Set status directly on wrapped writer to avoid race
+					// Don't set ctx.StatusCode to avoid race with handler goroutine
+					tw.mu.Lock()
+					tw.timedOut = true
+					tw.mu.Unlock()
+					tw.ResponseWriter.Header().Set("Content-Type", "application/json")
+					tw.ResponseWriter.WriteHeader(504)
+					tw.ResponseWriter.Write([]byte(`{"error":true,"message":"request timeout","code":504}`))
+					return nil
+				}
+				// Handler already started writing, wait for it to finish
+				return <-done
 			}
 		}
 	}
+}
+
+// timeoutWriter wraps http.ResponseWriter to prevent concurrent writes
+// from both the handler and timeout path
+type timeoutWriter struct {
+	http.ResponseWriter
+	ctx      *Context
+	mu       sync.Mutex
+	claimed  bool
+	timedOut bool
+}
+
+// tryClaimResponse attempts to claim the response. Returns true if this caller
+// won the race and can write the response, false if another caller already claimed it.
+func (tw *timeoutWriter) tryClaimResponse() bool {
+	tw.mu.Lock()
+	defer tw.mu.Unlock()
+	if tw.claimed {
+		return false
+	}
+	tw.claimed = true
+	return true
+}
+
+// WriteHeader implements http.ResponseWriter and claims the response
+func (tw *timeoutWriter) WriteHeader(code int) {
+	tw.mu.Lock()
+	if tw.timedOut {
+		tw.mu.Unlock()
+		return // Ignore writes after timeout
+	}
+	tw.claimed = true
+	tw.mu.Unlock()
+	tw.ResponseWriter.WriteHeader(code)
+}
+
+// Write implements http.ResponseWriter and claims the response
+func (tw *timeoutWriter) Write(b []byte) (int, error) {
+	tw.mu.Lock()
+	if tw.timedOut {
+		tw.mu.Unlock()
+		return len(b), nil // Pretend write succeeded but discard
+	}
+	tw.claimed = true
+	tw.mu.Unlock()
+	return tw.ResponseWriter.Write(b)
 }
 
 // TracingMiddleware creates a middleware that adds OpenTelemetry distributed tracing

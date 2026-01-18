@@ -63,6 +63,13 @@ type Hub struct {
 	// Shutdown channel
 	shutdown chan struct{}
 
+	// Started channel - closed when Run() is ready to receive
+	started chan struct{}
+
+	// running indicates if Run() has been started
+	running bool
+	runMu   sync.Mutex
+
 	// WaitGroup for graceful shutdown (hub.Run)
 	wg sync.WaitGroup
 
@@ -109,6 +116,7 @@ func NewHubWithConfig(config *Config) *Hub {
 		onConnect:        make([]EventHandler, 0),
 		onDisconnect:     make([]EventHandler, 0),
 		shutdown:         make(chan struct{}),
+		started:          make(chan struct{}),
 		config:           config,
 		metrics:          NewMetrics(),
 		connectionStates: make(map[string]*ConnectionState),
@@ -117,8 +125,19 @@ func NewHubWithConfig(config *Config) *Hub {
 
 // Run starts the hub's main loop
 func (h *Hub) Run() {
+	h.runMu.Lock()
+	if h.running {
+		h.runMu.Unlock()
+		return // Already running, avoid double-start
+	}
+	h.running = true
+	h.runMu.Unlock()
+
 	h.wg.Add(1)
 	defer h.wg.Done()
+
+	// Signal that we're ready to receive
+	close(h.started)
 
 	for {
 		select {
@@ -189,6 +208,7 @@ func (h *Hub) Run() {
 			}
 
 		case message := <-h.broadcast:
+			h.connMu.Lock()
 			for conn := range h.connections {
 				select {
 				case conn.send <- message:
@@ -198,6 +218,7 @@ func (h *Hub) Run() {
 					h.roomManager.RemoveConnectionFromAllRooms(conn)
 				}
 			}
+			h.connMu.Unlock()
 
 		case roomMsg := <-h.broadcastToRoom:
 			if room, exists := h.roomManager.GetRoom(roomMsg.RoomName); exists {
@@ -224,8 +245,30 @@ func (h *Hub) Run() {
 
 // Shutdown gracefully shuts down the hub
 func (h *Hub) Shutdown() {
+	// Check if Run() was ever started
+	h.runMu.Lock()
+	wasRunning := h.running
+	h.runMu.Unlock()
+
+	if !wasRunning {
+		// Run() was never called, nothing to shutdown
+		return
+	}
+
+	// Wait for Run() to start (ensures wg.Add(1) has been called)
+	<-h.started
+
 	// Close all WebSocket connections first (while hub is still running)
+	// Hold lock while iterating to avoid race with Run()
+	h.connMu.RLock()
+	connsToClose := make([]*Connection, 0, len(h.connections))
 	for conn := range h.connections {
+		connsToClose = append(connsToClose, conn)
+	}
+	h.connMu.RUnlock()
+
+	// Close connections outside the lock to avoid deadlock
+	for _, conn := range connsToClose {
 		if conn.conn != nil {
 			conn.conn.Close() // Close the underlying websocket, not conn.Close() which sends to unregister
 		}
@@ -241,6 +284,8 @@ func (h *Hub) Shutdown() {
 
 // GetConnections returns all active connections
 func (h *Hub) GetConnections() []*Connection {
+	h.connMu.RLock()
+	defer h.connMu.RUnlock()
 	conns := make([]*Connection, 0, len(h.connections))
 	for conn := range h.connections {
 		conns = append(conns, conn)

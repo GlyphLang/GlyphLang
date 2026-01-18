@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -13,10 +15,38 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// waitChan waits for a channel to close or times out
+func waitChan(ch <-chan struct{}, timeout time.Duration) bool {
+	select {
+	case <-ch:
+		return true
+	case <-time.After(timeout):
+		return false
+	}
+}
+
+// pollCondition polls until condition returns true or timeout
+func pollCondition(condition func() bool, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if condition() {
+			return true
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return false
+}
+
 // TestFullWebSocketFlow tests complete WebSocket communication flow
 func TestFullWebSocketFlow(t *testing.T) {
 	server := NewServer()
 	defer server.Shutdown()
+
+	connected := make(chan struct{})
+	server.OnConnect(func(conn *Connection) error {
+		close(connected)
+		return nil
+	})
 
 	// Setup test HTTP server
 	ts := httptest.NewServer(http.HandlerFunc(server.HandleWebSocket))
@@ -30,7 +60,7 @@ func TestFullWebSocketFlow(t *testing.T) {
 	defer client.Close()
 
 	// Wait for connection
-	time.Sleep(100 * time.Millisecond)
+	require.True(t, waitChan(connected, 2*time.Second), "connection timed out")
 
 	// Send message from client
 	msg := NewTextMessage("Hello Server")
@@ -49,6 +79,15 @@ func TestMultipleClientsAndBroadcast(t *testing.T) {
 	server := NewServer()
 	defer server.Shutdown()
 
+	var connCount int32
+	allConnected := make(chan struct{})
+	server.OnConnect(func(conn *Connection) error {
+		if atomic.AddInt32(&connCount, 1) == 2 {
+			close(allConnected)
+		}
+		return nil
+	})
+
 	ts := httptest.NewServer(http.HandlerFunc(server.HandleWebSocket))
 	defer ts.Close()
 
@@ -63,7 +102,7 @@ func TestMultipleClientsAndBroadcast(t *testing.T) {
 	require.NoError(t, err)
 	defer client2.Close()
 
-	time.Sleep(100 * time.Millisecond)
+	require.True(t, waitChan(allConnected, 2*time.Second), "connections timed out")
 
 	// Verify both clients connected
 	assert.Equal(t, 2, server.GetHub().GetConnectionCount())
@@ -75,15 +114,14 @@ func TestMultipleClientsAndBroadcast(t *testing.T) {
 	err = server.GetHub().BroadcastJSON(broadcastData)
 	require.NoError(t, err)
 
-	// Both clients should receive the message
-	time.Sleep(100 * time.Millisecond)
-
-	// Read from client1
+	// Read from client1 (with timeout via SetReadDeadline)
+	client1.SetReadDeadline(time.Now().Add(2 * time.Second))
 	_, msg1, err := client1.ReadMessage()
 	require.NoError(t, err)
 	assert.Contains(t, string(msg1), "Hello everyone!")
 
 	// Read from client2
+	client2.SetReadDeadline(time.Now().Add(2 * time.Second))
 	_, msg2, err := client2.ReadMessage()
 	require.NoError(t, err)
 	assert.Contains(t, string(msg2), "Hello everyone!")
@@ -93,6 +131,15 @@ func TestMultipleClientsAndBroadcast(t *testing.T) {
 func TestRoomBasedMessaging(t *testing.T) {
 	server := NewServer()
 	defer server.Shutdown()
+
+	var connCount int32
+	allConnected := make(chan struct{})
+	server.OnConnect(func(conn *Connection) error {
+		if atomic.AddInt32(&connCount, 1) == 2 {
+			close(allConnected)
+		}
+		return nil
+	})
 
 	ts := httptest.NewServer(http.HandlerFunc(server.HandleWebSocket))
 	defer ts.Close()
@@ -108,7 +155,7 @@ func TestRoomBasedMessaging(t *testing.T) {
 	require.NoError(t, err)
 	defer client2.Close()
 
-	time.Sleep(100 * time.Millisecond)
+	require.True(t, waitChan(allConnected, 2*time.Second), "connections timed out")
 
 	// Client1 joins room1
 	joinMsg := &Message{
@@ -119,9 +166,8 @@ func TestRoomBasedMessaging(t *testing.T) {
 	err = client1.WriteMessage(websocket.TextMessage, joinData)
 	require.NoError(t, err)
 
-	time.Sleep(100 * time.Millisecond)
-
-	// Read join confirmation
+	// Read join confirmation with timeout
+	client1.SetReadDeadline(time.Now().Add(2 * time.Second))
 	_, _, err = client1.ReadMessage()
 	require.NoError(t, err)
 
@@ -132,9 +178,8 @@ func TestRoomBasedMessaging(t *testing.T) {
 	err = server.GetHub().BroadcastJSONToRoom("room1", roomData, nil)
 	require.NoError(t, err)
 
-	time.Sleep(100 * time.Millisecond)
-
 	// Client1 should receive the message
+	client1.SetReadDeadline(time.Now().Add(2 * time.Second))
 	_, msg, err := client1.ReadMessage()
 	require.NoError(t, err)
 	assert.Contains(t, string(msg), "Room1 broadcast")
@@ -150,13 +195,22 @@ func TestCustomEventHandling(t *testing.T) {
 	server := NewServer()
 	defer server.Shutdown()
 
-	eventReceived := false
+	connected := make(chan struct{})
+	eventHandled := make(chan struct{})
 	var eventData interface{}
+	var mu sync.Mutex
+
+	server.OnConnect(func(conn *Connection) error {
+		close(connected)
+		return nil
+	})
 
 	// Register custom event handler
 	server.OnEvent("custom_event", func(ctx *MessageContext) error {
-		eventReceived = true
+		mu.Lock()
 		eventData = ctx.Message.Data
+		mu.Unlock()
+		close(eventHandled)
 		return nil
 	})
 
@@ -169,7 +223,7 @@ func TestCustomEventHandling(t *testing.T) {
 	require.NoError(t, err)
 	defer client.Close()
 
-	time.Sleep(100 * time.Millisecond)
+	require.True(t, waitChan(connected, 2*time.Second), "connection timed out")
 
 	// Send custom event
 	msg := NewEventMessage("custom_event", map[string]interface{}{
@@ -179,11 +233,13 @@ func TestCustomEventHandling(t *testing.T) {
 	err = client.WriteMessage(websocket.TextMessage, msgData)
 	require.NoError(t, err)
 
-	time.Sleep(100 * time.Millisecond)
+	// Wait for event to be handled
+	require.True(t, waitChan(eventHandled, 2*time.Second), "event handler not called")
 
-	// Verify event was handled
-	assert.True(t, eventReceived)
+	// Verify event data
+	mu.Lock()
 	assert.NotNil(t, eventData)
+	mu.Unlock()
 }
 
 // TestConnectionLifecycleHandlers tests onConnect and onDisconnect handlers
@@ -191,16 +247,16 @@ func TestConnectionLifecycleHandlers(t *testing.T) {
 	server := NewServer()
 	defer server.Shutdown()
 
-	connectCalled := false
-	disconnectCalled := false
+	connected := make(chan struct{})
+	disconnected := make(chan struct{})
 
 	server.OnConnect(func(conn *Connection) error {
-		connectCalled = true
+		close(connected)
 		return nil
 	})
 
 	server.OnDisconnect(func(conn *Connection) error {
-		disconnectCalled = true
+		close(disconnected)
 		return nil
 	})
 
@@ -212,18 +268,22 @@ func TestConnectionLifecycleHandlers(t *testing.T) {
 	client, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	require.NoError(t, err)
 
-	time.Sleep(100 * time.Millisecond)
-	assert.True(t, connectCalled)
+	require.True(t, waitChan(connected, 2*time.Second), "OnConnect not called")
 
 	client.Close()
-	time.Sleep(100 * time.Millisecond)
-	assert.True(t, disconnectCalled)
+	require.True(t, waitChan(disconnected, 2*time.Second), "OnDisconnect not called")
 }
 
 // TestPingPongMechanism tests ping/pong keep-alive
 func TestPingPongMechanism(t *testing.T) {
 	server := NewServer()
 	defer server.Shutdown()
+
+	connected := make(chan struct{})
+	server.OnConnect(func(conn *Connection) error {
+		close(connected)
+		return nil
+	})
 
 	ts := httptest.NewServer(http.HandlerFunc(server.HandleWebSocket))
 	defer ts.Close()
@@ -234,7 +294,7 @@ func TestPingPongMechanism(t *testing.T) {
 	require.NoError(t, err)
 	defer client.Close()
 
-	time.Sleep(100 * time.Millisecond)
+	require.True(t, waitChan(connected, 2*time.Second), "connection timed out")
 
 	// Send ping
 	pingMsg := &Message{
@@ -245,7 +305,8 @@ func TestPingPongMechanism(t *testing.T) {
 	err = client.WriteMessage(websocket.TextMessage, pingData)
 	require.NoError(t, err)
 
-	// Receive pong
+	// Receive pong with timeout
+	client.SetReadDeadline(time.Now().Add(2 * time.Second))
 	_, pongData, err := client.ReadMessage()
 	require.NoError(t, err)
 
@@ -260,6 +321,12 @@ func TestRoomLeaving(t *testing.T) {
 	server := NewServer()
 	defer server.Shutdown()
 
+	connected := make(chan struct{})
+	server.OnConnect(func(conn *Connection) error {
+		close(connected)
+		return nil
+	})
+
 	ts := httptest.NewServer(http.HandlerFunc(server.HandleWebSocket))
 	defer ts.Close()
 
@@ -269,7 +336,7 @@ func TestRoomLeaving(t *testing.T) {
 	require.NoError(t, err)
 	defer client.Close()
 
-	time.Sleep(100 * time.Millisecond)
+	require.True(t, waitChan(connected, 2*time.Second), "connection timed out")
 
 	// Join room
 	joinMsg := &Message{
@@ -280,7 +347,7 @@ func TestRoomLeaving(t *testing.T) {
 	err = client.WriteMessage(websocket.TextMessage, joinData)
 	require.NoError(t, err)
 
-	time.Sleep(100 * time.Millisecond)
+	client.SetReadDeadline(time.Now().Add(2 * time.Second))
 	client.ReadMessage() // Read join confirmation
 
 	// Leave room
@@ -292,11 +359,13 @@ func TestRoomLeaving(t *testing.T) {
 	err = client.WriteMessage(websocket.TextMessage, leaveData)
 	require.NoError(t, err)
 
-	time.Sleep(100 * time.Millisecond)
+	client.SetReadDeadline(time.Now().Add(2 * time.Second))
 	client.ReadMessage() // Read leave confirmation
 
-	// Verify room is empty
-	assert.Equal(t, 0, server.GetHub().GetRoomManager().GetRoomSize("test-room"))
+	// Wait for room to be empty
+	require.True(t, pollCondition(func() bool {
+		return server.GetHub().GetRoomManager().GetRoomSize("test-room") == 0
+	}, 2*time.Second), "room not empty")
 }
 
 // TestConcurrentConnections tests handling many concurrent connections
@@ -304,12 +373,21 @@ func TestConcurrentConnections(t *testing.T) {
 	server := NewServer()
 	defer server.Shutdown()
 
+	numClients := 10
+	var connCount int32
+	allConnected := make(chan struct{})
+	server.OnConnect(func(conn *Connection) error {
+		if atomic.AddInt32(&connCount, 1) == int32(numClients) {
+			close(allConnected)
+		}
+		return nil
+	})
+
 	ts := httptest.NewServer(http.HandlerFunc(server.HandleWebSocket))
 	defer ts.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http")
 
-	numClients := 10
 	clients := make([]*websocket.Conn, numClients)
 
 	// Connect multiple clients
@@ -320,7 +398,7 @@ func TestConcurrentConnections(t *testing.T) {
 		defer client.Close()
 	}
 
-	time.Sleep(200 * time.Millisecond)
+	require.True(t, waitChan(allConnected, 5*time.Second), "not all clients connected")
 
 	// Verify all clients connected
 	assert.Equal(t, numClients, server.GetHub().GetConnectionCount())

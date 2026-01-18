@@ -3,6 +3,7 @@ package jit
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/glyphlang/glyph/pkg/compiler"
 	"github.com/glyphlang/glyph/pkg/interpreter"
@@ -45,7 +46,7 @@ func (sc *SpecializationCache) GetSpecialization(routeName string, types map[str
 
 	for _, spec := range specs {
 		if spec.IsValid && typesMatch(spec.Types, types) {
-			spec.HitCount++
+			atomic.AddInt64(&spec.HitCount, 1)
 			return spec
 		}
 	}
@@ -183,15 +184,13 @@ func typeSignature(types map[string]string) string {
 
 // TypeSpecializedCompiler generates type-specialized bytecode
 type TypeSpecializedCompiler struct {
-	baseCompiler *compiler.Compiler
-	profiler     *Profiler
+	profiler *Profiler
 }
 
 // NewTypeSpecializedCompiler creates a new type-specialized compiler
 func NewTypeSpecializedCompiler(profiler *Profiler) *TypeSpecializedCompiler {
 	return &TypeSpecializedCompiler{
-		baseCompiler: compiler.NewCompilerWithOptLevel(compiler.OptAggressive),
-		profiler:     profiler,
+		profiler: profiler,
 	}
 }
 
@@ -203,7 +202,9 @@ func (tsc *TypeSpecializedCompiler) CompileWithTypeInfo(route *interpreter.Route
 	// 2. Specialize operations based on known types
 	// 3. Inline type checks that we know will succeed
 
-	return tsc.baseCompiler.CompileRoute(route)
+	// Create a new compiler instance for each compilation to avoid race conditions
+	comp := compiler.NewCompilerWithOptLevel(compiler.OptAggressive)
+	return comp.CompileRoute(route)
 }
 
 // InlineCandidate represents a function that could be inlined
