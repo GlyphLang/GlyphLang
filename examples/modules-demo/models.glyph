@@ -8,7 +8,7 @@ module "models"
   firstName: str!
   lastName: str!
   age: int
-  role: str = "user"
+  role: str
   createdAt: int
 }
 

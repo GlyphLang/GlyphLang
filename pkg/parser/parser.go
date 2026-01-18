@@ -299,146 +299,7 @@ func (p *Parser) parseFieldWithContext(typeParamNames []string) (interpreter.Fie
 
 // parseType parses a type annotation
 func (p *Parser) parseType() (interpreter.Type, bool, error) {
-	var baseType interpreter.Type
-	required := false
-
-	if !p.check(IDENT) {
-		return nil, false, p.typeError(
-			fmt.Sprintf("Expected type name, but found %s", p.current().Type),
-			p.current(),
-		)
-	}
-
-	typeName := p.current().Literal
-	p.advance()
-
-	// Check for qualified type name (e.g., module.TypeName)
-	for p.check(DOT) {
-		p.advance() // consume dot
-		if !p.check(IDENT) {
-			return nil, false, p.typeError(
-				fmt.Sprintf("Expected type name after '.', but found %s", p.current().Type),
-				p.current(),
-			)
-		}
-		typeName = typeName + "." + p.current().Literal
-		p.advance()
-	}
-
-	switch typeName {
-	case "int":
-		baseType = interpreter.IntType{}
-	case "str", "string":
-		baseType = interpreter.StringType{}
-	case "bool":
-		baseType = interpreter.BoolType{}
-	case "float":
-		baseType = interpreter.FloatType{}
-	default:
-		baseType = interpreter.NamedType{Name: typeName}
-	}
-
-	// Check for generic type parameters (e.g., List[str] or Map[str, str])
-	if p.check(LBRACKET) {
-		p.advance()
-
-		// If there's a type inside brackets, it's a generic type with parameters
-		// For now, we'll just skip to the closing bracket and treat it as a named type
-		if !p.check(RBRACKET) {
-			// Skip everything until the closing bracket
-			bracketDepth := 1
-			for bracketDepth > 0 && !p.isAtEnd() {
-				if p.check(LBRACKET) {
-					bracketDepth++
-				} else if p.check(RBRACKET) {
-					bracketDepth--
-					if bracketDepth == 0 {
-						break
-					}
-				}
-				p.advance()
-			}
-
-			if err := p.expect(RBRACKET); err != nil {
-				return nil, false, err
-			}
-			// Keep baseType as-is (NamedType like "List" or "Map")
-		} else {
-			// Empty brackets like int[] - treat as array type
-			p.advance() // consume ]
-			baseType = interpreter.ArrayType{ElementType: baseType}
-		}
-	}
-
-	// Check for union types (e.g., User | Error or Result<T, E>)
-	if p.check(PIPE) {
-		types := []interpreter.Type{baseType}
-		for p.check(PIPE) {
-			p.advance() // consume |
-
-			// Parse the next type
-			if !p.check(IDENT) {
-				return nil, false, p.typeError(
-					fmt.Sprintf("Expected type name after |, but found %s", p.current().Type),
-					p.current(),
-				)
-			}
-
-			nextTypeName := p.current().Literal
-			p.advance()
-
-			var nextType interpreter.Type
-			switch nextTypeName {
-			case "int":
-				nextType = interpreter.IntType{}
-			case "str", "string":
-				nextType = interpreter.StringType{}
-			case "bool":
-				nextType = interpreter.BoolType{}
-			case "float":
-				nextType = interpreter.FloatType{}
-			default:
-				nextType = interpreter.NamedType{Name: nextTypeName}
-			}
-
-			// Handle generic type parameters for the next type
-			if p.check(LBRACKET) {
-				p.advance()
-				if !p.check(RBRACKET) {
-					bracketDepth := 1
-					for bracketDepth > 0 && !p.isAtEnd() {
-						if p.check(LBRACKET) {
-							bracketDepth++
-						} else if p.check(RBRACKET) {
-							bracketDepth--
-							if bracketDepth == 0 {
-								break
-							}
-						}
-						p.advance()
-					}
-					if err := p.expect(RBRACKET); err != nil {
-						return nil, false, err
-					}
-				} else {
-					p.advance()
-					nextType = interpreter.ArrayType{ElementType: nextType}
-				}
-			}
-
-			types = append(types, nextType)
-		}
-
-		baseType = interpreter.UnionType{Types: types}
-	}
-
-	// Check for required marker
-	if p.check(BANG) {
-		p.advance()
-		required = true
-	}
-
-	return baseType, required, nil
+	return p.parseTypeWithContext(nil)
 }
 
 // parseSingleType parses a single type (without union handling) with optional type parameter context
@@ -589,6 +450,19 @@ func (p *Parser) parseTypeWithContext(typeParamNames []string) (interpreter.Type
 	} else {
 		typeName := p.current().Literal
 		p.advance()
+
+		// Check for qualified type name (e.g., module.TypeName)
+		for p.check(DOT) {
+			p.advance() // consume dot
+			if !p.check(IDENT) {
+				return nil, false, p.typeError(
+					fmt.Sprintf("Expected type name after '.', but found %s", p.current().Type),
+					p.current(),
+				)
+			}
+			typeName = typeName + "." + p.current().Literal
+			p.advance()
+		}
 
 		// Check if this is a type parameter reference
 		isTypeParam := false
