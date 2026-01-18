@@ -409,8 +409,8 @@ func TestConnectionState(t *testing.T) {
 		go hub.Run()
 		defer hub.Shutdown()
 
-		// Give the hub time to start
-		time.Sleep(50 * time.Millisecond)
+		// Wait for hub to be ready
+		<-hub.started
 
 		// Create a mock connection with state
 		conn := &Connection{

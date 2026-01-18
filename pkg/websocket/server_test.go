@@ -12,6 +12,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// waitWithTimeout waits for a channel to close or times out
+func waitWithTimeout(ch <-chan struct{}, timeout time.Duration) bool {
+	select {
+	case <-ch:
+		return true
+	case <-time.After(timeout):
+		return false
+	}
+}
+
 func TestNewServer(t *testing.T) {
 	server := NewServer()
 	assert.NotNil(t, server)
@@ -22,6 +32,13 @@ func TestNewServer(t *testing.T) {
 func TestServerWebSocketUpgrade(t *testing.T) {
 	server := NewServer()
 	defer server.Shutdown()
+
+	// Set up connection signal
+	connected := make(chan struct{})
+	server.OnConnect(func(conn *Connection) error {
+		close(connected)
+		return nil
+	})
 
 	// Create test HTTP server
 	testServer := httptest.NewServer(http.HandlerFunc(server.HandleWebSocket))
@@ -36,7 +53,7 @@ func TestServerWebSocketUpgrade(t *testing.T) {
 	defer conn.Close()
 
 	// Wait for connection to register
-	time.Sleep(100 * time.Millisecond)
+	require.True(t, waitWithTimeout(connected, 2*time.Second), "connection registration timed out")
 
 	// Check connection count
 	assert.Equal(t, 1, server.GetHub().GetConnectionCount())
@@ -44,6 +61,14 @@ func TestServerWebSocketUpgrade(t *testing.T) {
 
 func TestHubConnectionRegistration(t *testing.T) {
 	hub := NewHub()
+
+	// Set up connection signal before starting hub
+	connected := make(chan struct{})
+	hub.OnConnect(func(conn *Connection) error {
+		close(connected)
+		return nil
+	})
+
 	go hub.Run()
 	defer hub.Shutdown()
 
@@ -60,15 +85,30 @@ func TestHubConnectionRegistration(t *testing.T) {
 	hub.register <- mockConn
 
 	// Wait for registration
-	time.Sleep(100 * time.Millisecond)
+	require.True(t, waitWithTimeout(connected, 2*time.Second), "connection registration timed out")
 
 	// Check if connection is registered
 	assert.Equal(t, 1, hub.GetConnectionCount())
+	hub.connMu.RLock()
 	assert.Contains(t, hub.connections, mockConn)
+	hub.connMu.RUnlock()
 }
 
 func TestHubConnectionUnregistration(t *testing.T) {
 	hub := NewHub()
+
+	// Set up connection signals
+	connected := make(chan struct{})
+	disconnected := make(chan struct{})
+	hub.OnConnect(func(conn *Connection) error {
+		close(connected)
+		return nil
+	})
+	hub.OnDisconnect(func(conn *Connection) error {
+		close(disconnected)
+		return nil
+	})
+
 	go hub.Run()
 	defer hub.Shutdown()
 
@@ -82,18 +122,32 @@ func TestHubConnectionUnregistration(t *testing.T) {
 
 	// Register then unregister
 	hub.register <- mockConn
-	time.Sleep(100 * time.Millisecond)
+	require.True(t, waitWithTimeout(connected, 2*time.Second), "connection registration timed out")
 
 	hub.unregister <- mockConn
-	time.Sleep(100 * time.Millisecond)
+	require.True(t, waitWithTimeout(disconnected, 2*time.Second), "connection unregistration timed out")
 
 	// Check if connection is unregistered
 	assert.Equal(t, 0, hub.GetConnectionCount())
+	hub.connMu.RLock()
 	assert.NotContains(t, hub.connections, mockConn)
+	hub.connMu.RUnlock()
 }
 
 func TestHubBroadcast(t *testing.T) {
 	hub := NewHub()
+
+	// Track connections
+	connCount := 0
+	allConnected := make(chan struct{})
+	hub.OnConnect(func(conn *Connection) error {
+		connCount++
+		if connCount == 2 {
+			close(allConnected)
+		}
+		return nil
+	})
+
 	go hub.Run()
 	defer hub.Shutdown()
 
@@ -115,27 +169,24 @@ func TestHubBroadcast(t *testing.T) {
 
 	hub.register <- conn1
 	hub.register <- conn2
-	time.Sleep(100 * time.Millisecond)
+	require.True(t, waitWithTimeout(allConnected, 2*time.Second), "connections registration timed out")
 
 	// Broadcast message
 	testMsg := []byte("test broadcast")
 	hub.Broadcast(testMsg)
 
-	// Wait for broadcast
-	time.Sleep(100 * time.Millisecond)
-
-	// Check both connections received the message
+	// Check both connections received the message (with timeout)
 	select {
 	case msg := <-conn1.send:
 		assert.Equal(t, testMsg, msg)
-	default:
+	case <-time.After(2 * time.Second):
 		t.Fatal("conn1 did not receive broadcast")
 	}
 
 	select {
 	case msg := <-conn2.send:
 		assert.Equal(t, testMsg, msg)
-	default:
+	case <-time.After(2 * time.Second):
 		t.Fatal("conn2 did not receive broadcast")
 	}
 }
@@ -195,6 +246,13 @@ func TestConnectionSendJSON(t *testing.T) {
 
 func TestHubGetConnection(t *testing.T) {
 	hub := NewHub()
+
+	connected := make(chan struct{})
+	hub.OnConnect(func(conn *Connection) error {
+		close(connected)
+		return nil
+	})
+
 	go hub.Run()
 	defer hub.Shutdown()
 
@@ -207,7 +265,7 @@ func TestHubGetConnection(t *testing.T) {
 	}
 
 	hub.register <- conn
-	time.Sleep(100 * time.Millisecond)
+	require.True(t, waitWithTimeout(connected, 2*time.Second), "connection registration timed out")
 
 	// Get existing connection
 	found, exists := hub.GetConnection("test-conn-123")
@@ -221,15 +279,16 @@ func TestHubGetConnection(t *testing.T) {
 
 func TestHubOnConnectHandler(t *testing.T) {
 	hub := NewHub()
-	go hub.Run()
-	defer hub.Shutdown()
 
-	handlerCalled := false
+	handlerCalled := make(chan struct{})
 	hub.OnConnect(func(conn *Connection) error {
-		handlerCalled = true
 		assert.Equal(t, "test-conn", conn.ID)
+		close(handlerCalled)
 		return nil
 	})
+
+	go hub.Run()
+	defer hub.Shutdown()
 
 	conn := &Connection{
 		ID:   "test-conn",
@@ -240,22 +299,26 @@ func TestHubOnConnectHandler(t *testing.T) {
 	}
 
 	hub.register <- conn
-	time.Sleep(100 * time.Millisecond)
-
-	assert.True(t, handlerCalled)
+	require.True(t, waitWithTimeout(handlerCalled, 2*time.Second), "OnConnect handler not called")
 }
 
 func TestHubOnDisconnectHandler(t *testing.T) {
 	hub := NewHub()
-	go hub.Run()
-	defer hub.Shutdown()
 
-	handlerCalled := false
-	hub.OnDisconnect(func(conn *Connection) error {
-		handlerCalled = true
-		assert.Equal(t, "test-conn", conn.ID)
+	connected := make(chan struct{})
+	disconnectCalled := make(chan struct{})
+	hub.OnConnect(func(conn *Connection) error {
+		close(connected)
 		return nil
 	})
+	hub.OnDisconnect(func(conn *Connection) error {
+		assert.Equal(t, "test-conn", conn.ID)
+		close(disconnectCalled)
+		return nil
+	})
+
+	go hub.Run()
+	defer hub.Shutdown()
 
 	conn := &Connection{
 		ID:   "test-conn",
@@ -266,12 +329,10 @@ func TestHubOnDisconnectHandler(t *testing.T) {
 	}
 
 	hub.register <- conn
-	time.Sleep(100 * time.Millisecond)
+	require.True(t, waitWithTimeout(connected, 2*time.Second), "connection registration timed out")
 
 	hub.unregister <- conn
-	time.Sleep(100 * time.Millisecond)
-
-	assert.True(t, handlerCalled)
+	require.True(t, waitWithTimeout(disconnectCalled, 2*time.Second), "OnDisconnect handler not called")
 }
 
 func TestGenerateConnectionID(t *testing.T) {
@@ -285,6 +346,13 @@ func TestGenerateConnectionID(t *testing.T) {
 
 func TestHubBroadcastJSON(t *testing.T) {
 	hub := NewHub()
+
+	connected := make(chan struct{})
+	hub.OnConnect(func(conn *Connection) error {
+		close(connected)
+		return nil
+	})
+
 	go hub.Run()
 	defer hub.Shutdown()
 
@@ -297,7 +365,7 @@ func TestHubBroadcastJSON(t *testing.T) {
 	}
 
 	hub.register <- conn
-	time.Sleep(100 * time.Millisecond)
+	require.True(t, waitWithTimeout(connected, 2*time.Second), "connection registration timed out")
 
 	data := map[string]interface{}{
 		"type":    "notification",
@@ -307,13 +375,11 @@ func TestHubBroadcastJSON(t *testing.T) {
 	err := hub.BroadcastJSON(data)
 	require.NoError(t, err)
 
-	time.Sleep(100 * time.Millisecond)
-
 	select {
 	case msg := <-conn.send:
 		assert.Contains(t, string(msg), "notification")
 		assert.Contains(t, string(msg), "test")
-	case <-time.After(1 * time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("No message received")
 	}
 }

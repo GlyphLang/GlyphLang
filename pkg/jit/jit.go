@@ -40,6 +40,7 @@ type JITCompiler struct {
 	// Configuration
 	hotPathThreshold int
 	recompileWindow  time.Duration
+	configMux        sync.RWMutex
 
 	// Profiler for runtime data
 	profiler *Profiler
@@ -47,11 +48,6 @@ type JITCompiler struct {
 	// Compiled units cache
 	units     map[string]*CompilationUnit
 	unitsMux  sync.RWMutex
-
-	// Compiler instances for different optimization levels
-	baselineCompiler compiler.Compiler
-	optimizedCompiler compiler.Compiler
-	aggressiveCompiler compiler.Compiler
 
 	// Type specialization
 	specializationCache *SpecializationCache
@@ -97,9 +93,6 @@ func NewJITCompiler() *JITCompiler {
 		recompileWindow:     DefaultRecompileWindow,
 		profiler:            profiler,
 		units:               make(map[string]*CompilationUnit),
-		baselineCompiler:    *compiler.NewCompilerWithOptLevel(compiler.OptNone),
-		optimizedCompiler:   *compiler.NewCompilerWithOptLevel(compiler.OptBasic),
-		aggressiveCompiler:  *compiler.NewCompilerWithOptLevel(compiler.OptAggressive),
 		specializationCache: NewSpecializationCache(),
 		typeCompiler:        NewTypeSpecializedCompiler(profiler),
 		inliningOracle:      NewInliningOracle(profiler),
@@ -210,6 +203,12 @@ func (jit *JITCompiler) shouldRecompile(unit *CompilationUnit) bool {
 		return false
 	}
 
+	// Read config values with lock protection
+	jit.configMux.RLock()
+	hotPathThreshold := jit.hotPathThreshold
+	recompileWindow := jit.recompileWindow
+	jit.configMux.RUnlock()
+
 	// Recompile if:
 	// 1. Execution count is high enough
 	// 2. It's been long enough since last compilation
@@ -218,12 +217,12 @@ func (jit *JITCompiler) shouldRecompile(unit *CompilationUnit) bool {
 	switch unit.Tier {
 	case TierInterpreted, TierBaseline:
 		// Upgrade to optimized if executed frequently
-		return profile.ExecutionCount >= int64(jit.hotPathThreshold/2) &&
-		       timeSinceCompile > jit.recompileWindow
+		return profile.ExecutionCount >= int64(hotPathThreshold/2) &&
+		       timeSinceCompile > recompileWindow
 	case TierOptimized:
 		// Upgrade to highly optimized if very hot
-		return profile.ExecutionCount >= int64(jit.hotPathThreshold) &&
-		       timeSinceCompile > jit.recompileWindow
+		return profile.ExecutionCount >= int64(hotPathThreshold) &&
+		       timeSinceCompile > recompileWindow
 	default:
 		return false
 	}
@@ -264,15 +263,16 @@ func (jit *JITCompiler) recompileRoute(name string, route *interpreter.Route, cu
 func (jit *JITCompiler) compileWithTier(route *interpreter.Route, tier OptimizationTier) ([]byte, error) {
 	var comp *compiler.Compiler
 
+	// Create a new compiler instance for each compilation to avoid race conditions
 	switch tier {
 	case TierBaseline:
-		comp = &jit.baselineCompiler
+		comp = compiler.NewCompilerWithOptLevel(compiler.OptNone)
 	case TierOptimized:
-		comp = &jit.optimizedCompiler
+		comp = compiler.NewCompilerWithOptLevel(compiler.OptBasic)
 	case TierHighlyOptimized:
-		comp = &jit.aggressiveCompiler
+		comp = compiler.NewCompilerWithOptLevel(compiler.OptAggressive)
 	default:
-		comp = &jit.baselineCompiler
+		comp = compiler.NewCompilerWithOptLevel(compiler.OptNone)
 	}
 
 	return comp.CompileRoute(route)
@@ -286,8 +286,13 @@ func (jit *JITCompiler) determineInitialTier(name string) OptimizationTier {
 		return TierBaseline
 	}
 
+	// Read config value with lock protection
+	jit.configMux.RLock()
+	hotPathThreshold := jit.hotPathThreshold
+	jit.configMux.RUnlock()
+
 	// If we have historical data showing this is hot, start optimized
-	if profile.ExecutionCount >= int64(jit.hotPathThreshold) {
+	if profile.ExecutionCount >= int64(hotPathThreshold) {
 		return TierOptimized
 	}
 
@@ -327,17 +332,37 @@ func (jit *JITCompiler) GetStats() JITStats {
 	return jit.stats
 }
 
-// GetUnit returns a compilation unit by name
+// GetUnit returns a copy of a compilation unit by name
 func (jit *JITCompiler) GetUnit(name string) (*CompilationUnit, bool) {
 	jit.unitsMux.RLock()
 	defer jit.unitsMux.RUnlock()
+
 	unit, exists := jit.units[name]
-	return unit, exists
+	if !exists {
+		return nil, false
+	}
+
+	// Return a copy to avoid race conditions when caller reads while recompileRoute writes
+	unitCopy := &CompilationUnit{
+		Name:           unit.Name,
+		Bytecode:       make([]byte, len(unit.Bytecode)),
+		Tier:           unit.Tier,
+		CompiledAt:     unit.CompiledAt,
+		ExecutionCount: unit.ExecutionCount,
+		LastExecuted:   unit.LastExecuted,
+	}
+	copy(unitCopy.Bytecode, unit.Bytecode)
+
+	return unitCopy, true
 }
 
 // GetHotPaths returns a list of hot paths (frequently executed routes)
 func (jit *JITCompiler) GetHotPaths() []string {
-	hotPaths := jit.profiler.GetHotPaths(jit.hotPathThreshold)
+	jit.configMux.RLock()
+	hotPathThreshold := jit.hotPathThreshold
+	jit.configMux.RUnlock()
+
+	hotPaths := jit.profiler.GetHotPaths(hotPathThreshold)
 	return hotPaths
 }
 
@@ -362,12 +387,16 @@ func (jit *JITCompiler) GetProfiler() *Profiler {
 
 // SetHotPathThreshold sets the hot path threshold
 func (jit *JITCompiler) SetHotPathThreshold(threshold int) {
+	jit.configMux.Lock()
 	jit.hotPathThreshold = threshold
+	jit.configMux.Unlock()
 }
 
 // SetRecompileWindow sets the recompilation window
 func (jit *JITCompiler) SetRecompileWindow(window time.Duration) {
+	jit.configMux.Lock()
 	jit.recompileWindow = window
+	jit.configMux.Unlock()
 }
 
 // CompileRouteWithTypes compiles a route with type specialization

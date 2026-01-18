@@ -661,7 +661,7 @@ func TestTimeoutMiddleware(t *testing.T) {
 	t.Run("slow handler", func(t *testing.T) {
 		handler := func(ctx *Context) error {
 			time.Sleep(200 * time.Millisecond)
-			ctx.StatusCode = 200
+			// Note: handler continues after timeout but writes are discarded
 			return nil
 		}
 
@@ -675,8 +675,9 @@ func TestTimeoutMiddleware(t *testing.T) {
 
 		wrappedHandler := middleware(handler)
 		wrappedHandler(ctx)
-		if w.Code != 504 && ctx.StatusCode != 504 {
-			t.Errorf("Expected status 504, got response %d / ctx %d", w.Code, ctx.StatusCode)
+		// Check response code, not ctx.StatusCode (which may be modified by handler after timeout)
+		if w.Code != 504 {
+			t.Errorf("Expected status 504, got response %d", w.Code)
 		}
 	})
 }

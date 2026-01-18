@@ -94,7 +94,7 @@ func TestLoggerTextFormat(t *testing.T) {
 	defer logger.Close()
 
 	logger.Info("test message")
-	time.Sleep(50 * time.Millisecond) // Wait for async processing
+	logger.Sync() // Wait for async processing
 
 	output := buf.String()
 	if !strings.Contains(output, "INFO") {
@@ -119,7 +119,7 @@ func TestLoggerJSONFormat(t *testing.T) {
 	defer logger.Close()
 
 	logger.Info("test message")
-	time.Sleep(50 * time.Millisecond) // Wait for async processing
+	logger.Sync() // Wait for async processing
 
 	var entry LogEntry
 	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
@@ -153,7 +153,7 @@ func TestLoggerWithFields(t *testing.T) {
 	}
 
 	logger.InfoWithFields("user action", fields)
-	time.Sleep(50 * time.Millisecond)
+	logger.Sync()
 
 	var entry LogEntry
 	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
@@ -196,7 +196,7 @@ func TestLoggerLogLevels(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			buf.Reset()
 			tt.logFunc("test")
-			time.Sleep(50 * time.Millisecond)
+			logger.Sync()
 
 			var entry LogEntry
 			if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
@@ -225,14 +225,14 @@ func TestLoggerMinLevel(t *testing.T) {
 
 	logger.Debug("debug message")
 	logger.Info("info message")
-	time.Sleep(50 * time.Millisecond)
+	logger.Sync()
 
 	if buf.Len() > 0 {
 		t.Errorf("Expected no logs for DEBUG and INFO when MinLevel is WARN, got: %s", buf.String())
 	}
 
 	logger.Warn("warning message")
-	time.Sleep(50 * time.Millisecond)
+	logger.Sync()
 
 	if buf.Len() == 0 {
 		t.Error("Expected WARN log to be written")
@@ -256,7 +256,7 @@ func TestContextLogger(t *testing.T) {
 	ctxLogger := logger.WithRequestID(requestID)
 
 	ctxLogger.Info("context test")
-	time.Sleep(50 * time.Millisecond)
+	logger.Sync()
 
 	var entry LogEntry
 	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
@@ -288,7 +288,7 @@ func TestContextLoggerWithFields(t *testing.T) {
 
 	ctxLogger := logger.WithFields(fields)
 	ctxLogger.Info("test")
-	time.Sleep(50 * time.Millisecond)
+	logger.Sync()
 
 	var entry LogEntry
 	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
@@ -322,7 +322,7 @@ func TestContextLoggerChaining(t *testing.T) {
 		WithField("action", "update")
 
 	ctxLogger.Info("chained context")
-	time.Sleep(50 * time.Millisecond)
+	logger.Sync()
 
 	var entry LogEntry
 	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
@@ -355,7 +355,7 @@ func TestLoggerWithCaller(t *testing.T) {
 	defer logger.Close()
 
 	logger.Info("caller test")
-	time.Sleep(50 * time.Millisecond)
+	logger.Sync()
 
 	var entry LogEntry
 	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
@@ -385,7 +385,7 @@ func TestLoggerWithStackTrace(t *testing.T) {
 	defer logger.Close()
 
 	logger.Error("error with stack")
-	time.Sleep(50 * time.Millisecond)
+	logger.Sync()
 
 	var entry LogEntry
 	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
@@ -486,7 +486,7 @@ func TestInitDefaultLogger(t *testing.T) {
 	defer GetDefaultLogger().Close()
 
 	Info("test default logger")
-	time.Sleep(50 * time.Millisecond)
+	GetDefaultLogger().Sync()
 
 	var entry LogEntry
 	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
@@ -526,7 +526,7 @@ func TestConvenienceFunctions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			buf.Reset()
 			tt.logFunc("test")
-			time.Sleep(50 * time.Millisecond)
+			GetDefaultLogger().Sync()
 
 			var entry LogEntry
 			if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
@@ -556,7 +556,7 @@ func TestWithRequestIDConvenience(t *testing.T) {
 	requestID := "convenience-test-123"
 	ctxLogger := WithRequestID(requestID)
 	ctxLogger.Info("test")
-	time.Sleep(50 * time.Millisecond)
+	GetDefaultLogger().Sync()
 
 	var entry LogEntry
 	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
@@ -587,7 +587,7 @@ func TestWithFieldsConvenience(t *testing.T) {
 
 	ctxLogger := WithFields(fields)
 	ctxLogger.Info("test")
-	time.Sleep(50 * time.Millisecond)
+	GetDefaultLogger().Sync()
 
 	var entry LogEntry
 	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
@@ -632,7 +632,7 @@ func TestLoggerConcurrency(t *testing.T) {
 		<-done
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	logger.Sync()
 
 	// Count log entries
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
@@ -671,7 +671,7 @@ func TestContextLoggerConcurrency(t *testing.T) {
 		<-done
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	logger.Sync()
 
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
 	if len(lines) != 10 {

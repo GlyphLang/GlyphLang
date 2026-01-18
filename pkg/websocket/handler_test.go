@@ -9,6 +9,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// waitForCondition polls until condition returns true or timeout
+func waitForCondition(condition func() bool, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if condition() {
+			return true
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return false
+}
+
 func TestNewHandler(t *testing.T) {
 	handler := NewHandler()
 	assert.NotNil(t, handler)
@@ -110,11 +122,10 @@ func TestHandlerJoinRoomHandler(t *testing.T) {
 	err := handler.HandleMessage(ctx)
 	assert.NoError(t, err)
 
-	// Wait for room join
-	time.Sleep(100 * time.Millisecond)
-
-	// Verify connection joined room
-	assert.True(t, conn.IsInRoom("test-room"))
+	// Wait for room join with polling
+	require.True(t, waitForCondition(func() bool {
+		return conn.IsInRoom("test-room")
+	}, 2*time.Second), "connection did not join room")
 }
 
 func TestHandlerLeaveRoomHandler(t *testing.T) {
@@ -134,7 +145,9 @@ func TestHandlerLeaveRoomHandler(t *testing.T) {
 
 	// Join room first
 	conn.JoinRoom("test-room")
-	time.Sleep(100 * time.Millisecond)
+	require.True(t, waitForCondition(func() bool {
+		return conn.IsInRoom("test-room")
+	}, 2*time.Second), "connection did not join room")
 
 	msg := &Message{
 		Type: MessageTypeLeaveRoom,
@@ -149,11 +162,10 @@ func TestHandlerLeaveRoomHandler(t *testing.T) {
 	err := handler.HandleMessage(ctx)
 	assert.NoError(t, err)
 
-	// Wait for room leave
-	time.Sleep(100 * time.Millisecond)
-
-	// Verify connection left room
-	assert.False(t, conn.IsInRoom("test-room"))
+	// Wait for room leave with polling
+	require.True(t, waitForCondition(func() bool {
+		return !conn.IsInRoom("test-room")
+	}, 2*time.Second), "connection did not leave room")
 }
 
 func TestHandlerPingPongHandler(t *testing.T) {

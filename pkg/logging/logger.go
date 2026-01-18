@@ -93,6 +93,8 @@ type Logger struct {
 	mu         sync.Mutex
 	stopped    bool
 	fileWriter *rotatingFileWriter
+	// For Sync() support
+	syncCh     chan chan struct{}
 }
 
 // rotatingFileWriter handles log file rotation
@@ -120,6 +122,7 @@ func NewLogger(config LoggerConfig) (*Logger, error) {
 		config:  config,
 		buffer:  make(chan *LogEntry, config.BufferSize),
 		stopped: false,
+		syncCh:  make(chan chan struct{}, 1),
 	}
 
 	// Setup file rotation if file path is provided
@@ -227,8 +230,32 @@ func (w *rotatingFileWriter) Close() error {
 func (l *Logger) processLogs() {
 	defer l.wg.Done()
 
-	for entry := range l.buffer {
-		l.writeLog(entry)
+	for {
+		select {
+		case entry, ok := <-l.buffer:
+			if !ok {
+				// Buffer closed, drain any pending sync requests
+				select {
+				case done := <-l.syncCh:
+					close(done)
+				default:
+				}
+				return
+			}
+			l.writeLog(entry)
+		case done := <-l.syncCh:
+			// Drain all pending entries before signaling done
+			draining := true
+			for draining {
+				select {
+				case entry := <-l.buffer:
+					l.writeLog(entry)
+				default:
+					draining = false
+				}
+			}
+			close(done)
+		}
 	}
 }
 
@@ -403,6 +430,22 @@ func (l *Logger) Fatal(msg string) {
 // FatalWithFields logs a fatal message with additional fields and exits
 func (l *Logger) FatalWithFields(msg string, fields map[string]interface{}) {
 	l.log(FATAL, msg, fields, "")
+}
+
+// Sync flushes all pending log entries and waits for them to be written.
+// This is useful in tests to ensure all logs have been processed before
+// reading from output buffers.
+func (l *Logger) Sync() {
+	l.mu.Lock()
+	if l.stopped {
+		l.mu.Unlock()
+		return
+	}
+	l.mu.Unlock()
+
+	done := make(chan struct{})
+	l.syncCh <- done
+	<-done
 }
 
 // Close gracefully shuts down the logger
