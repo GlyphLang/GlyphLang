@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/glyphlang/glyph/pkg/config"
 	ws "github.com/glyphlang/glyph/pkg/websocket"
 )
 
@@ -29,7 +30,7 @@ func NewServer(options ...ServerOption) *Server {
 	s := &Server{
 		router:      NewRouter(),
 		middlewares: make([]Middleware, 0),
-		addr:        ":8080",
+		addr:        fmt.Sprintf(":%d", config.DefaultPort),
 		wsServer:    ws.NewServer(), // Initialize WebSocket server
 	}
 

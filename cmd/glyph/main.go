@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/glyphlang/glyph/pkg/compiler"
+	"github.com/glyphlang/glyph/pkg/config"
 	glyphcontext "github.com/glyphlang/glyph/pkg/context"
 	"github.com/glyphlang/glyph/pkg/decompiler"
 	"github.com/glyphlang/glyph/pkg/formatter"
@@ -84,7 +85,7 @@ to rapidly build high-performance, secure backend applications.`,
 		Args:  cobra.ExactArgs(1),
 		RunE:  runRun,
 	}
-	runCmd.Flags().Uint16P("port", "p", 3000, "Port to listen on")
+	runCmd.Flags().Uint16P("port", "p", uint16(config.DefaultPort), "Port to listen on")
 	runCmd.Flags().Bool("bytecode", false, "Execute bytecode (.glyphc) file")
 	runCmd.Flags().Bool("interpret", false, "Use tree-walking interpreter instead of compiler (fallback mode)")
 
@@ -95,7 +96,7 @@ to rapidly build high-performance, secure backend applications.`,
 		Args:  cobra.ExactArgs(1),
 		RunE:  runDev,
 	}
-	devCmd.Flags().Uint16P("port", "p", 3000, "Port to listen on")
+	devCmd.Flags().Uint16P("port", "p", uint16(config.DefaultPort), "Port to listen on")
 	devCmd.Flags().BoolP("watch", "w", true, "Watch for file changes")
 	devCmd.Flags().BoolP("open", "o", false, "Open browser automatically")
 
