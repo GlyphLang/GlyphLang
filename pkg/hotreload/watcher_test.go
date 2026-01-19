@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/glyphlang/glyph/pkg/config"
 )
 
 func TestFileWatcher_MatchesPattern(t *testing.T) {
@@ -303,21 +305,21 @@ func TestLiveReloadScript(t *testing.T) {
 }
 
 func TestDefaultDevServerConfig(t *testing.T) {
-	config := DefaultDevServerConfig()
+	cfg := DefaultDevServerConfig()
 
-	if config.Port != 8080 {
-		t.Errorf("Expected port 8080, got %d", config.Port)
+	if cfg.Port != config.DefaultPort {
+		t.Errorf("Expected port %d, got %d", config.DefaultPort, cfg.Port)
 	}
 
-	if config.Host != "localhost" {
-		t.Errorf("Expected host localhost, got %s", config.Host)
+	if cfg.Host != "localhost" {
+		t.Errorf("Expected host localhost, got %s", cfg.Host)
 	}
 
-	if !config.LiveReload {
+	if !cfg.LiveReload {
 		t.Error("Expected LiveReload to be true")
 	}
 
-	if len(config.WatchPaths) == 0 {
+	if len(cfg.WatchPaths) == 0 {
 		t.Error("Expected at least one watch path")
 	}
 }
