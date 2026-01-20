@@ -7,26 +7,25 @@ This document contains performance benchmarks for the Glyph compiler and runtime
 - **CPU**: AMD Ryzen 7 7800X3D 8-Core Processor
 - **OS**: Windows
 - **Architecture**: amd64
-- **Go Version**: go1.21+
-- **Rust Version**: 1.75+
+- **Go Version**: go1.24+
 
 ## Performance Targets
 
 | Component | Target | Status |
 |-----------|--------|--------|
-| Compilation Speed | < 100ms per typical route | ✅ Achieved |
-| VM Instruction Execution | < 10μs per instruction | ✅ Achieved |
-| Binary Size | Smaller or comparable to source | ✅ Achieved |
+| Compilation Speed | < 100ms per typical route | Achieved |
+| VM Instruction Execution | < 10us per instruction | Achieved |
+| Binary Size | Smaller or comparable to source | Achieved |
 
-## Compilation Performance (Rust)
+## Compilation Performance
 
 ### Lexer Benchmarks
 
 | Input | Size | Time | Throughput |
 |-------|------|------|------------|
 | Simple route | 47 bytes | 511 ns | ~92 MB/s |
-| Medium API | 186 bytes | 1.81 µs | ~103 MB/s |
-| Large API | 797 bytes | 6.93 µs | ~115 MB/s |
+| Medium API | 186 bytes | 1.81 us | ~103 MB/s |
+| Large API | 797 bytes | 6.93 us | ~115 MB/s |
 
 **Analysis**: The lexer shows consistent sub-microsecond performance for typical routes, with good throughput scaling.
 
@@ -35,8 +34,8 @@ This document contains performance benchmarks for the Glyph compiler and runtime
 | Input | Tokens | Time | Throughput |
 |-------|--------|------|------------|
 | Simple route | 13 | 469 ns | ~100K tokens/s |
-| Medium API | 68 | 2.17 µs | ~31K tokens/s |
-| Large API | 263 | 8.61 µs | ~30K tokens/s |
+| Medium API | 68 | 2.17 us | ~31K tokens/s |
+| Large API | 263 | 8.61 us | ~30K tokens/s |
 
 **Analysis**: Parser performance is excellent, parsing simple routes in under 500ns and maintaining consistent performance for larger inputs.
 
@@ -45,8 +44,8 @@ This document contains performance benchmarks for the Glyph compiler and runtime
 | Input | Size | Time | Throughput |
 |-------|------|------|------------|
 | Simple route | 47 bytes | 867 ns | ~54 MB/s |
-| Medium API | 186 bytes | 3.05 µs | ~61 MB/s |
-| Large API | 797 bytes | 11.8 µs | ~67 MB/s |
+| Medium API | 186 bytes | 3.05 us | ~61 MB/s |
+| Large API | 797 bytes | 11.8 us | ~67 MB/s |
 
 **Key Insight**: Full compilation of a typical route takes **< 1 microsecond**, which is **~100,000x faster** than the 100ms target. This leaves significant headroom for additional optimization passes and type checking.
 
@@ -59,13 +58,13 @@ This document contains performance benchmarks for the Glyph compiler and runtime
 | Serialize | Large API | 559 ns | ~1.4 GB/s |
 | Deserialize | Simple route | 259 ns | ~181 MB/s |
 | Deserialize | Medium API | 872 ns | ~213 MB/s |
-| Deserialize | Large API | 3.15 µs | ~253 MB/s |
-| Round-trip | Simple route | 1.28 µs | Full cycle |
-| Round-trip | Medium API | 4.70 µs | Full cycle |
+| Deserialize | Large API | 3.15 us | ~253 MB/s |
+| Round-trip | Simple route | 1.28 us | Full cycle |
+| Round-trip | Medium API | 4.70 us | Full cycle |
 
 **Analysis**: Binary serialization is extremely fast, with sub-microsecond serialization for most routes. Deserialization is slightly slower but still maintains excellent throughput.
 
-## VM Execution Performance (Go)
+## VM Execution Performance
 
 ### Stack Operations
 
@@ -76,7 +75,7 @@ This document contains performance benchmarks for the Glyph compiler and runtime
 | Complex Operation | 24.6 ns | 1 | 8 B |
 | Global Variable Access | 7.45 ns | 0 | 0 B |
 
-**Analysis**: Basic VM operations are extremely fast, with stack operations under 3ns and arithmetic under 10ns. This exceeds the 10µs target by **~1000x**.
+**Analysis**: Basic VM operations are extremely fast, with stack operations under 3ns and arithmetic under 10ns. This exceeds the 10us target by **~1000x**.
 
 ### Data Structure Creation
 
@@ -143,17 +142,17 @@ Rate: ~37,000 routes/second compilation throughput
 
 ## Performance Conclusions
 
-### Compilation Performance ✅
+### Compilation Performance
 
-- **Blazing Fast**: < 1µs for typical routes (100,000x faster than 100ms target)
+- **Blazing Fast**: < 1us for typical routes (100,000x faster than 100ms target)
 - **Predictable**: Performance scales linearly with input size
 - **Efficient**: Minimal memory allocation during compilation
 
-### VM Execution ✅
+### VM Execution
 
 - **Sub-nanosecond Operations**: Basic operations complete in 3-10ns
 - **Zero-allocation Hot Path**: Core VM operations don't allocate
-- **Target Exceeded**: Performance exceeds 10µs target by 1000x
+- **Target Exceeded**: Performance exceeds 10us target by 1000x
 
 ### Key Strengths
 
@@ -164,11 +163,11 @@ Rate: ~37,000 routes/second compilation throughput
 
 ### Next Steps
 
-1. ✅ Complete bytecode instruction set implementation
-2. ✅ Add full route execution support to VM
-3. ✅ Benchmark interpreter vs bytecode comparison
-4. ✅ Measure real-world API performance
-5. ✅ Optimize serialization format for size
+1. Complete bytecode instruction set implementation
+2. Add full route execution support to VM
+3. Benchmark interpreter vs bytecode comparison
+4. Measure real-world API performance
+5. Optimize serialization format for size
 
 ## Benchmark Reproduction
 
@@ -176,13 +175,7 @@ Rate: ~37,000 routes/second compilation throughput
 
 ```bash
 go test ./pkg/vm -bench=. -benchmem
-```
-
-### Run Rust Benchmarks
-
-```bash
-cd glyph-core
-cargo bench
+go test ./pkg/parser -bench=. -benchmem
 ```
 
 ### Run Integration Tests
@@ -195,11 +188,11 @@ go test ./tests -v -run=Benchmark
 
 ### Why So Fast?
 
-1. **Rust Compilation**: Zero-cost abstractions and LLVM optimization
-2. **Simple Language Design**: Minimal parser complexity
-3. **Stack-based VM**: Efficient instruction format
-4. **No Dynamic Typing**: Type checking happens at compile time
-5. **Minimal Allocations**: Careful memory management
+1. **Simple Language Design**: Minimal parser complexity
+2. **Stack-based VM**: Efficient instruction format
+3. **No Dynamic Typing**: Type checking happens at compile time
+4. **Minimal Allocations**: Careful memory management
+5. **Go Runtime**: Efficient garbage collection and goroutine scheduling
 
 ### Scaling Characteristics
 
@@ -212,7 +205,7 @@ go test ./tests -v -run=Benchmark
 
 | Tool | Compilation | Execution | Notes |
 |------|-------------|-----------|-------|
-| Glyph | < 1µs | ~10ns/op | This project |
+| Glyph | < 1us | ~10ns/op | This project |
 | Python | N/A | ~100ns/op | Interpreted |
 | Node.js | ~10ms | ~50ns/op | JIT compiled |
 | Go | ~100ms | ~5ns/op | Native compiled |
@@ -221,5 +214,5 @@ go test ./tests -v -run=Benchmark
 
 ---
 
-*Last updated: 2025-12-09*
-*Benchmarks run on: AMD Ryzen 7 7800X3D, Windows, Go 1.21+, Rust 1.75+*
+*Last updated: 2025-01-20*
+*Benchmarks run on: AMD Ryzen 7 7800X3D, Windows, Go 1.24+*

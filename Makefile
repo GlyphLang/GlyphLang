@@ -2,13 +2,13 @@
 
 # Default target
 help:
-	@echo "GlyphLang - AI Backend Compiler (Production Ready)"
+	@echo "GlyphLang - AI Backend Compiler"
 	@echo ""
 	@echo "Available targets:"
-	@echo "  build         - Build Rust core and Go CLI"
+	@echo "  build         - Build Go CLI"
 	@echo "  build-all     - Build for all platforms (Windows, Linux, macOS)"
-	@echo "  test          - Run all tests (640+ tests)"
-	@echo "  bench         - Run all benchmarks"
+	@echo "  test          - Run all tests"
+	@echo "  bench         - Run benchmarks"
 	@echo "  clean         - Clean build artifacts"
 	@echo "  docker        - Build Docker image"
 	@echo "  deploy-k8s    - Deploy to Kubernetes"
@@ -18,24 +18,22 @@ help:
 	@echo "  lint          - Run linters"
 
 # Build targets
-build: build-rust build-go
-
-build-rust:
-	@echo "Building Rust core..."
-	cd glyph-core && cargo build --release
-
-build-go:
+build:
 	@echo "Building Go CLI..."
+	go build -o glyph ./cmd/glyph
+
+build-windows:
+	@echo "Building Go CLI for Windows..."
 	go build -o glyph.exe ./cmd/glyph
 
 # Cross-platform build
 build-all:
 	@echo "Building for all platforms..."
 	@mkdir -p dist
-	GOOS=windows GOARCH=amd64 go build -o dist/glyph-windows-amd64.exe ./cmd/glyph
-	GOOS=linux GOARCH=amd64 go build -o dist/glyph-linux-amd64 ./cmd/glyph
-	GOOS=darwin GOARCH=amd64 go build -o dist/glyph-darwin-amd64 ./cmd/glyph
-	GOOS=darwin GOARCH=arm64 go build -o dist/glyph-darwin-arm64 ./cmd/glyph
+	GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o dist/glyph-windows-amd64.exe ./cmd/glyph
+	GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/glyph-linux-amd64 ./cmd/glyph
+	GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o dist/glyph-darwin-amd64 ./cmd/glyph
+	GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/glyph-darwin-arm64 ./cmd/glyph
 	@echo "Built binaries in dist/"
 
 # Windows installer (requires Inno Setup)
@@ -52,42 +50,53 @@ installer: build-all
 	@echo "Installer created: dist/glyph-*-windows-setup.exe"
 
 # Test targets
-test: test-rust test-go
-
-test-rust:
-	@echo "Running Rust tests (84 tests)..."
-	cd glyph-core && cargo test
-
-test-go:
-	@echo "Running Go tests (408+ tests)..."
+test:
+	@echo "Running Go tests..."
 	go test ./pkg/... -v
 
+test-short:
+	@echo "Running Go tests (short mode)..."
+	go test ./pkg/... -v -short
+
+test-coverage:
+	@echo "Running tests with coverage..."
+	go test ./pkg/... -coverprofile=coverage.out -covermode=atomic
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report: coverage.html"
+
 # Benchmark targets
-bench: bench-rust bench-go
-
-bench-rust:
-	@echo "Running Rust benchmarks..."
-	cd glyph-core && cargo bench
-
-bench-go:
+bench:
 	@echo "Running Go benchmarks..."
 	go test -bench=. ./pkg/vm/ -benchmem
+
+bench-all:
+	@echo "Running all benchmarks..."
+	go test -bench=. ./pkg/... -benchmem
 
 # Clean targets
 clean:
 	@echo "Cleaning build artifacts..."
-	cd glyph-core && cargo clean
 	go clean
 	rm -f glyph glyph.exe
+	rm -rf dist/
+	rm -f coverage.out coverage.html
 
 # Docker targets
 docker:
 	@echo "Building Docker image..."
 	docker build -t glyph:latest .
 
+docker-dev:
+	@echo "Building development Docker image..."
+	docker build -f Dockerfile.dev -t glyph:dev .
+
 docker-compose-up:
 	@echo "Starting Docker Compose stack..."
 	docker-compose up -d
+
+docker-compose-down:
+	@echo "Stopping Docker Compose stack..."
+	docker-compose down
 
 # Kubernetes targets
 deploy-k8s:
@@ -99,34 +108,31 @@ examples: example-hello example-rest example-blog
 
 example-hello:
 	@echo "Running Hello World example..."
-	./glyph.exe run examples/hello-world/main.glyph
+	go run ./cmd/glyph run examples/hello-world/main.glyph
 
 example-rest:
 	@echo "Running REST API example..."
-	./glyph.exe dev examples/rest-api/main.glyph --port 8080
+	go run ./cmd/glyph dev examples/rest-api/main.glyph --port 8080
 
 example-blog:
 	@echo "Running Blog API example..."
-	./glyph.exe dev examples/blog-api-complete/main.glyph --port 8080
+	go run ./cmd/glyph dev examples/blog-api-complete/main.glyph --port 8080
 
 # Format targets
-fmt: fmt-rust fmt-go
-
-fmt-rust:
-	@echo "Formatting Rust code..."
-	cd glyph-core && cargo fmt
-
-fmt-go:
+fmt:
 	@echo "Formatting Go code..."
 	go fmt ./...
 
 # Lint targets
-lint: lint-rust lint-go
-
-lint-rust:
-	@echo "Linting Rust code..."
-	cd glyph-core && cargo clippy -- -D warnings
-
-lint-go:
+lint:
 	@echo "Linting Go code..."
 	golangci-lint run ./...
+
+# Run the application
+run:
+	@echo "Running Glyph..."
+	go run ./cmd/glyph run examples/hello-world/main.glyph
+
+dev:
+	@echo "Running Glyph in dev mode..."
+	go run ./cmd/glyph dev examples/rest-api/main.glyph --port 8080
