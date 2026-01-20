@@ -3,7 +3,19 @@ package interpreter
 import (
 	"fmt"
 	"strings"
+	"unicode"
 )
+
+// capitalizeFirst capitalizes only the first letter of a string, preserving the rest.
+// This properly handles camelCase: "countWhere" -> "CountWhere", "nextId" -> "NextId"
+func capitalizeFirst(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+	runes := []rune(s)
+	runes[0] = unicode.ToUpper(runes[0])
+	return string(runes)
+}
 
 // EvaluateExpression evaluates an expression and returns its value
 func (i *Interpreter) EvaluateExpression(expr Expr, env *Environment) (interface{}, error) {
@@ -158,6 +170,8 @@ func (i *Interpreter) evaluateLiteral(lit Literal) (interface{}, error) {
 		return l.Value, nil
 	case FloatLiteral:
 		return l.Value, nil
+	case NullLiteral:
+		return nil, nil
 	default:
 		return nil, fmt.Errorf("unsupported literal type: %T", lit)
 	}
@@ -530,11 +544,13 @@ func (i *Interpreter) evaluateFieldAccess(expr FieldAccessExpr, env *Environment
 		return nil, err
 	}
 
-	// Handle database table access (db.tablename)
-	// The db handler will have a Table() method that returns a table handler
-	// This is accessed via reflection or type assertion
-	if dbHandler, ok := obj.(interface{ Table(string) interface{} }); ok {
-		return dbHandler.Table(expr.Field), nil
+	// Handle database table access (db.tablename) using reflection
+	// Check if obj has a Table(string) method
+	if HasMethod(obj, "Table") {
+		result, callErr := CallMethod(obj, "Table", expr.Field)
+		if callErr == nil {
+			return result, nil
+		}
 	}
 
 	// Handle map field access
@@ -1098,12 +1114,34 @@ func (i *Interpreter) evaluateFunctionCall(expr FunctionCallExpr, env *Environme
 		}
 
 		// Call the method using reflection
-		return CallMethod(obj, strings.Title(methodName), args...)
+		// Capitalize first letter only, preserving camelCase (e.g., "countWhere" -> "CountWhere")
+		capitalizedName := capitalizeFirst(methodName)
+		return CallMethod(obj, capitalizedName, args...)
 	}
 
 	// Check if it's a user-defined function
 	fn, err := env.Get(expr.Name)
 	if err != nil {
+		// Function not found - check if first arg is an object with this method
+		// This handles the parser's transformation of obj.method() -> method(obj)
+		if len(expr.Args) > 0 {
+			firstArg, evalErr := i.EvaluateExpression(expr.Args[0], env)
+			if evalErr == nil && firstArg != nil {
+				methodName := capitalizeFirst(expr.Name)
+				if HasMethod(firstArg, methodName) {
+					// Evaluate remaining arguments
+					args := make([]interface{}, len(expr.Args)-1)
+					for idx, arg := range expr.Args[1:] {
+						val, argErr := i.EvaluateExpression(arg, env)
+						if argErr != nil {
+							return nil, argErr
+						}
+						args[idx] = val
+					}
+					return CallMethod(firstArg, methodName, args...)
+				}
+			}
+		}
 		return nil, fmt.Errorf("undefined function: %s", expr.Name)
 	}
 
