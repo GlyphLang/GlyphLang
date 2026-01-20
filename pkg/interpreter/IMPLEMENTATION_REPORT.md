@@ -13,7 +13,7 @@ Successfully implemented a fully functional AST interpreter for the Glyph langua
 ### Core Implementation (5 files)
 
 1. **`ast.go`** (4,245 bytes)
-   - Complete AST type definitions matching `glyph-core/src/ast.rs`
+   - Complete AST type definitions for the Glyph language
    - Includes: Module, Item, TypeDef, Route, Function, Statement, Expression, Literal, BinOp types
    - Interface-based design for type safety
 

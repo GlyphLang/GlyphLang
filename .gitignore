@@ -8,13 +8,6 @@
 *.out
 go.work
 
-# Rust
-/glyph-core/target/
-/glyph-core/target/
-target/
-/glyph-core/Cargo.lock
-Cargo.lock
-
 # Build artifacts
 /build/
 /dist/

@@ -1164,7 +1164,7 @@ func interfaceToValue(v interface{}) vm.Value {
 	}
 }
 
-// parseSource parses GLYPH source using the Rust FFI parser
+// parseSource parses GLYPH source using the Go parser
 func parseSource(source string) (*interpreter.Module, error) {
 	// Use Go parser
 	lexer := parser.NewLexer(source)

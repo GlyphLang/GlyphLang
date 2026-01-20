@@ -14,7 +14,7 @@ This interpreter executes Glyph AST nodes directly without compilation to byteco
 
 ## Files
 
-- `ast.go` - AST type definitions matching `glyph-core/src/ast.rs`
+- `ast.go` - AST type definitions for the Glyph language
 - `environment.go` - Variable scope management
 - `evaluator.go` - Expression evaluation logic
 - `executor.go` - Statement execution logic
