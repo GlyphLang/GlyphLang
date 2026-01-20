@@ -275,10 +275,15 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 
 	// Handle dependency injections
 	for _, injection := range route.Injections {
+		// Check for DatabaseType or NamedType{Name: "Database"}
+		isDB := false
 		if _, ok := injection.Type.(DatabaseType); ok {
-			if i.dbHandler != nil {
-				routeEnv.Define(injection.Name, i.dbHandler)
-			}
+			isDB = true
+		} else if named, ok := injection.Type.(NamedType); ok && named.Name == "Database" {
+			isDB = true
+		}
+		if isDB && i.dbHandler != nil {
+			routeEnv.Define(injection.Name, i.dbHandler)
 		}
 	}
 
@@ -352,10 +357,15 @@ func (i *Interpreter) ExecuteRouteSimple(route *Route, pathParams map[string]str
 
 	// Handle dependency injections
 	for _, injection := range route.Injections {
+		// Check for DatabaseType or NamedType{Name: "Database"}
+		isDB := false
 		if _, ok := injection.Type.(DatabaseType); ok {
-			if i.dbHandler != nil {
-				routeEnv.Define(injection.Name, i.dbHandler)
-			}
+			isDB = true
+		} else if named, ok := injection.Type.(NamedType); ok && named.Name == "Database" {
+			isDB = true
+		}
+		if isDB && i.dbHandler != nil {
+			routeEnv.Define(injection.Name, i.dbHandler)
 		}
 	}
 

@@ -289,11 +289,11 @@ echo -e "${NC}"
 
 echo ""
 print_info "WebSocket endpoints available at:"
-echo -e "  ${CYAN}ws://localhost:8080/chat${NC}        - Global chat"
-echo -e "  ${CYAN}ws://localhost:8080/chat/:room${NC}  - Room-based chat"
+echo -e "  ${CYAN}ws://localhost:3000/chat${NC}        - Global chat"
+echo -e "  ${CYAN}ws://localhost:3000/chat/:room${NC}  - Room-based chat"
 echo ""
 print_info "To test interactively, use wscat:"
-echo -e "  ${YELLOW}wscat -c ws://localhost:8080/chat${NC}"
+echo -e "  ${YELLOW}wscat -c ws://localhost:3000/chat${NC}"
 echo ""
 
 run_curl "Check WebSocket server status" \
