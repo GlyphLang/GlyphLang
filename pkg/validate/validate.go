@@ -160,7 +160,7 @@ func (v *Validator) validateSemantics(module *interpreter.Module, result *Valida
 	definedTypes := make(map[string]bool)
 	builtinTypes := map[string]bool{
 		"int": true, "str": true, "string": true, "bool": true,
-		"float": true, "timestamp": true, "any": true,
+		"float": true, "timestamp": true, "any": true, "object": true,
 		"List": true, "Map": true, "Result": true, "Database": true,
 	}
 
