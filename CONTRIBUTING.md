@@ -12,6 +12,7 @@ Thank you for your interest in contributing to GlyphLang! This document outlines
 - [Commit Messages](#commit-messages)
 - [Pull Requests](#pull-requests)
 - [Reporting Issues](#reporting-issues)
+- [Issue Labels](#issue-labels)
 - [Feature Requests](#feature-requests)
 - [Contributor License Agreement](#contributor-license-agreement)
 - [Code of Conduct](#code-of-conduct)
@@ -239,6 +240,90 @@ When reporting bugs, include:
 ### Security Issues
 
 For security vulnerabilities, please do NOT open a public issue. Instead, email the maintainers directly or use GitHub's private security reporting feature.
+
+## Issue Labels
+
+We use a structured labeling system to help contributors find appropriate work and to track issue status. You can filter issues by labels on the GitHub Issues page.
+
+### Finding Issues by Skill Level
+
+**New to GlyphLang?** Start with these labels:
+
+- `good-first-issue` - Issues specifically curated for newcomers. These typically have clear requirements, limited scope, and include guidance on where to start.
+- `difficulty:beginner` - Issues that require minimal familiarity with the codebase.
+
+**Ready for more?** Look for:
+
+- `difficulty:intermediate` - Issues that require familiarity with the codebase structure and conventions.
+- `help-wanted` - Issues where maintainers are actively seeking community contributions.
+
+**Experienced contributors** can tackle:
+
+- `difficulty:advanced` - Complex issues requiring deep knowledge of the system architecture.
+
+### Label Categories
+
+#### Type Labels
+
+Indicate what kind of work the issue involves:
+
+| Label | Description |
+|-------|-------------|
+| `type:bug` | Something is not working as expected |
+| `type:feature` | New functionality or capability |
+| `type:enhancement` | Improvement to existing functionality |
+| `type:refactor` | Code restructuring without behavior change |
+| `type:test` | Adding or improving tests |
+| `type:performance` | Performance improvement or optimization |
+
+#### Area Labels
+
+Indicate which part of the codebase is affected:
+
+| Label | Description |
+|-------|-------------|
+| `area:parser` | Parser and syntax analysis |
+| `area:compiler` | Compiler and code generation |
+| `area:vm` | Virtual machine |
+| `area:interpreter` | Interpreter |
+| `area:server` | Glyph server |
+| `area:lsp` | Language Server Protocol implementation |
+| `area:cli` | Command-line interface |
+| `area:database` | Database functionality |
+| `area:security` | Security features and concerns |
+| `area:docs` | Documentation |
+
+#### Priority Labels
+
+Indicate urgency:
+
+| Label | Description |
+|-------|-------------|
+| `priority:low` | Nice to have but not urgent |
+| `priority:medium` | Should be addressed in the near term |
+| `priority:high` | Important issue requiring prompt attention |
+| `priority:critical` | Must be addressed immediately |
+
+#### Status Labels
+
+Indicate current state:
+
+| Label | Description |
+|-------|-------------|
+| `status:ready` | Ready to be worked on |
+| `status:in-progress` | Currently being worked on |
+| `status:blocked` | Blocked by another issue or external factor |
+| `status:needs-info` | Requires more information from reporter |
+
+### Tips for Contributors
+
+1. **Combine filters** - Use multiple labels to find the perfect issue. For example, filter by `good-first-issue` AND `area:parser` to find beginner-friendly parser issues.
+
+2. **Check status first** - Look for `status:ready` issues that are not already assigned.
+
+3. **Comment before starting** - Leave a comment on the issue to let maintainers know you are working on it. This prevents duplicate effort.
+
+4. **Ask questions** - If an issue is unclear, add a comment asking for clarification rather than guessing.
 
 ## Feature Requests
 

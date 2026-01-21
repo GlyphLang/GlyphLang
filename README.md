@@ -595,6 +595,17 @@ GlyphLang/
 └── tests/               # Integration tests
 ```
 
+## Community and Support
+
+We welcome questions, feedback, and contributions from the community.
+
+**Get Help and Connect:**
+- [GitHub Discussions](https://github.com/GlyphLang/GlyphLang/discussions) - Ask questions, share ideas, and discuss GlyphLang
+- [GitHub Issues](https://github.com/GlyphLang/GlyphLang/issues) - Report bugs or request features
+- [Contributing Guide](CONTRIBUTING.md) - Learn how to contribute to the project
+
+Whether you are just getting started or have experience with GlyphLang, we encourage you to participate. No question is too small, and your feedback helps make GlyphLang better for everyone.
+
 ## Contributing
 
 Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
