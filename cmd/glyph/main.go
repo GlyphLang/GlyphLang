@@ -16,6 +16,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/fatih/color"
+	"github.com/fsnotify/fsnotify"
 	"github.com/glyphlang/glyph/pkg/compiler"
 	"github.com/glyphlang/glyph/pkg/config"
 	glyphcontext "github.com/glyphlang/glyph/pkg/context"
@@ -29,8 +31,6 @@ import (
 	"github.com/glyphlang/glyph/pkg/validate"
 	"github.com/glyphlang/glyph/pkg/vm"
 	"github.com/glyphlang/glyph/pkg/websocket"
-	"github.com/fatih/color"
-	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/cobra"
 )
 
@@ -646,7 +646,7 @@ func (m *hotReloadManager) startDevServerInternal() (*http.Server, error) {
 	}
 
 	// Use shared logic for route compilation/interpretation
-	useCompiler, _, wsServer, router, err := setupRoutes(module)
+	useCompiler, _, wsServer, router, err := setupRoutes(module, m.filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -910,7 +910,8 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 // setupRoutes handles the common logic of determining execution mode, compiling routes,
 // and setting up the router. Used by both startServer and startDevServerInternal.
-func setupRoutes(module *interpreter.Module, forceInterpreter ...bool) (useCompiler bool, compiledRoutes map[string][]byte, wsServer *websocket.Server, router *server.Router, err error) {
+// filePath is the path to the source file, used for resolving relative module imports.
+func setupRoutes(module *interpreter.Module, filePath string, forceInterpreter ...bool) (useCompiler bool, compiledRoutes map[string][]byte, wsServer *websocket.Server, router *server.Router, err error) {
 	useCompiler = true
 	if len(forceInterpreter) > 0 && forceInterpreter[0] {
 		useCompiler = false
@@ -989,7 +990,9 @@ func setupRoutes(module *interpreter.Module, forceInterpreter ...bool) (useCompi
 		}
 	} else {
 		// Use interpreter mode
-		if loadErr := interp.LoadModule(*module); loadErr != nil {
+		// Pass the directory of the source file for proper module resolution
+		basePath := filepath.Dir(filePath)
+		if loadErr := interp.LoadModuleWithPath(*module, basePath); loadErr != nil {
 			err = fmt.Errorf("failed to load module: %w", loadErr)
 			return
 		}
@@ -1022,7 +1025,7 @@ func startServer(filePath string, port int, forceInterpreter bool) (*http.Server
 	}
 
 	// Use shared logic for route compilation/interpretation
-	useCompiler, _, wsServer, router, err := setupRoutes(module, forceInterpreter)
+	useCompiler, _, wsServer, router, err := setupRoutes(module, filePath, forceInterpreter)
 	if err != nil {
 		return nil, err
 	}
@@ -1188,6 +1191,18 @@ func newConfiguredInterpreter() *interpreter.Interpreter {
 	interp := interpreter.NewInterpreter()
 	mockDB := database.NewMockDatabase()
 	interp.SetDatabaseHandler(mockDB)
+
+	// Set up the parse function for module resolution
+	interp.GetModuleResolver().SetParseFunc(func(source string) (*interpreter.Module, error) {
+		lexer := parser.NewLexer(source)
+		tokens, err := lexer.Tokenize()
+		if err != nil {
+			return nil, err
+		}
+		p := parser.NewParser(tokens)
+		return p.Parse()
+	})
+
 	return interp
 }
 
