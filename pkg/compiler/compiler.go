@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/server"
 	"github.com/glyphlang/glyph/pkg/vm"
 )
 
@@ -104,7 +105,7 @@ func (c *Compiler) CompileRoute(route *interpreter.Route) ([]byte, error) {
 
 	// Add route parameters to symbol table
 	// Extract params from route.Path (anything after :)
-	params := extractRouteParams(route.Path)
+	params := server.ExtractRouteParamNames(route.Path)
 	for _, param := range params {
 		nameIdx := c.addConstant(vm.StringValue{Val: param})
 		c.symbolTable.Define(param, nameIdx)
@@ -962,16 +963,16 @@ func (c *Compiler) adjustJumpTargets(headerOffset uint32) {
 func hasOperand(opcode byte) bool {
 	// Opcodes with operands (based on vm.go)
 	withOperand := map[byte]bool{
-		byte(vm.OpPush):            true,
-		byte(vm.OpLoadVar):         true,
-		byte(vm.OpStoreVar):        true,
-		byte(vm.OpJump):            true,
-		byte(vm.OpJumpIfFalse):     true,
-		byte(vm.OpJumpIfTrue):      true,
-		byte(vm.OpIterNext):        true,
-		byte(vm.OpCall):            true,
-		byte(vm.OpBuildObject):     true,
-		byte(vm.OpBuildArray):      true,
+		byte(vm.OpPush):        true,
+		byte(vm.OpLoadVar):     true,
+		byte(vm.OpStoreVar):    true,
+		byte(vm.OpJump):        true,
+		byte(vm.OpJumpIfFalse): true,
+		byte(vm.OpJumpIfTrue):  true,
+		byte(vm.OpIterNext):    true,
+		byte(vm.OpCall):        true,
+		byte(vm.OpBuildObject): true,
+		byte(vm.OpBuildArray):  true,
 	}
 	return withOperand[opcode]
 }
@@ -1013,35 +1014,6 @@ func serializeConstant(c vm.Value) []byte {
 func isReturnStatement(stmt interpreter.Statement) bool {
 	_, ok := stmt.(*interpreter.ReturnStatement)
 	return ok
-}
-
-// extractRouteParams extracts parameter names from a route path
-// e.g., "/users/:id/:action" returns ["id", "action"]
-func extractRouteParams(path string) []string {
-	params := []string{}
-	parts := []rune(path)
-
-	for i := 0; i < len(parts); i++ {
-		if parts[i] == ':' {
-			// Found a parameter, extract the name
-			paramStart := i + 1
-			paramEnd := paramStart
-
-			// Find the end of the parameter (next / or end of string)
-			for paramEnd < len(parts) && parts[paramEnd] != '/' {
-				paramEnd++
-			}
-
-			if paramEnd > paramStart {
-				paramName := string(parts[paramStart:paramEnd])
-				params = append(params, paramName)
-			}
-
-			i = paramEnd - 1 // Move to the end of this parameter
-		}
-	}
-
-	return params
 }
 
 func valuesEqual(a, b vm.Value) bool {

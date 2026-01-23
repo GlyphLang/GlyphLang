@@ -361,25 +361,6 @@ func TestIsValidIdentifierHelper(t *testing.T) {
 	}
 }
 
-// TestExtractRouteParams tests extractRouteParams helper
-func TestExtractRouteParams(t *testing.T) {
-	tests := []struct {
-		path           string
-		expectedParams []string
-	}{
-		{"/api/users", []string{}},
-		{"/api/users/:id", []string{"id"}},
-		{"/api/users/:userId/posts/:postId", []string{"userId", "postId"}},
-	}
-
-	for _, tt := range tests {
-		result := extractRouteParams(tt.path)
-		if len(result) != len(tt.expectedParams) {
-			t.Errorf("extractRouteParams(%s) returned %d params, want %d", tt.path, len(result), len(tt.expectedParams))
-		}
-	}
-}
-
 // TestFormatCronTaskHover tests formatCronTaskHover helper
 func TestFormatCronTaskHover(t *testing.T) {
 	dm := NewDocumentManager()
@@ -1196,9 +1177,9 @@ func TestExtractSuggestion(t *testing.T) {
 func TestFindFunctionCallContext(t *testing.T) {
 	// findFunctionCallContext takes (line string, col int)
 	tests := []struct {
-		name   string
-		line   string
-		col    int
+		name string
+		line string
+		col  int
 	}{
 		{"inside function call", `  $ result = hash("test",`, 20},
 		{"after opening paren", `  foo(`, 6},

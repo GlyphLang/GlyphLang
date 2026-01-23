@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -427,6 +428,7 @@ func (s *Server) GetHub() *Hub {
 
 // extractPathParams extracts parameter values from an actual path given a pattern
 // pattern: "/chat/:room" actualPath: "/chat/general" -> {"room": "general"}
+// Handles URL-encoded values by decoding them.
 func extractPathParams(pattern, actualPath string) map[string]string {
 	params := make(map[string]string)
 
@@ -440,7 +442,12 @@ func extractPathParams(pattern, actualPath string) map[string]string {
 	for i, part := range patternParts {
 		if strings.HasPrefix(part, ":") {
 			paramName := part[1:]
-			params[paramName] = actualParts[i]
+			// URL-decode the value to handle encoded characters
+			value := actualParts[i]
+			if decoded, err := url.PathUnescape(value); err == nil {
+				value = decoded
+			}
+			params[paramName] = value
 		}
 	}
 

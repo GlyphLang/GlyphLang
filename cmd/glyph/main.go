@@ -16,6 +16,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/fatih/color"
+	"github.com/fsnotify/fsnotify"
 	"github.com/glyphlang/glyph/pkg/compiler"
 	glyphcontext "github.com/glyphlang/glyph/pkg/context"
 	"github.com/glyphlang/glyph/pkg/decompiler"
@@ -27,8 +29,6 @@ import (
 	"github.com/glyphlang/glyph/pkg/validate"
 	"github.com/glyphlang/glyph/pkg/vm"
 	"github.com/glyphlang/glyph/pkg/websocket"
-	"github.com/fatih/color"
-	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/cobra"
 )
 
@@ -729,7 +729,9 @@ func (m *hotReloadManager) startDevServerInternal() (*http.Server, error) {
 	for _, item := range module.Items {
 		if wsRoute, ok := item.(*interpreter.WebSocketRoute); ok {
 			path := wsRoute.Path
-			mux.HandleFunc(path, wsServer.HandleWebSocketWithPattern(path))
+			// Convert :param to {param} for Go's http.ServeMux pattern matching
+			muxPattern := server.ConvertPatternToMuxFormat(path)
+			mux.HandleFunc(muxPattern, wsServer.HandleWebSocketWithPattern(path))
 			printInfo(fmt.Sprintf("WebSocket endpoint: ws://localhost:%d%s", m.port, path))
 		}
 	}
@@ -1090,7 +1092,9 @@ func startServerWithCompiler(filePath string, port int) (*http.Server, error) {
 	for _, item := range module.Items {
 		if wsRoute, ok := item.(*interpreter.WebSocketRoute); ok {
 			path := wsRoute.Path
-			mux.HandleFunc(path, wsServer.HandleWebSocketWithPattern(path))
+			// Convert :param to {param} for Go's http.ServeMux pattern matching
+			muxPattern := server.ConvertPatternToMuxFormat(path)
+			mux.HandleFunc(muxPattern, wsServer.HandleWebSocketWithPattern(path))
 			printInfo(fmt.Sprintf("WebSocket endpoint: ws://localhost:%d%s", port, path))
 		}
 	}

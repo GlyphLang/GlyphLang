@@ -55,10 +55,10 @@ const (
 	OpWsGetUptime     Opcode = 0xA9 // Get server uptime in seconds
 
 	// Async/await opcodes
-	OpAsync       Opcode = 0xB0 // Create async future (operand: body length)
-	OpAwait       Opcode = 0xB1 // Await a future
+	OpAsync Opcode = 0xB0 // Create async future (operand: body length)
+	OpAwait Opcode = 0xB1 // Await a future
 
-	OpHalt        Opcode = 0xFF
+	OpHalt Opcode = 0xFF
 )
 
 // BuiltinFunc represents a built-in function
@@ -89,16 +89,16 @@ type WebSocketHandler interface {
 
 // VM represents the virtual machine
 type VM struct {
-	stack     []Value
-	locals    map[string]Value
-	globals   map[string]Value
-	constants []Value
-	builtins  map[string]BuiltinFunc
-	iterators map[int]*Iterator // track iterators by ID
+	stack      []Value
+	locals     map[string]Value
+	globals    map[string]Value
+	constants  []Value
+	builtins   map[string]BuiltinFunc
+	iterators  map[int]*Iterator // track iterators by ID
 	nextIterID int
-	pc        int // program counter
-	code      []byte
-	halted    bool
+	pc         int // program counter
+	code       []byte
+	halted     bool
 
 	// WebSocket context (set when executing WebSocket handlers)
 	wsHandler WebSocketHandler
@@ -107,15 +107,15 @@ type VM struct {
 // NewVM creates a new virtual machine
 func NewVM() *VM {
 	vm := &VM{
-		stack:     make([]Value, 0, 256),
-		locals:    make(map[string]Value),
-		globals:   make(map[string]Value),
-		constants: make([]Value, 0),
-		builtins:  make(map[string]BuiltinFunc),
-		iterators: make(map[int]*Iterator),
+		stack:      make([]Value, 0, 256),
+		locals:     make(map[string]Value),
+		globals:    make(map[string]Value),
+		constants:  make([]Value, 0),
+		builtins:   make(map[string]BuiltinFunc),
+		iterators:  make(map[int]*Iterator),
 		nextIterID: 0,
-		pc:        0,
-		halted:    false,
+		pc:         0,
+		halted:     false,
 	}
 	vm.registerBuiltins()
 	return vm
@@ -1688,7 +1688,12 @@ func (vm *VM) execWsSend() error {
 
 	// Convert Value to interface{} for sending
 	data := valueToInterface(msg)
-	return vm.wsHandler.Send(data)
+	if err := vm.wsHandler.Send(data); err != nil {
+		return err
+	}
+	// Push null so POP after expression statement works correctly
+	vm.Push(NullValue{})
+	return nil
 }
 
 // execWsBroadcast broadcasts a message to all connections
@@ -1703,7 +1708,12 @@ func (vm *VM) execWsBroadcast() error {
 	}
 
 	data := valueToInterface(msg)
-	return vm.wsHandler.Broadcast(data)
+	if err := vm.wsHandler.Broadcast(data); err != nil {
+		return err
+	}
+	// Push null so POP after expression statement works correctly
+	vm.Push(NullValue{})
+	return nil
 }
 
 // execWsBroadcastRoom broadcasts a message to a specific room
@@ -1728,7 +1738,12 @@ func (vm *VM) execWsBroadcastRoom() error {
 	}
 
 	data := valueToInterface(msg)
-	return vm.wsHandler.BroadcastToRoom(room.Val, data)
+	if err := vm.wsHandler.BroadcastToRoom(room.Val, data); err != nil {
+		return err
+	}
+	// Push null so POP after expression statement works correctly
+	vm.Push(NullValue{})
+	return nil
 }
 
 // execWsJoinRoom joins a WebSocket room
@@ -1747,7 +1762,12 @@ func (vm *VM) execWsJoinRoom() error {
 		return fmt.Errorf("room name must be a string, got %T", roomVal)
 	}
 
-	return vm.wsHandler.JoinRoom(room.Val)
+	if err := vm.wsHandler.JoinRoom(room.Val); err != nil {
+		return err
+	}
+	// Push null so POP after expression statement works correctly
+	vm.Push(NullValue{})
+	return nil
 }
 
 // execWsLeaveRoom leaves a WebSocket room
@@ -1766,7 +1786,12 @@ func (vm *VM) execWsLeaveRoom() error {
 		return fmt.Errorf("room name must be a string, got %T", roomVal)
 	}
 
-	return vm.wsHandler.LeaveRoom(room.Val)
+	if err := vm.wsHandler.LeaveRoom(room.Val); err != nil {
+		return err
+	}
+	// Push null so POP after expression statement works correctly
+	vm.Push(NullValue{})
+	return nil
 }
 
 // execWsClose closes the WebSocket connection
@@ -1785,7 +1810,12 @@ func (vm *VM) execWsClose() error {
 		reason = str.Val
 	}
 
-	return vm.wsHandler.Close(reason)
+	if err := vm.wsHandler.Close(reason); err != nil {
+		return err
+	}
+	// Push null so POP after expression statement works correctly
+	vm.Push(NullValue{})
+	return nil
 }
 
 // execWsGetRooms gets the list of rooms
