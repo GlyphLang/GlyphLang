@@ -24,7 +24,7 @@ func (c *Compiler) CompileWebSocketRoute(route *interpreter.WebSocketRoute) (*Co
 
 	// Compile each event handler
 	for _, event := range route.Events {
-		bytecode, err := c.compileWebSocketEvent(event)
+		bytecode, err := c.compileWebSocketEvent(event, route.Path)
 		if err != nil {
 			return nil, fmt.Errorf("failed to compile %s handler: %w", getEventName(event.EventType), err)
 		}
@@ -45,7 +45,7 @@ func (c *Compiler) CompileWebSocketRoute(route *interpreter.WebSocketRoute) (*Co
 }
 
 // compileWebSocketEvent compiles a WebSocket event handler
-func (c *Compiler) compileWebSocketEvent(event interpreter.WebSocketEvent) ([]byte, error) {
+func (c *Compiler) compileWebSocketEvent(event interpreter.WebSocketEvent, routePath string) ([]byte, error) {
 	// Create a new compiler for this event handler
 	eventCompiler := &Compiler{
 		constants:    make([]vm.Value, 0),
@@ -70,6 +70,13 @@ func (c *Compiler) compileWebSocketEvent(event interpreter.WebSocketEvent) ([]by
 	// client - the client ID
 	clientIdx := eventCompiler.addConstant(vm.StringValue{Val: "client"})
 	eventCompiler.symbolTable.Define("client", clientIdx)
+
+	// Extract and define path parameters from route path (e.g., :room from /chat/:room)
+	params := extractRouteParams(routePath)
+	for _, param := range params {
+		nameIdx := eventCompiler.addConstant(vm.StringValue{Val: param})
+		eventCompiler.symbolTable.Define(param, nameIdx)
+	}
 
 	// Optimize event body before compilation
 	optimizedBody := c.optimizer.OptimizeStatements(event.Body)

@@ -729,7 +729,7 @@ func (m *hotReloadManager) startDevServerInternal() (*http.Server, error) {
 	for _, item := range module.Items {
 		if wsRoute, ok := item.(*interpreter.WebSocketRoute); ok {
 			path := wsRoute.Path
-			mux.HandleFunc(path, wsServer.HandleWebSocket)
+			mux.HandleFunc(path, wsServer.HandleWebSocketWithPattern(path))
 			printInfo(fmt.Sprintf("WebSocket endpoint: ws://localhost:%d%s", m.port, path))
 		}
 	}
@@ -1090,7 +1090,7 @@ func startServerWithCompiler(filePath string, port int) (*http.Server, error) {
 	for _, item := range module.Items {
 		if wsRoute, ok := item.(*interpreter.WebSocketRoute); ok {
 			path := wsRoute.Path
-			mux.HandleFunc(path, wsServer.HandleWebSocket)
+			mux.HandleFunc(path, wsServer.HandleWebSocketWithPattern(path))
 			printInfo(fmt.Sprintf("WebSocket endpoint: ws://localhost:%d%s", port, path))
 		}
 	}
@@ -1155,6 +1155,11 @@ func executeWebSocketBytecode(bytecode []byte, conn *websocket.Connection, hub *
 
 	// Set connection context variables
 	vmInstance.SetLocal("client", vm.StringValue{Val: conn.ID})
+
+	// Inject path parameters from connection (e.g., room from /chat/:room)
+	for key, value := range conn.PathParams {
+		vmInstance.SetLocal(key, vm.StringValue{Val: value})
+	}
 
 	// Set input data if message is provided
 	if msg != nil {

@@ -383,3 +383,118 @@ func TestHubBroadcastJSON(t *testing.T) {
 		t.Fatal("No message received")
 	}
 }
+
+// TestExtractPathParams tests the path parameter extraction function
+// This is part of the fix for GitHub issue #64
+func TestExtractPathParams(t *testing.T) {
+	tests := []struct {
+		name       string
+		pattern    string
+		actualPath string
+		expected   map[string]string
+	}{
+		{
+			name:       "single parameter",
+			pattern:    "/chat/:room",
+			actualPath: "/chat/general",
+			expected:   map[string]string{"room": "general"},
+		},
+		{
+			name:       "multiple parameters",
+			pattern:    "/chat/:room/:user",
+			actualPath: "/chat/general/alice",
+			expected:   map[string]string{"room": "general", "user": "alice"},
+		},
+		{
+			name:       "parameter with numbers",
+			pattern:    "/users/:id",
+			actualPath: "/users/12345",
+			expected:   map[string]string{"id": "12345"},
+		},
+		{
+			name:       "no parameters",
+			pattern:    "/static/path",
+			actualPath: "/static/path",
+			expected:   map[string]string{},
+		},
+		{
+			name:       "parameter at end",
+			pattern:    "/api/v1/items/:itemId",
+			actualPath: "/api/v1/items/abc-123",
+			expected:   map[string]string{"itemId": "abc-123"},
+		},
+		{
+			name:       "mixed static and parameters",
+			pattern:    "/org/:orgId/project/:projectId/tasks",
+			actualPath: "/org/myorg/project/proj1/tasks",
+			expected:   map[string]string{"orgId": "myorg", "projectId": "proj1"},
+		},
+		{
+			name:       "mismatched path length returns empty",
+			pattern:    "/chat/:room",
+			actualPath: "/chat/general/extra",
+			expected:   map[string]string{},
+		},
+		{
+			name:       "trailing slashes handled",
+			pattern:    "/chat/:room/",
+			actualPath: "/chat/general/",
+			expected:   map[string]string{"room": "general"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractPathParams(tt.pattern, tt.actualPath)
+
+			if len(result) != len(tt.expected) {
+				t.Errorf("Expected %d params, got %d", len(tt.expected), len(result))
+			}
+
+			for key, expectedValue := range tt.expected {
+				if actualValue, ok := result[key]; !ok {
+					t.Errorf("Expected param '%s' not found", key)
+				} else if actualValue != expectedValue {
+					t.Errorf("Param '%s': expected '%s', got '%s'", key, expectedValue, actualValue)
+				}
+			}
+		})
+	}
+}
+
+// TestHandleWebSocketWithPattern tests that path parameters are extracted during WebSocket upgrade
+func TestHandleWebSocketWithPattern(t *testing.T) {
+	t.Run("handler extracts params from URL", func(t *testing.T) {
+		hub := NewHub()
+		go hub.Run()
+		defer hub.Shutdown()
+
+		// Verify extractPathParams works correctly
+		params := extractPathParams("/chat/:room", "/chat/testroom")
+		assert.Equal(t, "testroom", params["room"])
+	})
+
+	t.Run("handler returns http.HandlerFunc", func(t *testing.T) {
+		server := NewServer()
+		defer server.Shutdown()
+
+		handler := server.HandleWebSocketWithPattern("/chat/:room")
+		assert.NotNil(t, handler)
+	})
+}
+
+// TestConnectionPathParamsInitialized tests that PathParams is properly initialized
+func TestConnectionPathParamsInitialized(t *testing.T) {
+	hub := NewHub()
+	go hub.Run()
+	defer hub.Shutdown()
+
+	conn := NewConnection("test-id", nil, hub)
+
+	// Verify PathParams is initialized and not nil
+	assert.NotNil(t, conn.PathParams)
+
+	// Verify we can set and get path params
+	conn.PathParams["room"] = "general"
+	assert.Equal(t, "general", conn.PathParams["room"])
+}

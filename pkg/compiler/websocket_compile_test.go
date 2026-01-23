@@ -870,3 +870,208 @@ func TestWebSocketRouteCompilationPreservesPath(t *testing.T) {
 		})
 	}
 }
+
+// TestWebSocketRouteWithPathParams tests that path parameters are available in event handlers
+// This is the fix for GitHub issue #64
+func TestWebSocketRouteWithPathParams(t *testing.T) {
+	tests := []struct {
+		name        string
+		route       *interpreter.WebSocketRoute
+		expectError bool
+	}{
+		{
+			name: "single path parameter used in connect handler",
+			route: &interpreter.WebSocketRoute{
+				Path: "/chat/:room",
+				Events: []interpreter.WebSocketEvent{
+					{
+						EventType: interpreter.WSEventConnect,
+						Body: []interpreter.Statement{
+							// ws.join(room) - uses the path parameter 'room'
+							&interpreter.ExpressionStatement{
+								Expr: &interpreter.FunctionCallExpr{
+									Name: "ws.join",
+									Args: []interpreter.Expr{
+										&interpreter.VariableExpr{Name: "room"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "single path parameter used in message handler",
+			route: &interpreter.WebSocketRoute{
+				Path: "/chat/:room",
+				Events: []interpreter.WebSocketEvent{
+					{
+						EventType: interpreter.WSEventMessage,
+						Body: []interpreter.Statement{
+							// ws.broadcast_to_room(room, input)
+							&interpreter.ExpressionStatement{
+								Expr: &interpreter.FunctionCallExpr{
+									Name: "ws.broadcast_to_room",
+									Args: []interpreter.Expr{
+										&interpreter.VariableExpr{Name: "room"},
+										&interpreter.VariableExpr{Name: "input"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "multiple path parameters",
+			route: &interpreter.WebSocketRoute{
+				Path: "/chat/:room/:user",
+				Events: []interpreter.WebSocketEvent{
+					{
+						EventType: interpreter.WSEventConnect,
+						Body: []interpreter.Statement{
+							// Use both 'room' and 'user' parameters
+							&interpreter.AssignStatement{
+								Target: "roomName",
+								Value:  &interpreter.VariableExpr{Name: "room"},
+							},
+							&interpreter.AssignStatement{
+								Target: "userName",
+								Value:  &interpreter.VariableExpr{Name: "user"},
+							},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "path parameter used in all event types",
+			route: &interpreter.WebSocketRoute{
+				Path: "/notifications/:channel",
+				Events: []interpreter.WebSocketEvent{
+					{
+						EventType: interpreter.WSEventConnect,
+						Body: []interpreter.Statement{
+							&interpreter.ExpressionStatement{
+								Expr: &interpreter.FunctionCallExpr{
+									Name: "ws.join",
+									Args: []interpreter.Expr{
+										&interpreter.VariableExpr{Name: "channel"},
+									},
+								},
+							},
+						},
+					},
+					{
+						EventType: interpreter.WSEventMessage,
+						Body: []interpreter.Statement{
+							&interpreter.ExpressionStatement{
+								Expr: &interpreter.FunctionCallExpr{
+									Name: "ws.broadcast_to_room",
+									Args: []interpreter.Expr{
+										&interpreter.VariableExpr{Name: "channel"},
+										&interpreter.VariableExpr{Name: "input"},
+									},
+								},
+							},
+						},
+					},
+					{
+						EventType: interpreter.WSEventDisconnect,
+						Body: []interpreter.Statement{
+							&interpreter.ExpressionStatement{
+								Expr: &interpreter.FunctionCallExpr{
+									Name: "ws.leave",
+									Args: []interpreter.Expr{
+										&interpreter.VariableExpr{Name: "channel"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := NewCompiler()
+			compiled, err := c.CompileWebSocketRoute(tt.route)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected error, but got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("CompileWebSocketRoute() error: %v (path parameters should be accessible)", err)
+			}
+
+			// Verify bytecode was generated for the handlers
+			if compiled.Path != tt.route.Path {
+				t.Errorf("Expected path '%s', got '%s'", tt.route.Path, compiled.Path)
+			}
+
+			// Check that we have bytecode for the event handlers
+			for _, event := range tt.route.Events {
+				switch event.EventType {
+				case interpreter.WSEventConnect:
+					if len(compiled.OnConnect) == 0 {
+						t.Error("Expected OnConnect bytecode to be generated")
+					}
+				case interpreter.WSEventMessage:
+					if len(compiled.OnMessage) == 0 {
+						t.Error("Expected OnMessage bytecode to be generated")
+					}
+				case interpreter.WSEventDisconnect:
+					if len(compiled.OnDisconnect) == 0 {
+						t.Error("Expected OnDisconnect bytecode to be generated")
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestWebSocketRouteWithUndefinedVariable tests that undefined variables still cause errors
+func TestWebSocketRouteWithUndefinedVariable(t *testing.T) {
+	route := &interpreter.WebSocketRoute{
+		Path: "/chat/:room",
+		Events: []interpreter.WebSocketEvent{
+			{
+				EventType: interpreter.WSEventConnect,
+				Body: []interpreter.Statement{
+					// Use 'undefinedVar' which is NOT a path parameter
+					&interpreter.ExpressionStatement{
+						Expr: &interpreter.FunctionCallExpr{
+							Name: "ws.join",
+							Args: []interpreter.Expr{
+								&interpreter.VariableExpr{Name: "undefinedVar"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	_, err := c.CompileWebSocketRoute(route)
+
+	if err == nil {
+		t.Error("Expected error for undefined variable, but compilation succeeded")
+	}
+
+	if err != nil && !strings.Contains(err.Error(), "undefined") {
+		t.Errorf("Expected 'undefined' in error message, got: %v", err)
+	}
+}

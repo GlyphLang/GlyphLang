@@ -37,6 +37,9 @@ type Connection struct {
 	// Mutex for protecting rooms
 	roomsMu sync.RWMutex
 
+	// Path parameters extracted from the WebSocket route pattern (e.g., :room from /chat/:room)
+	PathParams map[string]string
+
 	// Heartbeat tracking
 	missedPongs    int
 	lastPongTime   time.Time
@@ -61,6 +64,7 @@ func NewConnection(id string, conn *websocket.Conn, hub *Hub) *Connection {
 		hub:          hub,
 		Data:         make(map[string]interface{}),
 		rooms:        make(map[string]bool),
+		PathParams:   make(map[string]string),
 		lastPongTime: time.Now(),
 		messageQueue: make([][]byte, 0),
 	}

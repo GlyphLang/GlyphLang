@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -422,6 +423,58 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 // GetHub returns the hub
 func (s *Server) GetHub() *Hub {
 	return s.hub
+}
+
+// extractPathParams extracts parameter values from an actual path given a pattern
+// pattern: "/chat/:room" actualPath: "/chat/general" -> {"room": "general"}
+func extractPathParams(pattern, actualPath string) map[string]string {
+	params := make(map[string]string)
+
+	patternParts := strings.Split(strings.Trim(pattern, "/"), "/")
+	actualParts := strings.Split(strings.Trim(actualPath, "/"), "/")
+
+	if len(patternParts) != len(actualParts) {
+		return params
+	}
+
+	for i, part := range patternParts {
+		if strings.HasPrefix(part, ":") {
+			paramName := part[1:]
+			params[paramName] = actualParts[i]
+		}
+	}
+
+	return params
+}
+
+// HandleWebSocketWithPattern handles WebSocket upgrade requests with path parameter extraction
+func (s *Server) HandleWebSocketWithPattern(pattern string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		conn, err := s.upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Printf("[WS] Upgrade error: %v", err)
+			return
+		}
+
+		// Generate unique connection ID
+		id := generateConnectionID()
+
+		// Create connection wrapper
+		wsConn := NewConnection(id, conn, s.hub)
+
+		// Extract and store path parameters from the request URL
+		wsConn.PathParams = extractPathParams(pattern, r.URL.Path)
+
+		// Register connection
+		s.hub.register <- wsConn
+
+		// Track connection goroutines for graceful shutdown
+		s.hub.connWg.Add(2)
+
+		// Start read/write pumps
+		go wsConn.WritePump()
+		go wsConn.ReadPump()
+	}
 }
 
 // Shutdown gracefully shuts down the server
