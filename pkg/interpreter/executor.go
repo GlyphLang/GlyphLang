@@ -76,15 +76,22 @@ func (i *Interpreter) executeStatements(stmts []Statement, env *Environment) (in
 
 // executeAssign executes a variable assignment
 func (i *Interpreter) executeAssign(stmt AssignStatement, env *Environment) (interface{}, error) {
+	// Check for redeclaration in current scope (issue #70)
+	// Variables declared with $ cannot be redeclared in the same scope
+	if env.HasLocal(stmt.Target) {
+		return nil, fmt.Errorf("cannot redeclare variable '%s' in the same scope", stmt.Target)
+	}
+
 	value, err := i.EvaluateExpression(stmt.Value, env)
 	if err != nil {
 		return nil, err
 	}
 
-	// Try to set existing variable first, otherwise define new one in current scope
-	err = env.Set(stmt.Target, value)
-	if err != nil {
-		// Variable doesn't exist, define it in current scope
+	// If variable exists in any scope (including parent), update it
+	// Otherwise, define a new variable in current scope
+	if env.Has(stmt.Target) {
+		env.Set(stmt.Target, value)
+	} else {
 		env.Define(stmt.Target, value)
 	}
 	return value, nil
@@ -154,12 +161,10 @@ func (i *Interpreter) executeIf(stmt IfStatement, env *Environment) (interface{}
 func (i *Interpreter) executeWhile(stmt WhileStatement, env *Environment) (interface{}, error) {
 	var result interface{}
 
-	// Create a new environment for the loop
-	loopEnv := NewChildEnvironment(env)
-
 	// Execute the loop until the condition is false
 	for {
-		condition, err := i.EvaluateExpression(stmt.Condition, loopEnv)
+		// Evaluate condition in parent environment (can access loop variables from previous iterations)
+		condition, err := i.EvaluateExpression(stmt.Condition, env)
 		if err != nil {
 			return nil, err
 		}
@@ -174,6 +179,9 @@ func (i *Interpreter) executeWhile(stmt WhileStatement, env *Environment) (inter
 		if !condBool {
 			break
 		}
+
+		// Create a fresh environment for each iteration
+		loopEnv := NewChildEnvironment(env)
 
 		// Execute loop body
 		result, err = i.executeStatements(stmt.Body, loopEnv)
@@ -201,12 +209,12 @@ func (i *Interpreter) executeFor(stmt ForStatement, env *Environment) (interface
 
 	// Check if iterable is an array (slice)
 	if arr, ok := iterable.([]interface{}); ok {
-		// Create a single child environment for the loop
-		loopEnv := NewChildEnvironment(env)
-		
 		// Iterate over array
 		for index, element := range arr {
-			// Update the loop variables for this iteration
+			// Create a fresh environment for each iteration
+			loopEnv := NewChildEnvironment(env)
+
+			// Define the loop variables for this iteration
 			if stmt.KeyVar != "" {
 				loopEnv.Define(stmt.KeyVar, int64(index))
 			}
@@ -223,12 +231,12 @@ func (i *Interpreter) executeFor(stmt ForStatement, env *Environment) (interface
 			}
 		}
 	} else if obj, ok := iterable.(map[string]interface{}); ok {
-		// Create a single child environment for the loop
-		loopEnv := NewChildEnvironment(env)
-		
 		// Iterate over object/map
 		for key, value := range obj {
-			// Update the loop variables for this iteration
+			// Create a fresh environment for each iteration
+			loopEnv := NewChildEnvironment(env)
+
+			// Define the loop variables for this iteration
 			if stmt.KeyVar != "" {
 				loopEnv.Define(stmt.KeyVar, key)
 			} else {

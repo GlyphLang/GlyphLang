@@ -450,6 +450,55 @@ func TestExecuteAssign(t *testing.T) {
 	assert.Equal(t, int64(42), val)
 }
 
+func TestExecuteAssign_RedeclarationError(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	// First assignment should succeed
+	stmt1 := AssignStatement{
+		Target: "x",
+		Value:  LiteralExpr{Value: IntLiteral{Value: 1}},
+	}
+	_, err := interp.ExecuteStatement(stmt1, env)
+	require.NoError(t, err)
+
+	// Second assignment to same variable in same scope should fail
+	stmt2 := AssignStatement{
+		Target: "x",
+		Value:  LiteralExpr{Value: IntLiteral{Value: 2}},
+	}
+	_, err = interp.ExecuteStatement(stmt2, env)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot redeclare variable 'x' in the same scope")
+}
+
+func TestExecuteAssign_UpdateParentScope(t *testing.T) {
+	interp := NewInterpreter()
+	parentEnv := NewEnvironment()
+
+	// Define x in parent scope
+	parentEnv.Define("x", int64(0))
+
+	// Create child scope
+	childEnv := NewChildEnvironment(parentEnv)
+
+	// Assignment in child scope should update parent's x (not create new)
+	stmt := AssignStatement{
+		Target: "x",
+		Value:  LiteralExpr{Value: IntLiteral{Value: 42}},
+	}
+	_, err := interp.ExecuteStatement(stmt, childEnv)
+	require.NoError(t, err)
+
+	// Verify parent's x was updated
+	val, err := parentEnv.Get("x")
+	require.NoError(t, err)
+	assert.Equal(t, int64(42), val)
+
+	// Verify x is not defined locally in child
+	assert.False(t, childEnv.HasLocal("x"))
+}
+
 func TestExecuteReturn(t *testing.T) {
 	interp := NewInterpreter()
 	env := NewEnvironment()
