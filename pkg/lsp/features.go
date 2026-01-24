@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/server"
 )
 
 // GetDiagnostics returns diagnostics for a document
@@ -601,7 +602,7 @@ func GetReferences(doc *Document, pos Position, includeDeclaration bool) []Locat
 		switch v := item.(type) {
 		case *interpreter.Route:
 			// Check if the word is a route parameter
-			params := extractRouteParams(v.Path)
+			params := server.ExtractRouteParamNames(v.Path)
 			for _, param := range params {
 				if param == word && includeDeclaration {
 					// This is the declaration in the route path
@@ -787,32 +788,6 @@ func findReferencesInExpression(expr interpreter.Expr, symbol string, uri string
 	return locations
 }
 
-// extractRouteParams extracts parameter names from a route path
-func extractRouteParams(path string) []string {
-	params := []string{}
-	parts := []rune(path)
-
-	for i := 0; i < len(parts); i++ {
-		if parts[i] == ':' {
-			paramStart := i + 1
-			paramEnd := paramStart
-
-			for paramEnd < len(parts) && parts[paramEnd] != '/' {
-				paramEnd++
-			}
-
-			if paramEnd > paramStart {
-				paramName := string(parts[paramStart:paramEnd])
-				params = append(params, paramName)
-			}
-
-			i = paramEnd - 1
-		}
-	}
-
-	return params
-}
-
 // Helper functions
 
 // checkTypes performs basic type checking and returns diagnostics
@@ -953,12 +928,12 @@ func checkTypes(module *interpreter.Module) []Diagnostic {
 // getKeywordInfo returns information about a keyword
 func getKeywordInfo(keyword string) string {
 	keywordDocs := map[string]string{
-		"route":  "**route** - Defines an HTTP route handler (explicit form)\n\nExample:\n```glyph\n@ route /api/users [GET]\n  > {users: []}\n```",
-		"GET":    "**GET** - HTTP GET method for retrieving resources\n\nExample:\n```glyph\n@ GET /api/users\n  > {users: []}\n```",
-		"POST":   "**POST** - HTTP POST method for creating resources\n\nExample:\n```glyph\n@ POST /api/users\n  > {created: true}\n```",
-		"PUT":    "**PUT** - HTTP PUT method for replacing resources\n\nExample:\n```glyph\n@ PUT /api/users/:id\n  > {updated: true}\n```",
-		"DELETE": "**DELETE** - HTTP DELETE method for removing resources\n\nExample:\n```glyph\n@ DELETE /api/users/:id\n  > {deleted: true}\n```",
-		"PATCH":  "**PATCH** - HTTP PATCH method for partial updates\n\nExample:\n```glyph\n@ PATCH /api/users/:id\n  > {patched: true}\n```",
+		"route":   "**route** - Defines an HTTP route handler (explicit form)\n\nExample:\n```glyph\n@ route /api/users [GET]\n  > {users: []}\n```",
+		"GET":     "**GET** - HTTP GET method for retrieving resources\n\nExample:\n```glyph\n@ GET /api/users\n  > {users: []}\n```",
+		"POST":    "**POST** - HTTP POST method for creating resources\n\nExample:\n```glyph\n@ POST /api/users\n  > {created: true}\n```",
+		"PUT":     "**PUT** - HTTP PUT method for replacing resources\n\nExample:\n```glyph\n@ PUT /api/users/:id\n  > {updated: true}\n```",
+		"DELETE":  "**DELETE** - HTTP DELETE method for removing resources\n\nExample:\n```glyph\n@ DELETE /api/users/:id\n  > {deleted: true}\n```",
+		"PATCH":   "**PATCH** - HTTP PATCH method for partial updates\n\nExample:\n```glyph\n@ PATCH /api/users/:id\n  > {patched: true}\n```",
 		"command": "**command** - Defines a CLI command\n\nExample:\n```glyph\n! command hello name: str!\n  > \"Hello \" + name\n```",
 		"cron":    "**cron** - Defines a scheduled task\n\nExample:\n```glyph\n* cron \"0 0 * * *\"\n  > \"Daily task executed\"\n```",
 		"event":   "**event** - Defines an event handler\n\nExample:\n```glyph\n~ event \"user.created\"\n  > \"Handle user creation\"\n```",
@@ -1364,7 +1339,7 @@ func isRenameableSymbol(doc *Document, word string) bool {
 			}
 		}
 		if route, ok := item.(*interpreter.Route); ok {
-			params := extractRouteParams(route.Path)
+			params := server.ExtractRouteParamNames(route.Path)
 			for _, param := range params {
 				if param == word {
 					return true
@@ -1445,8 +1420,8 @@ func generateQuickFixes(doc *Document, diag Diagnostic) []CodeAction {
 		if typeName != "" {
 			// Suggest creating the type
 			fixes = append(fixes, CodeAction{
-				Title: fmt.Sprintf("Create type '%s'", typeName),
-				Kind:  CodeActionKindQuickFix,
+				Title:       fmt.Sprintf("Create type '%s'", typeName),
+				Kind:        CodeActionKindQuickFix,
 				Diagnostics: []Diagnostic{diag},
 				Edit: &WorkspaceEdit{
 					Changes: map[string][]TextEdit{
@@ -1468,8 +1443,8 @@ func generateQuickFixes(doc *Document, diag Diagnostic) []CodeAction {
 	// Check for missing route return
 	if strings.Contains(msg, "missing return") || strings.Contains(msg, "no return") {
 		fixes = append(fixes, CodeAction{
-			Title: "Add return statement",
-			Kind:  CodeActionKindQuickFix,
+			Title:       "Add return statement",
+			Kind:        CodeActionKindQuickFix,
 			Diagnostics: []Diagnostic{diag},
 			Edit: &WorkspaceEdit{
 				Changes: map[string][]TextEdit{
@@ -1492,8 +1467,8 @@ func generateQuickFixes(doc *Document, diag Diagnostic) []CodeAction {
 		suggestion := extractSuggestion(msg)
 		if suggestion != "" {
 			fixes = append(fixes, CodeAction{
-				Title: fmt.Sprintf("Change to '%s'", suggestion),
-				Kind:  CodeActionKindQuickFix,
+				Title:       fmt.Sprintf("Change to '%s'", suggestion),
+				Kind:        CodeActionKindQuickFix,
 				IsPreferred: true,
 				Diagnostics: []Diagnostic{diag},
 				Edit: &WorkspaceEdit{

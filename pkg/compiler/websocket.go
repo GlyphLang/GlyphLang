@@ -4,16 +4,17 @@ import (
 	"fmt"
 
 	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/server"
 	"github.com/glyphlang/glyph/pkg/vm"
 )
 
 // CompiledWebSocketRoute represents a compiled WebSocket route
 type CompiledWebSocketRoute struct {
-	Path          string
-	OnConnect     []byte // Bytecode for connect handler
-	OnMessage     []byte // Bytecode for message handler
-	OnDisconnect  []byte // Bytecode for disconnect handler
-	OnError       []byte // Bytecode for error handler
+	Path         string
+	OnConnect    []byte // Bytecode for connect handler
+	OnMessage    []byte // Bytecode for message handler
+	OnDisconnect []byte // Bytecode for disconnect handler
+	OnError      []byte // Bytecode for error handler
 }
 
 // CompileWebSocketRoute compiles a WebSocket route to bytecode
@@ -24,7 +25,7 @@ func (c *Compiler) CompileWebSocketRoute(route *interpreter.WebSocketRoute) (*Co
 
 	// Compile each event handler
 	for _, event := range route.Events {
-		bytecode, err := c.compileWebSocketEvent(event)
+		bytecode, err := c.compileWebSocketEvent(event, route.Path)
 		if err != nil {
 			return nil, fmt.Errorf("failed to compile %s handler: %w", getEventName(event.EventType), err)
 		}
@@ -45,7 +46,7 @@ func (c *Compiler) CompileWebSocketRoute(route *interpreter.WebSocketRoute) (*Co
 }
 
 // compileWebSocketEvent compiles a WebSocket event handler
-func (c *Compiler) compileWebSocketEvent(event interpreter.WebSocketEvent) ([]byte, error) {
+func (c *Compiler) compileWebSocketEvent(event interpreter.WebSocketEvent, routePath string) ([]byte, error) {
 	// Create a new compiler for this event handler
 	eventCompiler := &Compiler{
 		constants:    make([]vm.Value, 0),
@@ -70,6 +71,13 @@ func (c *Compiler) compileWebSocketEvent(event interpreter.WebSocketEvent) ([]by
 	// client - the client ID
 	clientIdx := eventCompiler.addConstant(vm.StringValue{Val: "client"})
 	eventCompiler.symbolTable.Define("client", clientIdx)
+
+	// Extract and define path parameters from route path (e.g., :room from /chat/:room)
+	params := server.ExtractRouteParamNames(routePath)
+	for _, param := range params {
+		nameIdx := eventCompiler.addConstant(vm.StringValue{Val: param})
+		eventCompiler.symbolTable.Define(param, nameIdx)
+	}
 
 	// Optimize event body before compilation
 	optimizedBody := c.optimizer.OptimizeStatements(event.Body)
@@ -327,7 +335,7 @@ func (c *Compiler) CompileModule(module *interpreter.Module) (*CompiledModule, e
 
 // CompiledModule represents a fully compiled Glyph module
 type CompiledModule struct {
-	Routes          map[string][]byte                    // HTTP routes: "METHOD /path" -> bytecode
-	WebSocketRoutes map[string]*CompiledWebSocketRoute  // WS routes: "/path" -> compiled handlers
-	TypeDefs        map[string]*interpreter.TypeDef     // Type definitions
+	Routes          map[string][]byte                  // HTTP routes: "METHOD /path" -> bytecode
+	WebSocketRoutes map[string]*CompiledWebSocketRoute // WS routes: "/path" -> compiled handlers
+	TypeDefs        map[string]*interpreter.TypeDef    // Type definitions
 }

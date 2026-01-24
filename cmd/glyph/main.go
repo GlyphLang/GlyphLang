@@ -667,7 +667,9 @@ func (m *hotReloadManager) startDevServerInternal() (*http.Server, error) {
 	for _, item := range module.Items {
 		if wsRoute, ok := item.(*interpreter.WebSocketRoute); ok {
 			path := wsRoute.Path
-			mux.HandleFunc(path, wsServer.HandleWebSocket)
+			// Convert :param to {param} for Go's http.ServeMux pattern matching
+			muxPattern := server.ConvertPatternToMuxFormat(path)
+			mux.HandleFunc(muxPattern, wsServer.HandleWebSocketWithPattern(path))
 			printInfo(fmt.Sprintf("WebSocket endpoint: ws://localhost:%d%s", m.port, path))
 		}
 	}
@@ -1038,7 +1040,9 @@ func startServer(filePath string, port int, forceInterpreter bool) (*http.Server
 	for _, item := range module.Items {
 		if wsRoute, ok := item.(*interpreter.WebSocketRoute); ok {
 			path := wsRoute.Path
-			mux.HandleFunc(path, wsServer.HandleWebSocket)
+			// Convert :param to {param} for Go's http.ServeMux pattern matching
+			muxPattern := server.ConvertPatternToMuxFormat(path)
+			mux.HandleFunc(muxPattern, wsServer.HandleWebSocketWithPattern(path))
 			printInfo(fmt.Sprintf("WebSocket endpoint: ws://localhost:%d%s", port, path))
 		}
 	}
@@ -1071,26 +1075,34 @@ func startServer(filePath string, port int, forceInterpreter bool) (*http.Server
 func registerCompiledWebSocketRoute(wsServer *websocket.Server, path string, compiled *compiler.CompiledWebSocketRoute) {
 	hub := wsServer.GetHub()
 
-	// Register connect handler
+	// Register connect handler for this specific route
 	if len(compiled.OnConnect) > 0 {
-		hub.OnConnect(func(conn *websocket.Connection) error {
+		hub.OnConnectForRoute(path, func(conn *websocket.Connection) error {
 			return executeWebSocketBytecode(compiled.OnConnect, conn, hub, nil)
 		})
 	}
 
-	// Register disconnect handler
+	// Register disconnect handler for this specific route
 	if len(compiled.OnDisconnect) > 0 {
-		hub.OnDisconnect(func(conn *websocket.Connection) error {
+		hub.OnDisconnectForRoute(path, func(conn *websocket.Connection) error {
 			return executeWebSocketBytecode(compiled.OnDisconnect, conn, hub, nil)
 		})
 	}
 
-	// Register message handler
+	// Register message handler with route filtering
+	// Message handlers are global, so we filter by route pattern at execution time
 	if len(compiled.OnMessage) > 0 {
+		routePath := path // Capture for closure
 		hub.OnMessage(websocket.MessageTypeJSON, func(ctx *websocket.MessageContext) error {
+			if ctx.Conn.RoutePattern() != routePath {
+				return nil // Skip - not for this route
+			}
 			return executeWebSocketBytecode(compiled.OnMessage, ctx.Conn, hub, ctx.Message)
 		})
 		hub.OnMessage(websocket.MessageTypeText, func(ctx *websocket.MessageContext) error {
+			if ctx.Conn.RoutePattern() != routePath {
+				return nil // Skip - not for this route
+			}
 			return executeWebSocketBytecode(compiled.OnMessage, ctx.Conn, hub, ctx.Message)
 		})
 	}
@@ -1107,6 +1119,11 @@ func executeWebSocketBytecode(bytecode []byte, conn *websocket.Connection, hub *
 
 	// Set connection context variables
 	vmInstance.SetLocal("client", vm.StringValue{Val: conn.ID})
+
+	// Inject path parameters from connection (e.g., room from /chat/:room)
+	for key, value := range conn.PathParams {
+		vmInstance.SetLocal(key, vm.StringValue{Val: value})
+	}
 
 	// Set input data if message is provided
 	if msg != nil {
