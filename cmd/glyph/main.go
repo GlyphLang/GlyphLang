@@ -19,7 +19,9 @@ import (
 	"github.com/fatih/color"
 	"github.com/fsnotify/fsnotify"
 	"github.com/glyphlang/glyph/pkg/compiler"
+	"github.com/glyphlang/glyph/pkg/config"
 	glyphcontext "github.com/glyphlang/glyph/pkg/context"
+	"github.com/glyphlang/glyph/pkg/database"
 	"github.com/glyphlang/glyph/pkg/decompiler"
 	"github.com/glyphlang/glyph/pkg/formatter"
 	"github.com/glyphlang/glyph/pkg/interpreter"
@@ -32,7 +34,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var version = "0.3.1"
+var version = "0.3.4"
 
 func main() {
 	// Check if invoked with just a .glyph file (e.g., double-click on Windows)
@@ -84,7 +86,7 @@ to rapidly build high-performance, secure backend applications.`,
 		Args:  cobra.ExactArgs(1),
 		RunE:  runRun,
 	}
-	runCmd.Flags().Uint16P("port", "p", 3000, "Port to listen on")
+	runCmd.Flags().Uint16P("port", "p", uint16(config.DefaultPort), "Port to listen on")
 	runCmd.Flags().Bool("bytecode", false, "Execute bytecode (.glyphc) file")
 	runCmd.Flags().Bool("interpret", false, "Use tree-walking interpreter instead of compiler (fallback mode)")
 
@@ -95,7 +97,7 @@ to rapidly build high-performance, secure backend applications.`,
 		Args:  cobra.ExactArgs(1),
 		RunE:  runDev,
 	}
-	devCmd.Flags().Uint16P("port", "p", 3000, "Port to listen on")
+	devCmd.Flags().Uint16P("port", "p", uint16(config.DefaultPort), "Port to listen on")
 	devCmd.Flags().BoolP("watch", "w", true, "Watch for file changes")
 	devCmd.Flags().BoolP("open", "o", false, "Open browser automatically")
 
@@ -454,33 +456,14 @@ func runRun(cmd *cobra.Command, args []string) error {
 		printInfo(fmt.Sprintf("Execution time: %s", execTime))
 		printInfo(fmt.Sprintf("Result: %v", result))
 
-		// For now, just print the result
-		// TODO: Implement server mode for bytecode execution
 		return nil
 	}
 
-	// Running source file
-	if useInterpreter {
-		// Use tree-walking interpreter (fallback mode)
-		printInfo(fmt.Sprintf("Running %s with interpreter...", filePath))
-		srv, err := startServerWithInterpreter(filePath, int(port))
-		if err != nil {
-			return err
-		}
-		return waitForShutdown(srv)
-	}
-
-	// Default: compile and run with VM
-	printInfo(fmt.Sprintf("Compiling and running %s...", filePath))
-	srv, err := startServerWithCompiler(filePath, int(port))
+	// Running source file - use shared server startup logic
+	printInfo(fmt.Sprintf("Starting server for %s...", filePath))
+	srv, err := startServer(filePath, int(port), useInterpreter)
 	if err != nil {
-		// Fall back to interpreter on compilation error
-		printWarning(fmt.Sprintf("Compilation failed: %v", err))
-		printWarning("Falling back to interpreter mode...")
-		srv, err = startServerWithInterpreter(filePath, int(port))
-		if err != nil {
-			return err
-		}
+		return err
 	}
 
 	// Setup graceful shutdown
@@ -662,55 +645,10 @@ func (m *hotReloadManager) startDevServerInternal() (*http.Server, error) {
 		return nil, fmt.Errorf("parse error: %w", err)
 	}
 
-	// Try to compile routes, fall back to interpreter if needed
-	useCompiler := true
-	c := compiler.NewCompilerWithOptLevel(compiler.OptBasic)
-	compiledRoutes := make(map[string][]byte)
-
-	for _, item := range module.Items {
-		if route, ok := item.(*interpreter.Route); ok {
-			bytecode, err := c.CompileRoute(route)
-			if err != nil {
-				printWarning(fmt.Sprintf("Compilation failed for %s: %v", route.Path, err))
-				useCompiler = false
-				break
-			}
-			compiledRoutes[route.Path] = bytecode
-		}
-	}
-
-	// Create WebSocket server
-	wsServer := websocket.NewServer()
-
-	// Create router and register routes
-	router := server.NewRouter()
-	interp := interpreter.NewInterpreter()
-
-	if useCompiler {
-		for _, item := range module.Items {
-			if route, ok := item.(*interpreter.Route); ok {
-				bytecode := compiledRoutes[route.Path]
-				err := registerCompiledRoute(router, route, bytecode, wsServer.GetHub())
-				if err != nil {
-					printWarning(fmt.Sprintf("Failed to register route %s: %v", route.Path, err))
-				} else {
-					printInfo(fmt.Sprintf("Compiled route: %s %s", route.Method, route.Path))
-				}
-			}
-		}
-	} else {
-		printWarning("Falling back to interpreter mode...")
-		if err := interp.LoadModule(*module); err != nil {
-			return nil, fmt.Errorf("failed to load module: %w", err)
-		}
-		for _, item := range module.Items {
-			if route, ok := item.(*interpreter.Route); ok {
-				err := registerRoute(router, route, interp)
-				if err != nil {
-					printWarning(fmt.Sprintf("Failed to register route %s: %v", route.Path, err))
-				}
-			}
-		}
+	// Use shared logic for route compilation/interpretation
+	useCompiler, _, wsServer, router, err := setupRoutes(module, m.filePath)
+	if err != nil {
+		return nil, err
 	}
 
 	// Create HTTP server with live reload support
@@ -972,63 +910,110 @@ func runInit(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// startServerWithInterpreter parses the source file and starts the HTTP server using the tree-walking interpreter
-func startServerWithInterpreter(filePath string, port int) (*http.Server, error) {
-	// Read source file
-	source, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
+// setupRoutes handles the common logic of determining execution mode, compiling routes,
+// and setting up the router. Used by both startServer and startDevServerInternal.
+// filePath is the path to the source file, used for resolving relative module imports.
+func setupRoutes(module *interpreter.Module, filePath string, forceInterpreter ...bool) (useCompiler bool, compiledRoutes map[string][]byte, wsServer *websocket.Server, router *server.Router, err error) {
+	useCompiler = true
+	if len(forceInterpreter) > 0 && forceInterpreter[0] {
+		useCompiler = false
 	}
+	compiledRoutes = make(map[string][]byte)
 
-	// Parse the source (placeholder - Rust parser integration will come later)
-	module, err := parseSource(string(source))
-	if err != nil {
-		return nil, fmt.Errorf("parse error: %w", err)
-	}
-
-	// Create interpreter and load module
-	interp := interpreter.NewInterpreter()
-	if err := interp.LoadModule(*module); err != nil {
-		return nil, fmt.Errorf("failed to load module: %w", err)
-	}
-
-	// Create router and register routes
-	router := server.NewRouter()
+	// Check if any route has database injection - VM doesn't support db method calls
 	for _, item := range module.Items {
 		if route, ok := item.(*interpreter.Route); ok {
-			err := registerRoute(router, route, interp)
-			if err != nil {
-				printWarning(fmt.Sprintf("Failed to register route %s: %v", route.Path, err))
+			for _, injection := range route.Injections {
+				if _, isDB := injection.Type.(interpreter.DatabaseType); isDB {
+					printInfo("Routes use database injection, using interpreter mode")
+					useCompiler = false
+					break
+				}
+				if named, ok := injection.Type.(interpreter.NamedType); ok && named.Name == "Database" {
+					printInfo("Routes use database injection, using interpreter mode")
+					useCompiler = false
+					break
+				}
+			}
+			if !useCompiler {
+				break
 			}
 		}
 	}
 
-	// Create HTTP server
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", createHandler(router))
-
-	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
-		Handler: loggingMiddleware(mux),
+	// Try to compile routes if using compiler mode
+	if useCompiler {
+		c := compiler.NewCompilerWithOptLevel(compiler.OptBasic)
+		for _, item := range module.Items {
+			if route, ok := item.(*interpreter.Route); ok {
+				bytecode, compileErr := c.CompileRoute(route)
+				if compileErr != nil {
+					printWarning(fmt.Sprintf("Compilation failed for %s: %v, falling back to interpreter", route.Path, compileErr))
+					useCompiler = false
+					break
+				}
+				compiledRoutes[route.Path] = bytecode
+			}
+		}
 	}
 
-	// Start server in background
-	go func() {
-		printSuccess(fmt.Sprintf("Server listening on http://localhost:%d", port))
-		printInfo("Press Ctrl+C to stop")
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			printError(fmt.Errorf("server error: %w", err))
+	// Create WebSocket server
+	wsServer = websocket.NewServer()
+
+	// Create router and register routes
+	router = server.NewRouter()
+	interp := newConfiguredInterpreter()
+
+	if useCompiler {
+		for _, item := range module.Items {
+			if route, ok := item.(*interpreter.Route); ok {
+				bytecode := compiledRoutes[route.Path]
+				regErr := registerCompiledRoute(router, route, bytecode, wsServer.GetHub())
+				if regErr != nil {
+					printWarning(fmt.Sprintf("Failed to register route %s: %v", route.Path, regErr))
+				} else {
+					printInfo(fmt.Sprintf("Compiled route: %s %s", route.Method, route.Path))
+				}
+			}
 		}
-	}()
 
-	// Give server time to start
-	time.Sleep(100 * time.Millisecond)
+		// Compile and register WebSocket routes
+		c := compiler.NewCompilerWithOptLevel(compiler.OptBasic)
+		for _, item := range module.Items {
+			if wsRoute, ok := item.(*interpreter.WebSocketRoute); ok {
+				compiledWs, compileErr := c.CompileWebSocketRoute(wsRoute)
+				if compileErr != nil {
+					printWarning(fmt.Sprintf("Failed to compile WebSocket route %s: %v", wsRoute.Path, compileErr))
+					continue
+				}
+				registerCompiledWebSocketRoute(wsServer, wsRoute.Path, compiledWs)
+				printInfo(fmt.Sprintf("Compiled WebSocket route: %s", wsRoute.Path))
+			}
+		}
+	} else {
+		// Use interpreter mode
+		// Pass the directory of the source file for proper module resolution
+		basePath := filepath.Dir(filePath)
+		if loadErr := interp.LoadModuleWithPath(*module, basePath); loadErr != nil {
+			err = fmt.Errorf("failed to load module: %w", loadErr)
+			return
+		}
+		for _, item := range module.Items {
+			if route, ok := item.(*interpreter.Route); ok {
+				regErr := registerRoute(router, route, interp)
+				if regErr != nil {
+					printWarning(fmt.Sprintf("Failed to register route %s: %v", route.Path, regErr))
+				}
+			}
+		}
+	}
 
-	return srv, nil
+	return useCompiler, compiledRoutes, wsServer, router, nil
 }
 
-// startServerWithCompiler parses, compiles, and starts the HTTP server using the VM
-func startServerWithCompiler(filePath string, port int) (*http.Server, error) {
+// startServer is the unified server startup function used by both 'run' and 'dev' commands.
+// It handles database injection detection and automatic fallback to interpreter mode.
+func startServer(filePath string, port int, forceInterpreter bool) (*http.Server, error) {
 	// Read source file
 	source, err := os.ReadFile(filePath)
 	if err != nil {
@@ -1041,47 +1026,10 @@ func startServerWithCompiler(filePath string, port int) (*http.Server, error) {
 		return nil, fmt.Errorf("parse error: %w", err)
 	}
 
-	// Compile routes
-	c := compiler.NewCompilerWithOptLevel(compiler.OptBasic)
-	compiledRoutes := make(map[string][]byte) // path -> bytecode
-
-	for _, item := range module.Items {
-		if route, ok := item.(*interpreter.Route); ok {
-			bytecode, err := c.CompileRoute(route)
-			if err != nil {
-				return nil, fmt.Errorf("failed to compile route %s: %w", route.Path, err)
-			}
-			compiledRoutes[route.Path] = bytecode
-			printInfo(fmt.Sprintf("Compiled route: %s %s (%d bytes)", route.Method, route.Path, len(bytecode)))
-		}
-	}
-
-	// Create WebSocket server first (so HTTP routes can access stats)
-	wsServer := websocket.NewServer()
-
-	// Create router and register compiled routes
-	router := server.NewRouter()
-	for _, item := range module.Items {
-		if route, ok := item.(*interpreter.Route); ok {
-			bytecode := compiledRoutes[route.Path]
-			err := registerCompiledRoute(router, route, bytecode, wsServer.GetHub())
-			if err != nil {
-				printWarning(fmt.Sprintf("Failed to register route %s: %v", route.Path, err))
-			}
-		}
-	}
-
-	// Compile and register WebSocket routes
-	for _, item := range module.Items {
-		if wsRoute, ok := item.(*interpreter.WebSocketRoute); ok {
-			compiledWs, err := c.CompileWebSocketRoute(wsRoute)
-			if err != nil {
-				printWarning(fmt.Sprintf("Failed to compile WebSocket route %s: %v", wsRoute.Path, err))
-				continue
-			}
-			registerCompiledWebSocketRoute(wsServer, wsRoute.Path, compiledWs)
-			printInfo(fmt.Sprintf("Compiled WebSocket route: %s", wsRoute.Path))
-		}
+	// Use shared logic for route compilation/interpretation
+	useCompiler, _, wsServer, router, err := setupRoutes(module, filePath, forceInterpreter)
+	if err != nil {
+		return nil, err
 	}
 
 	// Create HTTP server
@@ -1106,7 +1054,11 @@ func startServerWithCompiler(filePath string, port int) (*http.Server, error) {
 
 	// Start server in background
 	go func() {
-		printSuccess(fmt.Sprintf("Server listening on http://localhost:%d (compiled mode)", port))
+		mode := "compiled"
+		if !useCompiler {
+			mode = "interpreted"
+		}
+		printSuccess(fmt.Sprintf("Server listening on http://localhost:%d (%s mode)", port, mode))
 		printInfo("Press Ctrl+C to stop")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			printError(fmt.Errorf("server error: %w", err))
@@ -1224,7 +1176,7 @@ func interfaceToValue(v interface{}) vm.Value {
 	}
 }
 
-// parseSource parses GLYPH source using the Rust FFI parser
+// parseSource parses GLYPH source using the Go parser
 func parseSource(source string) (*interpreter.Module, error) {
 	// Use Go parser
 	lexer := parser.NewLexer(source)
@@ -1240,6 +1192,27 @@ func parseSource(source string) (*interpreter.Module, error) {
 	}
 
 	return module, nil
+}
+
+// newConfiguredInterpreter creates an interpreter with common configuration
+// including mock database for development/demo purposes.
+func newConfiguredInterpreter() *interpreter.Interpreter {
+	interp := interpreter.NewInterpreter()
+	mockDB := database.NewMockDatabase()
+	interp.SetDatabaseHandler(mockDB)
+
+	// Set up the parse function for module resolution
+	interp.GetModuleResolver().SetParseFunc(func(source string) (*interpreter.Module, error) {
+		lexer := parser.NewLexer(source)
+		tokens, err := lexer.Tokenize()
+		if err != nil {
+			return nil, err
+		}
+		p := parser.NewParser(tokens)
+		return p.Parse()
+	})
+
+	return interp
 }
 
 // registerRoute registers a route with the router
@@ -1283,6 +1256,32 @@ func createCompiledRouteHandler(route *interpreter.Route, bytecode []byte, wsHub
 		// Inject path parameters into VM locals
 		for key, value := range ctx.PathParams {
 			vmInstance.SetLocal(key, vm.StringValue{Val: value})
+		}
+
+		// Parse and inject request body as 'input' for POST/PUT/PATCH requests
+		if ctx.Request.Method == "POST" || ctx.Request.Method == "PUT" || ctx.Request.Method == "PATCH" {
+			contentType := ctx.Request.Header.Get("Content-Type")
+			shouldParseJSON := contentType == "" ||
+				contentType == "application/json" ||
+				(len(contentType) >= 16 && contentType[:16] == "application/json")
+
+			if shouldParseJSON && ctx.Request.Body != nil {
+				const maxBodySize = 10 * 1024 * 1024
+				limitedReader := io.LimitReader(ctx.Request.Body, maxBodySize)
+
+				var bodyMap map[string]interface{}
+				decoder := json.NewDecoder(limitedReader)
+				if err := decoder.Decode(&bodyMap); err == nil {
+					vmInstance.SetLocal("input", interfaceToValue(bodyMap))
+				} else {
+					vmInstance.SetLocal("input", vm.NullValue{})
+				}
+				ctx.Request.Body.Close()
+			} else {
+				vmInstance.SetLocal("input", vm.NullValue{})
+			}
+		} else {
+			vmInstance.SetLocal("input", vm.NullValue{})
 		}
 
 		// Execute compiled bytecode
@@ -1625,7 +1624,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create interpreter and load module
-	interp := interpreter.NewInterpreter()
+	interp := newConfiguredInterpreter()
 	if err := interp.LoadModule(*module); err != nil {
 		return fmt.Errorf("failed to load module: %w", err)
 	}
@@ -1741,7 +1740,7 @@ func runListCommands(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create interpreter and load module
-	interp := interpreter.NewInterpreter()
+	interp := newConfiguredInterpreter()
 	if err := interp.LoadModule(*module); err != nil {
 		return fmt.Errorf("failed to load module: %w", err)
 	}

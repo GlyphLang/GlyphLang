@@ -1,5 +1,5 @@
 # Development Dockerfile with hot-reload
-FROM golang:1.21-alpine
+FROM golang:1.24-alpine
 
 WORKDIR /app
 
@@ -12,15 +12,8 @@ RUN apk add --no-cache \
     curl \
     bash
 
-# Install Rust for local compilation
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-ENV PATH="/root/.cargo/bin:${PATH}"
-
-# Install air for hot-reload (Go)
+# Install air for hot-reload
 RUN go install github.com/cosmtrek/air@latest
-
-# Install cargo-watch for hot-reload (Rust)
-RUN cargo install cargo-watch
 
 # Copy dependency files
 COPY go.mod go.sum ./

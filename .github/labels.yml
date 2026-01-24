@@ -1,0 +1,146 @@
+# GlyphLang GitHub Labels Configuration
+# Use with github-label-sync: npx github-label-sync --labels .github/labels.yml owner/repo
+#
+# To apply these labels to your repository:
+#   npm install -g github-label-sync
+#   github-label-sync --access-token YOUR_TOKEN --labels .github/labels.yml GlyphLang/GlyphLang
+
+# =============================================================================
+# Contributor Labels
+# =============================================================================
+
+- name: good-first-issue
+  color: "7057ff"
+  description: Good for newcomers to the project
+
+- name: help-wanted
+  color: "008672"
+  description: Extra attention is needed from the community
+
+# =============================================================================
+# Difficulty Labels
+# =============================================================================
+
+- name: "difficulty:beginner"
+  color: "c2e0c6"
+  description: Suitable for contributors new to the codebase
+
+- name: "difficulty:intermediate"
+  color: "fbca04"
+  description: Requires familiarity with the codebase
+
+- name: "difficulty:advanced"
+  color: "d93f0b"
+  description: Requires deep knowledge of the system architecture
+
+# =============================================================================
+# Area Labels
+# =============================================================================
+
+- name: "area:parser"
+  color: "0052cc"
+  description: Related to the parser and syntax analysis
+
+- name: "area:compiler"
+  color: "0052cc"
+  description: Related to the compiler and code generation
+
+- name: "area:vm"
+  color: "0052cc"
+  description: Related to the virtual machine
+
+- name: "area:interpreter"
+  color: "0052cc"
+  description: Related to the interpreter
+
+- name: "area:server"
+  color: "0052cc"
+  description: Related to the Glyph server
+
+- name: "area:lsp"
+  color: "0052cc"
+  description: Related to the Language Server Protocol implementation
+
+- name: "area:cli"
+  color: "0052cc"
+  description: Related to the command-line interface
+
+- name: "area:database"
+  color: "0052cc"
+  description: Related to database functionality
+
+- name: "area:security"
+  color: "0052cc"
+  description: Related to security features and concerns
+
+- name: "area:docs"
+  color: "0052cc"
+  description: Related to documentation
+
+# =============================================================================
+# Type Labels
+# =============================================================================
+
+- name: "type:bug"
+  color: "d73a4a"
+  description: Something is not working as expected
+
+- name: "type:feature"
+  color: "a2eeef"
+  description: New functionality or capability
+
+- name: "type:enhancement"
+  color: "a2eeef"
+  description: Improvement to existing functionality
+
+- name: "type:refactor"
+  color: "c5def5"
+  description: Code restructuring without behavior change
+
+- name: "type:test"
+  color: "c5def5"
+  description: Adding or improving tests
+
+- name: "type:performance"
+  color: "f9d0c4"
+  description: Performance improvement or optimization
+
+# =============================================================================
+# Priority Labels
+# =============================================================================
+
+- name: "priority:low"
+  color: "c5def5"
+  description: Nice to have but not urgent
+
+- name: "priority:medium"
+  color: "fbca04"
+  description: Should be addressed in the near term
+
+- name: "priority:high"
+  color: "ff7619"
+  description: Important issue requiring prompt attention
+
+- name: "priority:critical"
+  color: "b60205"
+  description: Must be addressed immediately
+
+# =============================================================================
+# Status Labels
+# =============================================================================
+
+- name: "status:blocked"
+  color: "d93f0b"
+  description: Blocked by another issue or external factor
+
+- name: "status:needs-info"
+  color: "d876e3"
+  description: Requires more information from reporter
+
+- name: "status:in-progress"
+  color: "0e8a16"
+  description: Currently being worked on
+
+- name: "status:ready"
+  color: "0e8a16"
+  description: Ready to be worked on

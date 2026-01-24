@@ -1,25 +1,6 @@
 # Multi-stage Dockerfile for Glyph
-# Stage 1: Build Rust compiler core
-FROM rust:1.75-slim as rust-builder
-
-WORKDIR /build
-
-# Install build dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    pkg-config \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy Rust project
-COPY glyph-core/ ./glyph-core/
-COPY Cargo.toml Cargo.lock* ./
-
-# Build Rust core in release mode
-WORKDIR /build/glyph-core
-RUN cargo build --release
-
-# Stage 2: Build Go runtime and CLI
-FROM golang:1.21-alpine as go-builder
+# Stage 1: Build Go CLI
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /build
 
@@ -34,21 +15,16 @@ RUN go mod download
 COPY pkg/ ./pkg/
 COPY cmd/ ./cmd/
 
-# Copy Rust artifacts from previous stage
-COPY --from=rust-builder /build/glyph-core/target/release/libglyph_core.* /usr/local/lib/
-COPY --from=rust-builder /build/glyph-core/target/release/libglyph_core.a /usr/local/lib/
+# Build Go CLI (static binary)
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o glyph ./cmd/glyph
 
-# Build Go CLI
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o glyph ./cmd/glyph
-
-# Stage 3: Runtime image
+# Stage 2: Runtime image
 FROM alpine:3.19
 
 # Install runtime dependencies
 RUN apk add --no-cache \
     ca-certificates \
-    tzdata \
-    libc6-compat
+    tzdata
 
 # Create non-root user
 RUN addgroup -g 1000 glyph && \
@@ -57,8 +33,7 @@ RUN addgroup -g 1000 glyph && \
 WORKDIR /app
 
 # Copy binary from builder
-COPY --from=go-builder /build/glyph /usr/local/bin/glyph
-COPY --from=rust-builder /build/glyph-core/target/release/libglyph_core.* /usr/local/lib/
+COPY --from=builder /build/glyph /usr/local/bin/glyph
 
 # Copy examples (optional)
 COPY examples/ ./examples/

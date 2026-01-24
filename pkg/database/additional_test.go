@@ -109,7 +109,7 @@ func TestTableHandler_NextIDMethod(t *testing.T) {
 	handler := NewHandler(mockDB)
 	table := handler.Table("users")
 
-	nextID := table.NextID()
+	nextID := table.NextId()
 	assert.Equal(t, int64(1), nextID)
 }
 
@@ -1002,7 +1002,7 @@ func TestMockTableHandler_NextIDExtra(t *testing.T) {
 	users := db.Table("users")
 
 	// Get next ID (should be 1 for empty table)
-	nextID := users.NextID()
+	nextID := users.NextId()
 	assert.Equal(t, int64(1), nextID)
 }
 
@@ -1731,7 +1731,7 @@ func TestTableHandler_NextIDHandler(t *testing.T) {
 	handler := NewHandler(mockDB)
 	table := handler.Table("users")
 
-	id := table.NextID()
+	id := table.NextId()
 	assert.Equal(t, int64(1), id)
 }
 
@@ -1970,13 +1970,13 @@ func TestMockTableHandler_NextIDProgression(t *testing.T) {
 	db := NewMockDatabase()
 	users := db.Table("users")
 
-	assert.Equal(t, int64(1), users.NextID())
+	assert.Equal(t, int64(1), users.NextId())
 
 	users.Create(map[string]interface{}{"name": "Alice"})
-	assert.Equal(t, int64(2), users.NextID())
+	assert.Equal(t, int64(2), users.NextId())
 
 	users.Create(map[string]interface{}{"name": "Bob"})
-	assert.Equal(t, int64(3), users.NextID())
+	assert.Equal(t, int64(3), users.NextId())
 }
 
 // TestQueryBuilder_RightJoin tests QueryBuilder with RIGHT join type

@@ -8,8 +8,8 @@
   description: str
   completed: bool!
   priority: str
-  created_at: timestamp
-  updated_at: timestamp
+  created_at: int
+  updated_at: int
 }
 
 # Define response types
@@ -46,7 +46,7 @@
 }
 
 # Get all todos with filtering
-@ GET /api/todos -> TodoList {
+@ GET /api/todos {
   + ratelimit(100/min)
   % db: Database
 
@@ -71,7 +71,7 @@
 }
 
 # Get a specific todo by ID
-@ GET /api/todos/:id -> Todo {
+@ GET /api/todos/:id {
   + ratelimit(200/min)
   % db: Database
 
@@ -90,7 +90,7 @@
 }
 
 # Create a new todo
-@ POST /api/todos -> TodoResponse {
+@ POST /api/todos {
   + ratelimit(50/min)
   % db: Database
 
@@ -130,7 +130,7 @@
 }
 
 # Update an existing todo
-@ PUT /api/todos/:id -> TodoResponse {
+@ PUT /api/todos/:id {
   + ratelimit(50/min)
   % db: Database
 
@@ -176,7 +176,7 @@
 }
 
 # Delete a todo
-@ DELETE /api/todos/:id -> TodoResponse {
+@ DELETE /api/todos/:id {
   + ratelimit(50/min)
   % db: Database
 
@@ -200,7 +200,7 @@
 }
 
 # Mark todo as completed
-@ PATCH /api/todos/:id/complete -> TodoResponse {
+@ PATCH /api/todos/:id/complete {
   + ratelimit(100/min)
   % db: Database
 
@@ -226,7 +226,7 @@
 }
 
 # Get todos by priority
-@ GET /api/todos/priority/:priority -> TodoList {
+@ GET /api/todos/priority/:priority {
   + ratelimit(100/min)
   % db: Database
 

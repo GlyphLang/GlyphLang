@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/glyphlang/glyph/pkg/config"
 )
 
 // ========================================
@@ -627,7 +629,7 @@ type DevServerConfig struct {
 func DefaultDevServerConfig() DevServerConfig {
 	return DevServerConfig{
 		WatchPaths:   []string{"."},
-		Port:         8080,
+		Port:         config.DefaultPort,
 		Host:         "localhost",
 		LiveReload:   true,
 		OpenBrowser:  false,

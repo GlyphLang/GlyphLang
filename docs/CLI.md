@@ -388,7 +388,7 @@ Display Glyph version.
 
 ```bash
 $ glyph --version
-Glyph version 0.3.1
+Glyph version 0.3.2
 ```
 
 ### `glyph --help`
@@ -604,15 +604,16 @@ glyph dev main.glyph -p 8080
 
 ## Architecture
 
-The CLI orchestrates three main components:
+The CLI orchestrates four main components:
 
-1. **Parser (Rust)** - Lexical analysis and AST generation
-2. **Interpreter (Go)** - AST execution and runtime
-3. **Server (Go)** - HTTP routing and middleware
+1. **Parser (Go)** - Lexical analysis and AST generation
+2. **VM (Go)** - Bytecode execution with JIT optimization
+3. **Interpreter (Go)** - AST execution and runtime (fallback)
+4. **Server (Go)** - HTTP routing and middleware
 
 ```
 ┌─────────────────┐
-│   Glyph CLI      │
+│   Glyph CLI     │
 │   (main.go)     │
 └────────┬────────┘
          │
@@ -620,7 +621,7 @@ The CLI orchestrates three main components:
     │         │          │          │
 ┌───▼───┐ ┌──▼──┐ ┌─────▼────┐ ┌──▼──┐
 │Parser │ │ VM  │ │Interpreter│ │Server│
-│(Rust) │ │(Go) │ │  (Go)     │ │(Go) │
+│ (Go)  │ │(Go) │ │   (Go)    │ │(Go)  │
 └───────┘ └─────┘ └──────────┘ └─────┘
 ```
 

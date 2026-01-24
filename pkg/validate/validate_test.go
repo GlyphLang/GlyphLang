@@ -229,6 +229,7 @@ func TestValidateBuiltinTypes(t *testing.T) {
   value: float!
   created: timestamp!
   data: any!
+  payload: object!
 }
 
 @ GET /test -> Response {
@@ -239,7 +240,9 @@ func TestValidateBuiltinTypes(t *testing.T) {
 	result := v.Validate()
 
 	if !result.Valid {
-		t.Errorf("expected valid result, got errors: %v", result.Errors)
+		for _, err := range result.Errors {
+			t.Errorf("validation error: %s - %s", err.Type, err.Message)
+		}
 	}
 }
 

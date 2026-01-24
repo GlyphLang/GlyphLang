@@ -267,7 +267,7 @@ func TestMockTableHandler_NextID(t *testing.T) {
 	users := db.Table("users")
 
 	t.Run("Empty table", func(t *testing.T) {
-		nextID := users.NextID()
+		nextID := users.NextId()
 		assert.Equal(t, int64(1), nextID)
 	})
 
@@ -275,7 +275,7 @@ func TestMockTableHandler_NextID(t *testing.T) {
 		users.Create(map[string]interface{}{"name": "John"})
 		users.Create(map[string]interface{}{"name": "Jane"})
 
-		nextID := users.NextID()
+		nextID := users.NextId()
 		assert.Equal(t, int64(3), nextID)
 	})
 }

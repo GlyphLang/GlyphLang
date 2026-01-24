@@ -5,6 +5,7 @@ package validate
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/glyphlang/glyph/pkg/interpreter"
@@ -13,11 +14,11 @@ import (
 
 // ValidationResult contains the results of validating a Glyph file
 type ValidationResult struct {
-	Valid    bool              `json:"valid"`
-	FilePath string            `json:"file_path"`
+	Valid    bool               `json:"valid"`
+	FilePath string             `json:"file_path"`
 	Errors   []*ValidationError `json:"errors,omitempty"`
 	Warnings []*ValidationError `json:"warnings,omitempty"`
-	Stats    *ValidationStats  `json:"stats,omitempty"`
+	Stats    *ValidationStats   `json:"stats,omitempty"`
 }
 
 // ValidationStats contains statistics about the validated file
@@ -31,13 +32,13 @@ type ValidationStats struct {
 
 // ValidationError represents a single validation error with context
 type ValidationError struct {
-	Type       string   `json:"type"`
-	Message    string   `json:"message"`
-	Location   *Location `json:"location,omitempty"`
-	FixHint    string   `json:"fix_hint,omitempty"`
-	Context    string   `json:"context,omitempty"`
-	Severity   string   `json:"severity"` // "error" or "warning"
-	RelatedTo  string   `json:"related_to,omitempty"`
+	Type      string    `json:"type"`
+	Message   string    `json:"message"`
+	Location  *Location `json:"location,omitempty"`
+	FixHint   string    `json:"fix_hint,omitempty"`
+	Context   string    `json:"context,omitempty"`
+	Severity  string    `json:"severity"` // "error" or "warning"
+	RelatedTo string    `json:"related_to,omitempty"`
 }
 
 // Location represents a source code location
@@ -160,9 +161,12 @@ func (v *Validator) validateSemantics(module *interpreter.Module, result *Valida
 	definedTypes := make(map[string]bool)
 	builtinTypes := map[string]bool{
 		"int": true, "str": true, "string": true, "bool": true,
-		"float": true, "timestamp": true, "any": true,
+		"float": true, "timestamp": true, "any": true, "object": true,
 		"List": true, "Map": true, "Result": true, "Database": true,
 	}
+
+	// Process imports to collect types from imported modules
+	v.processImports(module, definedTypes, result)
 
 	// First pass: collect all type definitions
 	for _, item := range module.Items {
@@ -195,6 +199,72 @@ func (v *Validator) validateSemantics(module *interpreter.Module, result *Valida
 
 	// Check for common issues
 	v.checkCommonIssues(module, result)
+}
+
+// processImports processes import statements and adds imported types to the defined types map
+func (v *Validator) processImports(module *interpreter.Module, definedTypes map[string]bool, result *ValidationResult) {
+	// Get the base path for resolving relative imports
+	basePath := filepath.Dir(v.filePath)
+
+	// Create a module resolver
+	resolver := interpreter.NewModuleResolver()
+	resolver.AddSearchPath(basePath)
+
+	// Set up the parse function for the resolver
+	resolver.SetParseFunc(func(source string) (*interpreter.Module, error) {
+		lexer := parser.NewLexer(source)
+		tokens, err := lexer.Tokenize()
+		if err != nil {
+			return nil, err
+		}
+		p := parser.NewParser(tokens)
+		return p.Parse()
+	})
+
+	// Process imports
+	imports, err := resolver.ProcessImports(module, basePath)
+	if err != nil {
+		// Add a warning but don't fail validation - the module might still work at runtime
+		result.Warnings = append(result.Warnings, &ValidationError{
+			Type:     ErrTypeUndefined,
+			Message:  fmt.Sprintf("failed to resolve imports: %s", err.Error()),
+			Severity: "warning",
+			FixHint:  "check that imported modules exist and are accessible",
+		})
+		return
+	}
+
+	// Add imported types to the defined types map with their aliases
+	for alias, loadedModule := range imports {
+		for name, item := range loadedModule.Exports {
+			if _, isType := item.(*interpreter.TypeDef); isType {
+				// Add the type with the alias prefix (e.g., "m.User")
+				qualifiedName := alias + "." + name
+				definedTypes[qualifiedName] = true
+			}
+		}
+	}
+
+	// Also process selective imports (from "./module" import { Type1, Type2 })
+	for _, item := range module.Items {
+		if importStmt, ok := item.(*interpreter.ImportStatement); ok && importStmt.Selective {
+			// For selective imports, the imported names are used directly without prefix
+			if loadedModule, exists := imports[importStmt.Path]; exists {
+				for _, importName := range importStmt.Names {
+					if item, ok := loadedModule.Exports[importName.Name]; ok {
+						if _, isType := item.(*interpreter.TypeDef); isType {
+							// Use alias if provided, otherwise use original name
+							name := importName.Name
+							if importName.Alias != "" {
+								name = importName.Alias
+							}
+							definedTypes[name] = true
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 // validateTypeFields validates field types in a type definition

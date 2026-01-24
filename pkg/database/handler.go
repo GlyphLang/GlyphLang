@@ -144,8 +144,8 @@ func (t *TableHandler) Query(query string, args ...interface{}) ([]map[string]in
 	return t.orm.Query(t.ctx, query, args...)
 }
 
-// NextID returns the next available ID (mock implementation)
-func (t *TableHandler) NextID() int64 {
+// NextId returns the next available ID (mock implementation)
+func (t *TableHandler) NextId() int64 {
 	// In a real implementation, this would query the database for the next sequence value
 	// For now, return a mock value
 	return 1
@@ -305,7 +305,7 @@ func (m *MockTableHandler) Count(column string, value interface{}) int64 {
 	return count
 }
 
-// CountWhere counts records matching multiple conditions
+// CountWhere counts records matching multiple conditions.
 func (m *MockTableHandler) CountWhere(column1 string, value1 interface{}, column2 string, value2 interface{}) int64 {
 	m.db.mu.RLock()
 	defer m.db.mu.RUnlock()
@@ -333,8 +333,8 @@ func (m *MockTableHandler) Filter(column string, value interface{}) []interface{
 	return result
 }
 
-// NextID returns the next available ID
-func (m *MockTableHandler) NextID() int64 {
+// NextId returns the next available ID.
+func (m *MockTableHandler) NextId() int64 {
 	m.db.mu.RLock()
 	defer m.db.mu.RUnlock()
 
