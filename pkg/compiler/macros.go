@@ -315,6 +315,16 @@ func (e *MacroExpander) substituteNode(node interpreter.Node, subs map[string]in
 			Value:  subExpr,
 		}, nil
 
+	case interpreter.ReassignStatement:
+		subExpr, err := e.substituteExpr(n.Value, subs)
+		if err != nil {
+			return nil, err
+		}
+		return interpreter.ReassignStatement{
+			Target: e.substituteString(n.Target, subs),
+			Value:  subExpr,
+		}, nil
+
 	case interpreter.ReturnStatement:
 		subExpr, err := e.substituteExpr(n.Value, subs)
 		if err != nil {

@@ -54,6 +54,9 @@ func (i *Interpreter) ExecuteStatement(stmt Statement, env *Environment) (interf
 	case ValidationStatement:
 		return i.executeValidation(s, env)
 
+	case ReassignStatement:
+		return i.executeReassign(s, env)
+
 	default:
 		return nil, fmt.Errorf("unsupported statement type: %T", stmt)
 	}
@@ -94,6 +97,23 @@ func (i *Interpreter) executeAssign(stmt AssignStatement, env *Environment) (int
 	} else {
 		env.Define(stmt.Target, value)
 	}
+	return value, nil
+}
+
+// executeReassign executes a variable reassignment (without $ prefix)
+func (i *Interpreter) executeReassign(stmt ReassignStatement, env *Environment) (interface{}, error) {
+	// Check that the variable exists (must be previously declared)
+	if !env.Has(stmt.Target) {
+		return nil, fmt.Errorf("cannot assign to undeclared variable '%s'", stmt.Target)
+	}
+
+	value, err := i.EvaluateExpression(stmt.Value, env)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update the existing variable
+	env.Set(stmt.Target, value)
 	return value, nil
 }
 

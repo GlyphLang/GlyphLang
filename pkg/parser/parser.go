@@ -1476,6 +1476,13 @@ func (p *Parser) parseStatement() (interpreter.Statement, error) {
 			return interpreter.ReturnStatement{Value: value}, nil
 		}
 
+		// Check for bare assignment (reassignment): identifier = expr
+		// This allows updating existing variables without $ prefix
+		// Only match direct assignment (not field access which could be method calls)
+		if p.peek(1).Type == EQUALS {
+			return p.parseReassignment()
+		}
+
 		// Try to parse as expression statement (e.g., function call: ws.send(...))
 		expr, err := p.parseExpr()
 		if err != nil {
@@ -1510,6 +1517,29 @@ func (p *Parser) parseStatement() (interpreter.Statement, error) {
 			"Statements must start with '$' (for variable assignment) or '>' (for return)",
 		)
 	}
+}
+
+// parseReassignment parses a simple variable reassignment: identifier = expr
+// Note: Field reassignment (obj.field = expr) uses the $ syntax: $ obj.field = expr
+func (p *Parser) parseReassignment() (interpreter.Statement, error) {
+	varName, err := p.expectIdent()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := p.expect(EQUALS); err != nil {
+		return nil, err
+	}
+
+	value, err := p.parseExpr()
+	if err != nil {
+		return nil, err
+	}
+
+	return interpreter.ReassignStatement{
+		Target: varName,
+		Value:  value,
+	}, nil
 }
 
 // parseIfStatement parses an if statement: if condition { ... } else { ... }
@@ -3364,6 +3394,8 @@ func (p *Parser) parseMacroBodyNode() (interpreter.Node, error) {
 func statementToNode(stmt interpreter.Statement) interpreter.Node {
 	switch s := stmt.(type) {
 	case interpreter.AssignStatement:
+		return s
+	case interpreter.ReassignStatement:
 		return s
 	case interpreter.ReturnStatement:
 		return s

@@ -329,6 +329,10 @@ func (c *Compiler) compileStatement(stmt interpreter.Statement) error {
 		return c.compileExpressionStatement(s)
 	case interpreter.ExpressionStatement:
 		return c.compileExpressionStatement(&s)
+	case *interpreter.ReassignStatement:
+		return c.compileReassignStatement(s)
+	case interpreter.ReassignStatement:
+		return c.compileReassignStatement(&s)
 	default:
 		return fmt.Errorf("unsupported statement type: %T", stmt)
 	}
@@ -358,6 +362,27 @@ func (c *Compiler) compileAssignStatement(stmt *interpreter.AssignStatement) err
 	if _, existsInParent := c.symbolTable.Resolve(stmt.Target); !existsInParent {
 		c.symbolTable.Define(stmt.Target, nameIdx)
 	}
+
+	return nil
+}
+
+// compileReassignStatement compiles variable reassignment (without $ prefix)
+func (c *Compiler) compileReassignStatement(stmt *interpreter.ReassignStatement) error {
+	// Check that the variable exists (must be previously declared)
+	if _, exists := c.symbolTable.Resolve(stmt.Target); !exists {
+		return &SemanticError{Message: fmt.Sprintf("cannot assign to undeclared variable '%s'", stmt.Target)}
+	}
+
+	// Compile the value expression
+	if err := c.compileExpression(stmt.Value); err != nil {
+		return err
+	}
+
+	// Add variable name to constants
+	nameIdx := c.addConstant(vm.StringValue{Val: stmt.Target})
+
+	// Emit store instruction (updates existing variable)
+	c.emitWithOperand(vm.OpStoreVar, uint32(nameIdx))
 
 	return nil
 }

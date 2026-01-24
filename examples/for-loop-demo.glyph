@@ -7,7 +7,7 @@
 
   for user in users {
     $ greeting = "Hello, " + user.name
-    $ greetings = greetings + [greeting]
+    greetings = greetings + [greeting]
   }
 
   > {greetings: greetings}
@@ -20,7 +20,7 @@
 
   for index, item in items {
     $ entry = {position: index, value: item}
-    $ indexed = indexed + [entry]
+    indexed = indexed + [entry]
   }
 
   > {indexed: indexed}
@@ -33,7 +33,7 @@
 
   for key, value in config {
     $ setting = {key: key, value: value}
-    $ settings = settings + [setting]
+    settings = settings + [setting]
   }
 
   > {settings: settings}
@@ -46,7 +46,7 @@
 
   for row in matrix {
     for cell in row {
-      $ sum = sum + cell
+      sum = sum + cell
     }
   }
 
@@ -60,7 +60,7 @@
 
   for person in people {
     if person.age >= 18 {
-      $ adults = adults + [person]
+      adults = adults + [person]
     }
   }
 
