@@ -948,6 +948,11 @@ func setupRoutes(module *interpreter.Module, filePath string, forceInterpreter .
 			if route, ok := item.(*interpreter.Route); ok {
 				bytecode, compileErr := c.CompileRoute(route)
 				if compileErr != nil {
+					// Semantic errors (like redeclaration) should fail completely, not fall back
+					if compiler.IsSemanticError(compileErr) {
+						printError(fmt.Errorf("compilation error for %s: %v", route.Path, compileErr))
+						os.Exit(1)
+					}
 					printWarning(fmt.Sprintf("Compilation failed for %s: %v, falling back to interpreter", route.Path, compileErr))
 					useCompiler = false
 					break

@@ -560,6 +560,11 @@ func (f *Formatter) formatStatement(stmt interpreter.Statement) {
 	case *interpreter.AssignStatement:
 		f.formatAssign(v.Target, v.Value)
 
+	case interpreter.ReassignStatement:
+		f.formatReassign(v.Target, v.Value)
+	case *interpreter.ReassignStatement:
+		f.formatReassign(v.Target, v.Value)
+
 	case interpreter.ReturnStatement:
 		f.formatReturn(v.Value)
 	case *interpreter.ReturnStatement:
@@ -671,6 +676,13 @@ func (f *Formatter) formatAssign(target string, value interpreter.Expr) {
 	} else {
 		f.write("$ ")
 	}
+	f.write(target)
+	f.write(" = ")
+	f.formatExpr(value)
+	f.writeln("")
+}
+
+func (f *Formatter) formatReassign(target string, value interpreter.Expr) {
 	f.write(target)
 	f.write(" = ")
 	f.formatExpr(value)

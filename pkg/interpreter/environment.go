@@ -68,3 +68,9 @@ func (e *Environment) Has(name string) bool {
 
 	return false
 }
+
+// HasLocal checks if a variable exists in the current scope only (no parent lookup)
+func (e *Environment) HasLocal(name string) bool {
+	_, ok := e.vars[name]
+	return ok
+}

@@ -11,6 +11,21 @@ import (
 	"github.com/glyphlang/glyph/pkg/vm"
 )
 
+// SemanticError represents a semantic error that should not fall back to interpreter
+type SemanticError struct {
+	Message string
+}
+
+func (e *SemanticError) Error() string {
+	return e.Message
+}
+
+// IsSemanticError checks if an error is a semantic error
+func IsSemanticError(err error) bool {
+	_, ok := err.(*SemanticError)
+	return ok
+}
+
 // Compiler compiles AST to bytecode
 type Compiler struct {
 	constants     []vm.Value
@@ -314,6 +329,10 @@ func (c *Compiler) compileStatement(stmt interpreter.Statement) error {
 		return c.compileExpressionStatement(s)
 	case interpreter.ExpressionStatement:
 		return c.compileExpressionStatement(&s)
+	case *interpreter.ReassignStatement:
+		return c.compileReassignStatement(s)
+	case interpreter.ReassignStatement:
+		return c.compileReassignStatement(&s)
 	default:
 		return fmt.Errorf("unsupported statement type: %T", stmt)
 	}
@@ -321,6 +340,12 @@ func (c *Compiler) compileStatement(stmt interpreter.Statement) error {
 
 // compileAssignStatement compiles variable assignment
 func (c *Compiler) compileAssignStatement(stmt *interpreter.AssignStatement) error {
+	// Check for redeclaration in current scope (issue #70)
+	// Variables declared with $ cannot be redeclared in the same scope
+	if _, exists := c.symbolTable.ResolveLocal(stmt.Target); exists {
+		return &SemanticError{Message: fmt.Sprintf("cannot redeclare variable '%s' in the same scope", stmt.Target)}
+	}
+
 	// Compile the value expression
 	if err := c.compileExpression(stmt.Value); err != nil {
 		return err
@@ -332,8 +357,32 @@ func (c *Compiler) compileAssignStatement(stmt *interpreter.AssignStatement) err
 	// Emit store instruction
 	c.emitWithOperand(vm.OpStoreVar, uint32(nameIdx))
 
-	// Define symbol
-	c.symbolTable.Define(stmt.Target, nameIdx)
+	// Only define a new symbol if it doesn't exist in any parent scope
+	// If it exists in a parent scope, this is an assignment to that variable
+	if _, existsInParent := c.symbolTable.Resolve(stmt.Target); !existsInParent {
+		c.symbolTable.Define(stmt.Target, nameIdx)
+	}
+
+	return nil
+}
+
+// compileReassignStatement compiles variable reassignment (without $ prefix)
+func (c *Compiler) compileReassignStatement(stmt *interpreter.ReassignStatement) error {
+	// Check that the variable exists (must be previously declared)
+	if _, exists := c.symbolTable.Resolve(stmt.Target); !exists {
+		return &SemanticError{Message: fmt.Sprintf("cannot assign to undeclared variable '%s'", stmt.Target)}
+	}
+
+	// Compile the value expression
+	if err := c.compileExpression(stmt.Value); err != nil {
+		return err
+	}
+
+	// Add variable name to constants
+	nameIdx := c.addConstant(vm.StringValue{Val: stmt.Target})
+
+	// Emit store instruction (updates existing variable)
+	c.emitWithOperand(vm.OpStoreVar, uint32(nameIdx))
 
 	return nil
 }
@@ -362,12 +411,18 @@ func (c *Compiler) compileIfStatement(stmt *interpreter.IfStatement) error {
 	jumpToElse := len(c.code)
 	c.emitWithOperand(vm.OpJumpIfFalse, 0) // Placeholder
 
+	// Enter block scope for then block
+	c.symbolTable = c.symbolTable.EnterScope(BlockScope)
+
 	// Compile then block
 	for _, thenStmt := range stmt.ThenBlock {
 		if err := c.compileStatement(thenStmt); err != nil {
 			return err
 		}
 	}
+
+	// Exit block scope
+	c.symbolTable = c.symbolTable.Parent()
 
 	// Emit jump to end (will patch later)
 	jumpToEnd := len(c.code)
@@ -379,11 +434,17 @@ func (c *Compiler) compileIfStatement(stmt *interpreter.IfStatement) error {
 
 	// Compile else block
 	if len(stmt.ElseBlock) > 0 {
+		// Enter block scope for else block
+		c.symbolTable = c.symbolTable.EnterScope(BlockScope)
+
 		for _, elseStmt := range stmt.ElseBlock {
 			if err := c.compileStatement(elseStmt); err != nil {
 				return err
 			}
 		}
+
+		// Exit block scope
+		c.symbolTable = c.symbolTable.Parent()
 	}
 
 	// Patch jump to end
@@ -407,12 +468,18 @@ func (c *Compiler) compileWhileStatement(stmt *interpreter.WhileStatement) error
 	jumpToEnd := len(c.code)
 	c.emitWithOperand(vm.OpJumpIfFalse, 0) // Placeholder
 
+	// Enter block scope for the loop body
+	c.symbolTable = c.symbolTable.EnterScope(BlockScope)
+
 	// Compile body
 	for _, bodyStmt := range stmt.Body {
 		if err := c.compileStatement(bodyStmt); err != nil {
 			return err
 		}
 	}
+
+	// Exit block scope
+	c.symbolTable = c.symbolTable.Parent()
 
 	// Jump back to loop start
 	c.emitWithOperand(vm.OpJump, uint32(loopStart))
@@ -560,12 +627,18 @@ func (c *Compiler) compileSwitchStatement(stmt *interpreter.SwitchStatement) err
 		jumpToNextCase := len(c.code)
 		c.emitWithOperand(vm.OpJumpIfFalse, 0)
 
+		// Enter block scope for case body
+		c.symbolTable = c.symbolTable.EnterScope(BlockScope)
+
 		// Compile case body
 		for _, stmt := range switchCase.Body {
 			if err := c.compileStatement(stmt); err != nil {
 				return err
 			}
 		}
+
+		// Exit block scope
+		c.symbolTable = c.symbolTable.Parent()
 
 		// Jump to end after executing case
 		jumpToEnd = append(jumpToEnd, len(c.code))
@@ -577,11 +650,17 @@ func (c *Compiler) compileSwitchStatement(stmt *interpreter.SwitchStatement) err
 
 	// Compile default case if present
 	if len(stmt.Default) > 0 {
+		// Enter block scope for default body
+		c.symbolTable = c.symbolTable.EnterScope(BlockScope)
+
 		for _, stmt := range stmt.Default {
 			if err := c.compileStatement(stmt); err != nil {
 				return err
 			}
 		}
+
+		// Exit block scope
+		c.symbolTable = c.symbolTable.Parent()
 	}
 
 	// Patch all jumps to end

@@ -162,6 +162,85 @@ func (o *Optimizer) OptimizeStatements(stmts []interpreter.Statement) []interpre
 			}
 			result = append(result, optimized)
 
+		case *interpreter.ReassignStatement:
+			// Optimize the value expression (same logic as AssignStatement)
+			optimizedValue := o.OptimizeExpression(s.Value)
+
+			// Copy propagation: track variable-to-variable assignments
+			if varExpr, ok := optimizedValue.(*interpreter.VariableExpr); ok {
+				o.copies[s.Target] = varExpr.Name
+				// Invalidate constant and expression tracking for this variable
+				delete(o.constants, s.Target)
+			} else {
+				// Not a copy, remove from copy tracking
+				delete(o.copies, s.Target)
+
+				// Common subexpression elimination (only for OptAggressive)
+				if o.level >= OptAggressive {
+					key := exprKey(optimizedValue)
+					if key != "" {
+						// Check if this expression was already computed
+						if existingVar, ok := o.expressions[key]; ok {
+							// Reuse the existing variable
+							optimizedValue = &interpreter.VariableExpr{Name: existingVar}
+							// Now it's a copy
+							o.copies[s.Target] = existingVar
+						} else {
+							// Track this expression
+							o.expressions[key] = s.Target
+						}
+					}
+				}
+
+				// Track constant assignments for constant propagation
+				if litExpr, ok := optimizedValue.(*interpreter.LiteralExpr); ok {
+					o.constants[s.Target] = litExpr.Value
+				} else {
+					// Non-constant assignment, invalidate any previous constant
+					delete(o.constants, s.Target)
+				}
+			}
+
+			optimized := &interpreter.ReassignStatement{
+				Target: s.Target,
+				Value:  optimizedValue,
+			}
+			result = append(result, optimized)
+
+		case interpreter.ReassignStatement:
+			// Same as *interpreter.ReassignStatement
+			optimizedValue := o.OptimizeExpression(s.Value)
+
+			if varExpr, ok := optimizedValue.(*interpreter.VariableExpr); ok {
+				o.copies[s.Target] = varExpr.Name
+				delete(o.constants, s.Target)
+			} else {
+				delete(o.copies, s.Target)
+
+				if o.level >= OptAggressive {
+					key := exprKey(optimizedValue)
+					if key != "" {
+						if existingVar, ok := o.expressions[key]; ok {
+							optimizedValue = &interpreter.VariableExpr{Name: existingVar}
+							o.copies[s.Target] = existingVar
+						} else {
+							o.expressions[key] = s.Target
+						}
+					}
+				}
+
+				if litExpr, ok := optimizedValue.(*interpreter.LiteralExpr); ok {
+					o.constants[s.Target] = litExpr.Value
+				} else {
+					delete(o.constants, s.Target)
+				}
+			}
+
+			result = append(result, &interpreter.ReassignStatement{
+				Target: s.Target,
+				Value:  optimizedValue,
+			})
+
 		case *interpreter.ReturnStatement:
 			// Optimize return value
 			optimized := &interpreter.ReturnStatement{
@@ -715,6 +794,12 @@ func getModifiedVariablesInStmt(stmt interpreter.Statement, modified map[string]
 	switch s := stmt.(type) {
 	case *interpreter.AssignStatement:
 		modified[s.Target] = true
+	case interpreter.AssignStatement:
+		modified[s.Target] = true
+	case *interpreter.ReassignStatement:
+		modified[s.Target] = true
+	case interpreter.ReassignStatement:
+		modified[s.Target] = true
 	case *interpreter.IfStatement:
 		getModifiedVariablesInStmt(&interpreter.AssignStatement{}, modified)
 		for _, thenStmt := range s.ThenBlock {
@@ -1068,6 +1153,10 @@ func containsCallInStmt(stmt interpreter.Statement, fnName string) bool {
 		return containsCallInExpr(s.Value, fnName)
 	case interpreter.AssignStatement:
 		return containsCallInExpr(s.Value, fnName)
+	case *interpreter.ReassignStatement:
+		return containsCallInExpr(s.Value, fnName)
+	case interpreter.ReassignStatement:
+		return containsCallInExpr(s.Value, fnName)
 	case *interpreter.ReturnStatement:
 		return containsCallInExpr(s.Value, fnName)
 	case interpreter.ReturnStatement:
@@ -1176,6 +1265,16 @@ func substituteParamsInStmt(stmt interpreter.Statement, bindings map[string]inte
 		}
 	case interpreter.AssignStatement:
 		return &interpreter.AssignStatement{
+			Target: s.Target,
+			Value:  substituteParamsInExpr(s.Value, bindings),
+		}
+	case *interpreter.ReassignStatement:
+		return &interpreter.ReassignStatement{
+			Target: s.Target,
+			Value:  substituteParamsInExpr(s.Value, bindings),
+		}
+	case interpreter.ReassignStatement:
+		return &interpreter.ReassignStatement{
 			Target: s.Target,
 			Value:  substituteParamsInExpr(s.Value, bindings),
 		}

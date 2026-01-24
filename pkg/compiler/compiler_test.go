@@ -206,6 +206,158 @@ func TestCompileVariableAssignment(t *testing.T) {
 	}
 }
 
+func TestCompileVariableRedeclaration(t *testing.T) {
+	// Test: $ x = 1, $ x = 2 (should fail - redeclaration in same scope)
+	route := &interpreter.Route{
+		Body: []interpreter.Statement{
+			&interpreter.AssignStatement{
+				Target: "x",
+				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+			},
+			&interpreter.AssignStatement{
+				Target: "x",
+				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	_, err := c.CompileRoute(route)
+	if err == nil {
+		t.Fatal("Expected redeclaration error, got nil")
+	}
+	if !IsSemanticError(err) {
+		t.Errorf("Expected SemanticError, got %T: %v", err, err)
+	}
+	expectedMsg := "cannot redeclare variable 'x' in the same scope"
+	if err.Error() != expectedMsg {
+		t.Errorf("Expected error message %q, got %q", expectedMsg, err.Error())
+	}
+}
+
+func TestCompileVariableUpdateInNestedScope(t *testing.T) {
+	// Test: $ cond = true, $ x = 0, if (cond) { $ x = 1 }, > x
+	// Should work - updating outer variable from nested scope
+	// Note: Using OptNone to prevent optimizer from inlining the if block
+	// (constant propagation would make the condition always true and inline the block)
+	route := &interpreter.Route{
+		Body: []interpreter.Statement{
+			&interpreter.AssignStatement{
+				Target: "cond",
+				Value:  &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
+			},
+			&interpreter.AssignStatement{
+				Target: "x",
+				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+			},
+			&interpreter.IfStatement{
+				Condition: &interpreter.VariableExpr{Name: "cond"},
+				ThenBlock: []interpreter.Statement{
+					&interpreter.AssignStatement{
+						Target: "x",
+						Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+					},
+				},
+			},
+			&interpreter.ReturnStatement{
+				Value: &interpreter.VariableExpr{Name: "x"},
+			},
+		},
+	}
+
+	c := NewCompilerWithOptLevel(OptNone)
+	bytecode, err := c.CompileRoute(route)
+	if err != nil {
+		t.Fatalf("CompileRoute() error: %v", err)
+	}
+
+	// Execute
+	vmInstance := vm.NewVM()
+	result, err := vmInstance.Execute(bytecode)
+	if err != nil {
+		t.Fatalf("Execute() error: %v", err)
+	}
+
+	expected := vm.IntValue{Val: 1}
+	if !valuesEqual(result, expected) {
+		t.Errorf("Expected %v, got %v", expected, result)
+	}
+}
+
+func TestCompileReassignment(t *testing.T) {
+	// Test: $ x = 0, x = x + 1, x = x + 1, > x
+	// Should work - declaration followed by reassignment
+	route := &interpreter.Route{
+		Body: []interpreter.Statement{
+			&interpreter.AssignStatement{
+				Target: "x",
+				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+			},
+			&interpreter.ReassignStatement{
+				Target: "x",
+				Value: &interpreter.BinaryOpExpr{
+					Op:    interpreter.Add,
+					Left:  &interpreter.VariableExpr{Name: "x"},
+					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+				},
+			},
+			&interpreter.ReassignStatement{
+				Target: "x",
+				Value: &interpreter.BinaryOpExpr{
+					Op:    interpreter.Add,
+					Left:  &interpreter.VariableExpr{Name: "x"},
+					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+				},
+			},
+			&interpreter.ReturnStatement{
+				Value: &interpreter.VariableExpr{Name: "x"},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	bytecode, err := c.CompileRoute(route)
+	if err != nil {
+		t.Fatalf("CompileRoute() error: %v", err)
+	}
+
+	vmInstance := vm.NewVM()
+	result, err := vmInstance.Execute(bytecode)
+	if err != nil {
+		t.Fatalf("Execute() error: %v", err)
+	}
+
+	expected := vm.IntValue{Val: 2}
+	if !valuesEqual(result, expected) {
+		t.Errorf("Expected %v, got %v", expected, result)
+	}
+}
+
+func TestCompileReassignmentUndeclaredVariable(t *testing.T) {
+	// Test: x = 1 (without prior declaration) should fail
+	route := &interpreter.Route{
+		Body: []interpreter.Statement{
+			&interpreter.ReassignStatement{
+				Target: "x",
+				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	_, err := c.CompileRoute(route)
+	if err == nil {
+		t.Fatal("Expected undeclared variable error, got nil")
+	}
+	if !IsSemanticError(err) {
+		t.Errorf("Expected SemanticError, got %T: %v", err, err)
+	}
+	expectedMsg := "cannot assign to undeclared variable 'x'"
+	if err.Error() != expectedMsg {
+		t.Errorf("Expected error message %q, got %q", expectedMsg, err.Error())
+	}
+}
+
 func TestCompileArithmeticExpression(t *testing.T) {
 	// Test: $ result = 5 + 3 * 2, > result
 	// Expected: 11 (5 + (3 * 2))

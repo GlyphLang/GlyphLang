@@ -45,6 +45,8 @@ func (d *SQLInjectionDetector) checkStatement(stmt interpreter.Statement, locati
 	switch s := stmt.(type) {
 	case interpreter.AssignStatement:
 		d.checkExpression(s.Value, location)
+	case interpreter.ReassignStatement:
+		d.checkExpression(s.Value, location)
 	case interpreter.ReturnStatement:
 		d.checkExpression(s.Value, location)
 	case interpreter.IfStatement:

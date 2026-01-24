@@ -718,6 +718,32 @@ func findReferencesInStatement(stmt interpreter.Statement, symbol string, uri st
 	case interpreter.WhileStatement:
 		locations = append(locations, findReferencesInExpression(s.Condition, symbol, uri)...)
 		locations = append(locations, findReferencesInStatements(s.Body, symbol, uri)...)
+
+	case *interpreter.ReassignStatement:
+		// Check if the reassignment target is our symbol
+		if s.Target == symbol {
+			locations = append(locations, Location{
+				URI: uri,
+				Range: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 0},
+				},
+			})
+		}
+		// Check the value expression
+		locations = append(locations, findReferencesInExpression(s.Value, symbol, uri)...)
+
+	case interpreter.ReassignStatement:
+		if s.Target == symbol {
+			locations = append(locations, Location{
+				URI: uri,
+				Range: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 0},
+				},
+			})
+		}
+		locations = append(locations, findReferencesInExpression(s.Value, symbol, uri)...)
 	}
 
 	return locations

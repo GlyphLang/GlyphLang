@@ -185,13 +185,22 @@ type Statement interface {
 	isNode()
 }
 
-// AssignStatement represents variable assignment
+// AssignStatement represents variable declaration with $ syntax
 type AssignStatement struct {
 	Target string
 	Value  Expr
 }
 
 func (AssignStatement) isStatement() {}
+
+// ReassignStatement represents variable reassignment without $ syntax
+type ReassignStatement struct {
+	Target string
+	Value  Expr
+}
+
+func (ReassignStatement) isStatement() {}
+func (ReassignStatement) isNode() {}
 
 // DbQueryStatement represents a database query
 type DbQueryStatement struct {

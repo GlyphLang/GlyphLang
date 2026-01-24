@@ -414,6 +414,106 @@ func TestParser_Assignment(t *testing.T) {
 	}
 }
 
+func TestParser_Reassignment(t *testing.T) {
+	source := `@ GET /test {
+  $ x = 0
+  x = 42
+  > {value: x}
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		t.Fatalf("lexer error: %v", err)
+	}
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("parser error: %v", err)
+	}
+
+	route, ok := module.Items[0].(*interpreter.Route)
+	if !ok {
+		t.Fatalf("expected Route, got %T", module.Items[0])
+	}
+
+	if len(route.Body) != 3 {
+		t.Fatalf("expected 3 statements, got %d", len(route.Body))
+	}
+
+	// First statement should be an AssignStatement (declaration)
+	assign, ok := route.Body[0].(interpreter.AssignStatement)
+	if !ok {
+		t.Fatalf("expected AssignStatement for first statement, got %T", route.Body[0])
+	}
+	if assign.Target != "x" {
+		t.Errorf("expected target 'x', got '%s'", assign.Target)
+	}
+
+	// Second statement should be a ReassignStatement (reassignment without $)
+	reassign, ok := route.Body[1].(interpreter.ReassignStatement)
+	if !ok {
+		t.Fatalf("expected ReassignStatement for second statement, got %T", route.Body[1])
+	}
+	if reassign.Target != "x" {
+		t.Errorf("expected reassign target 'x', got '%s'", reassign.Target)
+	}
+
+	// Check the value is a literal 42
+	lit, ok := reassign.Value.(interpreter.LiteralExpr)
+	if !ok {
+		t.Fatalf("expected LiteralExpr for reassign value, got %T", reassign.Value)
+	}
+	intLit, ok := lit.Value.(interpreter.IntLiteral)
+	if !ok {
+		t.Fatalf("expected IntLiteral, got %T", lit.Value)
+	}
+	if intLit.Value != 42 {
+		t.Errorf("expected value 42, got %d", intLit.Value)
+	}
+}
+
+func TestParser_ReassignmentWithExpression(t *testing.T) {
+	source := `@ GET /test {
+  $ x = 1
+  x = x + 1
+  > {value: x}
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		t.Fatalf("lexer error: %v", err)
+	}
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("parser error: %v", err)
+	}
+
+	route, ok := module.Items[0].(*interpreter.Route)
+	if !ok {
+		t.Fatalf("expected Route, got %T", module.Items[0])
+	}
+
+	// Second statement should be a ReassignStatement with binary expression
+	reassign, ok := route.Body[1].(interpreter.ReassignStatement)
+	if !ok {
+		t.Fatalf("expected ReassignStatement, got %T", route.Body[1])
+	}
+
+	// Check the value is a binary expression (x + 1)
+	binExpr, ok := reassign.Value.(interpreter.BinaryOpExpr)
+	if !ok {
+		t.Fatalf("expected BinaryOpExpr for reassign value, got %T", reassign.Value)
+	}
+	if binExpr.Op != interpreter.Add {
+		t.Errorf("expected Add operator, got %v", binExpr.Op)
+	}
+}
+
 func TestParser_BinaryOp(t *testing.T) {
 	source := `@ GET /calc {
   $ result = 10 + 20 * 2
