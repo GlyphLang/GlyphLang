@@ -599,3 +599,115 @@ func TestWebSocketPathParamsIssue64Verification(t *testing.T) {
 	t.Log("  - Path parameter is accessible in all event handlers")
 	t.Log("  - broadcast_to_room(room, ...) works as expected")
 }
+
+// TestWebSocketPathParamsMessageDelivery tests actual message delivery between
+// multiple clients connected to the same room via path parameters.
+// This is the end-to-end test that verifies messages are actually delivered.
+func TestWebSocketPathParamsMessageDelivery(t *testing.T) {
+	wsServer := glyphws.NewServer()
+	defer wsServer.Shutdown()
+
+	var connCount int
+	var mu sync.Mutex
+	allConnected := make(chan struct{})
+
+	// OnConnect: auto-join the room from path params
+	wsServer.GetHub().OnConnect(func(conn *glyphws.Connection) error {
+		room := conn.PathParams["room"]
+		t.Logf("Client connected to room: %s", room)
+		conn.JoinRoom(room)
+
+		mu.Lock()
+		connCount++
+		if connCount == 2 {
+			close(allConnected)
+		}
+		mu.Unlock()
+		return nil
+	})
+
+	// OnMessage: broadcast to room from path params
+	wsServer.GetHub().OnMessage(glyphws.MessageTypeText, func(ctx *glyphws.MessageContext) error {
+		room := ctx.Conn.PathParams["room"]
+		// Get the raw message data
+		data, _ := ctx.Message.ToJSON()
+		t.Logf("Broadcasting message to room %s", room)
+		wsServer.GetHub().BroadcastToRoom(room, data, ctx.Conn) // exclude sender
+		return nil
+	})
+
+	// Setup server with path pattern
+	pattern := "/chat/:room"
+	mux := http.NewServeMux()
+	mux.HandleFunc("/chat/{room}", wsServer.HandleWebSocketWithPattern(pattern))
+
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http")
+
+	// Connect client1 to room "golang"
+	client1, _, err := gorillaWS.DefaultDialer.Dial(wsURL+"/chat/golang", nil)
+	require.NoError(t, err, "Client1 should connect")
+	defer client1.Close()
+
+	// Connect client2 to same room "golang"
+	client2, _, err := gorillaWS.DefaultDialer.Dial(wsURL+"/chat/golang", nil)
+	require.NoError(t, err, "Client2 should connect")
+	defer client2.Close()
+
+	// Wait for both to connect
+	select {
+	case <-allConnected:
+		t.Log("Both clients connected")
+	case <-time.After(2 * time.Second):
+		t.Fatal("Timeout waiting for connections")
+	}
+
+	// Client1 sends a message (using the Message format expected by the server)
+	testMsg := glyphws.NewTextMessage("Hello from client1!")
+	msgData, _ := testMsg.ToJSON()
+	err = client1.WriteMessage(gorillaWS.TextMessage, msgData)
+	require.NoError(t, err, "Client1 should send message")
+	t.Log("Client1 sent message")
+
+	// Client2 should receive it (same room, sender excluded)
+	client2.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, received, err := client2.ReadMessage()
+	require.NoError(t, err, "Client2 should receive message")
+	assert.Contains(t, string(received), "Hello from client1!", "Message should contain original text")
+	t.Logf("SUCCESS: Client2 received: %s", string(received))
+
+	// Now test room isolation - connect client3 to different room
+	client3, _, err := gorillaWS.DefaultDialer.Dial(wsURL+"/chat/rust", nil)
+	require.NoError(t, err, "Client3 should connect to rust room")
+	defer client3.Close()
+
+	time.Sleep(200 * time.Millisecond) // Let client3 connect and join room
+
+	// Client1 sends another message to golang room
+	testMsg2 := glyphws.NewTextMessage("Another message to golang room")
+	msgData2, _ := testMsg2.ToJSON()
+	err = client1.WriteMessage(gorillaWS.TextMessage, msgData2)
+	require.NoError(t, err)
+
+	// Client2 should receive it
+	client2.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, received2, err := client2.ReadMessage()
+	require.NoError(t, err, "Client2 should receive second message")
+	assert.Contains(t, string(received2), "Another message to golang room")
+	t.Log("SUCCESS: Client2 received second message")
+
+	// Client3 should NOT receive it (different room)
+	client3.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+	_, received3, err := client3.ReadMessage()
+	if err != nil {
+		t.Log("SUCCESS: Client3 (rust room) correctly did NOT receive golang room message")
+	} else {
+		t.Errorf("FAIL: Client3 should not have received message, got: %s", string(received3))
+	}
+
+	t.Log("\n=== MESSAGE DELIVERY TEST PASSED ===")
+	t.Log("  - Messages delivered between clients in same room via path params")
+	t.Log("  - Messages NOT delivered to clients in different rooms")
+}
