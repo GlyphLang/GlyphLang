@@ -40,6 +40,10 @@ type Connection struct {
 	// Path parameters extracted from the WebSocket route pattern (e.g., :room from /chat/:room)
 	PathParams map[string]string
 
+	// routePattern is the original route pattern this connection matched (e.g., /chat/:room)
+	// Used internally to filter handlers when multiple WebSocket routes exist
+	routePattern string
+
 	// Heartbeat tracking
 	missedPongs    int
 	lastPongTime   time.Time
@@ -48,6 +52,16 @@ type Connection struct {
 	// Message queue for backpressure handling
 	messageQueue   [][]byte
 	queueMu        sync.Mutex
+}
+
+// RoutePattern returns the route pattern this connection matched
+func (c *Connection) RoutePattern() string {
+	return c.routePattern
+}
+
+// SetRoutePattern sets the route pattern for this connection
+func (c *Connection) SetRoutePattern(pattern string) {
+	c.routePattern = pattern
 }
 
 // NewConnection creates a new WebSocket connection
@@ -290,9 +304,13 @@ func (c *Connection) JoinRoom(roomName string) {
 	c.rooms[roomName] = true
 	c.roomsMu.Unlock()
 
-	c.hub.joinRoom <- &RoomAction{
-		Conn:     c,
-		RoomName: roomName,
+	// Add to room manager synchronously to ensure the room exists
+	// before any subsequent operations (like broadcast_to_room)
+	rm := c.hub.GetRoomManager()
+	if err := rm.AddConnectionToRoom(c, roomName); err != nil {
+		log.Printf("[WS] Failed to join room %s: %v", roomName, err)
+	} else {
+		log.Printf("[WS] Connection %s joined room %s", c.ID, roomName)
 	}
 }
 
@@ -302,10 +320,10 @@ func (c *Connection) LeaveRoom(roomName string) {
 	delete(c.rooms, roomName)
 	c.roomsMu.Unlock()
 
-	c.hub.leaveRoom <- &RoomAction{
-		Conn:     c,
-		RoomName: roomName,
-	}
+	// Remove from room manager synchronously
+	rm := c.hub.GetRoomManager()
+	rm.RemoveConnectionFromRoom(c, roomName)
+	log.Printf("[WS] Connection %s left room %s", c.ID, roomName)
 }
 
 // GetRooms returns all rooms this connection has joined

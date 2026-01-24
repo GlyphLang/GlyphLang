@@ -55,9 +55,13 @@ type Hub struct {
 	// Message handler
 	handler *Handler
 
-	// Connection lifecycle handlers
+	// Connection lifecycle handlers (global, for all routes)
 	onConnect    []EventHandler
 	onDisconnect []EventHandler
+
+	// Route-specific handlers (keyed by route pattern)
+	routeOnConnect    map[string][]EventHandler
+	routeOnDisconnect map[string][]EventHandler
 
 	// Mutex for handlers
 	handlerMu sync.RWMutex
@@ -114,10 +118,12 @@ func NewHubWithConfig(config *Config) *Hub {
 		joinRoom:         make(chan *RoomAction, 256),
 		leaveRoom:        make(chan *RoomAction, 256),
 		roomManager:      NewRoomManagerWithConfig(config),
-		handler:          NewHandler(),
-		onConnect:        make([]EventHandler, 0),
-		onDisconnect:     make([]EventHandler, 0),
-		shutdown:         make(chan struct{}),
+		handler:           NewHandler(),
+		onConnect:         make([]EventHandler, 0),
+		onDisconnect:      make([]EventHandler, 0),
+		routeOnConnect:    make(map[string][]EventHandler),
+		routeOnDisconnect: make(map[string][]EventHandler),
+		shutdown:          make(chan struct{}),
 		started:          make(chan struct{}),
 		config:           config,
 		metrics:          NewMetrics(),
@@ -161,12 +167,23 @@ func (h *Hub) Run() {
 			h.metrics.RegisterConnection(conn.ID)
 			log.Printf("[WS] Connection registered: %s (total: %d)", conn.ID, len(h.connections))
 
-			// Call onConnect handlers
+			// Call onConnect handlers (protected by handlerMu)
+			// routeOnConnect is also protected by handlerMu (see OnConnectForRoute)
 			h.handlerMu.RLock()
+			// Global handlers (for all routes)
 			for _, handler := range h.onConnect {
 				if err := handler(conn); err != nil {
 					log.Printf("[WS] onConnect handler error: %v", err)
 					h.metrics.IncrementHandlerErrors()
+				}
+			}
+			// Route-specific handlers
+			if routePattern := conn.RoutePattern(); routePattern != "" {
+				for _, handler := range h.routeOnConnect[routePattern] {
+					if err := handler(conn); err != nil {
+						log.Printf("[WS] onConnect handler error for route %s: %v", routePattern, err)
+						h.metrics.IncrementHandlerErrors()
+					}
 				}
 			}
 			h.handlerMu.RUnlock()
@@ -189,12 +206,24 @@ func (h *Hub) Run() {
 
 				log.Printf("[WS] Connection unregistered: %s (total: %d)", conn.ID, len(h.connections))
 
-				// Call onDisconnect handlers
+				// Call onDisconnect handlers (protected by handlerMu)
+				// Note: routeOnDisconnect is also protected by handlerMu (see OnDisconnectForRoute)
+				// conn.RoutePattern() is immutable after connection setup
 				h.handlerMu.RLock()
+				// Global handlers (for all routes)
 				for _, handler := range h.onDisconnect {
 					if err := handler(conn); err != nil {
 						log.Printf("[WS] onDisconnect handler error: %v", err)
 						h.metrics.IncrementHandlerErrors()
+					}
+				}
+				// Route-specific handlers
+				if routePattern := conn.RoutePattern(); routePattern != "" {
+					for _, handler := range h.routeOnDisconnect[routePattern] {
+						if err := handler(conn); err != nil {
+							log.Printf("[WS] onDisconnect handler error for route %s: %v", routePattern, err)
+							h.metrics.IncrementHandlerErrors()
+						}
 					}
 				}
 				h.handlerMu.RUnlock()
@@ -364,6 +393,20 @@ func (h *Hub) OnDisconnect(handler EventHandler) {
 	h.onDisconnect = append(h.onDisconnect, handler)
 }
 
+// OnConnectForRoute registers a handler for connection events on a specific route
+func (h *Hub) OnConnectForRoute(pattern string, handler EventHandler) {
+	h.handlerMu.Lock()
+	defer h.handlerMu.Unlock()
+	h.routeOnConnect[pattern] = append(h.routeOnConnect[pattern], handler)
+}
+
+// OnDisconnectForRoute registers a handler for disconnection events on a specific route
+func (h *Hub) OnDisconnectForRoute(pattern string, handler EventHandler) {
+	h.handlerMu.Lock()
+	defer h.handlerMu.Unlock()
+	h.routeOnDisconnect[pattern] = append(h.routeOnDisconnect[pattern], handler)
+}
+
 // OnMessage registers a handler for message events
 func (h *Hub) OnMessage(msgType MessageType, handler MessageHandler) {
 	h.handler.On(msgType, handler)
@@ -471,6 +514,9 @@ func (s *Server) HandleWebSocketWithPattern(pattern string) http.HandlerFunc {
 
 		// Extract and store path parameters from the request URL
 		wsConn.PathParams = extractPathParams(pattern, r.URL.Path)
+
+		// Store the route pattern so handlers can filter by route
+		wsConn.SetRoutePattern(pattern)
 
 		// Register connection
 		s.hub.register <- wsConn
