@@ -29,3 +29,4 @@ The examples below demonstrate async blocks and await usage.
   > {user: user, orders: orders, stats: stats}
 }
 
+```
