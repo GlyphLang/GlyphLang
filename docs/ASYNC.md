@@ -1,3 +1,8 @@
+# Async / Await
+
+This document explains how asynchronous execution works in GlyphLang.
+The examples below demonstrate async blocks and await usage.
+
 ```glyph
 # Basic async block - executes in background, returns Future
 @ GET /compute {
@@ -23,3 +28,4 @@
 
   > {user: user, orders: orders, stats: stats}
 }
+

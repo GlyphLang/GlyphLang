@@ -1,3 +1,8 @@
+# Event Handlers
+
+GlyphLang supports event-based handlers for reactive systems.
+The examples below demonstrate synchronous and asynchronous event handlers.
+
 ```glyph
 # Handle user creation event
 ~ "user.created" {
@@ -10,6 +15,6 @@
 ~ "order.completed" async {
   $ order_id = event.order_id
   $ total = event.total
-  > {processed: true, order_id: order_id}
+  > {processed: true}
 }
-```
+
