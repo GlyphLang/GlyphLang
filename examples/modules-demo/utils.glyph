@@ -1,6 +1,9 @@
 # utils.glyph - Utility module with helper functions
 module "utils"
 
+# Import types from models
+from "./models" import { User }
+
 # Get all users from the database
 ! getAllUsers(db: Database): [User] {
   $ users = db.users.all()
