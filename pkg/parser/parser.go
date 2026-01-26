@@ -274,7 +274,7 @@ func (p *Parser) parseField() (interpreter.Field, error) {
 	return p.parseFieldWithContext(nil)
 }
 
-// parseFieldWithContext parses a field with type parameter context: name: type!
+// parseFieldWithContext parses a field with type parameter context: name: type! [= default]
 func (p *Parser) parseFieldWithContext(typeParamNames []string) (interpreter.Field, error) {
 	name, err := p.expectIdent()
 	if err != nil {
@@ -290,11 +290,40 @@ func (p *Parser) parseFieldWithContext(typeParamNames []string) (interpreter.Fie
 		return interpreter.Field{}, err
 	}
 
+	// Check for default value: = expr
+	var defaultValue interpreter.Expr
+	if p.check(EQUALS) {
+		p.advance()
+		defaultValue, err = p.parseExpr()
+		if err != nil {
+			return interpreter.Field{}, err
+		}
+	}
+
 	return interpreter.Field{
 		Name:           name,
 		TypeAnnotation: typeAnnotation,
 		Required:       required,
+		Default:        defaultValue,
 	}, nil
+}
+
+// validateFunctionParams validates that required parameters come before optional ones
+// This ensures positional argument passing works correctly
+func (p *Parser) validateFunctionParams(params []interpreter.Field) error {
+	sawOptional := false
+	for _, param := range params {
+		hasDefault := param.Default != nil
+		isRequired := param.Required && !hasDefault
+
+		if isRequired && sawOptional {
+			return fmt.Errorf("required parameter '%s' cannot come after optional parameters", param.Name)
+		}
+		if hasDefault || !param.Required {
+			sawOptional = true
+		}
+	}
+	return nil
 }
 
 // parseType parses a type annotation
@@ -2596,6 +2625,11 @@ func (p *Parser) parseGenericFunction(name string) (interpreter.Item, error) {
 		return nil, err
 	}
 
+	// Validate parameter ordering (required params must come before optional ones)
+	if err := p.validateFunctionParams(params); err != nil {
+		return nil, err
+	}
+
 	// Parse optional return type : Type or -> Type
 	var returnType interpreter.Type
 	if p.check(COLON) || p.check(ARROW) {
@@ -2665,6 +2699,11 @@ func (p *Parser) parseRegularFunction(name string) (interpreter.Item, error) {
 	}
 
 	if err := p.expect(RPAREN); err != nil {
+		return nil, err
+	}
+
+	// Validate parameter ordering (required params must come before optional ones)
+	if err := p.validateFunctionParams(params); err != nil {
 		return nil, err
 	}
 

@@ -1,12 +1,12 @@
 # Authentication Demo API
 # Demonstrates JWT authentication, protected routes, and role-based access control
 
-# Define user types
+# Define user types with default role
 : User {
   id: int!
   username: str!
   email: str!
-  role: str!
+  role: str! = "user"
   created_at: timestamp
   last_login: timestamp
 }

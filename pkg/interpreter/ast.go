@@ -51,6 +51,7 @@ type Field struct {
 	Name           string
 	TypeAnnotation Type
 	Required       bool
+	Default        Expr // nil if no default value
 }
 
 // Type represents a type annotation

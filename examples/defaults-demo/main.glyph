@@ -1,0 +1,275 @@
+# Default Values Demo
+# Demonstrates struct field defaults and function parameter defaults in GlyphLang
+
+# ============================================================================
+# SECTION 1: STRUCT FIELDS WITH DEFAULT VALUES
+# ============================================================================
+
+# User configuration with sensible defaults
+: UserConfig {
+  id: int!
+  username: str!
+  theme: str! = "light"
+  language: str! = "en"
+  notifications_enabled: bool! = true
+  max_items_per_page: int! = 20
+  font_size: float! = 14.0
+}
+
+# Server settings with default configuration
+: ServerConfig {
+  host: str! = "localhost"
+  port: int! = 8080
+  debug: bool! = false
+  timeout_seconds: float! = 30.0
+  max_connections: int! = 100
+}
+
+# Task with common defaults
+: Task {
+  id: int!
+  title: str!
+  description: str = ""
+  status: str! = "pending"
+  priority: int! = 3
+  completed: bool! = false
+  progress: float! = 0.0
+}
+
+# API response with default success state
+: ApiResponse {
+  success: bool! = true
+  message: str! = "OK"
+  data: any
+  timestamp: timestamp
+}
+
+# ============================================================================
+# SECTION 2: ROUTES USING STRUCTS WITH DEFAULTS
+# ============================================================================
+
+# Health check endpoint
+@ GET /api/health {
+  > {
+    success: true,
+    message: "Service is healthy",
+    data: null,
+    timestamp: now()
+  }
+}
+
+# Get default configuration
+@ GET /api/config/defaults {
+  # These values come from the struct defaults
+  $ config = {
+    host: "localhost",
+    port: 8080,
+    debug: false,
+    timeout_seconds: 30.0,
+    max_connections: 100
+  }
+  > {
+    success: true,
+    message: "Default configuration",
+    data: config,
+    timestamp: now()
+  }
+}
+
+# Create a new task - only title is required due to defaults
+@ POST /api/tasks {
+  + ratelimit(50/min)
+  % db: Database
+
+  # Validate required field
+  if input.title == null || input.title == "" {
+    > {
+      success: false,
+      message: "Title is required",
+      data: null,
+      timestamp: now()
+    }
+  } else {
+    # Create task - other fields use defaults if not provided
+    $ newTask = {
+      id: db.tasks.nextId(),
+      title: input.title,
+      description: input.description,
+      status: "pending",
+      priority: 3,
+      completed: false,
+      progress: 0.0
+    }
+
+    # Override defaults if values provided
+    if input.priority != null {
+      $ newTask.priority = input.priority
+    }
+
+    if input.status != null {
+      $ newTask.status = input.status
+    }
+
+    $ saved = db.tasks.create(newTask)
+
+    > {
+      success: true,
+      message: "Task created with defaults applied",
+      data: saved,
+      timestamp: now()
+    }
+  }
+}
+
+# Get user configuration with defaults
+@ GET /api/users/:id/config {
+  % db: Database
+
+  $ user = db.users.get(id)
+
+  if user == null {
+    > {
+      success: false,
+      message: "User not found",
+      data: null,
+      timestamp: now()
+    }
+  } else {
+    # Return config with defaults for any missing preferences
+    $ config = {
+      id: user.id,
+      username: user.username,
+      theme: "light",
+      language: "en",
+      notifications_enabled: true,
+      max_items_per_page: 20,
+      font_size: 14.0
+    }
+
+    # Override with user preferences if they exist
+    if user.preferences != null {
+      if user.preferences.theme != null {
+        $ config.theme = user.preferences.theme
+      }
+      if user.preferences.language != null {
+        $ config.language = user.preferences.language
+      }
+    }
+
+    > {
+      success: true,
+      message: "User configuration",
+      data: config,
+      timestamp: now()
+    }
+  }
+}
+
+# ============================================================================
+# SECTION 3: CLI COMMANDS WITH PARAMETER DEFAULTS
+# ============================================================================
+
+# Greet command with default formal flag
+! greet name: str! --formal: bool = false {
+  if formal {
+    $ msg = "Good day, " + name + "."
+  } else {
+    $ msg = "Hey " + name + "!"
+  }
+  > {greeting: msg}
+}
+
+# Server start command with defaults
+# Note: Only one optional flag parameter is demonstrated here due to parser limitations
+# with multiple flag defaults (a known issue tracked separately)
+! start_server --host: str = "localhost" {
+  $ config = {
+    host: host,
+    port: 8080,
+    debug: false
+  }
+  > {
+    action: "starting server",
+    config: config
+  }
+}
+
+# Generate report with positional required param and one optional flag
+! report type: str! --format: str = "json" {
+  $ options = {
+    report_type: type,
+    output_format: format,
+    result_limit: 100,
+    with_metadata: true
+  }
+  > {
+    action: "generating report",
+    options: options
+  }
+}
+
+# ============================================================================
+# SECTION 4: COMBINING DEFAULTS IN COMPLEX SCENARIOS
+# ============================================================================
+
+# Notification settings with nested defaults
+: NotificationPrefs {
+  email_enabled: bool! = true
+  push_enabled: bool! = true
+  sms_enabled: bool! = false
+  frequency: str! = "immediate"
+  quiet_hours_start: int! = 22
+  quiet_hours_end: int! = 8
+}
+
+# Pagination with sensible defaults
+: PaginationParams {
+  page: int! = 1
+  per_page: int! = 20
+  sort_by: str! = "created_at"
+  sort_order: str! = "desc"
+}
+
+# List items with pagination defaults
+@ GET /api/items {
+  + ratelimit(100/min)
+  % db: Database
+
+  # Use defaults if not provided in query
+  $ page = 1
+  $ per_page = 20
+  $ sort_by = "created_at"
+  $ sort_order = "desc"
+
+  if input.page != null {
+    $ page = parseInt(input.page)
+  }
+  if input.per_page != null {
+    $ per_page = parseInt(input.per_page)
+  }
+  if input.sort_by != null {
+    $ sort_by = input.sort_by
+  }
+  if input.sort_order != null {
+    $ sort_order = input.sort_order
+  }
+
+  $ items = db.items.all()
+  $ total = items.length()
+
+  > {
+    success: true,
+    message: "Items retrieved",
+    data: {
+      items: items,
+      pagination: {
+        page: page,
+        per_page: per_page,
+        total: total,
+        sort_by: sort_by,
+        sort_order: sort_order
+      }
+    },
+    timestamp: now()
+  }
+}
