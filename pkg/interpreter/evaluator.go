@@ -1218,10 +1218,10 @@ func (i *Interpreter) executeFunction(fn Function, args []Expr, env *Environment
 	// Create a new environment for the function
 	fnEnv := NewChildEnvironment(env)
 
-	// Count required parameters (those without defaults)
+	// Count required parameters (those marked required without defaults)
 	requiredCount := 0
 	for _, param := range fn.Params {
-		if param.Default == nil {
+		if param.Required && param.Default == nil {
 			requiredCount++
 		}
 	}
@@ -1251,12 +1251,17 @@ func (i *Interpreter) executeFunction(fn Function, args []Expr, env *Environment
 			if err != nil {
 				return nil, fmt.Errorf("error evaluating default for parameter %s: %v", param.Name, err)
 			}
+		} else if !param.Required {
+			// Optional parameter without default gets nil
+			argVal = nil
 		} else {
 			return nil, fmt.Errorf("missing required argument %s in function %s", param.Name, fn.Name)
 		}
 
 		// Validate argument type matches parameter type annotation
-		if param.TypeAnnotation != nil {
+		// Optional parameters can be nil without type checking
+		skipTypeCheck := argVal == nil && !param.Required
+		if param.TypeAnnotation != nil && !skipTypeCheck {
 			if err := i.typeChecker.CheckType(argVal, param.TypeAnnotation); err != nil {
 				return nil, fmt.Errorf("argument %d (%s): %v", idx+1, param.Name, err)
 			}

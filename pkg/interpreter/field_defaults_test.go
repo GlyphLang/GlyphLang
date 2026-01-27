@@ -144,6 +144,142 @@ func TestInterpreter_ApplyTypeDefaults_IntDefault(t *testing.T) {
 	assert.Equal(t, int64(3), result["retries"])
 }
 
+// Test executeFunction with optional parameter without default
+func TestInterpreter_ExecuteFunction_OptionalParamWithoutDefault(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	// Function with required param and optional param (no default)
+	// The function just returns a literal - we're testing that it can be called
+	// with only the required argument (the optional one gets nil)
+	fn := Function{
+		Name: "test",
+		Params: []Field{
+			{Name: "name", TypeAnnotation: StringType{}, Required: true, Default: nil},
+			{Name: "nickname", TypeAnnotation: StringType{}, Required: false, Default: nil},
+		},
+		Body: []Statement{
+			ReturnStatement{Value: LiteralExpr{Value: StringLiteral{Value: "success"}}},
+		},
+	}
+
+	// Call with only the required argument - optional param should get nil
+	args := []Expr{
+		LiteralExpr{Value: StringLiteral{Value: "Alice"}},
+	}
+
+	result, err := interp.executeFunction(fn, args, env)
+	require.NoError(t, err, "should not error when optional param without default is omitted")
+	assert.Equal(t, "success", result)
+}
+
+// Test executeFunction counts only required params without defaults
+func TestInterpreter_ExecuteFunction_RequiredParamCount(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	// Function with: required param, optional param (no default), param with default
+	fn := Function{
+		Name: "test",
+		Params: []Field{
+			{Name: "a", TypeAnnotation: StringType{}, Required: true, Default: nil},
+			{Name: "b", TypeAnnotation: StringType{}, Required: false, Default: nil},
+			{Name: "c", TypeAnnotation: StringType{}, Required: false, Default: LiteralExpr{Value: StringLiteral{Value: "default"}}},
+		},
+		Body: []Statement{
+			ReturnStatement{Value: LiteralExpr{Value: StringLiteral{Value: "ok"}}},
+		},
+	}
+
+	// Should succeed with just required param
+	args := []Expr{
+		LiteralExpr{Value: StringLiteral{Value: "value"}},
+	}
+
+	_, err := interp.executeFunction(fn, args, env)
+	require.NoError(t, err, "should succeed with only required argument")
+
+	// Should fail with no arguments (missing required)
+	_, err = interp.executeFunction(fn, []Expr{}, env)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "expects at least 1 argument")
+}
+
+// Test that providing all arguments still works correctly
+func TestInterpreter_ExecuteFunction_AllArgsProvided(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	fn := Function{
+		Name: "test",
+		Params: []Field{
+			{Name: "a", TypeAnnotation: StringType{}, Required: true, Default: nil},
+			{Name: "b", TypeAnnotation: StringType{}, Required: false, Default: nil},
+			{Name: "c", TypeAnnotation: StringType{}, Required: false, Default: LiteralExpr{Value: StringLiteral{Value: "default_c"}}},
+		},
+		Body: []Statement{
+			ReturnStatement{Value: LiteralExpr{Value: StringLiteral{Value: "ok"}}},
+		},
+	}
+
+	// Provide all three arguments
+	args := []Expr{
+		LiteralExpr{Value: StringLiteral{Value: "val_a"}},
+		LiteralExpr{Value: StringLiteral{Value: "val_b"}},
+		LiteralExpr{Value: StringLiteral{Value: "val_c"}},
+	}
+
+	_, err := interp.executeFunction(fn, args, env)
+	require.NoError(t, err, "should succeed when all arguments are provided")
+}
+
+// Test that too many arguments fails
+func TestInterpreter_ExecuteFunction_TooManyArgs(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	fn := Function{
+		Name: "test",
+		Params: []Field{
+			{Name: "a", TypeAnnotation: StringType{}, Required: true, Default: nil},
+		},
+		Body: []Statement{
+			ReturnStatement{Value: LiteralExpr{Value: StringLiteral{Value: "ok"}}},
+		},
+	}
+
+	// Provide too many arguments
+	args := []Expr{
+		LiteralExpr{Value: StringLiteral{Value: "val_a"}},
+		LiteralExpr{Value: StringLiteral{Value: "extra"}},
+	}
+
+	_, err := interp.executeFunction(fn, args, env)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "expects at most 1 argument")
+}
+
+// Test required param with default is not required
+func TestInterpreter_ExecuteFunction_RequiredParamWithDefault(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	// A required (!) param with a default should NOT require an argument
+	fn := Function{
+		Name: "test",
+		Params: []Field{
+			{Name: "name", TypeAnnotation: StringType{}, Required: true, Default: LiteralExpr{Value: StringLiteral{Value: "default_name"}}},
+		},
+		Body: []Statement{
+			ReturnStatement{Value: LiteralExpr{Value: StringLiteral{Value: "ok"}}},
+		},
+	}
+
+	// Call with no arguments - should work because default exists
+	_, err := interp.executeFunction(fn, []Expr{}, env)
+	require.NoError(t, err, "required param with default should not require argument")
+}
+
 // Test InstantiateGenericType preserves defaults
 func TestTypeChecker_InstantiateGenericType_PreservesDefaults(t *testing.T) {
 	tc := NewTypeChecker()
