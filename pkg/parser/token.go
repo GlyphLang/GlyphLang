@@ -42,6 +42,7 @@ const (
 	DOT      // .
 	ARROW    // ->
 	PIPE     // |
+	PIPE_OP  // |>
 	EQUALS   // =
 
 	// Literals
@@ -151,6 +152,8 @@ func (t TokenType) String() string {
 		return "->"
 	case PIPE:
 		return "|"
+	case PIPE_OP:
+		return "|>"
 	case EQUALS:
 		return "="
 	case IDENT:

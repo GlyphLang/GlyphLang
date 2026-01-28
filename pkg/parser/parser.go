@@ -2067,7 +2067,30 @@ func (p *Parser) parseSwitchStatement() (interpreter.Statement, error) {
 
 // parseExpr parses an expression with operator precedence
 func (p *Parser) parseExpr() (interpreter.Expr, error) {
-	return p.parseBinaryExpr(0)
+	return p.parsePipeExpr()
+}
+
+// parsePipeExpr parses pipe expressions (|>) with the lowest precedence
+// Pipes are left-associative: a |> b |> c parses as ((a |> b) |> c)
+func (p *Parser) parsePipeExpr() (interpreter.Expr, error) {
+	left, err := p.parseBinaryExpr(0)
+	if err != nil {
+		return nil, err
+	}
+
+	for p.current().Type == PIPE_OP {
+		p.advance() // consume |>
+		right, err := p.parseBinaryExpr(0)
+		if err != nil {
+			return nil, err
+		}
+		left = interpreter.PipeExpr{
+			Left:  left,
+			Right: right,
+		}
+	}
+
+	return left, nil
 }
 
 // parseBinaryExpr parses binary expressions with precedence climbing

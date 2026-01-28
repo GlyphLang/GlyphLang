@@ -394,6 +394,15 @@ type LambdaExpr struct {
 
 func (LambdaExpr) isExpr() {}
 
+// PipeExpr represents a pipe expression: left |> right
+// The left value is piped as the first argument to the right function
+type PipeExpr struct {
+	Left  Expr // The value being piped
+	Right Expr // The function/call to receive the piped value
+}
+
+func (PipeExpr) isExpr() {}
+
 // Literal represents a literal value
 type Literal interface {
 	isLiteral()
