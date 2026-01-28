@@ -74,3 +74,32 @@ func (e *Environment) HasLocal(name string) bool {
 	_, ok := e.vars[name]
 	return ok
 }
+
+// GetAll returns all variables in this environment and all parent environments.
+// If a variable exists in multiple scopes, the closest scope wins.
+func (e *Environment) GetAll() map[string]interface{} {
+	result := make(map[string]interface{})
+
+	// Start with parent variables (if any)
+	if e.parent != nil {
+		for name, val := range e.parent.GetAll() {
+			result[name] = val
+		}
+	}
+
+	// Override with current scope variables
+	for name, val := range e.vars {
+		result[name] = val
+	}
+
+	return result
+}
+
+// GetLocal returns all variables in the current scope only (no parent lookup).
+func (e *Environment) GetLocal() map[string]interface{} {
+	result := make(map[string]interface{})
+	for name, val := range e.vars {
+		result[name] = val
+	}
+	return result
+}

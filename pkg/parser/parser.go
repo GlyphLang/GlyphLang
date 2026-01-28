@@ -4058,3 +4058,45 @@ func (p *Parser) parseArrayPattern() (interpreter.Pattern, error) {
 		Rest:     rest,
 	}, nil
 }
+
+// ParseExpression parses a single expression from the token stream.
+// This is used by the REPL and other tools that need to parse expressions directly.
+func (p *Parser) ParseExpression() (interpreter.Expr, error) {
+	// Skip leading newlines
+	p.skipNewlines()
+
+	if p.isAtEnd() {
+		return nil, fmt.Errorf("unexpected end of input")
+	}
+
+	expr, err := p.parseExpr()
+	if err != nil {
+		return nil, err
+	}
+
+	// Skip trailing newlines
+	p.skipNewlines()
+
+	return expr, nil
+}
+
+// ParseStatement parses a single statement from the token stream.
+// This is used by the REPL and other tools that need to parse statements directly.
+func (p *Parser) ParseStatement() (interpreter.Statement, error) {
+	// Skip leading newlines
+	p.skipNewlines()
+
+	if p.isAtEnd() {
+		return nil, fmt.Errorf("unexpected end of input")
+	}
+
+	stmt, err := p.parseStatement()
+	if err != nil {
+		return nil, err
+	}
+
+	// Skip trailing newlines
+	p.skipNewlines()
+
+	return stmt, nil
+}
