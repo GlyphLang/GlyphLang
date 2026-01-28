@@ -15,8 +15,9 @@ type Interpreter struct {
 	queueWorkers   map[string]QueueWorker
 	typeChecker    *TypeChecker
 	dbHandler      interface{}       // Database handler for dependency injection
-	moduleResolver *ModuleResolver   // Module resolver for handling imports
+	moduleResolver  *ModuleResolver           // Module resolver for handling imports
 	importedModules map[string]*LoadedModule // Imported modules by alias/name
+	constants       map[string]struct{}      // Tracks names that are constants (immutable)
 }
 
 // NewInterpreter creates a new interpreter instance
@@ -33,7 +34,14 @@ func NewInterpreter() *Interpreter {
 		typeChecker:     typeChecker,
 		moduleResolver:  NewModuleResolver(),
 		importedModules: make(map[string]*LoadedModule),
+		constants:       make(map[string]struct{}),
 	}
+}
+
+// IsConstant checks if a name refers to a constant (immutable) binding
+func (i *Interpreter) IsConstant(name string) bool {
+	_, ok := i.constants[name]
+	return ok
 }
 
 // SetModuleResolver sets a custom module resolver
@@ -109,6 +117,20 @@ func (i *Interpreter) LoadModuleWithPath(module Module, basePath string) error {
 
 		case *QueueWorker:
 			i.queueWorkers[it.QueueName] = *it
+
+		case *ConstDecl:
+			// Evaluate and store constant at module load time
+			value, err := i.EvaluateExpression(it.Value, i.globalEnv)
+			if err != nil {
+				return fmt.Errorf("error evaluating constant %s: %v", it.Name, err)
+			}
+			if it.Type != nil {
+				if err := i.typeChecker.CheckType(value, it.Type); err != nil {
+					return fmt.Errorf("constant %s type mismatch: %v", it.Name, err)
+				}
+			}
+			i.globalEnv.Define(it.Name, value)
+			i.constants[it.Name] = struct{}{}
 
 		default:
 			return fmt.Errorf("unsupported item type: %T", item)
