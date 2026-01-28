@@ -69,6 +69,13 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 				return nil, err
 			}
 			items = append(items, item)
+		case CONST:
+			// const NAME = value or const NAME: Type = value
+			item, err := p.parseConstDecl()
+			if err != nil {
+				return nil, err
+			}
+			items = append(items, item)
 		case COLON:
 			item, err := p.parseTypeDef()
 			if err != nil {
@@ -140,7 +147,7 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 				return nil, p.errorWithHint(
 					fmt.Sprintf("Unexpected token %s", p.current().Type),
 					p.current(),
-					"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'import', 'from', or 'module'",
+					"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'import', 'from', 'module', or 'const'",
 				)
 			}
 		case EOF:
@@ -149,7 +156,7 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 			return nil, p.errorWithHint(
 				fmt.Sprintf("Unexpected token %s", p.current().Type),
 				p.current(),
-				"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'import', 'from', or 'module'",
+				"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'import', 'from', 'module', or 'const'",
 			)
 		}
 	}
@@ -3490,6 +3497,54 @@ func (p *Parser) parseModuleDecl() (interpreter.Item, error) {
 
 	return &interpreter.ModuleDecl{
 		Name: name,
+	}, nil
+}
+
+// parseConstDecl parses a constant declaration: const NAME = value or const NAME: Type = value
+func (p *Parser) parseConstDecl() (interpreter.Item, error) {
+	// Consume "const" keyword
+	if err := p.expect(CONST); err != nil {
+		return nil, err
+	}
+
+	// Get constant name
+	name, err := p.expectIdent()
+	if err != nil {
+		return nil, p.errorWithHint(
+			"Expected constant name after 'const'",
+			p.current(),
+			"Example: const MAX_SIZE = 100",
+		)
+	}
+
+	// Check for optional type annotation
+	var constType interpreter.Type
+	if p.match(COLON) {
+		constType, _, err = p.parseType()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Expect '='
+	if err := p.expect(EQUALS); err != nil {
+		return nil, p.errorWithHint(
+			"Expected '=' after constant name",
+			p.current(),
+			"Example: const MAX_SIZE = 100 or const PI: float = 3.14159",
+		)
+	}
+
+	// Parse value expression
+	value, err := p.parseExpr()
+	if err != nil {
+		return nil, err
+	}
+
+	return &interpreter.ConstDecl{
+		Name:  name,
+		Value: value,
+		Type:  constType,
 	}, nil
 }
 

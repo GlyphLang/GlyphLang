@@ -72,6 +72,7 @@ const (
 	FROM      // from
 	AS        // as
 	MODULE    // module
+	CONST     // const
 )
 
 // Token represents a lexical token
@@ -203,6 +204,8 @@ func (t TokenType) String() string {
 		return "AS"
 	case MODULE:
 		return "MODULE"
+	case CONST:
+		return "CONST"
 	default:
 		return "UNKNOWN"
 	}

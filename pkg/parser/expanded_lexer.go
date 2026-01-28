@@ -398,6 +398,8 @@ func (l *ExpandedLexer) readIdentifier() Token {
 		tok.Type = AS
 	case "module":
 		tok.Type = MODULE
+	case "const":
+		tok.Type = CONST
 	default:
 		tok.Type = IDENT
 	}
