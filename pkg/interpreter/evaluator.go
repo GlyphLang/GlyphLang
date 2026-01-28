@@ -56,6 +56,12 @@ func (i *Interpreter) EvaluateExpression(expr Expr, env *Environment) (interface
 	case MatchExpr:
 		return i.evaluateMatchExpr(e, env)
 
+	case LambdaExpr:
+		return i.evaluateLambdaExpr(e, env)
+
+	case PipeExpr:
+		return i.evaluatePipeExpr(e, env)
+
 	default:
 		return nil, fmt.Errorf("unsupported expression type: %T", expr)
 	}
@@ -1577,4 +1583,222 @@ func (i *Interpreter) matchArrayPattern(pattern ArrayPattern, value interface{},
 	}
 
 	return true, nil
+}
+
+// LambdaClosure represents a lambda expression with its captured environment
+type LambdaClosure struct {
+	Lambda LambdaExpr
+	Env    *Environment
+}
+
+// evaluateLambdaExpr creates a closure from a lambda expression
+func (i *Interpreter) evaluateLambdaExpr(expr LambdaExpr, env *Environment) (interface{}, error) {
+	return &LambdaClosure{
+		Lambda: expr,
+		Env:    env,
+	}, nil
+}
+
+// evaluatePipeExpr evaluates a pipe expression: left |> right
+// The left value is piped as the first argument to the right function
+func (i *Interpreter) evaluatePipeExpr(expr PipeExpr, env *Environment) (interface{}, error) {
+	// Evaluate the left side to get the value being piped
+	leftVal, err := i.EvaluateExpression(expr.Left, env)
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle the right side based on its type
+	switch right := expr.Right.(type) {
+	case VariableExpr:
+		// Simple function reference: x |> f
+		// Look up the function and call it with leftVal as the first argument
+		fn, err := env.Get(right.Name)
+		if err != nil {
+			return nil, fmt.Errorf("undefined function: %s", right.Name)
+		}
+		return i.callWithPipedArg(fn, leftVal, nil, env)
+
+	case FunctionCallExpr:
+		// Function call with args: x |> f(a, b)
+		// Prepend leftVal to the existing arguments
+		fn, err := env.Get(right.Name)
+		if err != nil {
+			return nil, fmt.Errorf("undefined function: %s", right.Name)
+		}
+		return i.callWithPipedArg(fn, leftVal, right.Args, env)
+
+	case LambdaExpr:
+		// Inline lambda: x |> (v -> v * 2)
+		closure := &LambdaClosure{Lambda: right, Env: env}
+		return i.callWithPipedArg(closure, leftVal, nil, env)
+
+	default:
+		// Try to evaluate it as an expression that results in a callable
+		rightVal, err := i.EvaluateExpression(expr.Right, env)
+		if err != nil {
+			return nil, err
+		}
+		return i.callWithPipedArg(rightVal, leftVal, nil, env)
+	}
+}
+
+// callWithPipedArg calls a function with the piped value as the first argument
+func (i *Interpreter) callWithPipedArg(fn interface{}, pipedVal interface{}, extraArgs []Expr, env *Environment) (interface{}, error) {
+	switch f := fn.(type) {
+	case Function:
+		// Build argument list: piped value first, then extra args
+		argVals := []interface{}{pipedVal}
+		for _, argExpr := range extraArgs {
+			argVal, err := i.EvaluateExpression(argExpr, env)
+			if err != nil {
+				return nil, err
+			}
+			argVals = append(argVals, argVal)
+		}
+		return i.executeFunctionWithValues(f, argVals, env)
+
+	case *LambdaClosure:
+		// Build argument list for lambda
+		argVals := []interface{}{pipedVal}
+		for _, argExpr := range extraArgs {
+			argVal, err := i.EvaluateExpression(argExpr, env)
+			if err != nil {
+				return nil, err
+			}
+			argVals = append(argVals, argVal)
+		}
+		return i.callLambdaClosure(f, argVals)
+
+	case func(args ...interface{}) (interface{}, error):
+		// Built-in variadic function
+		argVals := []interface{}{pipedVal}
+		for _, argExpr := range extraArgs {
+			argVal, err := i.EvaluateExpression(argExpr, env)
+			if err != nil {
+				return nil, err
+			}
+			argVals = append(argVals, argVal)
+		}
+		return f(argVals...)
+
+	default:
+		return nil, fmt.Errorf("pipe target is not a function: %T", fn)
+	}
+}
+
+// executeFunctionWithValues executes a user-defined function with pre-evaluated argument values
+func (i *Interpreter) executeFunctionWithValues(fn Function, argVals []interface{}, env *Environment) (interface{}, error) {
+	// Create a new environment for the function
+	fnEnv := NewChildEnvironment(env)
+
+	// Count required parameters (those marked required without defaults)
+	requiredCount := 0
+	for _, param := range fn.Params {
+		if param.Required && param.Default == nil {
+			requiredCount++
+		}
+	}
+
+	// Validate argument count
+	if len(argVals) < requiredCount {
+		return nil, fmt.Errorf("function %s expects at least %d arguments, got %d", fn.Name, requiredCount, len(argVals))
+	}
+	if len(argVals) > len(fn.Params) {
+		return nil, fmt.Errorf("function %s expects at most %d arguments, got %d", fn.Name, len(fn.Params), len(argVals))
+	}
+
+	// Bind arguments to parameters
+	for idx, param := range fn.Params {
+		var argVal interface{}
+		var err error
+
+		if idx < len(argVals) {
+			// Argument was provided
+			argVal = argVals[idx]
+		} else if param.Default != nil {
+			// Use default value
+			argVal, err = i.EvaluateExpression(param.Default, fnEnv)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating default for parameter %s: %v", param.Name, err)
+			}
+		} else if !param.Required {
+			// Optional parameter without default gets nil
+			argVal = nil
+		} else {
+			return nil, fmt.Errorf("missing required argument %s in function %s", param.Name, fn.Name)
+		}
+
+		// Validate argument type matches parameter type annotation
+		skipTypeCheck := argVal == nil && !param.Required
+		if param.TypeAnnotation != nil && !skipTypeCheck {
+			if err := i.typeChecker.CheckType(argVal, param.TypeAnnotation); err != nil {
+				return nil, fmt.Errorf("argument %d (%s): %v", idx+1, param.Name, err)
+			}
+		}
+
+		fnEnv.Define(param.Name, argVal)
+	}
+
+	// Execute function body
+	result, err := i.executeStatements(fn.Body, fnEnv)
+	if err != nil {
+		if retErr, ok := err.(*returnValue); ok {
+			result = retErr.value
+		} else {
+			return nil, err
+		}
+	}
+
+	// Validate return value matches declared return type
+	if fn.ReturnType != nil {
+		if err := i.typeChecker.CheckType(result, fn.ReturnType); err != nil {
+			return nil, fmt.Errorf("return type mismatch in function %s: %v", fn.Name, err)
+		}
+	}
+
+	return result, nil
+}
+
+// callLambdaClosure executes a lambda closure with the given arguments
+func (i *Interpreter) callLambdaClosure(closure *LambdaClosure, args []interface{}) (interface{}, error) {
+	// Create a new environment for the lambda execution
+	lambdaEnv := NewChildEnvironment(closure.Env)
+
+	// Bind parameters to arguments
+	for idx, param := range closure.Lambda.Params {
+		if idx < len(args) {
+			lambdaEnv.Define(param.Name, args[idx])
+		} else if param.Default != nil {
+			// Use default value if provided
+			defVal, err := i.EvaluateExpression(param.Default, lambdaEnv)
+			if err != nil {
+				return nil, err
+			}
+			lambdaEnv.Define(param.Name, defVal)
+		} else if !param.Required {
+			lambdaEnv.Define(param.Name, nil)
+		} else {
+			return nil, fmt.Errorf("missing required argument: %s", param.Name)
+		}
+	}
+
+	// Execute the lambda body
+	if closure.Lambda.Body != nil {
+		return i.EvaluateExpression(closure.Lambda.Body, lambdaEnv)
+	}
+
+	// Execute block body
+	if len(closure.Lambda.Block) > 0 {
+		result, err := i.executeStatements(closure.Lambda.Block, lambdaEnv)
+		if err != nil {
+			if retErr, ok := err.(*returnValue); ok {
+				return retErr.value, nil
+			}
+			return nil, err
+		}
+		return result, nil
+	}
+
+	return nil, nil
 }
