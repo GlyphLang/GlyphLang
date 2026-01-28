@@ -303,3 +303,196 @@ func TestTypeChecker_InstantiateGenericType_PreservesDefaults(t *testing.T) {
 	require.Len(t, instantiated.Fields, 2)
 	assert.NotNil(t, instantiated.Fields[1].Default, "default should be preserved in generic instantiation")
 }
+
+// Test ExecuteRoute with InputType and defaults
+func TestInterpreter_ExecuteRoute_WithInputTypeDefaults(t *testing.T) {
+	interp := NewInterpreter()
+
+	// Register a TypeDef with defaults
+	typeDef := TypeDef{
+		Name: "CreateUserInput",
+		Fields: []Field{
+			{Name: "name", TypeAnnotation: StringType{}, Required: true, Default: nil},
+			{Name: "role", TypeAnnotation: StringType{}, Required: false, Default: LiteralExpr{Value: StringLiteral{Value: "user"}}},
+			{Name: "active", TypeAnnotation: BoolType{}, Required: false, Default: LiteralExpr{Value: BoolLiteral{Value: true}}},
+		},
+	}
+	interp.typeDefs["CreateUserInput"] = typeDef
+	interp.typeChecker.SetTypeDefs(interp.typeDefs)
+
+	// Create a route with InputType
+	route := &Route{
+		Path:      "/api/users",
+		Method:    Post,
+		InputType: NamedType{Name: "CreateUserInput"},
+		Body: []Statement{
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "name", Value: FieldAccessExpr{Object: VariableExpr{Name: "input"}, Field: "name"}},
+						{Key: "role", Value: FieldAccessExpr{Object: VariableExpr{Name: "input"}, Field: "role"}},
+						{Key: "active", Value: FieldAccessExpr{Object: VariableExpr{Name: "input"}, Field: "active"}},
+					},
+				},
+			},
+		},
+	}
+
+	// Create a request with only required fields - defaults should be applied
+	request := &Request{
+		Path:   "/api/users",
+		Method: "POST",
+		Body: map[string]interface{}{
+			"name": "Alice",
+			// "role" and "active" are missing - defaults should be applied
+		},
+	}
+
+	response, err := interp.ExecuteRoute(route, request)
+	require.NoError(t, err)
+	require.NotNil(t, response)
+	assert.Equal(t, 200, response.StatusCode)
+
+	body, ok := response.Body.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "Alice", body["name"])
+	assert.Equal(t, "user", body["role"], "Default role should be applied")
+	assert.Equal(t, true, body["active"], "Default active should be applied")
+}
+
+// Test ExecuteRoute validation fails for missing required field
+func TestInterpreter_ExecuteRoute_ValidationFailsMissingRequired(t *testing.T) {
+	interp := NewInterpreter()
+
+	// Register a TypeDef with a required field
+	typeDef := TypeDef{
+		Name: "CreateUserInput",
+		Fields: []Field{
+			{Name: "name", TypeAnnotation: StringType{}, Required: true, Default: nil},
+			{Name: "role", TypeAnnotation: StringType{}, Required: false, Default: LiteralExpr{Value: StringLiteral{Value: "user"}}},
+		},
+	}
+	interp.typeDefs["CreateUserInput"] = typeDef
+	interp.typeChecker.SetTypeDefs(interp.typeDefs)
+
+	route := &Route{
+		Path:      "/api/users",
+		Method:    Post,
+		InputType: NamedType{Name: "CreateUserInput"},
+		Body: []Statement{
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "name", Value: FieldAccessExpr{Object: VariableExpr{Name: "input"}, Field: "name"}},
+					},
+				},
+			},
+		},
+	}
+
+	// Create a request missing the required "name" field
+	request := &Request{
+		Path:   "/api/users",
+		Method: "POST",
+		Body: map[string]interface{}{
+			"role": "admin",
+			// "name" is missing and required
+		},
+	}
+
+	response, err := interp.ExecuteRoute(route, request)
+	require.Error(t, err)
+	require.NotNil(t, response)
+	assert.Equal(t, 400, response.StatusCode, "Should return 400 for validation error")
+}
+
+// Test ExecuteRoute without InputType works normally
+func TestInterpreter_ExecuteRoute_NoInputType(t *testing.T) {
+	interp := NewInterpreter()
+
+	// Create a route without InputType
+	route := &Route{
+		Path:   "/api/echo",
+		Method: Post,
+		// InputType is nil
+		Body: []Statement{
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "received", Value: VariableExpr{Name: "input"}},
+					},
+				},
+			},
+		},
+	}
+
+	// Any input should work
+	request := &Request{
+		Path:   "/api/echo",
+		Method: "POST",
+		Body: map[string]interface{}{
+			"anything": "goes",
+		},
+	}
+
+	response, err := interp.ExecuteRoute(route, request)
+	require.NoError(t, err)
+	require.NotNil(t, response)
+	assert.Equal(t, 200, response.StatusCode)
+
+	body, ok := response.Body.(map[string]interface{})
+	require.True(t, ok)
+	received, ok := body["received"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "goes", received["anything"])
+}
+
+// Test that existing values are not overwritten by defaults
+func TestInterpreter_ExecuteRoute_ExistingValuesNotOverwritten(t *testing.T) {
+	interp := NewInterpreter()
+
+	typeDef := TypeDef{
+		Name: "CreateUserInput",
+		Fields: []Field{
+			{Name: "name", TypeAnnotation: StringType{}, Required: true, Default: nil},
+			{Name: "role", TypeAnnotation: StringType{}, Required: false, Default: LiteralExpr{Value: StringLiteral{Value: "user"}}},
+		},
+	}
+	interp.typeDefs["CreateUserInput"] = typeDef
+	interp.typeChecker.SetTypeDefs(interp.typeDefs)
+
+	route := &Route{
+		Path:      "/api/users",
+		Method:    Post,
+		InputType: NamedType{Name: "CreateUserInput"},
+		Body: []Statement{
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "name", Value: FieldAccessExpr{Object: VariableExpr{Name: "input"}, Field: "name"}},
+						{Key: "role", Value: FieldAccessExpr{Object: VariableExpr{Name: "input"}, Field: "role"}},
+					},
+				},
+			},
+		},
+	}
+
+	// Provide all values including role
+	request := &Request{
+		Path:   "/api/users",
+		Method: "POST",
+		Body: map[string]interface{}{
+			"name": "Bob",
+			"role": "admin", // This should not be overwritten
+		},
+	}
+
+	response, err := interp.ExecuteRoute(route, request)
+	require.NoError(t, err)
+	require.NotNil(t, response)
+
+	body, ok := response.Body.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "Bob", body["name"])
+	assert.Equal(t, "admin", body["role"], "Provided role should not be overwritten")
+}

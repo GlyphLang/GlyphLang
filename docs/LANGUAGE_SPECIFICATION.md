@@ -345,6 +345,26 @@ fieldName: Type! = expression
 }
 ```
 
+**Default Value Evaluation Semantics:**
+
+Function parameter defaults are evaluated at call time, not at function definition time. This has the following implications:
+
+1. Default expressions are evaluated fresh each time the function is called without providing that argument
+2. Parameters are processed in declaration order, so default expressions can reference earlier parameters in the same signature
+3. This differs from Python, where defaults are evaluated once at function definition
+
+Example of a default referencing an earlier parameter:
+```glyph
+! greet name: str! greeting: str = "Hello " + name {
+  > {message: greeting}
+}
+
+# greet("Alice") returns {message: "Hello Alice"}
+# greet("Bob", "Hi Bob") returns {message: "Hi Bob"}
+```
+
+Note: If a default expression has side effects, those effects will occur each time the function is called without that argument.
+
 ---
 
 ## 3. Declarations

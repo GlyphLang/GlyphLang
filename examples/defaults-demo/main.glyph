@@ -179,14 +179,13 @@
   > {greeting: msg}
 }
 
-# Server start command with defaults
-# Note: Only one optional flag parameter is demonstrated here due to parser limitations
-# with multiple flag defaults (a known issue tracked separately)
-! start_server --host: str = "localhost" {
+# Server start command with multiple flag defaults
+# All flags have default values, so the command can be called with just "start_server"
+! start_server --host: str = "localhost" --port: int = 8080 --debug: bool = false {
   $ config = {
     host: host,
-    port: 8080,
-    debug: false
+    port: port,
+    debug: debug
   }
   > {
     action: "starting server",
@@ -194,13 +193,13 @@
   }
 }
 
-# Generate report with positional required param and one optional flag
-! report type: str! --format: str = "json" {
+# Generate report with positional required param and multiple optional flags
+! report type: str! --format: str = "json" --limit: int = 100 --with_metadata: bool = true {
   $ options = {
     report_type: type,
     output_format: format,
-    result_limit: 100,
-    with_metadata: true
+    result_limit: limit,
+    with_metadata: with_metadata
   }
   > {
     action: "generating report",

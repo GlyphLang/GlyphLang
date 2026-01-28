@@ -189,3 +189,223 @@ func TestParser_OptionalParamWithoutDefault(t *testing.T) {
 	assert.False(t, fn.Params[1].Required)
 	assert.Nil(t, fn.Params[1].Default)
 }
+
+// Test type mismatch: string default for int field
+func TestParser_FieldDefaultTypeMismatch_StringForInt(t *testing.T) {
+	source := `: Config {
+  age: int = "not a number"
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	_, err = parser.Parse()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "default value type mismatch")
+	assert.Contains(t, err.Error(), "age")
+	assert.Contains(t, err.Error(), "expects int")
+	assert.Contains(t, err.Error(), "got string")
+}
+
+// Test type mismatch: int default for string field
+func TestParser_FieldDefaultTypeMismatch_IntForString(t *testing.T) {
+	source := `: Config {
+  name: str = 42
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	_, err = parser.Parse()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "default value type mismatch")
+	assert.Contains(t, err.Error(), "name")
+	assert.Contains(t, err.Error(), "expects str")
+	assert.Contains(t, err.Error(), "got int")
+}
+
+// Test type mismatch: bool default for int field
+func TestParser_FieldDefaultTypeMismatch_BoolForInt(t *testing.T) {
+	source := `: Config {
+  count: int = true
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	_, err = parser.Parse()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "default value type mismatch")
+	assert.Contains(t, err.Error(), "count")
+	assert.Contains(t, err.Error(), "expects int")
+	assert.Contains(t, err.Error(), "got bool")
+}
+
+// Test type mismatch: string default for bool field
+func TestParser_FieldDefaultTypeMismatch_StringForBool(t *testing.T) {
+	source := `: Config {
+  active: bool = "yes"
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	_, err = parser.Parse()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "default value type mismatch")
+	assert.Contains(t, err.Error(), "active")
+	assert.Contains(t, err.Error(), "expects bool")
+	assert.Contains(t, err.Error(), "got string")
+}
+
+// Test type mismatch: int default for float field
+func TestParser_FieldDefaultTypeMismatch_IntForFloat(t *testing.T) {
+	source := `: Config {
+  rate: float = 42
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	_, err = parser.Parse()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "default value type mismatch")
+	assert.Contains(t, err.Error(), "rate")
+	assert.Contains(t, err.Error(), "expects float")
+	assert.Contains(t, err.Error(), "got int")
+}
+
+// Test type mismatch: float default for int field
+func TestParser_FieldDefaultTypeMismatch_FloatForInt(t *testing.T) {
+	source := `: Config {
+  count: int = 3.14
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	_, err = parser.Parse()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "default value type mismatch")
+	assert.Contains(t, err.Error(), "count")
+	assert.Contains(t, err.Error(), "expects int")
+	assert.Contains(t, err.Error(), "got float")
+}
+
+// Test type mismatch in function parameters
+func TestParser_FunctionParamTypeMismatch(t *testing.T) {
+	source := `! greet(count: int = "hello"): str {
+  > "hi"
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	_, err = parser.Parse()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "default value type mismatch")
+	assert.Contains(t, err.Error(), "count")
+	assert.Contains(t, err.Error(), "expects int")
+	assert.Contains(t, err.Error(), "got string")
+}
+
+// Test that correct type matches still work
+func TestParser_FieldDefaultCorrectTypes(t *testing.T) {
+	source := `: Config {
+  name: str = "default"
+  count: int = 42
+  active: bool = true
+  rate: float = 3.14
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	require.True(t, ok)
+	require.Len(t, typeDef.Fields, 4)
+
+	// All fields should have defaults
+	for _, field := range typeDef.Fields {
+		assert.NotNil(t, field.Default, "field %s should have default", field.Name)
+	}
+}
+
+// Test that complex expressions (binary ops) are not validated at parse time
+func TestParser_FieldDefaultComplexExpressionNotValidated(t *testing.T) {
+	// Binary expression - should NOT be validated at parse time
+	source := `: Config {
+  timeout: int = 30 * 60
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	require.True(t, ok)
+	require.Len(t, typeDef.Fields, 1)
+	assert.NotNil(t, typeDef.Fields[0].Default)
+}
+
+// Test that optional fields accept matching defaults
+func TestParser_OptionalFieldDefaultMatchingType(t *testing.T) {
+	source := `: Config {
+  name: str? = "default"
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	require.True(t, ok)
+	require.Len(t, typeDef.Fields, 1)
+	assert.NotNil(t, typeDef.Fields[0].Default)
+}
+
+// Test that optional fields reject mismatching defaults
+func TestParser_OptionalFieldDefaultTypeMismatch(t *testing.T) {
+	source := `: Config {
+  name: str? = 42
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	_, err = parser.Parse()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "default value type mismatch")
+	assert.Contains(t, err.Error(), "name")
+	assert.Contains(t, err.Error(), "expects str")
+	assert.Contains(t, err.Error(), "got int")
+}

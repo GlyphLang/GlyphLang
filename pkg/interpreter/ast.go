@@ -24,6 +24,7 @@ func (TypeDef) isItem() {}
 type Route struct {
 	Path        string
 	Method      HttpMethod
+	InputType   Type // Type for request body validation (from < input: Type syntax)
 	ReturnType  Type
 	Auth        *AuthConfig
 	RateLimit   *RateLimit

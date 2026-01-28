@@ -293,9 +293,15 @@ func (p *Parser) parseFieldWithContext(typeParamNames []string) (interpreter.Fie
 	// Check for default value: = expr
 	var defaultValue interpreter.Expr
 	if p.check(EQUALS) {
+		equalsToken := p.current()
 		p.advance()
 		defaultValue, err = p.parseExpr()
 		if err != nil {
+			return interpreter.Field{}, err
+		}
+
+		// Validate literal default values against the declared type
+		if err := p.validateDefaultType(name, typeAnnotation, defaultValue, equalsToken); err != nil {
 			return interpreter.Field{}, err
 		}
 	}
@@ -306,6 +312,113 @@ func (p *Parser) parseFieldWithContext(typeParamNames []string) (interpreter.Fie
 		Required:       required,
 		Default:        defaultValue,
 	}, nil
+}
+
+// validateDefaultType validates that a literal default value matches the declared type
+// For complex expressions (function calls, binary ops, etc.), validation is deferred to runtime
+func (p *Parser) validateDefaultType(fieldName string, declaredType interpreter.Type, defaultExpr interpreter.Expr, tok Token) error {
+	// Only validate literal expressions at parse time
+	litExpr, ok := defaultExpr.(interpreter.LiteralExpr)
+	if !ok {
+		// Complex expressions (function calls, binary ops, etc.) - defer to runtime
+		return nil
+	}
+
+	// Get the actual type from the declared type, unwrapping OptionalType if present
+	actualDeclaredType := declaredType
+	if optType, ok := declaredType.(interpreter.OptionalType); ok {
+		actualDeclaredType = optType.InnerType
+	}
+
+	// Check the literal type against the declared type
+	switch lit := litExpr.Value.(type) {
+	case interpreter.IntLiteral:
+		if _, ok := actualDeclaredType.(interpreter.IntType); !ok {
+			return p.errorWithHint(
+				fmt.Sprintf("default value type mismatch: field '%s' expects %s, got int", fieldName, typeToString(actualDeclaredType)),
+				tok,
+				"Ensure the default value matches the declared type",
+			)
+		}
+	case interpreter.StringLiteral:
+		if _, ok := actualDeclaredType.(interpreter.StringType); !ok {
+			return p.errorWithHint(
+				fmt.Sprintf("default value type mismatch: field '%s' expects %s, got string", fieldName, typeToString(actualDeclaredType)),
+				tok,
+				"Ensure the default value matches the declared type",
+			)
+		}
+	case interpreter.BoolLiteral:
+		if _, ok := actualDeclaredType.(interpreter.BoolType); !ok {
+			return p.errorWithHint(
+				fmt.Sprintf("default value type mismatch: field '%s' expects %s, got bool", fieldName, typeToString(actualDeclaredType)),
+				tok,
+				"Ensure the default value matches the declared type",
+			)
+		}
+	case interpreter.FloatLiteral:
+		if _, ok := actualDeclaredType.(interpreter.FloatType); !ok {
+			return p.errorWithHint(
+				fmt.Sprintf("default value type mismatch: field '%s' expects %s, got float", fieldName, typeToString(actualDeclaredType)),
+				tok,
+				"Ensure the default value matches the declared type",
+			)
+		}
+	case interpreter.NullLiteral:
+		// null is only valid for optional types
+		if _, ok := declaredType.(interpreter.OptionalType); !ok {
+			return p.errorWithHint(
+				fmt.Sprintf("default value type mismatch: field '%s' expects %s, got null (null is only valid for optional types)", fieldName, typeToString(declaredType)),
+				tok,
+				"Use '?' to mark the field as optional if you want to allow null",
+			)
+		}
+	default:
+		_ = lit // Silence unused variable warning for unknown literal types
+	}
+
+	return nil
+}
+
+// typeToString returns a human-readable string representation of a type
+func typeToString(t interpreter.Type) string {
+	switch t := t.(type) {
+	case interpreter.IntType:
+		return "int"
+	case interpreter.StringType:
+		return "str"
+	case interpreter.BoolType:
+		return "bool"
+	case interpreter.FloatType:
+		return "float"
+	case interpreter.ArrayType:
+		return "[" + typeToString(t.ElementType) + "]"
+	case interpreter.OptionalType:
+		return typeToString(t.InnerType) + "?"
+	case interpreter.NamedType:
+		return t.Name
+	case interpreter.GenericType:
+		// Handle generic types like List<int>
+		base := typeToString(t.BaseType)
+		if len(t.TypeArgs) > 0 {
+			args := make([]string, len(t.TypeArgs))
+			for i, arg := range t.TypeArgs {
+				args[i] = typeToString(arg)
+			}
+			return base + "<" + strings.Join(args, ", ") + ">"
+		}
+		return base
+	case interpreter.TypeParameterType:
+		return t.Name
+	case interpreter.FunctionType:
+		params := make([]string, len(t.ParamTypes))
+		for i, param := range t.ParamTypes {
+			params[i] = typeToString(param)
+		}
+		return "(" + strings.Join(params, ", ") + ") -> " + typeToString(t.ReturnType)
+	default:
+		return "unknown"
+	}
 }
 
 // validateFunctionParams validates that required parameters come before optional ones
@@ -899,6 +1012,7 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 	var injections []interpreter.Injection
 	var queryParams []interpreter.QueryParamDecl
 	var body []interpreter.Statement
+	var inputType interpreter.Type
 
 	if !p.check(LBRACE) {
 		return nil, p.errorWithHint(
@@ -965,11 +1079,19 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 			p.skipNewlines()
 
 		case LESS:
-			// Input binding: < input: Type (skip for now)
+			// Input binding: < input: Type
 			p.advance()
-			p.expectIdent()
-			p.expect(COLON)
-			p.parseType()
+			_, err := p.expectIdent() // consume "input" identifier
+			if err != nil {
+				return nil, err
+			}
+			if err := p.expect(COLON); err != nil {
+				return nil, err
+			}
+			inputType, _, err = p.parseType()
+			if err != nil {
+				return nil, err
+			}
 			p.skipNewlines()
 
 		case QUESTION:
@@ -1050,6 +1172,7 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 	return &interpreter.Route{
 		Path:        path,
 		Method:      method,
+		InputType:   inputType,
 		ReturnType:  returnType,
 		Auth:        auth,
 		RateLimit:   rateLimit,
@@ -1990,6 +2113,86 @@ func (p *Parser) currentBinaryOp() (interpreter.BinOp, int) {
 	}
 }
 
+// parseCommandDefaultExpr parses a default value expression for CLI command parameters.
+// This is a specialized version that stops when it encounters what looks like the next flag
+// (--name or -name pattern), avoiding the ambiguity between binary minus and flag prefix.
+func (p *Parser) parseCommandDefaultExpr() (interpreter.Expr, error) {
+	return p.parseCommandDefaultBinaryExpr(0)
+}
+
+// parseCommandDefaultBinaryExpr parses binary expressions for command defaults,
+// but treats MINUS as a binary operator only if not followed by MINUS or IDENT
+// (which would indicate a new flag parameter like --host or -h).
+func (p *Parser) parseCommandDefaultBinaryExpr(minPrecedence int) (interpreter.Expr, error) {
+	left, err := p.parseUnary()
+	if err != nil {
+		return nil, err
+	}
+
+	for {
+		op, precedence := p.currentCommandDefaultBinaryOp()
+		if precedence < minPrecedence {
+			break
+		}
+
+		p.advance() // consume operator
+
+		right, err := p.parseCommandDefaultBinaryExpr(precedence + 1)
+		if err != nil {
+			return nil, err
+		}
+
+		left = interpreter.BinaryOpExpr{
+			Op:    op,
+			Left:  left,
+			Right: right,
+		}
+	}
+
+	return left, nil
+}
+
+// currentCommandDefaultBinaryOp returns the current token as a binary operator,
+// but returns -1 precedence for MINUS when followed by MINUS or IDENT
+// (indicating start of a new flag parameter).
+func (p *Parser) currentCommandDefaultBinaryOp() (interpreter.BinOp, int) {
+	switch p.current().Type {
+	case PLUS:
+		return interpreter.Add, 10
+	case MINUS:
+		// Check if this MINUS is part of a flag prefix (--flag or -flag)
+		// If the next token is MINUS or IDENT, this is likely a new flag, not binary minus
+		nextTok := p.peek(1)
+		if nextTok.Type == MINUS || nextTok.Type == IDENT {
+			// Stop parsing - this is the start of a new flag parameter
+			return interpreter.BinOp(-1), -1
+		}
+		return interpreter.Sub, 10
+	case STAR:
+		return interpreter.Mul, 20
+	case SLASH:
+		return interpreter.Div, 20
+	case EQ_EQ:
+		return interpreter.Eq, 5
+	case NOT_EQ:
+		return interpreter.Ne, 5
+	case LESS:
+		return interpreter.Lt, 5
+	case LESS_EQ:
+		return interpreter.Le, 5
+	case GREATER:
+		return interpreter.Gt, 5
+	case GREATER_EQ:
+		return interpreter.Ge, 5
+	case AND:
+		return interpreter.And, 3
+	case OR:
+		return interpreter.Or, 2
+	default:
+		return interpreter.BinOp(-1), -1
+	}
+}
+
 // parseUnary parses unary expressions (!, -)
 func (p *Parser) parseUnary() (interpreter.Expr, error) {
 	// Check for unary NOT operator
@@ -2528,9 +2731,11 @@ func (p *Parser) parseCommand() (interpreter.Item, error) {
 		}
 
 		// Check for default value: = value
+		// Use parseCommandDefaultExpr to properly handle the case where the next
+		// token is a flag prefix (--flag or -flag), not a binary minus operator
 		if p.check(EQUALS) {
 			p.advance()
-			defaultValue, err := p.parseExpr()
+			defaultValue, err := p.parseCommandDefaultExpr()
 			if err != nil {
 				return nil, err
 			}
