@@ -330,6 +330,25 @@ func (p *Parser) validateDefaultType(fieldName string, declaredType interpreter.
 		actualDeclaredType = optType.InnerType
 	}
 
+	// Handle built-in types that are parsed as NamedType
+	if namedType, ok := actualDeclaredType.(interpreter.NamedType); ok {
+		switch namedType.Name {
+		case "any", "object":
+			// 'any' and 'object' accept any literal - skip validation
+			return nil
+		case "timestamp":
+			// 'timestamp' is semantically an int - allow int literals
+			// Also allow string literals for ISO date parsing at runtime
+			switch litExpr.Value.(type) {
+			case interpreter.IntLiteral, interpreter.StringLiteral:
+				return nil
+			}
+			// Fall through to error for other literal types (bool, float, null)
+		}
+		// For user-defined types, fall through to validation
+		// This catches obvious errors like `field: User = 42`
+	}
+
 	// Check the literal type against the declared type
 	switch lit := litExpr.Value.(type) {
 	case interpreter.IntLiteral:

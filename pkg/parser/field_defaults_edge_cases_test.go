@@ -409,3 +409,132 @@ func TestParser_OptionalFieldDefaultTypeMismatch(t *testing.T) {
 	assert.Contains(t, err.Error(), "expects str")
 	assert.Contains(t, err.Error(), "got int")
 }
+
+// Test that 'any' type accepts any literal default value
+func TestParser_AnyTypeAcceptsAllDefaults(t *testing.T) {
+	source := `: Config {
+  strVal: any = "hello"
+  intVal: any = 42
+  boolVal: any = true
+  floatVal: any = 3.14
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err, "'any' type should accept any literal default")
+
+	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	require.True(t, ok)
+	require.Len(t, typeDef.Fields, 4)
+
+	// Verify all fields have defaults
+	for _, field := range typeDef.Fields {
+		assert.NotNil(t, field.Default, "field %s should have a default", field.Name)
+	}
+}
+
+// Test that optional 'any' type also accepts defaults
+func TestParser_OptionalAnyTypeAcceptsDefaults(t *testing.T) {
+	source := `: Config {
+  value: any? = "test"
+  nullVal: any? = null
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err, "optional 'any' type should accept defaults")
+
+	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	require.True(t, ok)
+	require.Len(t, typeDef.Fields, 2)
+}
+
+// Test that 'timestamp' type accepts int and string defaults
+func TestParser_TimestampTypeAcceptsValidDefaults(t *testing.T) {
+	source := `: Event {
+  created_at: timestamp = 1706400000
+  updated_at: timestamp = "2024-01-28T00:00:00Z"
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err, "'timestamp' should accept int and string defaults")
+
+	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	require.True(t, ok)
+	require.Len(t, typeDef.Fields, 2)
+	assert.NotNil(t, typeDef.Fields[0].Default)
+	assert.NotNil(t, typeDef.Fields[1].Default)
+}
+
+// Test that 'timestamp' rejects invalid defaults (bool, float)
+func TestParser_TimestampTypeRejectsInvalidDefaults(t *testing.T) {
+	source := `: Event {
+  created_at: timestamp = true
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	_, err = parser.Parse()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "default value type mismatch")
+	assert.Contains(t, err.Error(), "timestamp")
+	assert.Contains(t, err.Error(), "got bool")
+}
+
+// Test that 'object' type accepts any literal default
+func TestParser_ObjectTypeAcceptsDefaults(t *testing.T) {
+	source := `: Config {
+  data: object = "stringified"
+  count: object = 42
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err, "'object' type should accept any literal default")
+
+	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	require.True(t, ok)
+	require.Len(t, typeDef.Fields, 2)
+}
+
+// Test that user-defined types still reject mismatched literal defaults
+func TestParser_UserDefinedTypeRejectsMismatchedDefault(t *testing.T) {
+	source := `: User {
+  name: str!
+}
+
+: Config {
+  user: User = 42
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	_, err = parser.Parse()
+	require.Error(t, err, "user-defined type should reject primitive literal default")
+	assert.Contains(t, err.Error(), "default value type mismatch")
+	assert.Contains(t, err.Error(), "User")
+	assert.Contains(t, err.Error(), "got int")
+}
