@@ -298,6 +298,73 @@ fieldName: Type?        # Optional field (explicit)
 fieldName: List[Type]   # Collection type
 ```
 
+### 2.8 Default Values
+
+Fields in type definitions and function parameters can have default values using the `=` syntax.
+
+**Syntax:**
+```
+fieldName: Type = expression
+fieldName: Type! = expression
+```
+
+**Examples with different types:**
+```glyph
+: User {
+  id: int!
+  username: str!
+  role: str! = "user"           # String default
+  active: bool! = true          # Boolean default
+  age: int = 0                  # Integer default
+  score: float = 0.0            # Float default
+  tags: List[str] = []          # Empty array default
+}
+
+: Config {
+  host: str! = "localhost"
+  port: int! = 8080
+  debug: bool! = false
+  timeout: float! = 30.0
+}
+```
+
+**Important notes:**
+- Fields with default values are not required when creating instances
+- Required fields (`!`) can have defaults - the `!` indicates the field cannot be null, but the default provides a value if none is given
+- When mixing required and optional parameters in functions, required parameters (those without defaults) should come before optional parameters (those with defaults)
+
+**Function parameters with defaults:**
+```glyph
+! greet name: str! --formal: bool = false {
+  if formal {
+    $ msg = "Good day, " + name + "."
+  } else {
+    $ msg = "Hello " + name + "!"
+  }
+  > {message: msg}
+}
+```
+
+**Default Value Evaluation Semantics:**
+
+Function parameter defaults are evaluated at call time, not at function definition time. This has the following implications:
+
+1. Default expressions are evaluated fresh each time the function is called without providing that argument
+2. Parameters are processed in declaration order, so default expressions can reference earlier parameters in the same signature
+3. This differs from Python, where defaults are evaluated once at function definition
+
+Example of a default referencing an earlier parameter:
+```glyph
+! greet name: str! greeting: str = "Hello " + name {
+  > {message: greeting}
+}
+
+# greet("Alice") returns {message: "Hello Alice"}
+# greet("Bob", "Hi Bob") returns {message: "Hi Bob"}
+```
+
+Note: If a default expression has side effects, those effects will occur each time the function is called without that argument.
+
 ---
 
 ## 3. Declarations
@@ -1352,7 +1419,7 @@ Item        = TypeDef | Route | Command | CronTask | EventHandler | QueueWorker
 
 TypeDef     = ":" Identifier "{" Field* "}"
             | "type" Identifier "{" Field* "}"
-Field       = Identifier ":" Type ["!"]
+Field       = Identifier ":" Type ["!" | "?"] ["=" Expr]
 
 Route       = "@" "route" Path ["[" Method "]"] ["->" Type] "{" Middleware* Injection* Statement* "}"
             | "@" Method Path "{" Statement* "}"

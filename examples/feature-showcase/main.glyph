@@ -8,13 +8,14 @@
 # ============================================================================
 
 # Basic type with required (!) and optional (no !) fields
+# Fields can have default values using the = syntax
 : User {
   id: int!
   username: str!
   email: str!
-  role: str!
+  role: str! = "user"
   age: int
-  active: bool!
+  active: bool! = true
   created_at: timestamp
 }
 

@@ -1189,24 +1189,79 @@ func (i *Interpreter) evaluateArrayExpr(expr ArrayExpr, env *Environment) (inter
 	return arr, nil
 }
 
+// ApplyTypeDefaults applies default values from a TypeDef to an object
+// Returns a new object with defaults applied for missing fields
+func (i *Interpreter) ApplyTypeDefaults(obj map[string]interface{}, typeDef TypeDef, env *Environment) (map[string]interface{}, error) {
+	// Create a copy of the object to avoid modifying the original
+	result := make(map[string]interface{})
+	for k, v := range obj {
+		result[k] = v
+	}
+
+	// Apply defaults for missing fields
+	for _, field := range typeDef.Fields {
+		if _, exists := result[field.Name]; !exists && field.Default != nil {
+			// Evaluate the default expression
+			defaultVal, err := i.EvaluateExpression(field.Default, env)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating default for field %s: %v", field.Name, err)
+			}
+			result[field.Name] = defaultVal
+		}
+	}
+
+	return result, nil
+}
+
 // executeFunction executes a user-defined function
 func (i *Interpreter) executeFunction(fn Function, args []Expr, env *Environment) (interface{}, error) {
 	// Create a new environment for the function
 	fnEnv := NewChildEnvironment(env)
 
-	// Evaluate arguments and bind to parameters
-	if len(args) != len(fn.Params) {
-		return nil, fmt.Errorf("function %s expects %d arguments, got %d", fn.Name, len(fn.Params), len(args))
+	// Count required parameters (those marked required without defaults)
+	requiredCount := 0
+	for _, param := range fn.Params {
+		if param.Required && param.Default == nil {
+			requiredCount++
+		}
 	}
 
+	// Validate argument count
+	if len(args) < requiredCount {
+		return nil, fmt.Errorf("function %s expects at least %d arguments, got %d", fn.Name, requiredCount, len(args))
+	}
+	if len(args) > len(fn.Params) {
+		return nil, fmt.Errorf("function %s expects at most %d arguments, got %d", fn.Name, len(fn.Params), len(args))
+	}
+
+	// Evaluate arguments and bind to parameters
 	for idx, param := range fn.Params {
-		argVal, err := i.EvaluateExpression(args[idx], env)
-		if err != nil {
-			return nil, err
+		var argVal interface{}
+		var err error
+
+		if idx < len(args) {
+			// Argument was provided
+			argVal, err = i.EvaluateExpression(args[idx], env)
+			if err != nil {
+				return nil, err
+			}
+		} else if param.Default != nil {
+			// Use default value
+			argVal, err = i.EvaluateExpression(param.Default, fnEnv)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating default for parameter %s: %v", param.Name, err)
+			}
+		} else if !param.Required {
+			// Optional parameter without default gets nil
+			argVal = nil
+		} else {
+			return nil, fmt.Errorf("missing required argument %s in function %s", param.Name, fn.Name)
 		}
 
 		// Validate argument type matches parameter type annotation
-		if param.TypeAnnotation != nil {
+		// Optional parameters can be nil without type checking
+		skipTypeCheck := argVal == nil && !param.Required
+		if param.TypeAnnotation != nil && !skipTypeCheck {
 			if err := i.typeChecker.CheckType(argVal, param.TypeAnnotation); err != nil {
 				return nil, fmt.Errorf("argument %d (%s): %v", idx+1, param.Name, err)
 			}

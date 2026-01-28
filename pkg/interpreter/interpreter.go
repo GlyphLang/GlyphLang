@@ -266,8 +266,39 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 
 	// Always add request body to environment (even if nil)
 	// This ensures 'input' variable is always available in routes
-	if request.Body != nil {
-		routeEnv.Define("input", request.Body)
+	inputValue := request.Body
+	if inputValue != nil {
+		// If route has an InputType declared, apply defaults and validate
+		if route.InputType != nil {
+			if namedType, ok := route.InputType.(NamedType); ok {
+				if typeDef, exists := i.typeDefs[namedType.Name]; exists {
+					if inputObj, ok := inputValue.(map[string]interface{}); ok {
+						// Apply defaults for missing fields
+						inputWithDefaults, err := i.ApplyTypeDefaults(inputObj, typeDef, routeEnv)
+						if err != nil {
+							return &Response{
+								StatusCode: 400,
+								Body: map[string]interface{}{
+									"error": fmt.Sprintf("error applying defaults: %v", err),
+								},
+							}, err
+						}
+						inputValue = inputWithDefaults
+
+						// Validate input against the TypeDef
+						if err := i.typeChecker.ValidateObjectAgainstTypeDef(inputWithDefaults, typeDef); err != nil {
+							return &Response{
+								StatusCode: 400,
+								Body: map[string]interface{}{
+									"error": fmt.Sprintf("input validation failed: %v", err),
+								},
+							}, err
+						}
+					}
+				}
+			}
+		}
+		routeEnv.Define("input", inputValue)
 	} else {
 		// Define input as nil/empty map for routes without body
 		routeEnv.Define("input", nil)

@@ -293,9 +293,9 @@ func (tc *TypeChecker) ValidateTypeReference(t Type) error {
 
 // ValidateObjectAgainstTypeDef validates an object against a TypeDef
 func (tc *TypeChecker) ValidateObjectAgainstTypeDef(obj map[string]interface{}, typeDef TypeDef) error {
-	// Check required fields
+	// Check required fields (fields with defaults are not required)
 	for _, field := range typeDef.Fields {
-		if field.Required {
+		if field.Required && field.Default == nil {
 			if _, exists := obj[field.Name]; !exists {
 				return fmt.Errorf("missing required field: %s", field.Name)
 			}
@@ -437,6 +437,7 @@ func (tc *TypeChecker) InstantiateGenericType(typeDef TypeDef, typeArgs []Type) 
 			Name:           field.Name,
 			TypeAnnotation: tc.SubstituteTypeParams(field.TypeAnnotation, typeArgMap),
 			Required:       field.Required,
+			Default:        field.Default,
 		}
 	}
 
@@ -476,6 +477,7 @@ func (tc *TypeChecker) InstantiateGenericFunction(fn Function, typeArgs []Type) 
 			Name:           param.Name,
 			TypeAnnotation: tc.SubstituteTypeParams(param.TypeAnnotation, typeArgMap),
 			Required:       param.Required,
+			Default:        param.Default,
 		}
 	}
 

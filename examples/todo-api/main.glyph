@@ -1,13 +1,13 @@
 # Todo List API Example
 # Demonstrates CRUD operations, path parameters, and different HTTP methods
 
-# Define a Todo type
+# Define a Todo type with default values
 : Todo {
   id: int!
   title: str!
   description: str
-  completed: bool!
-  priority: str
+  completed: bool! = false
+  priority: str = "medium"
   created_at: int
   updated_at: int
 }
