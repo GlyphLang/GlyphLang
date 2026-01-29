@@ -4685,3 +4685,140 @@ func TestInterpreter_RedisInjection_NilHandler(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, true, resultMap["ok"])
 }
+
+// --- SSE / Yield tests ---
+
+// mockSSEWriter implements the SSEWriter interface for testing
+type mockSSEWriter struct {
+	events []mockSSEEvent
+}
+
+type mockSSEEvent struct {
+	Data      interface{}
+	EventType string
+}
+
+func (m *mockSSEWriter) SendEvent(data interface{}, eventType string) error {
+	m.events = append(m.events, mockSSEEvent{Data: data, EventType: eventType})
+	return nil
+}
+
+func TestInterpreter_YieldStatement_WithSSEWriter(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	writer := &mockSSEWriter{}
+	env.Define("__sse_writer", writer)
+
+	stmt := YieldStatement{
+		Value: LiteralExpr{Value: StringLiteral{Value: "hello"}},
+	}
+
+	_, err := interp.ExecuteStatement(stmt, env)
+	require.NoError(t, err)
+	require.Len(t, writer.events, 1)
+	assert.Equal(t, "hello", writer.events[0].Data)
+}
+
+func TestInterpreter_YieldStatement_WithEventType(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	writer := &mockSSEWriter{}
+	env.Define("__sse_writer", writer)
+
+	stmt := YieldStatement{
+		Value:     LiteralExpr{Value: StringLiteral{Value: "update"}},
+		EventType: "notification",
+	}
+
+	_, err := interp.ExecuteStatement(stmt, env)
+	require.NoError(t, err)
+	require.Len(t, writer.events, 1)
+	assert.Equal(t, "notification", writer.events[0].EventType)
+}
+
+func TestInterpreter_YieldStatement_NoWriter(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	stmt := YieldStatement{
+		Value: LiteralExpr{Value: StringLiteral{Value: "hello"}},
+	}
+
+	_, err := interp.ExecuteStatement(stmt, env)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "yield can only be used inside an SSE route")
+}
+
+func TestInterpreter_SSERoute_InjectsWriter(t *testing.T) {
+	interp := NewInterpreter()
+	writer := &mockSSEWriter{}
+
+	route := &Route{
+		Path:   "/events",
+		Method: SSE,
+		Body: []Statement{
+			YieldStatement{
+				Value: LiteralExpr{Value: StringLiteral{Value: "event1"}},
+			},
+			YieldStatement{
+				Value: LiteralExpr{Value: StringLiteral{Value: "event2"}},
+			},
+		},
+	}
+
+	request := &Request{
+		Path:      "/events",
+		Method:    "GET",
+		SSEWriter: writer,
+	}
+
+	resp, err := interp.ExecuteRoute(route, request)
+	require.NoError(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+	assert.Nil(t, resp.Body)
+	require.Len(t, writer.events, 2)
+	assert.Equal(t, "event1", writer.events[0].Data)
+	assert.Equal(t, "event2", writer.events[1].Data)
+}
+
+func TestInterpreter_SSERoute_ObjectYield(t *testing.T) {
+	interp := NewInterpreter()
+	writer := &mockSSEWriter{}
+
+	route := &Route{
+		Path:   "/updates",
+		Method: SSE,
+		Body: []Statement{
+			YieldStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "count", Value: LiteralExpr{Value: IntLiteral{Value: 42}}},
+						{Key: "msg", Value: LiteralExpr{Value: StringLiteral{Value: "update"}}},
+					},
+				},
+			},
+		},
+	}
+
+	request := &Request{
+		Path:      "/updates",
+		Method:    "GET",
+		SSEWriter: writer,
+	}
+
+	resp, err := interp.ExecuteRoute(route, request)
+	require.NoError(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+	require.Len(t, writer.events, 1)
+
+	eventData, ok := writer.events[0].Data.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, int64(42), eventData["count"])
+	assert.Equal(t, "update", eventData["msg"])
+}
+
+func TestInterpreter_SSEMethodString(t *testing.T) {
+	assert.Equal(t, "SSE", SSE.String())
+}

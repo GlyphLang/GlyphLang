@@ -135,6 +135,7 @@ const (
 	Delete
 	Patch
 	WebSocket // WebSocket upgrade
+	SSE       // Server-Sent Events
 )
 
 func (m HttpMethod) String() string {
@@ -151,6 +152,8 @@ func (m HttpMethod) String() string {
 		return "PATCH"
 	case WebSocket:
 		return "WS"
+	case SSE:
+		return "SSE"
 	default:
 		return "UNKNOWN"
 	}
@@ -303,6 +306,14 @@ type ExpressionStatement struct {
 }
 
 func (ExpressionStatement) isStatement() {}
+
+// YieldStatement sends a value as a Server-Sent Event in SSE routes.
+type YieldStatement struct {
+	Value     Expr   // The event data to send
+	EventType string // Optional named event type (empty for default "message")
+}
+
+func (YieldStatement) isStatement() {}
 
 // Expr represents an expression in the AST
 type Expr interface {
@@ -781,6 +792,7 @@ func (WsBroadcastStatement) isNode() {}
 func (WsCloseStatement) isNode()     {}
 func (ValidationStatement) isNode()  {}
 func (ExpressionStatement) isNode()  {}
+func (YieldStatement) isNode()       {}
 func (WebSocketEvent) isNode()       {}
 func (LiteralExpr) isNode()          {}
 func (VariableExpr) isNode()         {}
