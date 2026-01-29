@@ -559,6 +559,24 @@ func (i *Interpreter) evaluateFieldAccess(expr FieldAccessExpr, env *Environment
 		}
 	}
 
+	// Handle Result type field access
+	if result, ok := obj.(*ResultValue); ok {
+		switch expr.Field {
+		case "ok":
+			return result.IsOk(), nil
+		case "error", "err":
+			return result.ErrValue(), nil
+		case "value":
+			return result.OkValue(), nil
+		case "isOk":
+			return result.IsOk(), nil
+		case "isErr":
+			return result.IsErr(), nil
+		default:
+			return nil, fmt.Errorf("Result has no field '%s'", expr.Field)
+		}
+	}
+
 	// Handle map field access
 	if objMap, ok := obj.(map[string]interface{}); ok {
 		if val, exists := objMap[expr.Field]; exists {
@@ -581,6 +599,28 @@ func (i *Interpreter) evaluateFunctionCall(expr FunctionCallExpr, env *Environme
 	case "now":
 		// Return a mock timestamp
 		return int64(1234567890), nil
+
+	// Result type constructors (issue #31) - capitalized to match Rust/Swift convention
+	// for type constructors. NewOk/NewErr are defined in result.go in this package.
+	case "Ok":
+		if len(expr.Args) != 1 {
+			return nil, fmt.Errorf("Ok() expects 1 argument, got %d", len(expr.Args))
+		}
+		val, err := i.EvaluateExpression(expr.Args[0], env)
+		if err != nil {
+			return nil, err
+		}
+		return NewOk(val), nil
+
+	case "Err":
+		if len(expr.Args) != 1 {
+			return nil, fmt.Errorf("Err() expects 1 argument, got %d", len(expr.Args))
+		}
+		val, err := i.EvaluateExpression(expr.Args[0], env)
+		if err != nil {
+			return nil, err
+		}
+		return NewErr(val), nil
 
 	case "upper":
 		// Convert string to uppercase
@@ -1105,6 +1145,11 @@ func (i *Interpreter) evaluateFunctionCall(expr FunctionCallExpr, env *Environme
 			}
 		}
 
+		// Handle Result type methods (result.map, result.isOk, etc.)
+		if result, ok := obj.(*ResultValue); ok {
+			return i.evaluateResultMethod(result, methodName, args, env)
+		}
+
 		// Check if obj is a map (module namespace) and methodName is a function
 		if objMap, ok := obj.(map[string]interface{}); ok {
 			if fn, exists := objMap[methodName]; exists {
@@ -1513,10 +1558,27 @@ func (i *Interpreter) matchLiteralPattern(pattern LiteralPattern, value interfac
 
 // matchObjectPattern matches a value against an object destructuring pattern
 func (i *Interpreter) matchObjectPattern(pattern ObjectPattern, value interface{}, env *Environment) (bool, error) {
-	// Value must be a map
-	objMap, ok := value.(map[string]interface{})
-	if !ok {
-		return false, nil
+	var objMap map[string]interface{}
+
+	// Handle ResultValue by exposing it as a map with "ok"/"error" keys
+	if result, ok := value.(*ResultValue); ok {
+		if result.IsOk() {
+			objMap = map[string]interface{}{
+				"ok":    result.value,
+				"value": result.value,
+			}
+		} else {
+			objMap = map[string]interface{}{
+				"error": result.value,
+				"err":   result.value,
+			}
+		}
+	} else {
+		var ok bool
+		objMap, ok = value.(map[string]interface{})
+		if !ok {
+			return false, nil
+		}
 	}
 
 	// Match each field in the pattern
@@ -1801,4 +1863,131 @@ func (i *Interpreter) callLambdaClosure(closure *LambdaClosure, args []interface
 	}
 
 	return nil, nil
+}
+
+// evaluateResultMethod handles method calls on ResultValue instances.
+func (i *Interpreter) evaluateResultMethod(result *ResultValue, method string, args []interface{}, env *Environment) (interface{}, error) {
+	switch method {
+	case "isOk":
+		return result.IsOk(), nil
+
+	case "isErr":
+		return result.IsErr(), nil
+
+	case "unwrap":
+		return result.Unwrap()
+
+	case "unwrapOr":
+		if len(args) != 1 {
+			return nil, fmt.Errorf("unwrapOr() expects 1 argument, got %d", len(args))
+		}
+		return result.UnwrapOr(args[0]), nil
+
+	case "unwrapErr":
+		return result.UnwrapErr()
+
+	case "map":
+		if len(args) != 1 {
+			return nil, fmt.Errorf("map() expects 1 argument (a function), got %d", len(args))
+		}
+		if !result.IsOk() {
+			return result, nil
+		}
+		mapped, err := i.callFnArg(args[0], result.value, env)
+		if err != nil {
+			return nil, fmt.Errorf("Result.map: %w", err)
+		}
+		return NewOk(mapped), nil
+
+	case "mapErr":
+		if len(args) != 1 {
+			return nil, fmt.Errorf("mapErr() expects 1 argument (a function), got %d", len(args))
+		}
+		if result.IsOk() {
+			return result, nil
+		}
+		mapped, err := i.callFnArg(args[0], result.value, env)
+		if err != nil {
+			return nil, fmt.Errorf("Result.mapErr: %w", err)
+		}
+		return NewErr(mapped), nil
+
+	case "andThen":
+		if len(args) != 1 {
+			return nil, fmt.Errorf("andThen() expects 1 argument (a function), got %d", len(args))
+		}
+		if !result.IsOk() {
+			return result, nil
+		}
+		chained, err := i.callFnArg(args[0], result.value, env)
+		if err != nil {
+			return nil, fmt.Errorf("Result.andThen: %w", err)
+		}
+		if _, ok := chained.(*ResultValue); ok {
+			return chained, nil
+		}
+		return NewOk(chained), nil
+
+	case "orElse":
+		if len(args) != 1 {
+			return nil, fmt.Errorf("orElse() expects 1 argument (a function), got %d", len(args))
+		}
+		if result.IsOk() {
+			return result, nil
+		}
+		fallback, err := i.callFnArg(args[0], result.value, env)
+		if err != nil {
+			return nil, fmt.Errorf("Result.orElse: %w", err)
+		}
+		if _, ok := fallback.(*ResultValue); ok {
+			return fallback, nil
+		}
+		return NewOk(fallback), nil
+
+	default:
+		return nil, fmt.Errorf("Result has no method '%s'", method)
+	}
+}
+
+// callFnArg calls a function-like value with a single argument.
+// Supports Function AST nodes and LambdaClosure values.
+func (i *Interpreter) callFnArg(fn interface{}, arg interface{}, env *Environment) (interface{}, error) {
+	switch f := fn.(type) {
+	case Function:
+		fnEnv := NewChildEnvironment(env)
+		if len(f.Params) > 0 {
+			fnEnv.Define(f.Params[0].Name, arg)
+		}
+		result, err := i.executeStatements(f.Body, fnEnv)
+		if err != nil {
+			if retErr, ok := err.(*returnValue); ok {
+				return retErr.value, nil
+			}
+			return nil, err
+		}
+		return result, nil
+	case *Function:
+		return i.callFnArg(*f, arg, env)
+	case *LambdaClosure:
+		fnEnv := NewChildEnvironment(f.Env)
+		if len(f.Lambda.Params) > 0 {
+			fnEnv.Define(f.Lambda.Params[0].Name, arg)
+		}
+		if f.Lambda.Body != nil {
+			return i.EvaluateExpression(f.Lambda.Body, fnEnv)
+		}
+		if len(f.Lambda.Block) > 0 {
+			result, err := i.executeStatements(f.Lambda.Block, fnEnv)
+			if err != nil {
+				if retErr, ok := err.(*returnValue); ok {
+					return retErr.value, nil
+				}
+				return nil, err
+			}
+			return result, nil
+		}
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("expected a function, got %T", fn)
+	}
 }
