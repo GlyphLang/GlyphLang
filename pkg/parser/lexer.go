@@ -281,6 +281,12 @@ func (l *Lexer) nextToken() Token {
 			tok.Type = OR
 			tok.Literal = string(ch) + string(l.ch)
 			l.readChar()
+		} else if l.peekChar() == '>' {
+			ch := l.ch
+			l.readChar()
+			tok.Type = PIPE_OP
+			tok.Literal = string(ch) + string(l.ch)
+			l.readChar()
 		} else {
 			tok.Type = PIPE
 			tok.Literal = string(l.ch)
@@ -391,6 +397,8 @@ func (l *Lexer) readIdentifier() Token {
 		tok.Type = AS
 	case "module":
 		tok.Type = MODULE
+	case "const":
+		tok.Type = CONST
 	default:
 		tok.Type = IDENT
 	}

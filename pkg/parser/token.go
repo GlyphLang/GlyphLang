@@ -42,6 +42,7 @@ const (
 	DOT      // .
 	ARROW    // ->
 	PIPE     // |
+	PIPE_OP  // |>
 	EQUALS   // =
 
 	// Literals
@@ -72,6 +73,7 @@ const (
 	FROM      // from
 	AS        // as
 	MODULE    // module
+	CONST     // const
 )
 
 // Token represents a lexical token
@@ -151,6 +153,8 @@ func (t TokenType) String() string {
 		return "->"
 	case PIPE:
 		return "|"
+	case PIPE_OP:
+		return "|>"
 	case EQUALS:
 		return "="
 	case IDENT:
@@ -203,6 +207,8 @@ func (t TokenType) String() string {
 		return "AS"
 	case MODULE:
 		return "MODULE"
+	case CONST:
+		return "CONST"
 	default:
 		return "UNKNOWN"
 	}

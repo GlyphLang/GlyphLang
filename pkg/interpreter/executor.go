@@ -107,6 +107,11 @@ func (i *Interpreter) executeReassign(stmt ReassignStatement, env *Environment) 
 		return nil, fmt.Errorf("cannot assign to undeclared variable '%s'", stmt.Target)
 	}
 
+	// Check if target is a constant (immutable)
+	if i.IsConstant(stmt.Target) {
+		return nil, fmt.Errorf("cannot reassign constant '%s'", stmt.Target)
+	}
+
 	value, err := i.EvaluateExpression(stmt.Value, env)
 	if err != nil {
 		return nil, err

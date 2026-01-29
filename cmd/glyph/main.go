@@ -27,6 +27,7 @@ import (
 	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/lsp"
 	"github.com/glyphlang/glyph/pkg/parser"
+	"github.com/glyphlang/glyph/pkg/repl"
 	"github.com/glyphlang/glyph/pkg/server"
 	"github.com/glyphlang/glyph/pkg/validate"
 	"github.com/glyphlang/glyph/pkg/vm"
@@ -255,6 +256,31 @@ Examples:
 	compactCmd.Flags().StringP("output", "o", "", "Output file (default: stdout)")
 	compactCmd.Flags().BoolP("watch", "w", false, "Watch for file changes and auto-convert")
 
+	// REPL command - interactive Read-Eval-Print Loop
+	var replCmd = &cobra.Command{
+		Use:   "repl",
+		Short: "Start an interactive REPL session",
+		Long: `Start an interactive Read-Eval-Print Loop (REPL) for GlyphLang.
+
+The REPL allows you to:
+- Execute Glyph expressions and statements interactively
+- Explore language features and test code snippets
+- Inspect variables and their values
+
+Commands:
+  :help    - Show available commands
+  :quit    - Exit the REPL
+  :clear   - Clear the environment
+  :vars    - Show all defined variables
+
+Examples:
+  glyph repl              # Start REPL`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			r := repl.New(os.Stdin, os.Stdout, version)
+			return r.Start()
+		},
+	}
+
 	// Version command
 	var versionCmd = &cobra.Command{
 		Use:   "version",
@@ -281,6 +307,7 @@ Examples:
 	rootCmd.AddCommand(validateCmd)
 	rootCmd.AddCommand(expandCmd)
 	rootCmd.AddCommand(compactCmd)
+	rootCmd.AddCommand(replCmd)
 	rootCmd.AddCommand(versionCmd)
 
 	if err := rootCmd.Execute(); err != nil {

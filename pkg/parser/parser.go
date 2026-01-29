@@ -69,6 +69,13 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 				return nil, err
 			}
 			items = append(items, item)
+		case CONST:
+			// const NAME = value or const NAME: Type = value
+			item, err := p.parseConstDecl()
+			if err != nil {
+				return nil, err
+			}
+			items = append(items, item)
 		case COLON:
 			item, err := p.parseTypeDef()
 			if err != nil {
@@ -140,7 +147,7 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 				return nil, p.errorWithHint(
 					fmt.Sprintf("Unexpected token %s", p.current().Type),
 					p.current(),
-					"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'import', 'from', or 'module'",
+					"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'import', 'from', 'module', or 'const'",
 				)
 			}
 		case EOF:
@@ -149,7 +156,7 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 			return nil, p.errorWithHint(
 				fmt.Sprintf("Unexpected token %s", p.current().Type),
 				p.current(),
-				"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'import', 'from', or 'module'",
+				"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'import', 'from', 'module', or 'const'",
 			)
 		}
 	}
@@ -2067,7 +2074,30 @@ func (p *Parser) parseSwitchStatement() (interpreter.Statement, error) {
 
 // parseExpr parses an expression with operator precedence
 func (p *Parser) parseExpr() (interpreter.Expr, error) {
-	return p.parseBinaryExpr(0)
+	return p.parsePipeExpr()
+}
+
+// parsePipeExpr parses pipe expressions (|>) with the lowest precedence
+// Pipes are left-associative: a |> b |> c parses as ((a |> b) |> c)
+func (p *Parser) parsePipeExpr() (interpreter.Expr, error) {
+	left, err := p.parseBinaryExpr(0)
+	if err != nil {
+		return nil, err
+	}
+
+	for p.current().Type == PIPE_OP {
+		p.advance() // consume |>
+		right, err := p.parseBinaryExpr(0)
+		if err != nil {
+			return nil, err
+		}
+		left = interpreter.PipeExpr{
+			Left:  left,
+			Right: right,
+		}
+	}
+
+	return left, nil
 }
 
 // parseBinaryExpr parses binary expressions with precedence climbing
@@ -3493,6 +3523,54 @@ func (p *Parser) parseModuleDecl() (interpreter.Item, error) {
 	}, nil
 }
 
+// parseConstDecl parses a constant declaration: const NAME = value or const NAME: Type = value
+func (p *Parser) parseConstDecl() (interpreter.Item, error) {
+	// Consume "const" keyword
+	if err := p.expect(CONST); err != nil {
+		return nil, err
+	}
+
+	// Get constant name
+	name, err := p.expectIdent()
+	if err != nil {
+		return nil, p.errorWithHint(
+			"Expected constant name after 'const'",
+			p.current(),
+			"Example: const MAX_SIZE = 100",
+		)
+	}
+
+	// Check for optional type annotation
+	var constType interpreter.Type
+	if p.match(COLON) {
+		constType, _, err = p.parseType()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Expect '='
+	if err := p.expect(EQUALS); err != nil {
+		return nil, p.errorWithHint(
+			"Expected '=' after constant name",
+			p.current(),
+			"Example: const MAX_SIZE = 100 or const PI: float = 3.14159",
+		)
+	}
+
+	// Parse value expression
+	value, err := p.parseExpr()
+	if err != nil {
+		return nil, err
+	}
+
+	return &interpreter.ConstDecl{
+		Name:  name,
+		Value: value,
+		Type:  constType,
+	}, nil
+}
+
 // parseMacroDef parses a macro definition: macro! name(params) { body }
 // Example: macro! log(level, msg) { if level >= logLevel { print(msg) } }
 func (p *Parser) parseMacroDef() (interpreter.Item, error) {
@@ -4057,4 +4135,46 @@ func (p *Parser) parseArrayPattern() (interpreter.Pattern, error) {
 		Elements: elements,
 		Rest:     rest,
 	}, nil
+}
+
+// ParseExpression parses a single expression from the token stream.
+// This is used by the REPL and other tools that need to parse expressions directly.
+func (p *Parser) ParseExpression() (interpreter.Expr, error) {
+	// Skip leading newlines
+	p.skipNewlines()
+
+	if p.isAtEnd() {
+		return nil, fmt.Errorf("unexpected end of input")
+	}
+
+	expr, err := p.parseExpr()
+	if err != nil {
+		return nil, err
+	}
+
+	// Skip trailing newlines
+	p.skipNewlines()
+
+	return expr, nil
+}
+
+// ParseStatement parses a single statement from the token stream.
+// This is used by the REPL and other tools that need to parse statements directly.
+func (p *Parser) ParseStatement() (interpreter.Statement, error) {
+	// Skip leading newlines
+	p.skipNewlines()
+
+	if p.isAtEnd() {
+		return nil, fmt.Errorf("unexpected end of input")
+	}
+
+	stmt, err := p.parseStatement()
+	if err != nil {
+		return nil, err
+	}
+
+	// Skip trailing newlines
+	p.skipNewlines()
+
+	return stmt, nil
 }

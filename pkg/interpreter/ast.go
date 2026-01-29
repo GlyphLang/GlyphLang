@@ -394,6 +394,15 @@ type LambdaExpr struct {
 
 func (LambdaExpr) isExpr() {}
 
+// PipeExpr represents a pipe expression: left |> right
+// The left value is piped as the first argument to the right function
+type PipeExpr struct {
+	Left  Expr // The value being piped
+	Right Expr // The function/call to receive the piped value
+}
+
+func (PipeExpr) isExpr() {}
+
 // Literal represents a literal value
 type Literal interface {
 	isLiteral()
@@ -605,6 +614,17 @@ type ModuleDecl struct {
 
 func (ModuleDecl) isItem() {}
 
+// ConstDecl represents a module-level constant declaration.
+// Constants are immutable bindings evaluated at module load time.
+// Syntax: const NAME = value or const NAME: Type = value
+type ConstDecl struct {
+	Name  string // The constant name
+	Value Expr   // The constant value expression
+	Type  Type   // Optional type annotation (nil if type is inferred)
+}
+
+func (ConstDecl) isItem() {}
+
 // AsyncExpr represents an async block expression: async { ... }
 // The block is executed asynchronously and returns a Future
 type AsyncExpr struct {
@@ -743,6 +763,7 @@ func (EventHandler) isNode()        {}
 func (QueueWorker) isNode()         {}
 func (ImportStatement) isNode()     {}
 func (ModuleDecl) isNode()          {}
+func (ConstDecl) isNode()           {}
 func (MacroDef) isNode()            {}
 func (MacroInvocation) isNode()     {}
 func (AssignStatement) isNode()     {}
