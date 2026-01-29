@@ -4822,3 +4822,212 @@ func TestInterpreter_SSERoute_ObjectYield(t *testing.T) {
 func TestInterpreter_SSEMethodString(t *testing.T) {
 	assert.Equal(t, "SSE", SSE.String())
 }
+
+// --- MongoDB injection tests ---
+
+func TestInterpreter_SetMongoDBHandler(t *testing.T) {
+	interp := NewInterpreter()
+	mockMongo := map[string]interface{}{"connected": true}
+	interp.SetMongoDBHandler(mockMongo)
+	assert.Equal(t, mockMongo, interp.mongoDBHandler)
+}
+
+func TestInterpreter_MongoDBInjection_Route(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockMongo := map[string]interface{}{
+		"status": "connected",
+	}
+	interp.SetMongoDBHandler(mockMongo)
+
+	route := &Route{
+		Path:   "/api/test",
+		Method: Get,
+		Injections: []Injection{
+			{Name: "mongo", Type: MongoDBType{}},
+		},
+		Body: []Statement{
+			AssignStatement{
+				Target: "s",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "mongo"},
+					Field:  "status",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "db_status", Value: VariableExpr{Name: "s"}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteRouteSimple(route, map[string]string{})
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "connected", resultMap["db_status"])
+}
+
+func TestInterpreter_MongoDBInjection_NamedType(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockMongo := map[string]interface{}{
+		"value": int64(99),
+	}
+	interp.SetMongoDBHandler(mockMongo)
+
+	route := &Route{
+		Path:   "/api/test",
+		Method: Get,
+		Injections: []Injection{
+			{Name: "db", Type: NamedType{Name: "MongoDB"}},
+		},
+		Body: []Statement{
+			AssignStatement{
+				Target: "v",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "db"},
+					Field:  "value",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "data", Value: VariableExpr{Name: "v"}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteRouteSimple(route, map[string]string{})
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, int64(99), resultMap["data"])
+}
+
+func TestInterpreter_MongoDBInjection_CronTask(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockMongo := map[string]interface{}{
+		"status": "synced",
+	}
+	interp.SetMongoDBHandler(mockMongo)
+
+	task := &CronTask{
+		Name:     "mongo_sync",
+		Schedule: "0 * * * *",
+		Injections: []Injection{
+			{Name: "mongo", Type: MongoDBType{}},
+		},
+		Body: []Statement{
+			AssignStatement{
+				Target: "s",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "mongo"},
+					Field:  "status",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "sync_status", Value: VariableExpr{Name: "s"}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteCronTask(task)
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "synced", resultMap["sync_status"])
+}
+
+func TestInterpreter_MongoDBInjection_NilHandler(t *testing.T) {
+	interp := NewInterpreter()
+	// Don't set MongoDB handler — should not panic
+
+	route := &Route{
+		Path:   "/api/test",
+		Method: Get,
+		Injections: []Injection{
+			{Name: "mongo", Type: MongoDBType{}},
+		},
+		Body: []Statement{
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "ok", Value: LiteralExpr{Value: BoolLiteral{Value: true}}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteRouteSimple(route, map[string]string{})
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, true, resultMap["ok"])
+}
+
+func TestInterpreter_AllThreeInjections(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockDB := map[string]interface{}{"type": "postgres"}
+	mockRedis := map[string]interface{}{"type": "redis"}
+	mockMongo := map[string]interface{}{"type": "mongodb"}
+
+	interp.SetDatabaseHandler(mockDB)
+	interp.SetRedisHandler(mockRedis)
+	interp.SetMongoDBHandler(mockMongo)
+
+	route := &Route{
+		Path:   "/api/test",
+		Method: Get,
+		Injections: []Injection{
+			{Name: "db", Type: DatabaseType{}},
+			{Name: "cache", Type: RedisType{}},
+			{Name: "docs", Type: MongoDBType{}},
+		},
+		Body: []Statement{
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "db_type", Value: FieldAccessExpr{
+							Object: VariableExpr{Name: "db"},
+							Field:  "type",
+						}},
+						{Key: "cache_type", Value: FieldAccessExpr{
+							Object: VariableExpr{Name: "cache"},
+							Field:  "type",
+						}},
+						{Key: "docs_type", Value: FieldAccessExpr{
+							Object: VariableExpr{Name: "docs"},
+							Field:  "type",
+						}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteRouteSimple(route, map[string]string{})
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "postgres", resultMap["db_type"])
+	assert.Equal(t, "redis", resultMap["cache_type"])
+	assert.Equal(t, "mongodb", resultMap["docs_type"])
+}

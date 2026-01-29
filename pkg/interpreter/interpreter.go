@@ -16,6 +16,7 @@ type Interpreter struct {
 	typeChecker     *TypeChecker
 	dbHandler       interface{}              // Database handler for dependency injection
 	redisHandler    interface{}              // Redis handler for dependency injection
+	mongoDBHandler  interface{}              // MongoDB handler for dependency injection
 	moduleResolver  *ModuleResolver          // Module resolver for handling imports
 	importedModules map[string]*LoadedModule // Imported modules by alias/name
 	constants       map[string]struct{}      // Tracks names that are constants (immutable)
@@ -244,8 +245,13 @@ func (i *Interpreter) SetRedisHandler(handler interface{}) {
 	i.redisHandler = handler
 }
 
+// SetMongoDBHandler sets the MongoDB handler for dependency injection
+func (i *Interpreter) SetMongoDBHandler(handler interface{}) {
+	i.mongoDBHandler = handler
+}
+
 // injectDependency handles a single dependency injection into the given environment.
-// It checks for DatabaseType/NamedType{"Database"} and RedisType/NamedType{"Redis"}.
+// It checks for DatabaseType/NamedType{"Database"}, RedisType/NamedType{"Redis"}, and MongoDBType/NamedType{"MongoDB"}.
 func (i *Interpreter) injectDependency(injection Injection, env *Environment) {
 	// Check for DatabaseType or NamedType{Name: "Database"}
 	isDB := false
@@ -268,6 +274,18 @@ func (i *Interpreter) injectDependency(injection Injection, env *Environment) {
 	}
 	if isRedis && i.redisHandler != nil {
 		env.Define(injection.Name, i.redisHandler)
+		return
+	}
+
+	// Check for MongoDBType or NamedType{Name: "MongoDB"}
+	isMongo := false
+	if _, ok := injection.Type.(MongoDBType); ok {
+		isMongo = true
+	} else if named, ok := injection.Type.(NamedType); ok && named.Name == "MongoDB" {
+		isMongo = true
+	}
+	if isMongo && i.mongoDBHandler != nil {
+		env.Define(injection.Name, i.mongoDBHandler)
 		return
 	}
 }
