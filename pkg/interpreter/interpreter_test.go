@@ -4387,3 +4387,301 @@ func TestMatchExpr_NoMatch_ReturnsNil(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }
+
+// --- Redis injection tests ---
+
+func TestInterpreter_SetRedisHandler(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockRedis := map[string]interface{}{
+		"cached": "hello",
+	}
+	interp.SetRedisHandler(mockRedis)
+
+	// Verify the handler is stored
+	assert.NotNil(t, interp.redisHandler)
+	assert.Equal(t, mockRedis, interp.redisHandler)
+}
+
+func TestInterpreter_RedisInjection_Route(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockRedis := map[string]interface{}{
+		"cached": "cached_value",
+	}
+	interp.SetRedisHandler(mockRedis)
+
+	route := &Route{
+		Path:   "/api/test",
+		Method: Get,
+		Injections: []Injection{
+			{Name: "redis", Type: RedisType{}},
+		},
+		Body: []Statement{
+			AssignStatement{
+				Target: "val",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "redis"},
+					Field:  "cached",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "result", Value: VariableExpr{Name: "val"}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteRouteSimple(route, map[string]string{})
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "cached_value", resultMap["result"])
+}
+
+func TestInterpreter_RedisInjection_NamedType(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockRedis := map[string]interface{}{
+		"value": int64(42),
+	}
+	interp.SetRedisHandler(mockRedis)
+
+	// Test with NamedType{Name: "Redis"} (as produced by the parser)
+	route := &Route{
+		Path:   "/api/test",
+		Method: Get,
+		Injections: []Injection{
+			{Name: "cache", Type: NamedType{Name: "Redis"}},
+		},
+		Body: []Statement{
+			AssignStatement{
+				Target: "v",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "cache"},
+					Field:  "value",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "data", Value: VariableExpr{Name: "v"}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteRouteSimple(route, map[string]string{})
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, int64(42), resultMap["data"])
+}
+
+func TestInterpreter_RedisInjection_CronTask(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockRedis := map[string]interface{}{
+		"status": "ready",
+	}
+	interp.SetRedisHandler(mockRedis)
+
+	task := &CronTask{
+		Name:     "cache_refresh",
+		Schedule: "*/5 * * * *",
+		Injections: []Injection{
+			{Name: "redis", Type: RedisType{}},
+		},
+		Body: []Statement{
+			AssignStatement{
+				Target: "s",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "redis"},
+					Field:  "status",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "cache_status", Value: VariableExpr{Name: "s"}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteCronTask(task)
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "ready", resultMap["cache_status"])
+}
+
+func TestInterpreter_RedisInjection_EventHandler(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockRedis := map[string]interface{}{
+		"key": "event_data",
+	}
+	interp.SetRedisHandler(mockRedis)
+
+	handler := &EventHandler{
+		EventType: "cache.invalidate",
+		Injections: []Injection{
+			{Name: "redis", Type: RedisType{}},
+		},
+		Body: []Statement{
+			AssignStatement{
+				Target: "k",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "redis"},
+					Field:  "key",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "invalidated", Value: VariableExpr{Name: "k"}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteEventHandler(handler, map[string]interface{}{"key": "user:1"})
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "event_data", resultMap["invalidated"])
+}
+
+func TestInterpreter_RedisInjection_QueueWorker(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockRedis := map[string]interface{}{
+		"queue_size": int64(5),
+	}
+	interp.SetRedisHandler(mockRedis)
+
+	worker := &QueueWorker{
+		QueueName: "cache_updates",
+		Injections: []Injection{
+			{Name: "redis", Type: RedisType{}},
+		},
+		Body: []Statement{
+			AssignStatement{
+				Target: "size",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "redis"},
+					Field:  "queue_size",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "remaining", Value: VariableExpr{Name: "size"}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteQueueWorker(worker, map[string]interface{}{"action": "update"})
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, int64(5), resultMap["remaining"])
+}
+
+func TestInterpreter_BothDbAndRedisInjection(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockDB := map[string]interface{}{
+		"users": int64(100),
+	}
+	mockRedis := map[string]interface{}{
+		"cached_count": int64(99),
+	}
+	interp.SetDatabaseHandler(mockDB)
+	interp.SetRedisHandler(mockRedis)
+
+	route := &Route{
+		Path:   "/api/test",
+		Method: Get,
+		Injections: []Injection{
+			{Name: "db", Type: DatabaseType{}},
+			{Name: "redis", Type: RedisType{}},
+		},
+		Body: []Statement{
+			AssignStatement{
+				Target: "db_count",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "db"},
+					Field:  "users",
+				},
+			},
+			AssignStatement{
+				Target: "cache_count",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "redis"},
+					Field:  "cached_count",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "db_users", Value: VariableExpr{Name: "db_count"}},
+						{Key: "cached_users", Value: VariableExpr{Name: "cache_count"}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteRouteSimple(route, map[string]string{})
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, int64(100), resultMap["db_users"])
+	assert.Equal(t, int64(99), resultMap["cached_users"])
+}
+
+func TestInterpreter_RedisInjection_NilHandler(t *testing.T) {
+	interp := NewInterpreter()
+	// Don't set a redis handler
+
+	route := &Route{
+		Path:   "/api/test",
+		Method: Get,
+		Injections: []Injection{
+			{Name: "redis", Type: RedisType{}},
+		},
+		Body: []Statement{
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "ok", Value: LiteralExpr{Value: BoolLiteral{Value: true}}},
+					},
+				},
+			},
+		},
+	}
+
+	// Should not panic, redis just won't be available
+	result, err := interp.ExecuteRouteSimple(route, map[string]string{})
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, true, resultMap["ok"])
+}

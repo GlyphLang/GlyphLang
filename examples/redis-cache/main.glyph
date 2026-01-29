@@ -1,0 +1,202 @@
+# Redis Cache Example
+# Demonstrates Redis integration for caching, counters, and key-value storage
+
+# Define types
+: User {
+  id: int!
+  username: str!
+  email: str!
+}
+
+: CacheResponse {
+  success: bool!
+  message: str!
+  data: any
+  cached: bool
+}
+
+: CounterResponse {
+  success: bool!
+  counter: str!
+  value: int!
+}
+
+# Get a user with Redis caching
+@ GET /api/users/:id -> CacheResponse {
+  + ratelimit(200/min)
+  % db: Database
+  % redis: Redis
+
+  # Try cache first
+  $ cached = redis.get("user:" + id)
+
+  if cached != null {
+    > {
+      success: true,
+      message: "Cache hit",
+      data: cached,
+      cached: true
+    }
+  } else {
+    $ user = db.users.get(id)
+
+    if user == null {
+      > {
+        success: false,
+        message: "User not found",
+        data: null,
+        cached: false
+      }
+    } else {
+      # Cache for 1 hour (3600 seconds)
+      $ result = redis.set("user:" + id, user, 3600)
+
+      > {
+        success: true,
+        message: "Cache miss - fetched from database",
+        data: user,
+        cached: false
+      }
+    }
+  }
+}
+
+# Invalidate user cache
+@ DELETE /api/users/:id/cache -> CacheResponse {
+  + ratelimit(50/min)
+  % redis: Redis
+
+  $ deleted = redis.del("user:" + id)
+
+  > {
+    success: true,
+    message: "Cache invalidated",
+    data: deleted,
+    cached: false
+  }
+}
+
+# Increment a named counter
+@ POST /api/counters/:name/incr -> CounterResponse {
+  + ratelimit(100/min)
+  % redis: Redis
+
+  $ value = redis.incr("counter:" + name)
+
+  > {
+    success: true,
+    counter: name,
+    value: value
+  }
+}
+
+# Get counter value
+@ GET /api/counters/:name -> CounterResponse {
+  + ratelimit(200/min)
+  % redis: Redis
+
+  $ value = redis.get("counter:" + name)
+
+  if value == null {
+    > {
+      success: true,
+      counter: name,
+      value: 0
+    }
+  } else {
+    > {
+      success: true,
+      counter: name,
+      value: value
+    }
+  }
+}
+
+# Store user session data in a hash
+@ POST /api/sessions/:sessionId {
+  + auth(jwt)
+  + ratelimit(50/min)
+  % redis: Redis
+
+  $ result = redis.hset("session:" + sessionId, "user_id", input.user_id, "role", input.role)
+
+  # Set session expiry to 24 hours
+  $ expiry = redis.expire("session:" + sessionId, 86400)
+
+  > {
+    success: true,
+    message: "Session created",
+    session_id: sessionId
+  }
+}
+
+# Get session data
+@ GET /api/sessions/:sessionId {
+  + ratelimit(200/min)
+  % redis: Redis
+
+  $ session = redis.hgetall("session:" + sessionId)
+
+  if session == null {
+    > {
+      success: false,
+      message: "Session not found"
+    }
+  } else {
+    > {
+      success: true,
+      session: session
+    }
+  }
+}
+
+# Add item to a recent activity list
+@ POST /api/activity {
+  + auth(jwt)
+  + ratelimit(100/min)
+  % redis: Redis
+
+  $ count = redis.lpush("activity:recent", input.activity)
+
+  # Keep only the last 100 items
+  if count > 100 {
+    $ trimmed = redis.rpop("activity:recent")
+  }
+
+  > {
+    success: true,
+    message: "Activity recorded",
+    total: count
+  }
+}
+
+# Get recent activity
+@ GET /api/activity/recent {
+  + ratelimit(200/min)
+  % redis: Redis
+
+  $ items = redis.lrange("activity:recent", 0, 19)
+  $ total = redis.llen("activity:recent")
+
+  > {
+    success: true,
+    items: items,
+    total: total,
+    showing: 20
+  }
+}
+
+# Check if a key exists and get its TTL
+@ GET /api/cache/info/:key {
+  + ratelimit(200/min)
+  % redis: Redis
+
+  $ exists = redis.exists(key)
+  $ ttl = redis.ttl(key)
+
+  > {
+    key: key,
+    exists: exists,
+    ttl: ttl
+  }
+}
