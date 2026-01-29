@@ -16,6 +16,7 @@ type Interpreter struct {
 	typeChecker     *TypeChecker
 	dbHandler       interface{}              // Database handler for dependency injection
 	redisHandler    interface{}              // Redis handler for dependency injection
+	mongoDBHandler  interface{}              // MongoDB handler for dependency injection
 	moduleResolver  *ModuleResolver          // Module resolver for handling imports
 	importedModules map[string]*LoadedModule // Imported modules by alias/name
 	constants       map[string]struct{}      // Tracks names that are constants (immutable)
@@ -57,12 +58,13 @@ func (i *Interpreter) GetModuleResolver() *ModuleResolver {
 
 // Request represents an HTTP request
 type Request struct {
-	Path     string
-	Method   string
-	Params   map[string]string
-	Body     interface{}
-	Headers  map[string]string
-	AuthData map[string]interface{} // Authenticated user data from JWT
+	Path      string
+	Method    string
+	Params    map[string]string
+	Body      interface{}
+	Headers   map[string]string
+	AuthData  map[string]interface{} // Authenticated user data from JWT
+	SSEWriter interface{}             // SSEWriter for SSE routes (implements executor.SSEWriter)
 }
 
 // Response represents an HTTP response
@@ -243,8 +245,13 @@ func (i *Interpreter) SetRedisHandler(handler interface{}) {
 	i.redisHandler = handler
 }
 
+// SetMongoDBHandler sets the MongoDB handler for dependency injection
+func (i *Interpreter) SetMongoDBHandler(handler interface{}) {
+	i.mongoDBHandler = handler
+}
+
 // injectDependency handles a single dependency injection into the given environment.
-// It checks for DatabaseType/NamedType{"Database"} and RedisType/NamedType{"Redis"}.
+// It checks for DatabaseType/NamedType{"Database"}, RedisType/NamedType{"Redis"}, and MongoDBType/NamedType{"MongoDB"}.
 func (i *Interpreter) injectDependency(injection Injection, env *Environment) {
 	// Check for DatabaseType or NamedType{Name: "Database"}
 	isDB := false
@@ -267,6 +274,18 @@ func (i *Interpreter) injectDependency(injection Injection, env *Environment) {
 	}
 	if isRedis && i.redisHandler != nil {
 		env.Define(injection.Name, i.redisHandler)
+		return
+	}
+
+	// Check for MongoDBType or NamedType{Name: "MongoDB"}
+	isMongo := false
+	if _, ok := injection.Type.(MongoDBType); ok {
+		isMongo = true
+	} else if named, ok := injection.Type.(NamedType); ok && named.Name == "MongoDB" {
+		isMongo = true
+	}
+	if isMongo && i.mongoDBHandler != nil {
+		env.Define(injection.Name, i.mongoDBHandler)
 		return
 	}
 }
@@ -385,6 +404,14 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 		routeEnv.Define("auth", authData)
 	}
 
+	// For SSE routes (SSE constant defined in ast.go), inject the writer
+	// so yield statements can stream events. The writer is provided by the
+	// server handler and implements the SSEWriter interface from executor.go.
+	// Cleanup/flushing is handled by the server handler after execution.
+	if route.Method == SSE && request.SSEWriter != nil {
+		routeEnv.Define("__sse_writer", request.SSEWriter)
+	}
+
 	// Execute route body
 	result, err := i.executeStatements(route.Body, routeEnv)
 	if err != nil {
@@ -399,6 +426,16 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 				},
 			}, err
 		}
+	}
+
+	// SSE routes stream events via yield — no body is returned.
+	// Type checking is skipped because the yielded event types are
+	// validated individually by the SSEWriter, not as a single return value.
+	if route.Method == SSE {
+		return &Response{
+			StatusCode: 200,
+			Headers:    make(map[string]string),
+		}, nil
 	}
 
 	// Validate return value matches declared return type

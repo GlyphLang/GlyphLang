@@ -923,12 +923,15 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 	case "PATCH":
 		methodFromKeyword = interpreter.Patch
 		hasMethodKeyword = true
+	case "SSE":
+		methodFromKeyword = interpreter.SSE
+		hasMethodKeyword = true
 	case "ROUTE":
 		// Standard syntax
 		hasMethodKeyword = false
 	default:
 		return nil, p.routeError(
-			fmt.Sprintf("Expected 'route', 'ws', 'websocket', or HTTP method after '@', but found '%s'", routeKw),
+			fmt.Sprintf("Expected 'route', 'ws', 'websocket', 'sse', or HTTP method after '@', but found '%s'", routeKw),
 			p.tokens[p.position-1],
 		)
 	}
@@ -1652,6 +1655,16 @@ func (p *Parser) parseStatement() (interpreter.Statement, error) {
 				return nil, err
 			}
 			return interpreter.ReturnStatement{Value: value}, nil
+		}
+
+		// Check for "yield" keyword (SSE event emission)
+		if p.current().Literal == "yield" {
+			p.advance() // consume "yield"
+			value, err := p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+			return interpreter.YieldStatement{Value: value}, nil
 		}
 
 		// Check for bare assignment (reassignment): identifier = expr

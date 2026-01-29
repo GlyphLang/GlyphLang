@@ -18,11 +18,13 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/fsnotify/fsnotify"
+	"github.com/glyphlang/glyph/pkg/codegen"
 	"github.com/glyphlang/glyph/pkg/compiler"
 	"github.com/glyphlang/glyph/pkg/config"
 	glyphcontext "github.com/glyphlang/glyph/pkg/context"
 	"github.com/glyphlang/glyph/pkg/database"
 	"github.com/glyphlang/glyph/pkg/decompiler"
+	"github.com/glyphlang/glyph/pkg/docs"
 	"github.com/glyphlang/glyph/pkg/formatter"
 	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/lsp"
@@ -283,6 +285,54 @@ Examples:
 	openapiCmd.Flags().String("title", "", "API title (default: derived from filename)")
 	openapiCmd.Flags().String("api-version", "1.0.0", "API version")
 
+	// Docs command - generate API documentation
+	var docsCmd = &cobra.Command{
+		Use:   "docs <file>",
+		Short: "Generate API documentation from GLYPH source",
+		Long: `Generate API documentation from your GLYPH source code.
+
+Reads route definitions and type definitions to produce documentation
+with endpoint listings, request/response schemas, and type definitions.
+
+Output formats:
+  - html: Self-contained HTML page with sidebar and search (default)
+  - markdown: Markdown documentation
+
+Examples:
+  glyph docs main.glyph                      # Output HTML to stdout
+  glyph docs main.glyph -o docs.html         # Write to file
+  glyph docs main.glyph --format markdown    # Output as Markdown
+  glyph docs main.glyph --title "My API"     # Set API title`,
+		Args: cobra.ExactArgs(1),
+		RunE: runDocs,
+	}
+	docsCmd.Flags().StringP("output", "o", "", "Output file (default: stdout)")
+	docsCmd.Flags().StringP("format", "f", "html", "Output format: html or markdown")
+	docsCmd.Flags().String("title", "", "API title (default: derived from filename)")
+
+	// Client command - generate API client code
+	var clientCmd = &cobra.Command{
+		Use:   "client <file>",
+		Short: "Generate API client code from GLYPH source",
+		Long: `Generate a typed API client from your GLYPH source code.
+
+Reads route definitions and type definitions to produce a fully typed
+API client with methods for each endpoint.
+
+Output languages:
+  - typescript: TypeScript client (default)
+
+Examples:
+  glyph client main.glyph                          # Output TypeScript to stdout
+  glyph client main.glyph -o client.ts              # Write to file
+  glyph client main.glyph --base-url http://api.io  # Set base URL`,
+		Args: cobra.ExactArgs(1),
+		RunE: runClient,
+	}
+	clientCmd.Flags().StringP("output", "o", "", "Output file (default: stdout)")
+	clientCmd.Flags().String("lang", "typescript", "Output language: typescript")
+	clientCmd.Flags().String("base-url", "http://localhost:3000", "Base URL for the API client")
+
 	// REPL command - interactive Read-Eval-Print Loop
 	var replCmd = &cobra.Command{
 		Use:   "repl",
@@ -336,6 +386,8 @@ Examples:
 	rootCmd.AddCommand(compactCmd)
 	rootCmd.AddCommand(replCmd)
 	rootCmd.AddCommand(openapiCmd)
+	rootCmd.AddCommand(docsCmd)
+	rootCmd.AddCommand(clientCmd)
 	rootCmd.AddCommand(versionCmd)
 
 	if err := rootCmd.Execute(); err != nil {
@@ -2457,6 +2509,98 @@ func runOpenAPI(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Print(string(data))
+	return nil
+}
+
+// runDocs handles the docs command
+func runDocs(cmd *cobra.Command, args []string) error {
+	filePath := args[0]
+	output, _ := cmd.Flags().GetString("output")
+	format, _ := cmd.Flags().GetString("format")
+	title, _ := cmd.Flags().GetString("title")
+
+	// Read source file
+	source, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Parse source
+	module, err := parseSource(string(source))
+	if err != nil {
+		return fmt.Errorf("parse error: %w", err)
+	}
+
+	// Default title from filename
+	if title == "" {
+		base := filepath.Base(filePath)
+		ext := filepath.Ext(base)
+		title = base[:len(base)-len(ext)] + " API"
+	}
+
+	apiDoc := docs.ExtractDocs(module, title)
+
+	var content string
+	switch format {
+	case "html":
+		content = docs.GenerateHTML(apiDoc)
+	case "markdown", "md":
+		content = docs.GenerateMarkdown(apiDoc)
+	default:
+		return fmt.Errorf("unsupported format: %s (supported: html, markdown)", format)
+	}
+
+	// Write output
+	if output != "" {
+		if err := os.WriteFile(output, []byte(content), 0644); err != nil {
+			return fmt.Errorf("failed to write output: %w", err)
+		}
+		printSuccess(fmt.Sprintf("API documentation written to %s", output))
+		return nil
+	}
+
+	fmt.Print(content)
+	return nil
+}
+
+// runClient handles the client command
+func runClient(cmd *cobra.Command, args []string) error {
+	filePath := args[0]
+	output, _ := cmd.Flags().GetString("output")
+	lang, _ := cmd.Flags().GetString("lang")
+	baseURL, _ := cmd.Flags().GetString("base-url")
+
+	// Read source file
+	source, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Parse source
+	module, err := parseSource(string(source))
+	if err != nil {
+		return fmt.Errorf("parse error: %w", err)
+	}
+
+	var code string
+	switch lang {
+	case "typescript", "ts":
+		gen := codegen.NewTypeScriptGenerator(baseURL)
+		code = gen.Generate(module)
+	default:
+		return fmt.Errorf("unsupported language: %s (supported: typescript)", lang)
+	}
+
+	// Write output
+	if output != "" {
+		if err := os.WriteFile(output, []byte(code), 0644); err != nil {
+			return fmt.Errorf("failed to write output: %w", err)
+		}
+		printSuccess(fmt.Sprintf("API client written to %s", output))
+		return nil
+	}
+
+	fmt.Print(code)
 	return nil
 }
 
