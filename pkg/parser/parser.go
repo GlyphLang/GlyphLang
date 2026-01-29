@@ -297,6 +297,18 @@ func (p *Parser) parseFieldWithContext(typeParamNames []string) (interpreter.Fie
 		return interpreter.Field{}, err
 	}
 
+	// Parse validation annotations: @minLen(2) @email @pattern("[A-Z]")
+	// Annotations are optional and follow the type declaration.
+	// The Annotations field on interpreter.Field is defined in ast.go.
+	var annotations []interpreter.FieldAnnotation
+	for p.check(AT) {
+		ann, parseErr := p.parseFieldAnnotation()
+		if parseErr != nil {
+			return interpreter.Field{}, parseErr
+		}
+		annotations = append(annotations, ann)
+	}
+
 	// Check for default value: = expr
 	var defaultValue interpreter.Expr
 	if p.check(EQUALS) {
@@ -318,7 +330,77 @@ func (p *Parser) parseFieldWithContext(typeParamNames []string) (interpreter.Fie
 		TypeAnnotation: typeAnnotation,
 		Required:       required,
 		Default:        defaultValue,
+		Annotations:    annotations,
 	}, nil
+}
+
+// parseFieldAnnotation parses a single validation annotation like @minLen(2)
+// or @email. Returns an error if the annotation has invalid syntax.
+func (p *Parser) parseFieldAnnotation() (interpreter.FieldAnnotation, error) {
+	p.advance() // consume @
+
+	name, err := p.expectIdent()
+	if err != nil {
+		return interpreter.FieldAnnotation{}, err
+	}
+
+	ann := interpreter.FieldAnnotation{Name: name}
+
+	// Parse optional parameters: @minLen(2), @range(0, 150), @oneOf(["a", "b"])
+	if p.check(LPAREN) {
+		p.advance() // consume (
+		for !p.check(RPAREN) && !p.isAtEnd() {
+			tok := p.current()
+			switch tok.Type {
+			case INTEGER:
+				val, parseErr := strconv.ParseInt(tok.Literal, 10, 64)
+				if parseErr != nil {
+					return interpreter.FieldAnnotation{}, fmt.Errorf("line %d: invalid integer in annotation @%s: %s", tok.Line, name, tok.Literal)
+				}
+				ann.Params = append(ann.Params, val)
+				p.advance()
+			case FLOAT:
+				val, parseErr := strconv.ParseFloat(tok.Literal, 64)
+				if parseErr != nil {
+					return interpreter.FieldAnnotation{}, fmt.Errorf("line %d: invalid float in annotation @%s: %s", tok.Line, name, tok.Literal)
+				}
+				ann.Params = append(ann.Params, val)
+				p.advance()
+			case STRING:
+				ann.Params = append(ann.Params, tok.Literal)
+				p.advance()
+			case LBRACKET:
+				// Parse string array: ["a", "b", "c"]
+				p.advance() // consume [
+				var items []string
+				for !p.check(RBRACKET) && !p.isAtEnd() {
+					if p.check(COMMA) {
+						p.advance()
+						continue
+					}
+					if p.current().Type == STRING {
+						items = append(items, p.current().Literal)
+						p.advance()
+					} else {
+						return interpreter.FieldAnnotation{}, fmt.Errorf("line %d: expected string in annotation array, got %s", p.current().Line, p.current().Type.String())
+					}
+				}
+				if p.check(RBRACKET) {
+					p.advance() // consume ]
+				}
+				ann.Params = append(ann.Params, items)
+			case COMMA:
+				p.advance() // skip comma between parameters
+			default:
+				return interpreter.FieldAnnotation{}, fmt.Errorf("line %d: unexpected token in annotation @%s: %s", tok.Line, name, tok.Literal)
+			}
+		}
+		if err := p.expect(RPAREN); err != nil {
+			return interpreter.FieldAnnotation{}, err
+		}
+	}
+
+	return ann, nil
 }
 
 // validateDefaultType validates that a literal default value matches the declared type

@@ -3173,3 +3173,106 @@ func TestLexer_DotDotDot(t *testing.T) {
 	assert.Equal(t, IDENT, tokens[1].Type)
 	assert.Equal(t, "rest", tokens[1].Literal)
 }
+
+func TestParser_FieldAnnotations(t *testing.T) {
+	source := `: CreateUser {
+  name: str! @minLen(2) @maxLen(100)
+  email: str! @email
+  age: int @min(0) @max(150)
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	require.Len(t, module.Items, 1)
+	td, ok := module.Items[0].(*interpreter.TypeDef)
+	require.True(t, ok)
+	require.Len(t, td.Fields, 3)
+
+	// name field: @minLen(2) @maxLen(100)
+	nameField := td.Fields[0]
+	assert.Equal(t, "name", nameField.Name)
+	require.Len(t, nameField.Annotations, 2)
+	assert.Equal(t, "minLen", nameField.Annotations[0].Name)
+	assert.Equal(t, int64(2), nameField.Annotations[0].Params[0])
+	assert.Equal(t, "maxLen", nameField.Annotations[1].Name)
+	assert.Equal(t, int64(100), nameField.Annotations[1].Params[0])
+
+	// email field: @email
+	emailField := td.Fields[1]
+	require.Len(t, emailField.Annotations, 1)
+	assert.Equal(t, "email", emailField.Annotations[0].Name)
+	assert.Empty(t, emailField.Annotations[0].Params)
+
+	// age field: @min(0) @max(150)
+	ageField := td.Fields[2]
+	require.Len(t, ageField.Annotations, 2)
+	assert.Equal(t, "min", ageField.Annotations[0].Name)
+	assert.Equal(t, "max", ageField.Annotations[1].Name)
+}
+
+func TestParser_FieldAnnotationWithPattern(t *testing.T) {
+	source := `: Input {
+  code: str! @pattern("[A-Z]{3}")
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	td, ok := module.Items[0].(*interpreter.TypeDef)
+	require.True(t, ok)
+	require.Len(t, td.Fields[0].Annotations, 1)
+	assert.Equal(t, "pattern", td.Fields[0].Annotations[0].Name)
+	assert.Equal(t, "[A-Z]{3}", td.Fields[0].Annotations[0].Params[0])
+}
+
+func TestParser_FieldAnnotationOneOf(t *testing.T) {
+	source := `: Input {
+  role: str! @oneOf(["admin", "user", "guest"])
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	td, ok := module.Items[0].(*interpreter.TypeDef)
+	require.True(t, ok)
+	require.Len(t, td.Fields[0].Annotations, 1)
+	ann := td.Fields[0].Annotations[0]
+	assert.Equal(t, "oneOf", ann.Name)
+	items, ok := ann.Params[0].([]string)
+	require.True(t, ok)
+	assert.Equal(t, []string{"admin", "user", "guest"}, items)
+}
+
+func TestParser_FieldNoAnnotations(t *testing.T) {
+	source := `: Simple {
+  name: str!
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	td, ok := module.Items[0].(*interpreter.TypeDef)
+	require.True(t, ok)
+	assert.Empty(t, td.Fields[0].Annotations)
+}
