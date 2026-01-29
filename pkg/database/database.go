@@ -126,7 +126,8 @@ func NewDatabase(config *Config) (Database, error) {
 	case "postgres", "postgresql":
 		return NewPostgresDB(config), nil
 	case "mysql":
-		return nil, fmt.Errorf("MySQL driver not yet implemented")
+		// NewMySQLDB is defined in mysql.go - mirrors NewPostgresDB pattern
+		return NewMySQLDB(config), nil
 	case "sqlite", "sqlite3":
 		return nil, fmt.Errorf("SQLite driver not yet implemented")
 	default:
