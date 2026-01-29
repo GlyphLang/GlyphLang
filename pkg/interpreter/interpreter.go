@@ -6,16 +6,17 @@ import (
 
 // Interpreter is the main interpreter struct
 type Interpreter struct {
-	globalEnv      *Environment
-	functions      map[string]Function
-	typeDefs       map[string]TypeDef
-	commands       map[string]Command
-	cronTasks      []CronTask
-	eventHandlers  map[string][]EventHandler
-	queueWorkers   map[string]QueueWorker
-	typeChecker    *TypeChecker
-	dbHandler      interface{}       // Database handler for dependency injection
-	moduleResolver  *ModuleResolver           // Module resolver for handling imports
+	globalEnv       *Environment
+	functions       map[string]Function
+	typeDefs        map[string]TypeDef
+	commands        map[string]Command
+	cronTasks       []CronTask
+	eventHandlers   map[string][]EventHandler
+	queueWorkers    map[string]QueueWorker
+	typeChecker     *TypeChecker
+	dbHandler       interface{}              // Database handler for dependency injection
+	redisHandler    interface{}              // Redis handler for dependency injection
+	moduleResolver  *ModuleResolver          // Module resolver for handling imports
 	importedModules map[string]*LoadedModule // Imported modules by alias/name
 	constants       map[string]struct{}      // Tracks names that are constants (immutable)
 }
@@ -237,6 +238,39 @@ func (i *Interpreter) SetDatabaseHandler(handler interface{}) {
 	i.dbHandler = handler
 }
 
+// SetRedisHandler sets the Redis handler for dependency injection
+func (i *Interpreter) SetRedisHandler(handler interface{}) {
+	i.redisHandler = handler
+}
+
+// injectDependency handles a single dependency injection into the given environment.
+// It checks for DatabaseType/NamedType{"Database"} and RedisType/NamedType{"Redis"}.
+func (i *Interpreter) injectDependency(injection Injection, env *Environment) {
+	// Check for DatabaseType or NamedType{Name: "Database"}
+	isDB := false
+	if _, ok := injection.Type.(DatabaseType); ok {
+		isDB = true
+	} else if named, ok := injection.Type.(NamedType); ok && named.Name == "Database" {
+		isDB = true
+	}
+	if isDB && i.dbHandler != nil {
+		env.Define(injection.Name, i.dbHandler)
+		return
+	}
+
+	// Check for RedisType or NamedType{Name: "Redis"}
+	isRedis := false
+	if _, ok := injection.Type.(RedisType); ok {
+		isRedis = true
+	} else if named, ok := injection.Type.(NamedType); ok && named.Name == "Redis" {
+		isRedis = true
+	}
+	if isRedis && i.redisHandler != nil {
+		env.Define(injection.Name, i.redisHandler)
+		return
+	}
+}
+
 // ExecuteRoute executes a route with the given request
 func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, error) {
 	// Create a new environment for the route
@@ -328,16 +362,7 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 
 	// Handle dependency injections
 	for _, injection := range route.Injections {
-		// Check for DatabaseType or NamedType{Name: "Database"}
-		isDB := false
-		if _, ok := injection.Type.(DatabaseType); ok {
-			isDB = true
-		} else if named, ok := injection.Type.(NamedType); ok && named.Name == "Database" {
-			isDB = true
-		}
-		if isDB && i.dbHandler != nil {
-			routeEnv.Define(injection.Name, i.dbHandler)
-		}
+		i.injectDependency(injection, routeEnv)
 	}
 
 	// Handle auth injection when route has auth middleware
@@ -410,16 +435,7 @@ func (i *Interpreter) ExecuteRouteSimple(route *Route, pathParams map[string]str
 
 	// Handle dependency injections
 	for _, injection := range route.Injections {
-		// Check for DatabaseType or NamedType{Name: "Database"}
-		isDB := false
-		if _, ok := injection.Type.(DatabaseType); ok {
-			isDB = true
-		} else if named, ok := injection.Type.(NamedType); ok && named.Name == "Database" {
-			isDB = true
-		}
-		if isDB && i.dbHandler != nil {
-			routeEnv.Define(injection.Name, i.dbHandler)
-		}
+		i.injectDependency(injection, routeEnv)
 	}
 
 	// Handle auth injection when route has auth middleware
@@ -554,11 +570,7 @@ func (i *Interpreter) ExecuteCronTask(task *CronTask) (interface{}, error) {
 
 	// Handle dependency injections
 	for _, injection := range task.Injections {
-		if _, ok := injection.Type.(DatabaseType); ok {
-			if i.dbHandler != nil {
-				taskEnv.Define(injection.Name, i.dbHandler)
-			}
-		}
+		i.injectDependency(injection, taskEnv)
 	}
 
 	// Execute task body
@@ -585,11 +597,7 @@ func (i *Interpreter) ExecuteEventHandler(handler *EventHandler, eventData inter
 
 	// Handle dependency injections
 	for _, injection := range handler.Injections {
-		if _, ok := injection.Type.(DatabaseType); ok {
-			if i.dbHandler != nil {
-				handlerEnv.Define(injection.Name, i.dbHandler)
-			}
-		}
+		i.injectDependency(injection, handlerEnv)
 	}
 
 	// Execute handler body
@@ -635,11 +643,7 @@ func (i *Interpreter) ExecuteQueueWorker(worker *QueueWorker, message interface{
 
 	// Handle dependency injections
 	for _, injection := range worker.Injections {
-		if _, ok := injection.Type.(DatabaseType); ok {
-			if i.dbHandler != nil {
-				workerEnv.Define(injection.Name, i.dbHandler)
-			}
-		}
+		i.injectDependency(injection, workerEnv)
 	}
 
 	// Execute worker body

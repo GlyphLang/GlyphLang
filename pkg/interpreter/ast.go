@@ -78,6 +78,7 @@ type NamedType struct {
 }
 
 type DatabaseType struct{}
+type RedisType struct{}
 
 type UnionType struct {
 	Types []Type
@@ -118,6 +119,7 @@ func (ArrayType) isType()         {}
 func (OptionalType) isType()      {}
 func (NamedType) isType()         {}
 func (DatabaseType) isType()      {}
+func (RedisType) isType()         {}
 func (UnionType) isType()         {}
 func (GenericType) isType()       {}
 func (TypeParameterType) isType() {}
@@ -202,7 +204,7 @@ type ReassignStatement struct {
 }
 
 func (ReassignStatement) isStatement() {}
-func (ReassignStatement) isNode() {}
+func (ReassignStatement) isNode()      {}
 
 // DbQueryStatement represents a database query
 type DbQueryStatement struct {
@@ -274,8 +276,8 @@ func (WsSendStatement) isStatement() {}
 
 // WsBroadcastStatement represents broadcasting a message to all clients
 type WsBroadcastStatement struct {
-	Message Expr      // Message to broadcast
-	Except  *Expr     // Optional: client ID to exclude
+	Message Expr  // Message to broadcast
+	Except  *Expr // Optional: client ID to exclude
 }
 
 func (WsBroadcastStatement) isStatement() {}
@@ -387,8 +389,8 @@ func (ArrayExpr) isExpr() {}
 // LambdaExpr represents an anonymous function (lambda/arrow function)
 // Example: (x) => x * 2, (a, b) => a + b
 type LambdaExpr struct {
-	Params []Field    // Parameter list
-	Body   Expr       // Single expression body (for short lambdas)
+	Params []Field     // Parameter list
+	Body   Expr        // Single expression body (for short lambdas)
 	Block  []Statement // Statement body (for multi-line lambdas), mutually exclusive with Body
 }
 
@@ -587,10 +589,11 @@ func (QueueWorker) isItem() {}
 
 // ImportStatement represents an import declaration
 // Syntax forms:
-//   import "path/to/file"
-//   import "path/to/file" as alias
-//   from "path/to/file" import { name1, name2 }
-//   from "path/to/file" import { name1 as alias1, name2 }
+//
+//	import "path/to/file"
+//	import "path/to/file" as alias
+//	from "path/to/file" import { name1, name2 }
+//	from "path/to/file" import { name1 as alias1, name2 }
 type ImportStatement struct {
 	Path      string       // The import path (relative or package name)
 	Alias     string       // Optional alias for the entire module
@@ -753,49 +756,49 @@ type Node interface {
 }
 
 // Make existing types implement Node
-func (TypeDef) isNode()             {}
-func (Route) isNode()               {}
-func (Function) isNode()            {}
-func (WebSocketRoute) isNode()      {}
-func (Command) isNode()             {}
-func (CronTask) isNode()            {}
-func (EventHandler) isNode()        {}
-func (QueueWorker) isNode()         {}
-func (ImportStatement) isNode()     {}
-func (ModuleDecl) isNode()          {}
-func (ConstDecl) isNode()           {}
-func (MacroDef) isNode()            {}
-func (MacroInvocation) isNode()     {}
-func (AssignStatement) isNode()     {}
-func (DbQueryStatement) isNode()    {}
-func (ReturnStatement) isNode()     {}
-func (IfStatement) isNode()         {}
-func (WhileStatement) isNode()      {}
-func (SwitchStatement) isNode()     {}
-func (ForStatement) isNode()        {}
-func (WsSendStatement) isNode()     {}
-func (WsBroadcastStatement) isNode(){}
-func (WsCloseStatement) isNode()    {}
-func (ValidationStatement) isNode() {}
-func (ExpressionStatement) isNode() {}
-func (WebSocketEvent) isNode()      {}
-func (LiteralExpr) isNode()         {}
-func (VariableExpr) isNode()        {}
-func (BinaryOpExpr) isNode()        {}
-func (UnaryOpExpr) isNode()         {}
-func (FieldAccessExpr) isNode()     {}
-func (ArrayIndexExpr) isNode()      {}
-func (FunctionCallExpr) isNode()    {}
-func (ObjectExpr) isNode()          {}
-func (ArrayExpr) isNode()           {}
-func (QuoteExpr) isNode()           {}
-func (UnquoteExpr) isNode()         {}
-func (MatchExpr) isNode()           {}
-func (LiteralPattern) isNode()      {}
-func (VariablePattern) isNode()     {}
-func (WildcardPattern) isNode()     {}
-func (ObjectPattern) isNode()       {}
-func (ArrayPattern) isNode()        {}
-func (AsyncExpr) isNode()           {}
-func (AwaitExpr) isNode()           {}
-func (LambdaExpr) isNode()          {}
+func (TypeDef) isNode()              {}
+func (Route) isNode()                {}
+func (Function) isNode()             {}
+func (WebSocketRoute) isNode()       {}
+func (Command) isNode()              {}
+func (CronTask) isNode()             {}
+func (EventHandler) isNode()         {}
+func (QueueWorker) isNode()          {}
+func (ImportStatement) isNode()      {}
+func (ModuleDecl) isNode()           {}
+func (ConstDecl) isNode()            {}
+func (MacroDef) isNode()             {}
+func (MacroInvocation) isNode()      {}
+func (AssignStatement) isNode()      {}
+func (DbQueryStatement) isNode()     {}
+func (ReturnStatement) isNode()      {}
+func (IfStatement) isNode()          {}
+func (WhileStatement) isNode()       {}
+func (SwitchStatement) isNode()      {}
+func (ForStatement) isNode()         {}
+func (WsSendStatement) isNode()      {}
+func (WsBroadcastStatement) isNode() {}
+func (WsCloseStatement) isNode()     {}
+func (ValidationStatement) isNode()  {}
+func (ExpressionStatement) isNode()  {}
+func (WebSocketEvent) isNode()       {}
+func (LiteralExpr) isNode()          {}
+func (VariableExpr) isNode()         {}
+func (BinaryOpExpr) isNode()         {}
+func (UnaryOpExpr) isNode()          {}
+func (FieldAccessExpr) isNode()      {}
+func (ArrayIndexExpr) isNode()       {}
+func (FunctionCallExpr) isNode()     {}
+func (ObjectExpr) isNode()           {}
+func (ArrayExpr) isNode()            {}
+func (QuoteExpr) isNode()            {}
+func (UnquoteExpr) isNode()          {}
+func (MatchExpr) isNode()            {}
+func (LiteralPattern) isNode()       {}
+func (VariablePattern) isNode()      {}
+func (WildcardPattern) isNode()      {}
+func (ObjectPattern) isNode()        {}
+func (ArrayPattern) isNode()         {}
+func (AsyncExpr) isNode()            {}
+func (AwaitExpr) isNode()            {}
+func (LambdaExpr) isNode()           {}
