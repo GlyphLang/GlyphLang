@@ -26,6 +26,7 @@ import (
 	"github.com/glyphlang/glyph/pkg/formatter"
 	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/lsp"
+	"github.com/glyphlang/glyph/pkg/openapi"
 	"github.com/glyphlang/glyph/pkg/parser"
 	"github.com/glyphlang/glyph/pkg/repl"
 	"github.com/glyphlang/glyph/pkg/server"
@@ -256,6 +257,32 @@ Examples:
 	compactCmd.Flags().StringP("output", "o", "", "Output file (default: stdout)")
 	compactCmd.Flags().BoolP("watch", "w", false, "Watch for file changes and auto-convert")
 
+	// OpenAPI command - generate OpenAPI 3.0 specification
+	var openapiCmd = &cobra.Command{
+		Use:   "openapi <file>",
+		Short: "Generate OpenAPI 3.0 specification from GLYPH source",
+		Long: `Generate an OpenAPI 3.0 specification from your GLYPH source code.
+
+Analyzes route definitions, type definitions, authentication middleware,
+and query parameters to produce a complete OpenAPI 3.0 specification.
+
+Output formats:
+  - yaml: YAML format (default)
+  - json: JSON format
+
+Examples:
+  glyph openapi main.glyph                      # Output YAML to stdout
+  glyph openapi main.glyph -o openapi.yaml      # Write to file
+  glyph openapi main.glyph --format json         # Output as JSON
+  glyph openapi main.glyph --title "My API"      # Set API title`,
+		Args: cobra.ExactArgs(1),
+		RunE: runOpenAPI,
+	}
+	openapiCmd.Flags().StringP("output", "o", "", "Output file (default: stdout)")
+	openapiCmd.Flags().StringP("format", "f", "yaml", "Output format: yaml or json")
+	openapiCmd.Flags().String("title", "", "API title (default: derived from filename)")
+	openapiCmd.Flags().String("api-version", "1.0.0", "API version")
+
 	// REPL command - interactive Read-Eval-Print Loop
 	var replCmd = &cobra.Command{
 		Use:   "repl",
@@ -308,6 +335,7 @@ Examples:
 	rootCmd.AddCommand(expandCmd)
 	rootCmd.AddCommand(compactCmd)
 	rootCmd.AddCommand(replCmd)
+	rootCmd.AddCommand(openapiCmd)
 	rootCmd.AddCommand(versionCmd)
 
 	if err := rootCmd.Execute(); err != nil {
@@ -2381,6 +2409,55 @@ func compactDirectory(dirPath, outputDir string) error {
 
 		return compactFile(path, outPath)
 	})
+}
+
+// runOpenAPI handles the openapi command
+func runOpenAPI(cmd *cobra.Command, args []string) error {
+	filePath := args[0]
+	output, _ := cmd.Flags().GetString("output")
+	format, _ := cmd.Flags().GetString("format")
+	title, _ := cmd.Flags().GetString("title")
+	apiVersion, _ := cmd.Flags().GetString("api-version")
+
+	// Read source file
+	source, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Parse source
+	module, err := parseSource(string(source))
+	if err != nil {
+		return fmt.Errorf("parse error: %w", err)
+	}
+
+	// Default title from filename
+	if title == "" {
+		base := filepath.Base(filePath)
+		ext := filepath.Ext(base)
+		title = base[:len(base)-len(ext)] + " API"
+	}
+
+	// Generate spec
+	spec := openapi.GenerateFromModule(module, title, apiVersion)
+
+	// Format output
+	data, err := openapi.FormatSpec(spec, format)
+	if err != nil {
+		return err
+	}
+
+	// Write output
+	if output != "" {
+		if err := os.WriteFile(output, data, 0644); err != nil {
+			return fmt.Errorf("failed to write output: %w", err)
+		}
+		printSuccess(fmt.Sprintf("OpenAPI spec written to %s", output))
+		return nil
+	}
+
+	fmt.Print(string(data))
+	return nil
 }
 
 // runWatchMode runs the expand or compact command in watch mode
