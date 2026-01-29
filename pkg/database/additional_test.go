@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestNewDatabaseFromString tests creating a database from connection string
@@ -147,15 +148,16 @@ func TestConfig_ConnectionString_DefaultDriver(t *testing.T) {
 	assert.Equal(t, "", result)
 }
 
-// TestNewDatabase_MySQL tests MySQL driver error
+// TestNewDatabase_MySQL tests MySQL driver instantiation
 func TestNewDatabase_MySQL(t *testing.T) {
 	config := &Config{
 		Driver: "mysql",
 	}
 
-	_, err := NewDatabase(config)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "MySQL driver not yet implemented")
+	db, err := NewDatabase(config)
+	require.NoError(t, err)
+	assert.NotNil(t, db)
+	assert.Equal(t, "mysql", db.Driver())
 }
 
 // TestNewDatabase_SQLite tests SQLite driver error
@@ -1743,12 +1745,13 @@ func TestNewDatabase_UnsupportedDriver(t *testing.T) {
 	assert.Contains(t, err.Error(), "unsupported database driver")
 }
 
-// TestNewDatabase_MySQLNotImplemented tests NewDatabase with MySQL driver
-func TestNewDatabase_MySQLNotImplemented(t *testing.T) {
+// TestNewDatabase_MySQLImplemented tests NewDatabase with MySQL driver
+func TestNewDatabase_MySQLImplemented(t *testing.T) {
 	config := &Config{Driver: "mysql"}
-	_, err := NewDatabase(config)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "MySQL driver not yet implemented")
+	db, err := NewDatabase(config)
+	require.NoError(t, err)
+	assert.NotNil(t, db)
+	assert.Equal(t, "mysql", db.Driver())
 }
 
 // TestNewDatabase_SQLiteNotImplemented tests NewDatabase with SQLite driver
