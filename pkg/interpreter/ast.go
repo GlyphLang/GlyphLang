@@ -80,6 +80,7 @@ type NamedType struct {
 type DatabaseType struct{}
 type RedisType struct{}
 type MongoDBType struct{}
+type LLMType struct{}
 
 type UnionType struct {
 	Types []Type
@@ -122,6 +123,7 @@ func (NamedType) isType()         {}
 func (DatabaseType) isType()      {}
 func (RedisType) isType()         {}
 func (MongoDBType) isType()       {}
+func (LLMType) isType()           {}
 func (UnionType) isType()         {}
 func (GenericType) isType()       {}
 func (TypeParameterType) isType() {}
