@@ -57,6 +57,9 @@ func (i *Interpreter) ExecuteStatement(stmt Statement, env *Environment) (interf
 	case ReassignStatement:
 		return i.executeReassign(s, env)
 
+	case YieldStatement:
+		return i.executeYield(s, env)
+
 	default:
 		return nil, fmt.Errorf("unsupported statement type: %T", stmt)
 	}
@@ -409,4 +412,34 @@ func (i *Interpreter) executeValidation(stmt ValidationStatement, env *Environme
 
 	// Unexpected return type
 	return nil, &ValidationError{Message: fmt.Sprintf("validation function %s returned unexpected type %T", stmt.Call.Name, result)}
+}
+
+// SSEWriter is the interface that yield statements use to send events.
+// It is injected into the environment as "__sse_writer" for SSE routes.
+type SSEWriter interface {
+	SendEvent(data interface{}, eventType string) error
+}
+
+// executeYield handles a yield statement by sending an SSE event.
+func (i *Interpreter) executeYield(stmt YieldStatement, env *Environment) (interface{}, error) {
+	value, err := i.EvaluateExpression(stmt.Value, env)
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate yield expression: %w", err)
+	}
+
+	writer, err := env.Get("__sse_writer")
+	if err != nil {
+		return nil, fmt.Errorf("yield can only be used inside an SSE route")
+	}
+
+	sseWriter, ok := writer.(SSEWriter)
+	if !ok {
+		return nil, fmt.Errorf("invalid SSE writer in environment")
+	}
+
+	if err := sseWriter.SendEvent(value, stmt.EventType); err != nil {
+		return nil, fmt.Errorf("failed to send SSE event: %w", err)
+	}
+
+	return nil, nil
 }

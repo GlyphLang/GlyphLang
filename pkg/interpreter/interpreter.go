@@ -58,12 +58,13 @@ func (i *Interpreter) GetModuleResolver() *ModuleResolver {
 
 // Request represents an HTTP request
 type Request struct {
-	Path     string
-	Method   string
-	Params   map[string]string
-	Body     interface{}
-	Headers  map[string]string
-	AuthData map[string]interface{} // Authenticated user data from JWT
+	Path      string
+	Method    string
+	Params    map[string]string
+	Body      interface{}
+	Headers   map[string]string
+	AuthData  map[string]interface{} // Authenticated user data from JWT
+	SSEWriter interface{}             // SSEWriter for SSE routes (implements executor.SSEWriter)
 }
 
 // Response represents an HTTP response
@@ -403,6 +404,14 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 		routeEnv.Define("auth", authData)
 	}
 
+	// For SSE routes (SSE constant defined in ast.go), inject the writer
+	// so yield statements can stream events. The writer is provided by the
+	// server handler and implements the SSEWriter interface from executor.go.
+	// Cleanup/flushing is handled by the server handler after execution.
+	if route.Method == SSE && request.SSEWriter != nil {
+		routeEnv.Define("__sse_writer", request.SSEWriter)
+	}
+
 	// Execute route body
 	result, err := i.executeStatements(route.Body, routeEnv)
 	if err != nil {
@@ -417,6 +426,16 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 				},
 			}, err
 		}
+	}
+
+	// SSE routes stream events via yield — no body is returned.
+	// Type checking is skipped because the yielded event types are
+	// validated individually by the SSEWriter, not as a single return value.
+	if route.Method == SSE {
+		return &Response{
+			StatusCode: 200,
+			Headers:    make(map[string]string),
+		}, nil
 	}
 
 	// Validate return value matches declared return type
