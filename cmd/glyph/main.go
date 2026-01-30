@@ -358,6 +358,27 @@ Examples:
 		},
 	}
 
+	// Test command
+	var testCmd = &cobra.Command{
+		Use:   "test <file>",
+		Short: "Run tests defined in a GLYPH file",
+		Long: `Execute all test blocks defined with 'test' keyword in a GLYPH file.
+
+Example:
+  test "should add numbers" {
+    assert(1 + 1 == 2)
+  }
+
+  glyph test math_test.glyph
+  glyph test math_test.glyph --verbose
+  glyph test math_test.glyph --filter "add*"`,
+		Args: cobra.ExactArgs(1),
+		RunE: runTest,
+	}
+	testCmd.Flags().BoolP("verbose", "v", false, "Show detailed output for each test")
+	testCmd.Flags().StringP("filter", "f", "", "Run only tests matching filter pattern")
+	testCmd.Flags().Bool("fail-fast", false, "Stop on first test failure")
+
 	// Version command
 	var versionCmd = &cobra.Command{
 		Use:   "version",
@@ -388,6 +409,7 @@ Examples:
 	rootCmd.AddCommand(openapiCmd)
 	rootCmd.AddCommand(docsCmd)
 	rootCmd.AddCommand(clientCmd)
+	rootCmd.AddCommand(testCmd)
 	rootCmd.AddCommand(versionCmd)
 
 	if err := rootCmd.Execute(); err != nil {
@@ -529,6 +551,105 @@ func runDecompile(cmd *cobra.Command, args []string) error {
 }
 
 // runRun handles the run command
+// runTest handles the test command - executes test blocks in a GLYPH file.
+// Argument count is validated by cobra.ExactArgs(1) before this function is called.
+// printWarning, printInfo are defined in this file (see helper functions section).
+func runTest(cmd *cobra.Command, args []string) error {
+	filePath := args[0]
+	verbose, err := cmd.Flags().GetBool("verbose")
+	if err != nil {
+		return fmt.Errorf("invalid flag --verbose: %w", err)
+	}
+	filter, err := cmd.Flags().GetString("filter")
+	if err != nil {
+		return fmt.Errorf("invalid flag --filter: %w", err)
+	}
+	failFast, err := cmd.Flags().GetBool("fail-fast")
+	if err != nil {
+		return fmt.Errorf("invalid flag --fail-fast: %w", err)
+	}
+
+	// Read and parse source file
+	source, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Determine lexer type based on file extension
+	var tokens []parser.Token
+	if filepath.Ext(filePath) == ".glyphx" {
+		lexer := parser.NewExpandedLexer(string(source))
+		tokens, err = lexer.Tokenize()
+	} else {
+		lexer := parser.NewLexer(string(source))
+		tokens, err = lexer.Tokenize()
+	}
+	if err != nil {
+		return fmt.Errorf("lexer error: %w", err)
+	}
+
+	p := parser.NewParserWithSource(tokens, string(source))
+	module, err := p.Parse()
+	if err != nil {
+		return fmt.Errorf("parse error: %w", err)
+	}
+
+	// Create interpreter and load module
+	interp := interpreter.NewInterpreter()
+	if err := interp.LoadModule(*module); err != nil {
+		return fmt.Errorf("load error: %w", err)
+	}
+
+	tests := interp.GetTestBlocks()
+	if len(tests) == 0 {
+		printWarning("No test blocks found in " + filePath)
+		return nil
+	}
+
+	// Run tests
+	results := interp.RunTests(filter)
+	if len(results) == 0 {
+		printWarning("No tests matched filter: " + filter)
+		return nil
+	}
+
+	// Display results
+	passed := 0
+	failed := 0
+
+	greenCheck := color.New(color.FgGreen).SprintFunc()
+	redX := color.New(color.FgRed).SprintFunc()
+
+	for _, r := range results {
+		if r.Passed {
+			passed++
+			if verbose {
+				fmt.Printf("  %s %s (%s)\n", greenCheck("PASS"), r.Name, r.Duration)
+			}
+		} else {
+			failed++
+			fmt.Printf("  %s %s\n", redX("FAIL"), r.Name)
+			if r.Error != "" {
+				fmt.Printf("       %s\n", r.Error)
+			}
+			if failFast {
+				break
+			}
+		}
+	}
+
+	// Summary
+	fmt.Println()
+	total := passed + failed
+	if failed > 0 {
+		color.New(color.FgRed, color.Bold).Printf("FAIL: %d/%d tests passed\n", passed, total)
+		return fmt.Errorf("%d test(s) failed", failed)
+	}
+
+	color.New(color.FgGreen, color.Bold).Printf("PASS: %d/%d tests passed\n", passed, total)
+	return nil
+}
+
 func runRun(cmd *cobra.Command, args []string) error {
 	filePath := args[0]
 	port, _ := cmd.Flags().GetUint16("port")

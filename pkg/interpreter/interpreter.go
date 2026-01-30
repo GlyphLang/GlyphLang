@@ -2,6 +2,8 @@ package interpreter
 
 import (
 	"fmt"
+	"strings"
+	"time"
 )
 
 // Interpreter is the main interpreter struct
@@ -14,10 +16,12 @@ type Interpreter struct {
 	eventHandlers    map[string][]EventHandler
 	queueWorkers     map[string]QueueWorker
 	graphqlResolvers map[string]GraphQLResolver // key: "operation.fieldName"
+	testBlocks       []TestBlock
 	typeChecker      *TypeChecker
 	dbHandler        interface{}              // Database handler for dependency injection
 	redisHandler     interface{}              // Redis handler for dependency injection
 	mongoDBHandler   interface{}              // MongoDB handler for dependency injection
+	llmHandler       interface{}              // LLM handler for AI integration
 	moduleResolver   *ModuleResolver          // Module resolver for handling imports
 	importedModules  map[string]*LoadedModule // Imported modules by alias/name
 	constants        map[string]struct{}      // Tracks names that are constants (immutable)
@@ -35,6 +39,7 @@ func NewInterpreter() *Interpreter {
 		eventHandlers:    make(map[string][]EventHandler),
 		queueWorkers:     make(map[string]QueueWorker),
 		graphqlResolvers: make(map[string]GraphQLResolver),
+		testBlocks:       []TestBlock{},
 		typeChecker:      typeChecker,
 		moduleResolver:   NewModuleResolver(),
 		importedModules:  make(map[string]*LoadedModule),
@@ -66,7 +71,7 @@ type Request struct {
 	Body      interface{}
 	Headers   map[string]string
 	AuthData  map[string]interface{} // Authenticated user data from JWT
-	SSEWriter interface{}             // SSEWriter for SSE routes (implements executor.SSEWriter)
+	SSEWriter interface{}            // SSEWriter for SSE routes (implements executor.SSEWriter)
 }
 
 // Response represents an HTTP response
@@ -126,6 +131,10 @@ func (i *Interpreter) LoadModuleWithPath(module Module, basePath string) error {
 		case *GraphQLResolver:
 			key := it.Operation.String() + "." + it.FieldName
 			i.graphqlResolvers[key] = *it
+
+		case *TestBlock:
+			// Store test blocks for later execution by the test runner.
+			i.testBlocks = append(i.testBlocks, *it)
 
 		case *ConstDecl:
 			// Evaluate and store constant at module load time
@@ -256,8 +265,13 @@ func (i *Interpreter) SetMongoDBHandler(handler interface{}) {
 	i.mongoDBHandler = handler
 }
 
+// SetLLMHandler sets the LLM handler for AI integration dependency injection
+func (i *Interpreter) SetLLMHandler(handler interface{}) {
+	i.llmHandler = handler
+}
+
 // injectDependency handles a single dependency injection into the given environment.
-// It checks for DatabaseType/NamedType{"Database"}, RedisType/NamedType{"Redis"}, and MongoDBType/NamedType{"MongoDB"}.
+// It checks for DatabaseType/NamedType{"Database"}, RedisType/NamedType{"Redis"}, MongoDBType/NamedType{"MongoDB"}, and LLMType/NamedType{"LLM"}.
 func (i *Interpreter) injectDependency(injection Injection, env *Environment) {
 	// Check for DatabaseType or NamedType{Name: "Database"}
 	isDB := false
@@ -292,6 +306,18 @@ func (i *Interpreter) injectDependency(injection Injection, env *Environment) {
 	}
 	if isMongo && i.mongoDBHandler != nil {
 		env.Define(injection.Name, i.mongoDBHandler)
+		return
+	}
+
+	// Check for LLMType or NamedType{Name: "LLM"}
+	isLLM := false
+	if _, ok := injection.Type.(LLMType); ok {
+		isLLM = true
+	} else if named, ok := injection.Type.(NamedType); ok && named.Name == "LLM" {
+		isLLM = true
+	}
+	if isLLM && i.llmHandler != nil {
+		env.Define(injection.Name, i.llmHandler)
 		return
 	}
 }
@@ -721,9 +747,6 @@ func (i *Interpreter) GetTypeDefs() map[string]TypeDef {
 }
 
 // ExecuteGraphQLResolver executes a single GraphQL resolver with the given arguments.
-// The resolver's body statements are executed in a child environment with
-// arguments, injections, and auth data bound. This follows the same execution
-// pattern as ExecuteRoute (see interpreter.go:293) and ExecuteQueueWorker.
 func (i *Interpreter) ExecuteGraphQLResolver(resolver *GraphQLResolver, args map[string]interface{}, authData map[string]interface{}) (interface{}, error) {
 	if resolver == nil {
 		return nil, fmt.Errorf("resolver is nil")
@@ -748,19 +771,14 @@ func (i *Interpreter) ExecuteGraphQLResolver(resolver *GraphQLResolver, args map
 		}
 	}
 
-	// Handle dependency injections (same pattern as ExecuteRoute at line 382)
 	for _, injection := range resolver.Injections {
 		i.injectDependency(injection, resolverEnv)
 	}
 
-	// Handle auth injection when resolver has auth middleware.
-	// Auth data is passed from the server layer which validates JWT/API key tokens
-	// before calling the resolver, matching the pattern in ExecuteRoute (line 387).
 	if resolver.Auth != nil && authData != nil {
 		resolverEnv.Define("auth", authData)
 	}
 
-	// Execute resolver body (same pattern as ExecuteRoute at line 416)
 	result, err := i.executeStatements(resolver.Body, resolverEnv)
 	if err != nil {
 		if retErr, ok := err.(*returnValue); ok {
@@ -771,4 +789,68 @@ func (i *Interpreter) ExecuteGraphQLResolver(resolver *GraphQLResolver, args map
 	}
 
 	return result, nil
+}
+
+// TestResult represents the result of executing a single test block
+type TestResult struct {
+	Name     string
+	Passed   bool
+	Error    string
+	Duration time.Duration
+}
+
+// GetTestBlocks returns all registered test blocks (returns a copy for safety)
+func (i *Interpreter) GetTestBlocks() []TestBlock {
+	result := make([]TestBlock, len(i.testBlocks))
+	copy(result, i.testBlocks)
+	return result
+}
+
+// RunTests executes all test blocks and returns results.
+// If filter is non-empty, only tests whose names match are executed.
+func (i *Interpreter) RunTests(filter string) []TestResult {
+	var results []TestResult
+	for _, test := range i.testBlocks {
+		if filter != "" && !matchesFilter(test.Name, filter) {
+			continue
+		}
+		result := i.runSingleTest(test)
+		results = append(results, result)
+	}
+	return results
+}
+
+// runSingleTest executes a single test block in an isolated child environment
+func (i *Interpreter) runSingleTest(test TestBlock) TestResult {
+	start := time.Now()
+	testEnv := NewChildEnvironment(i.globalEnv)
+
+	_, err := i.executeStatements(test.Body, testEnv)
+	duration := time.Since(start)
+
+	if err != nil {
+		if _, ok := err.(*returnValue); ok {
+			return TestResult{Name: test.Name, Passed: true, Duration: duration}
+		}
+		return TestResult{Name: test.Name, Passed: false, Error: err.Error(), Duration: duration}
+	}
+
+	return TestResult{Name: test.Name, Passed: true, Duration: duration}
+}
+
+// matchesFilter checks if a test name matches a filter string.
+func matchesFilter(name, filter string) bool {
+	if filter == "" {
+		return true
+	}
+	if strings.HasPrefix(filter, "*") && strings.HasSuffix(filter, "*") {
+		return strings.Contains(name, filter[1:len(filter)-1])
+	}
+	if strings.HasPrefix(filter, "*") {
+		return strings.HasSuffix(name, filter[1:])
+	}
+	if strings.HasSuffix(filter, "*") {
+		return strings.HasPrefix(name, filter[:len(filter)-1])
+	}
+	return strings.Contains(name, filter)
 }
