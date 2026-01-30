@@ -47,12 +47,22 @@ type Function struct {
 
 func (Function) isItem() {}
 
+// FieldAnnotation represents a declarative validation annotation on a type
+// field such as @minLen(2), @email, or @pattern("[A-Z]"). Annotations are
+// parsed from type definitions and processed by the validation schema builder
+// in pkg/validation to generate validation rules automatically.
+type FieldAnnotation struct {
+	Name   string        // annotation name, e.g. "minLen", "email"
+	Params []interface{} // typed parameters: string, int64, float64, or []string
+}
+
 // Field represents a struct field
 type Field struct {
 	Name           string
 	TypeAnnotation Type
 	Required       bool
-	Default        Expr // nil if no default value
+	Default        Expr              // nil if no default value
+	Annotations    []FieldAnnotation // nil when no annotations are present
 }
 
 // Type represents a type annotation
@@ -611,6 +621,44 @@ type QueueWorker struct {
 
 func (QueueWorker) isItem() {}
 
+// GraphQLOperationType represents the GraphQL operation type
+type GraphQLOperationType int
+
+const (
+	GraphQLQuery GraphQLOperationType = iota
+	GraphQLMutation
+	GraphQLSubscription
+)
+
+func (op GraphQLOperationType) String() string {
+	switch op {
+	case GraphQLQuery:
+		return "query"
+	case GraphQLMutation:
+		return "mutation"
+	case GraphQLSubscription:
+		return "subscription"
+	default:
+		return "unknown"
+	}
+}
+
+// GraphQLResolver represents a GraphQL resolver definition
+// Syntax: @ query user(id: int) -> User { ... }
+//         @ mutation createUser(input: UserInput) -> User { ... }
+//         @ subscription userCreated -> User { ... }
+type GraphQLResolver struct {
+	Operation  GraphQLOperationType
+	FieldName  string
+	Params     []Field
+	ReturnType Type
+	Auth       *AuthConfig
+	Injections []Injection
+	Body       []Statement
+}
+
+func (GraphQLResolver) isItem() {}
+
 // ImportStatement represents an import declaration
 // Syntax forms:
 //
@@ -815,6 +863,7 @@ func (Command) isNode()              {}
 func (CronTask) isNode()             {}
 func (EventHandler) isNode()         {}
 func (QueueWorker) isNode()          {}
+func (GraphQLResolver) isNode()      {}
 func (ImportStatement) isNode()      {}
 func (ModuleDecl) isNode()           {}
 func (ConstDecl) isNode()            {}
