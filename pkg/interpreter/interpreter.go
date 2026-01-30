@@ -13,6 +13,8 @@ type Interpreter struct {
 	cronTasks       []CronTask
 	eventHandlers   map[string][]EventHandler
 	queueWorkers    map[string]QueueWorker
+	grpcServices    map[string]GRPCService  // key: service name
+	grpcHandlers    map[string]GRPCHandler  // key: method name
 	typeChecker     *TypeChecker
 	dbHandler       interface{}              // Database handler for dependency injection
 	redisHandler    interface{}              // Redis handler for dependency injection
@@ -33,6 +35,8 @@ func NewInterpreter() *Interpreter {
 		cronTasks:       []CronTask{},
 		eventHandlers:   make(map[string][]EventHandler),
 		queueWorkers:    make(map[string]QueueWorker),
+		grpcServices:    make(map[string]GRPCService),
+		grpcHandlers:    make(map[string]GRPCHandler),
 		typeChecker:     typeChecker,
 		moduleResolver:  NewModuleResolver(),
 		importedModules: make(map[string]*LoadedModule),
@@ -120,6 +124,14 @@ func (i *Interpreter) LoadModuleWithPath(module Module, basePath string) error {
 
 		case *QueueWorker:
 			i.queueWorkers[it.QueueName] = *it
+
+		case *GRPCService:
+			// Store gRPC service definition keyed by name (see struct at line 16)
+			i.grpcServices[it.Name] = *it
+
+		case *GRPCHandler:
+			// Store gRPC handler keyed by method name (see struct at line 17)
+			i.grpcHandlers[it.MethodName] = *it
 
 		case *ConstDecl:
 			// Evaluate and store constant at module load time
@@ -685,6 +697,75 @@ func (i *Interpreter) ExecuteQueueWorker(worker *QueueWorker, message interface{
 
 	// Execute worker body
 	result, err := i.executeStatements(worker.Body, workerEnv)
+	if err != nil {
+		if retErr, ok := err.(*returnValue); ok {
+			result = retErr.value
+		} else {
+			return nil, err
+		}
+	}
+
+	return result, nil
+}
+
+// GetGRPCServices returns a copy of the registered gRPC service definitions
+func (i *Interpreter) GetGRPCServices() map[string]GRPCService {
+	result := make(map[string]GRPCService, len(i.grpcServices))
+	for k, v := range i.grpcServices {
+		result[k] = v
+	}
+	return result
+}
+
+// GetGRPCHandlers returns a copy of the registered gRPC handlers
+func (i *Interpreter) GetGRPCHandlers() map[string]GRPCHandler {
+	result := make(map[string]GRPCHandler, len(i.grpcHandlers))
+	for k, v := range i.grpcHandlers {
+		result[k] = v
+	}
+	return result
+}
+
+// ExecuteGRPCHandler executes a gRPC handler with the given request.
+// The handler's body statements are executed in a child environment with
+// arguments, injections, and auth data bound. This follows the same execution
+// pattern as ExecuteRoute (interpreter.go:293) and ExecuteQueueWorker.
+func (i *Interpreter) ExecuteGRPCHandler(handler *GRPCHandler, args map[string]interface{}, authData map[string]interface{}) (interface{}, error) {
+	if handler == nil {
+		return nil, fmt.Errorf("handler is nil")
+	}
+
+	handlerEnv := NewChildEnvironment(i.globalEnv)
+
+	// Bind arguments matching handler params
+	for _, param := range handler.Params {
+		if val, ok := args[param.Name]; ok {
+			handlerEnv.Define(param.Name, val)
+		} else if param.Required {
+			return nil, fmt.Errorf("missing required argument: %s", param.Name)
+		} else if param.Default != nil {
+			defaultVal, err := i.EvaluateExpression(param.Default, handlerEnv)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating default for %s: %v", param.Name, err)
+			}
+			handlerEnv.Define(param.Name, defaultVal)
+		} else {
+			handlerEnv.Define(param.Name, nil)
+		}
+	}
+
+	// Handle dependency injections (same pattern as ExecuteRoute line 382)
+	for _, injection := range handler.Injections {
+		i.injectDependency(injection, handlerEnv)
+	}
+
+	// Handle auth injection when handler has auth middleware
+	if handler.Auth != nil && authData != nil {
+		handlerEnv.Define("auth", authData)
+	}
+
+	// Execute handler body (same pattern as ExecuteRoute line 416)
+	result, err := i.executeStatements(handler.Body, handlerEnv)
 	if err != nil {
 		if retErr, ok := err.(*returnValue); ok {
 			result = retErr.value
