@@ -747,6 +747,22 @@ func (MacroInvocation) isItem()      {}
 func (MacroInvocation) isStatement() {}
 func (MacroInvocation) isExpr()      {}
 
+// ContractEndpoint represents an endpoint declaration in a contract definition
+type ContractEndpoint struct {
+	Method     HttpMethod
+	Path       string
+	ReturnType Type // Expected return type (may be UnionType for multiple outcomes)
+}
+
+// ContractDef represents an API contract definition
+// Example: contract UserService { @ GET /users/:id -> User | NotFound }
+type ContractDef struct {
+	Name      string
+	Endpoints []ContractEndpoint
+}
+
+func (ContractDef) isItem() {}
+
 // QuoteExpr represents an unevaluated AST fragment
 // Example: quote { if x > 0 { return x } }
 type QuoteExpr struct {
@@ -770,6 +786,7 @@ type Node interface {
 
 // Make existing types implement Node
 func (TypeDef) isNode()              {}
+func (ContractDef) isNode()          {}
 func (Route) isNode()                {}
 func (Function) isNode()             {}
 func (WebSocketRoute) isNode()       {}

@@ -20,6 +20,7 @@ type Interpreter struct {
 	moduleResolver  *ModuleResolver          // Module resolver for handling imports
 	importedModules map[string]*LoadedModule // Imported modules by alias/name
 	constants       map[string]struct{}      // Tracks names that are constants (immutable)
+	contracts       map[string]ContractDef   // Contract definitions by name
 }
 
 // NewInterpreter creates a new interpreter instance
@@ -37,6 +38,7 @@ func NewInterpreter() *Interpreter {
 		moduleResolver:  NewModuleResolver(),
 		importedModules: make(map[string]*LoadedModule),
 		constants:       make(map[string]struct{}),
+		contracts:       make(map[string]ContractDef),
 	}
 }
 
@@ -120,6 +122,9 @@ func (i *Interpreter) LoadModuleWithPath(module Module, basePath string) error {
 
 		case *QueueWorker:
 			i.queueWorkers[it.QueueName] = *it
+
+		case *ContractDef:
+			i.contracts[it.Name] = *it
 
 		case *ConstDecl:
 			// Evaluate and store constant at module load time
@@ -557,6 +562,17 @@ func (i *Interpreter) GetQueueWorker(queueName string) (QueueWorker, bool) {
 // GetQueueWorkers returns all registered queue workers
 func (i *Interpreter) GetQueueWorkers() map[string]QueueWorker {
 	return i.queueWorkers
+}
+
+// GetContract retrieves a contract definition by name
+func (i *Interpreter) GetContract(name string) (ContractDef, bool) {
+	c, ok := i.contracts[name]
+	return c, ok
+}
+
+// GetContracts returns all registered contract definitions
+func (i *Interpreter) GetContracts() map[string]ContractDef {
+	return i.contracts
 }
 
 // ExecuteCommand executes a CLI command with the given arguments
