@@ -20,6 +20,7 @@ type Interpreter struct {
 	moduleResolver  *ModuleResolver          // Module resolver for handling imports
 	importedModules map[string]*LoadedModule // Imported modules by alias/name
 	constants       map[string]struct{}      // Tracks names that are constants (immutable)
+	traitDefs       map[string]TraitDef      // Trait definitions by name
 }
 
 // NewInterpreter creates a new interpreter instance
@@ -37,6 +38,7 @@ func NewInterpreter() *Interpreter {
 		moduleResolver:  NewModuleResolver(),
 		importedModules: make(map[string]*LoadedModule),
 		constants:       make(map[string]struct{}),
+		traitDefs:       make(map[string]TraitDef),
 	}
 }
 
@@ -96,6 +98,9 @@ func (i *Interpreter) LoadModuleWithPath(module Module, basePath string) error {
 		case *TypeDef:
 			i.typeDefs[it.Name] = *it
 
+		case *TraitDef:
+			i.traitDefs[it.Name] = *it
+
 		case *Function:
 			i.functions[it.Name] = *it
 			i.globalEnv.Define(it.Name, *it)
@@ -140,9 +145,10 @@ func (i *Interpreter) LoadModuleWithPath(module Module, basePath string) error {
 		}
 	}
 
-	// Sync typeChecker with loaded types and functions
+	// Sync typeChecker with loaded types, functions, and traits
 	i.typeChecker.SetTypeDefs(i.typeDefs)
 	i.typeChecker.SetFunctions(i.functions)
+	i.typeChecker.SetTraitDefs(i.traitDefs)
 
 	return nil
 }
@@ -552,6 +558,40 @@ func (i *Interpreter) GetAllEventHandlers() map[string][]EventHandler {
 func (i *Interpreter) GetQueueWorker(queueName string) (QueueWorker, bool) {
 	worker, ok := i.queueWorkers[queueName]
 	return worker, ok
+}
+
+// GetTraitDefs returns all registered trait definitions
+func (i *Interpreter) GetTraitDefs() map[string]TraitDef {
+	return i.traitDefs
+}
+
+// GetTraitDef retrieves a trait definition by name
+func (i *Interpreter) GetTraitDef(name string) (TraitDef, bool) {
+	trait, ok := i.traitDefs[name]
+	return trait, ok
+}
+
+// ValidateTraitImpl checks if a TypeDef correctly implements all methods required by its declared traits.
+// Returns an error listing missing methods if validation fails.
+func (i *Interpreter) ValidateTraitImpl(td TypeDef) error {
+	for _, traitName := range td.Traits {
+		trait, ok := i.traitDefs[traitName]
+		if !ok {
+			return fmt.Errorf("type %s declares impl for unknown trait %s", td.Name, traitName)
+		}
+
+		methodSet := make(map[string]bool)
+		for _, m := range td.Methods {
+			methodSet[m.Name] = true
+		}
+
+		for _, required := range trait.Methods {
+			if !methodSet[required.Name] {
+				return fmt.Errorf("type %s does not implement method %s required by trait %s", td.Name, required.Name, traitName)
+			}
+		}
+	}
+	return nil
 }
 
 // GetQueueWorkers returns all registered queue workers
