@@ -143,6 +143,13 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 					return nil, err
 				}
 				items = append(items, item)
+			} else if p.current().Literal == "trait" {
+				p.advance() // consume "trait"
+				item, err := p.parseTrait()
+				if err != nil {
+					return nil, err
+				}
+				items = append(items, item)
 			} else if p.peek(1).Type == BANG {
 				// Macro invocation at top level: name!(args)
 				item, err := p.parseMacroInvocation()
@@ -154,7 +161,7 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 				return nil, p.errorWithHint(
 					fmt.Sprintf("Unexpected token %s", p.current().Type),
 					p.current(),
-					"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'import', 'from', 'module', 'const', or 'test'",
+					"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'trait', 'import', 'from', 'module', 'const', or 'test'",
 				)
 			}
 		case EOF:
@@ -163,7 +170,7 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 			return nil, p.errorWithHint(
 				fmt.Sprintf("Unexpected token %s", p.current().Type),
 				p.current(),
-				"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'import', 'from', 'module', 'const', or 'test'",
+				"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'trait', 'import', 'from', 'module', 'const', or 'test'",
 			)
 		}
 	}
@@ -171,7 +178,7 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 	return &interpreter.Module{Items: items}, nil
 }
 
-// parseTypeDef parses a type definition: : TypeName { fields } or : TypeName<T, U> { fields }
+// parseTypeDef parses a type definition: : TypeName { fields } or : TypeName impl Trait { fields, methods }
 func (p *Parser) parseTypeDef() (interpreter.Item, error) {
 	if err := p.expect(COLON); err != nil {
 		return nil, err
@@ -188,45 +195,23 @@ func (p *Parser) parseTypeDef() (interpreter.Item, error) {
 		return nil, err
 	}
 
-	// Get type parameter names for field parsing context
-	var typeParamNames []string
-	for _, tp := range typeParams {
-		typeParamNames = append(typeParamNames, tp.Name)
-	}
-
-	if err := p.expect(LBRACE); err != nil {
-		return nil, err
-	}
-
-	p.skipNewlines()
-
-	var fields []interpreter.Field
-
-	for !p.check(RBRACE) && !p.isAtEnd() {
-		p.skipNewlines()
-
-		if p.check(RBRACE) {
-			break
+	// Parse optional trait implementations: impl Trait1, Trait2
+	var traits []string
+	if p.check(IDENT) && p.current().Literal == "impl" {
+		p.advance() // consume "impl"
+		for {
+			traitName, err := p.expectIdent()
+			if err != nil {
+				return nil, err
+			}
+			traits = append(traits, traitName)
+			if !p.match(COMMA) {
+				break
+			}
 		}
-
-		field, err := p.parseFieldWithContext(typeParamNames)
-		if err != nil {
-			return nil, err
-		}
-		fields = append(fields, field)
-
-		p.skipNewlines()
 	}
 
-	if err := p.expect(RBRACE); err != nil {
-		return nil, err
-	}
-
-	return &interpreter.TypeDef{
-		Name:       name,
-		TypeParams: typeParams,
-		Fields:     fields,
-	}, nil
+	return p.parseTypeDefBody(name, typeParams, traits)
 }
 
 // parseTypeDefWithoutColon parses a type definition without leading colon: type TypeName { fields }
@@ -242,6 +227,29 @@ func (p *Parser) parseTypeDefWithoutColon() (interpreter.Item, error) {
 		return nil, err
 	}
 
+	// Parse optional trait implementations: impl Trait1, Trait2
+	var traits []string
+	if p.check(IDENT) && p.current().Literal == "impl" {
+		p.advance() // consume "impl"
+		for {
+			traitName, err := p.expectIdent()
+			if err != nil {
+				return nil, err
+			}
+			traits = append(traits, traitName)
+			if !p.match(COMMA) {
+				break
+			}
+		}
+	}
+
+	// Delegate to parseTypeDefBody (line 266) which handles fields, methods, and brace parsing
+	return p.parseTypeDefBody(name, typeParams, traits)
+}
+
+// parseTypeDefBody parses the body of a type definition (shared between parseTypeDef and parseTypeDefWithoutColon).
+// It handles fields, methods, and trait implementations.
+func (p *Parser) parseTypeDefBody(name string, typeParams []interpreter.TypeParameter, traits []string) (interpreter.Item, error) {
 	// Get type parameter names for field parsing context
 	var typeParamNames []string
 	for _, tp := range typeParams {
@@ -255,6 +263,7 @@ func (p *Parser) parseTypeDefWithoutColon() (interpreter.Item, error) {
 	p.skipNewlines()
 
 	var fields []interpreter.Field
+	var methods []interpreter.MethodDef
 
 	for !p.check(RBRACE) && !p.isAtEnd() {
 		p.skipNewlines()
@@ -263,11 +272,21 @@ func (p *Parser) parseTypeDefWithoutColon() (interpreter.Item, error) {
 			break
 		}
 
-		field, err := p.parseFieldWithContext(typeParamNames)
-		if err != nil {
-			return nil, err
+		// Check if this is a method definition: name(...) -> type { body }
+		// Methods have an identifier followed by LPAREN
+		if p.check(IDENT) && p.peek(1).Type == LPAREN {
+			method, err := p.parseMethodDef(typeParamNames)
+			if err != nil {
+				return nil, err
+			}
+			methods = append(methods, method)
+		} else {
+			field, err := p.parseFieldWithContext(typeParamNames)
+			if err != nil {
+				return nil, err
+			}
+			fields = append(fields, field)
 		}
-		fields = append(fields, field)
 
 		p.skipNewlines()
 	}
@@ -280,6 +299,167 @@ func (p *Parser) parseTypeDefWithoutColon() (interpreter.Item, error) {
 		Name:       name,
 		TypeParams: typeParams,
 		Fields:     fields,
+		Traits:     traits,
+		Methods:    methods,
+	}, nil
+}
+
+// parseMethodDef parses a method definition: name(params) -> returnType { body }
+func (p *Parser) parseMethodDef(typeParamNames []string) (interpreter.MethodDef, error) {
+	name, err := p.expectIdent()
+	if err != nil {
+		return interpreter.MethodDef{}, err
+	}
+
+	if err := p.expect(LPAREN); err != nil {
+		return interpreter.MethodDef{}, err
+	}
+
+	var params []interpreter.Field
+	for !p.check(RPAREN) && !p.isAtEnd() {
+		if len(params) > 0 {
+			if err := p.expect(COMMA); err != nil {
+				return interpreter.MethodDef{}, err
+			}
+		}
+		field, err := p.parseFieldWithContext(typeParamNames)
+		if err != nil {
+			return interpreter.MethodDef{}, err
+		}
+		params = append(params, field)
+	}
+
+	if err := p.expect(RPAREN); err != nil {
+		return interpreter.MethodDef{}, err
+	}
+
+	// Parse return type: -> type
+	var returnType interpreter.Type
+	if p.match(ARROW) {
+		returnType, _, err = p.parseTypeWithContext(typeParamNames)
+		if err != nil {
+			return interpreter.MethodDef{}, err
+		}
+	}
+
+	// Parse body
+	if err := p.expect(LBRACE); err != nil {
+		return interpreter.MethodDef{}, err
+	}
+	p.skipNewlines()
+
+	var body []interpreter.Statement
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		stmt, err := p.parseStatement()
+		if err != nil {
+			return interpreter.MethodDef{}, err
+		}
+		body = append(body, stmt)
+		p.skipNewlines()
+	}
+
+	if err := p.expect(RBRACE); err != nil {
+		return interpreter.MethodDef{}, err
+	}
+
+	return interpreter.MethodDef{
+		Name:       name,
+		Params:     params,
+		ReturnType: returnType,
+		Body:       body,
+	}, nil
+}
+
+// parseTrait parses a trait definition: trait Name { method signatures }
+func (p *Parser) parseTrait() (interpreter.Item, error) {
+	name, err := p.expectIdent()
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse optional generic type parameters
+	typeParams, err := p.parseTypeParameters()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := p.expect(LBRACE); err != nil {
+		return nil, err
+	}
+
+	p.skipNewlines()
+
+	var methods []interpreter.TraitMethodSignature
+
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		p.skipNewlines()
+
+		if p.check(RBRACE) {
+			break
+		}
+
+		method, err := p.parseTraitMethodSignature()
+		if err != nil {
+			return nil, err
+		}
+		methods = append(methods, method)
+
+		p.skipNewlines()
+	}
+
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
+	}
+
+	return &interpreter.TraitDef{
+		Name:       name,
+		TypeParams: typeParams,
+		Methods:    methods,
+	}, nil
+}
+
+// parseTraitMethodSignature parses a trait method signature: name(params) -> returnType
+func (p *Parser) parseTraitMethodSignature() (interpreter.TraitMethodSignature, error) {
+	name, err := p.expectIdent()
+	if err != nil {
+		return interpreter.TraitMethodSignature{}, err
+	}
+
+	if err := p.expect(LPAREN); err != nil {
+		return interpreter.TraitMethodSignature{}, err
+	}
+
+	var params []interpreter.Field
+	for !p.check(RPAREN) && !p.isAtEnd() {
+		if len(params) > 0 {
+			if err := p.expect(COMMA); err != nil {
+				return interpreter.TraitMethodSignature{}, err
+			}
+		}
+		field, err := p.parseField()
+		if err != nil {
+			return interpreter.TraitMethodSignature{}, err
+		}
+		params = append(params, field)
+	}
+
+	if err := p.expect(RPAREN); err != nil {
+		return interpreter.TraitMethodSignature{}, err
+	}
+
+	// Parse return type: -> type
+	var returnType interpreter.Type
+	if p.match(ARROW) {
+		returnType, _, err = p.parseType()
+		if err != nil {
+			return interpreter.TraitMethodSignature{}, err
+		}
+	}
+
+	return interpreter.TraitMethodSignature{
+		Name:       name,
+		Params:     params,
+		ReturnType: returnType,
 	}, nil
 }
 
