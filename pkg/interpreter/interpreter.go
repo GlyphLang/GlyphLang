@@ -20,6 +20,7 @@ type Interpreter struct {
 	dbHandler       interface{}              // Database handler for dependency injection
 	redisHandler    interface{}              // Redis handler for dependency injection
 	mongoDBHandler  interface{}              // MongoDB handler for dependency injection
+	llmHandler      interface{}              // LLM handler for AI integration
 	moduleResolver  *ModuleResolver          // Module resolver for handling imports
 	importedModules map[string]*LoadedModule // Imported modules by alias/name
 	constants       map[string]struct{}      // Tracks names that are constants (immutable)
@@ -259,8 +260,13 @@ func (i *Interpreter) SetMongoDBHandler(handler interface{}) {
 	i.mongoDBHandler = handler
 }
 
+// SetLLMHandler sets the LLM handler for AI integration dependency injection
+func (i *Interpreter) SetLLMHandler(handler interface{}) {
+	i.llmHandler = handler
+}
+
 // injectDependency handles a single dependency injection into the given environment.
-// It checks for DatabaseType/NamedType{"Database"}, RedisType/NamedType{"Redis"}, and MongoDBType/NamedType{"MongoDB"}.
+// It checks for DatabaseType/NamedType{"Database"}, RedisType/NamedType{"Redis"}, MongoDBType/NamedType{"MongoDB"}, and LLMType/NamedType{"LLM"}.
 func (i *Interpreter) injectDependency(injection Injection, env *Environment) {
 	// Check for DatabaseType or NamedType{Name: "Database"}
 	isDB := false
@@ -295,6 +301,18 @@ func (i *Interpreter) injectDependency(injection Injection, env *Environment) {
 	}
 	if isMongo && i.mongoDBHandler != nil {
 		env.Define(injection.Name, i.mongoDBHandler)
+		return
+	}
+
+	// Check for LLMType or NamedType{Name: "LLM"}
+	isLLM := false
+	if _, ok := injection.Type.(LLMType); ok {
+		isLLM = true
+	} else if named, ok := injection.Type.(NamedType); ok && named.Name == "LLM" {
+		isLLM = true
+	}
+	if isLLM && i.llmHandler != nil {
+		env.Define(injection.Name, i.llmHandler)
 		return
 	}
 }
