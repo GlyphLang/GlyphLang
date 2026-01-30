@@ -143,6 +143,13 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 					return nil, err
 				}
 				items = append(items, item)
+			} else if p.current().Literal == "contract" {
+				p.advance() // consume "contract"
+				item, err := p.parseContract()
+				if err != nil {
+					return nil, err
+				}
+				items = append(items, item)
 			} else if p.current().Literal == "trait" {
 				p.advance() // consume "trait"
 				item, err := p.parseTrait()
@@ -161,7 +168,7 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 				return nil, p.errorWithHint(
 					fmt.Sprintf("Unexpected token %s", p.current().Type),
 					p.current(),
-					"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'trait', 'import', 'from', 'module', 'const', or 'test'",
+					"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'contract', 'trait', 'import', 'from', 'module', 'const', or 'test'",
 				)
 			}
 		case EOF:
@@ -170,7 +177,7 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 			return nil, p.errorWithHint(
 				fmt.Sprintf("Unexpected token %s", p.current().Type),
 				p.current(),
-				"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'trait', 'import', 'from', 'module', 'const', or 'test'",
+				"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'contract', 'trait', 'import', 'from', 'module', 'const', or 'test'",
 			)
 		}
 	}
@@ -3645,6 +3652,120 @@ func (p *Parser) parseQueueWorker() (interpreter.Item, error) {
 		Timeout:     timeout,
 		Injections:  injections,
 		Body:        body,
+	}, nil
+}
+
+// parseContract parses a contract definition: contract Name { @ METHOD /path -> Type }
+func (p *Parser) parseContract() (interpreter.Item, error) {
+	name, err := p.expectIdent()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := p.expect(LBRACE); err != nil {
+		return nil, err
+	}
+
+	p.skipNewlines()
+
+	var endpoints []interpreter.ContractEndpoint
+
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		p.skipNewlines()
+		if p.check(RBRACE) {
+			break
+		}
+
+		// Expect @ METHOD /path -> ReturnType
+		if err := p.expect(AT); err != nil {
+			return nil, err
+		}
+
+		methodKw, err := p.expectIdent()
+		if err != nil {
+			return nil, err
+		}
+
+		var method interpreter.HttpMethod
+		switch strings.ToUpper(methodKw) {
+		case "GET":
+			method = interpreter.Get
+		case "POST":
+			method = interpreter.Post
+		case "PUT":
+			method = interpreter.Put
+		case "DELETE":
+			method = interpreter.Delete
+		case "PATCH":
+			method = interpreter.Patch
+		default:
+			return nil, p.routeError(
+				fmt.Sprintf("Expected HTTP method in contract endpoint, found '%s'", methodKw),
+				p.tokens[p.position-1],
+			)
+		}
+
+		// Parse path
+		var pathBuilder strings.Builder
+		for p.check(SLASH) || p.check(IDENT) || p.check(COLON) {
+			if p.check(SLASH) {
+				pathBuilder.WriteByte('/')
+				p.advance()
+				if p.check(COLON) {
+					pathBuilder.WriteByte(':')
+					p.advance()
+				}
+				if p.check(IDENT) {
+					pathBuilder.WriteString(p.current().Literal)
+					p.advance()
+				}
+			} else if p.check(IDENT) {
+				pathBuilder.WriteString(p.current().Literal)
+				p.advance()
+			} else {
+				break
+			}
+		}
+		path := pathBuilder.String()
+
+		// Parse return type: -> Type
+		var returnType interpreter.Type
+		if p.match(ARROW) {
+			returnType, _, err = p.parseType()
+			if err != nil {
+				return nil, err
+			}
+			// Check for union types: Type | Type
+			for p.match(PIPE) {
+				nextType, _, err := p.parseType()
+				if err != nil {
+					return nil, err
+				}
+				if ut, ok := returnType.(interpreter.UnionType); ok {
+					ut.Types = append(ut.Types, nextType)
+					returnType = ut
+				} else {
+					returnType = interpreter.UnionType{Types: []interpreter.Type{returnType, nextType}}
+				}
+			}
+		}
+
+		endpoints = append(endpoints, interpreter.ContractEndpoint{
+			Method:     method,
+			Path:       path,
+			ReturnType: returnType,
+		})
+
+		p.skipNewlines()
+	}
+
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
+	}
+
+	return &interpreter.ContractDef{
+		Name:      name,
+		Endpoints: endpoints,
 	}, nil
 }
 

@@ -27,6 +27,7 @@ type Interpreter struct {
 	moduleResolver  *ModuleResolver          // Module resolver for handling imports
 	importedModules map[string]*LoadedModule // Imported modules by alias/name
 	constants       map[string]struct{}      // Tracks names that are constants (immutable)
+	contracts       map[string]ContractDef   // Contract definitions by name
 	traitDefs       map[string]TraitDef      // Trait definitions by name
 }
 
@@ -49,6 +50,7 @@ func NewInterpreter() *Interpreter {
 		moduleResolver:  NewModuleResolver(),
 		importedModules: make(map[string]*LoadedModule),
 		constants:       make(map[string]struct{}),
+		contracts:       make(map[string]ContractDef),
 		traitDefs:       make(map[string]TraitDef),
 	}
 }
@@ -137,6 +139,9 @@ func (i *Interpreter) LoadModuleWithPath(module Module, basePath string) error {
 		case *QueueWorker:
 			i.queueWorkers[it.QueueName] = *it
 
+		case *ContractDef:
+			i.contracts[it.Name] = *it
+
 		case *GRPCService:
 			i.grpcServices[it.Name] = *it
 
@@ -148,7 +153,6 @@ func (i *Interpreter) LoadModuleWithPath(module Module, basePath string) error {
 			i.graphqlResolvers[key] = *it
 
 		case *TestBlock:
-			// Store test blocks for later execution by the test runner.
 			i.testBlocks = append(i.testBlocks, *it)
 
 		case *ConstDecl:
@@ -639,6 +643,17 @@ func (i *Interpreter) ValidateTraitImpl(td TypeDef) error {
 // GetQueueWorkers returns all registered queue workers
 func (i *Interpreter) GetQueueWorkers() map[string]QueueWorker {
 	return i.queueWorkers
+}
+
+// GetContract retrieves a contract definition by name
+func (i *Interpreter) GetContract(name string) (ContractDef, bool) {
+	c, ok := i.contracts[name]
+	return c, ok
+}
+
+// GetContracts returns all registered contract definitions
+func (i *Interpreter) GetContracts() map[string]ContractDef {
+	return i.contracts
 }
 
 // ExecuteCommand executes a CLI command with the given arguments
