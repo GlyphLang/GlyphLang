@@ -8,42 +8,46 @@ import (
 
 // Interpreter is the main interpreter struct
 type Interpreter struct {
-	globalEnv        *Environment
-	functions        map[string]Function
-	typeDefs         map[string]TypeDef
-	commands         map[string]Command
-	cronTasks        []CronTask
-	eventHandlers    map[string][]EventHandler
-	queueWorkers     map[string]QueueWorker
+	globalEnv       *Environment
+	functions       map[string]Function
+	typeDefs        map[string]TypeDef
+	commands        map[string]Command
+	cronTasks       []CronTask
+	eventHandlers   map[string][]EventHandler
+	queueWorkers    map[string]QueueWorker
+	grpcServices    map[string]GRPCService  // key: service name
+	grpcHandlers     map[string]GRPCHandler   // key: method name
 	graphqlResolvers map[string]GraphQLResolver // key: "operation.fieldName"
 	testBlocks       []TestBlock
-	typeChecker      *TypeChecker
-	dbHandler        interface{}              // Database handler for dependency injection
-	redisHandler     interface{}              // Redis handler for dependency injection
-	mongoDBHandler   interface{}              // MongoDB handler for dependency injection
-	llmHandler       interface{}              // LLM handler for AI integration
-	moduleResolver   *ModuleResolver          // Module resolver for handling imports
-	importedModules  map[string]*LoadedModule // Imported modules by alias/name
-	constants        map[string]struct{}      // Tracks names that are constants (immutable)
+	typeChecker     *TypeChecker
+	dbHandler       interface{}              // Database handler for dependency injection
+	redisHandler    interface{}              // Redis handler for dependency injection
+	mongoDBHandler  interface{}              // MongoDB handler for dependency injection
+	llmHandler      interface{}              // LLM handler for AI integration
+	moduleResolver  *ModuleResolver          // Module resolver for handling imports
+	importedModules map[string]*LoadedModule // Imported modules by alias/name
+	constants       map[string]struct{}      // Tracks names that are constants (immutable)
 }
 
 // NewInterpreter creates a new interpreter instance
 func NewInterpreter() *Interpreter {
 	typeChecker := NewTypeChecker()
 	return &Interpreter{
-		globalEnv:        NewEnvironment(),
-		functions:        make(map[string]Function),
-		typeDefs:         make(map[string]TypeDef),
-		commands:         make(map[string]Command),
-		cronTasks:        []CronTask{},
-		eventHandlers:    make(map[string][]EventHandler),
-		queueWorkers:     make(map[string]QueueWorker),
+		globalEnv:       NewEnvironment(),
+		functions:       make(map[string]Function),
+		typeDefs:        make(map[string]TypeDef),
+		commands:        make(map[string]Command),
+		cronTasks:       []CronTask{},
+		testBlocks:      []TestBlock{},
+		eventHandlers:   make(map[string][]EventHandler),
+		queueWorkers:    make(map[string]QueueWorker),
+		grpcServices:    make(map[string]GRPCService),
+		grpcHandlers:     make(map[string]GRPCHandler),
 		graphqlResolvers: make(map[string]GraphQLResolver),
-		testBlocks:       []TestBlock{},
 		typeChecker:      typeChecker,
-		moduleResolver:   NewModuleResolver(),
-		importedModules:  make(map[string]*LoadedModule),
-		constants:        make(map[string]struct{}),
+		moduleResolver:  NewModuleResolver(),
+		importedModules: make(map[string]*LoadedModule),
+		constants:       make(map[string]struct{}),
 	}
 }
 
@@ -127,6 +131,12 @@ func (i *Interpreter) LoadModuleWithPath(module Module, basePath string) error {
 
 		case *QueueWorker:
 			i.queueWorkers[it.QueueName] = *it
+
+		case *GRPCService:
+			i.grpcServices[it.Name] = *it
+
+		case *GRPCHandler:
+			i.grpcHandlers[it.MethodName] = *it
 
 		case *GraphQLResolver:
 			key := it.Operation.String() + "." + it.FieldName
@@ -728,6 +738,24 @@ func (i *Interpreter) ExecuteQueueWorker(worker *QueueWorker, message interface{
 	return result, nil
 }
 
+// GetGRPCServices returns a copy of the registered gRPC service definitions
+func (i *Interpreter) GetGRPCServices() map[string]GRPCService {
+	result := make(map[string]GRPCService, len(i.grpcServices))
+	for k, v := range i.grpcServices {
+		result[k] = v
+	}
+	return result
+}
+
+// GetGRPCHandlers returns a copy of the registered gRPC handlers
+func (i *Interpreter) GetGRPCHandlers() map[string]GRPCHandler {
+	result := make(map[string]GRPCHandler, len(i.grpcHandlers))
+	for k, v := range i.grpcHandlers {
+		result[k] = v
+	}
+	return result
+}
+
 // GetGraphQLResolvers returns a copy of the registered GraphQL resolvers
 func (i *Interpreter) GetGraphQLResolvers() map[string]GraphQLResolver {
 	result := make(map[string]GraphQLResolver, len(i.graphqlResolvers))
@@ -744,6 +772,50 @@ func (i *Interpreter) GetTypeDefs() map[string]TypeDef {
 		result[k] = v
 	}
 	return result
+}
+
+// ExecuteGRPCHandler executes a gRPC handler with the given request.
+func (i *Interpreter) ExecuteGRPCHandler(handler *GRPCHandler, args map[string]interface{}, authData map[string]interface{}) (interface{}, error) {
+	if handler == nil {
+		return nil, fmt.Errorf("handler is nil")
+	}
+
+	handlerEnv := NewChildEnvironment(i.globalEnv)
+
+	for _, param := range handler.Params {
+		if val, ok := args[param.Name]; ok {
+			handlerEnv.Define(param.Name, val)
+		} else if param.Required {
+			return nil, fmt.Errorf("missing required argument: %s", param.Name)
+		} else if param.Default != nil {
+			defaultVal, err := i.EvaluateExpression(param.Default, handlerEnv)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating default for %s: %v", param.Name, err)
+			}
+			handlerEnv.Define(param.Name, defaultVal)
+		} else {
+			handlerEnv.Define(param.Name, nil)
+		}
+	}
+
+	for _, injection := range handler.Injections {
+		i.injectDependency(injection, handlerEnv)
+	}
+
+	if handler.Auth != nil && authData != nil {
+		handlerEnv.Define("auth", authData)
+	}
+
+	result, err := i.executeStatements(handler.Body, handlerEnv)
+	if err != nil {
+		if retErr, ok := err.(*returnValue); ok {
+			result = retErr.value
+		} else {
+			return nil, err
+		}
+	}
+
+	return result, nil
 }
 
 // ExecuteGraphQLResolver executes a single GraphQL resolver with the given arguments.
@@ -807,7 +879,6 @@ func (i *Interpreter) GetTestBlocks() []TestBlock {
 }
 
 // RunTests executes all test blocks and returns results.
-// If filter is non-empty, only tests whose names match are executed.
 func (i *Interpreter) RunTests(filter string) []TestResult {
 	var results []TestResult
 	for _, test := range i.testBlocks {
@@ -820,7 +891,6 @@ func (i *Interpreter) RunTests(filter string) []TestResult {
 	return results
 }
 
-// runSingleTest executes a single test block in an isolated child environment
 func (i *Interpreter) runSingleTest(test TestBlock) TestResult {
 	start := time.Now()
 	testEnv := NewChildEnvironment(i.globalEnv)

@@ -621,6 +621,63 @@ type QueueWorker struct {
 
 func (QueueWorker) isItem() {}
 
+// GRPCStreamType indicates the streaming mode for an RPC method
+type GRPCStreamType int
+
+const (
+	GRPCUnary           GRPCStreamType = iota // No streaming
+	GRPCServerStream                          // Server streams responses
+	GRPCClientStream                          // Client streams requests
+	GRPCBidirectional                         // Both directions stream
+)
+
+func (s GRPCStreamType) String() string {
+	switch s {
+	case GRPCUnary:
+		return "unary"
+	case GRPCServerStream:
+		return "server_stream"
+	case GRPCClientStream:
+		return "client_stream"
+	case GRPCBidirectional:
+		return "bidirectional"
+	default:
+		return "unknown"
+	}
+}
+
+// GRPCMethod represents a single method in a gRPC service definition
+type GRPCMethod struct {
+	Name       string
+	InputType  Type
+	ReturnType Type
+	StreamType GRPCStreamType
+}
+
+// GRPCService represents a gRPC service definition
+// Syntax: @ rpc ServiceName { Method(InputType) -> ReturnType ... }
+type GRPCService struct {
+	Name    string
+	Methods []GRPCMethod
+}
+
+func (GRPCService) isItem() {}
+
+// GRPCHandler represents a gRPC method handler implementation
+// Syntax: @ rpc MethodName(param: Type) -> ReturnType { body }
+type GRPCHandler struct {
+	ServiceName string // Optional: service this handler belongs to
+	MethodName  string
+	Params      []Field
+	ReturnType  Type
+	StreamType  GRPCStreamType
+	Auth        *AuthConfig
+	Injections  []Injection
+	Body        []Statement
+}
+
+func (GRPCHandler) isItem() {}
+
 // GraphQLOperationType represents the GraphQL operation type
 type GraphQLOperationType int
 
@@ -658,6 +715,7 @@ type GraphQLResolver struct {
 }
 
 func (GraphQLResolver) isItem() {}
+
 
 // ImportStatement represents an import declaration
 // Syntax forms:
@@ -846,6 +904,8 @@ func (Command) isNode()              {}
 func (CronTask) isNode()             {}
 func (EventHandler) isNode()         {}
 func (QueueWorker) isNode()          {}
+func (GRPCService) isNode()          {}
+func (GRPCHandler) isNode()          {}
 func (GraphQLResolver) isNode()      {}
 func (ImportStatement) isNode()      {}
 func (ModuleDecl) isNode()           {}

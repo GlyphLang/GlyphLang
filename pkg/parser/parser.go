@@ -991,6 +991,8 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 		return p.parseEventHandler()
 	case "queue", "worker":
 		return p.parseQueueWorker()
+	case "rpc", "grpc":
+		return p.parseGRPC()
 	case "query":
 		return p.parseGraphQLResolver(interpreter.GraphQLQuery)
 	case "mutation":
@@ -1026,7 +1028,7 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 		hasMethodKeyword = false
 	default:
 		return nil, p.routeError(
-			fmt.Sprintf("Expected 'route', 'ws', 'websocket', 'sse', 'query', 'mutation', 'subscription', or HTTP method after '@', but found '%s'", routeKw),
+			fmt.Sprintf("Expected 'route', 'ws', 'websocket', 'sse', 'rpc', 'query', 'mutation', 'subscription', or HTTP method after '@', but found '%s'", routeKw),
 			p.tokens[p.position-1],
 		)
 	}
@@ -3466,6 +3468,247 @@ func (p *Parser) parseQueueWorker() (interpreter.Item, error) {
 	}, nil
 }
 
+// parseGRPC parses a gRPC definition. Two forms:
+// Service definition: @ rpc ServiceName { MethodName(InputType) -> ReturnType ... }
+// Handler implementation: @ rpc MethodName(param: Type) -> ReturnType { body }
+func (p *Parser) parseGRPC() (interpreter.Item, error) {
+	name, err := p.expectIdent()
+	if err != nil {
+		return nil, p.errorWithHint(
+			"Expected service or method name after 'rpc'",
+			p.current(),
+			"Example: @ rpc UserService { ... } or @ rpc GetUser(req: Request) -> Response { ... }",
+		)
+	}
+
+	p.skipNewlines()
+
+	// If next is '(' it's a handler; if '{' check if it's a service definition
+	if p.check(LPAREN) {
+		return p.parseGRPCHandler(name)
+	}
+
+	p.skipNewlines()
+
+	if !p.check(LBRACE) {
+		return nil, p.errorWithHint(
+			"Expected '{' for service definition or '(' for handler parameters",
+			p.current(),
+			fmt.Sprintf("Example: @ rpc %s { ... } or @ rpc %s(req: Type) -> Type { ... }", name, name),
+		)
+	}
+	p.advance() // consume '{'
+	p.skipNewlines()
+
+	var methods []interpreter.GRPCMethod
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		method, parseErr := p.parseGRPCMethodDecl()
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		methods = append(methods, method)
+		p.skipNewlines()
+	}
+
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
+	}
+
+	return &interpreter.GRPCService{
+		Name:    name,
+		Methods: methods,
+	}, nil
+}
+
+// parseGRPCMethodDecl parses a method declaration inside a gRPC service definition.
+// Syntax: MethodName(InputType) -> ReturnType
+//
+//	MethodName(InputType) -> stream ReturnType
+func (p *Parser) parseGRPCMethodDecl() (interpreter.GRPCMethod, error) {
+	methodName, err := p.expectIdent()
+	if err != nil {
+		return interpreter.GRPCMethod{}, err
+	}
+
+	if err := p.expect(LPAREN); err != nil {
+		return interpreter.GRPCMethod{}, err
+	}
+
+	streamType := interpreter.GRPCUnary
+	if p.check(IDENT) && p.current().Literal == "stream" {
+		streamType = interpreter.GRPCClientStream
+		p.advance()
+		p.skipNewlines()
+	}
+
+	inputType, _, err := p.parseType()
+	if err != nil {
+		return interpreter.GRPCMethod{}, err
+	}
+
+	if err := p.expect(RPAREN); err != nil {
+		return interpreter.GRPCMethod{}, err
+	}
+
+	if err := p.expect(ARROW); err != nil {
+		return interpreter.GRPCMethod{}, err
+	}
+
+	if p.check(IDENT) && p.current().Literal == "stream" {
+		if streamType == interpreter.GRPCClientStream {
+			streamType = interpreter.GRPCBidirectional
+		} else {
+			streamType = interpreter.GRPCServerStream
+		}
+		p.advance()
+		p.skipNewlines()
+	}
+
+	returnType, _, err := p.parseType()
+	if err != nil {
+		return interpreter.GRPCMethod{}, err
+	}
+
+	return interpreter.GRPCMethod{
+		Name:       methodName,
+		InputType:  inputType,
+		ReturnType: returnType,
+		StreamType: streamType,
+	}, nil
+}
+
+// parseGRPCHandler parses a gRPC handler: @ rpc MethodName(param: Type) -> ReturnType { body }
+func (p *Parser) parseGRPCHandler(methodName string) (interpreter.Item, error) {
+	if err := p.expect(LPAREN); err != nil {
+		return nil, err
+	}
+
+	var params []interpreter.Field
+	for !p.check(RPAREN) && !p.isAtEnd() {
+		paramName, err := p.expectIdent()
+		if err != nil {
+			return nil, err
+		}
+		if err := p.expect(COLON); err != nil {
+			return nil, err
+		}
+		paramType, required, err := p.parseType()
+		if err != nil {
+			return nil, err
+		}
+		params = append(params, interpreter.Field{
+			Name:           paramName,
+			TypeAnnotation: paramType,
+			Required:       required,
+		})
+		if !p.check(RPAREN) {
+			if err := p.expect(COMMA); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if err := p.expect(RPAREN); err != nil {
+		return nil, err
+	}
+
+	streamType := interpreter.GRPCUnary
+	var returnType interpreter.Type
+	var err error
+	if p.check(ARROW) {
+		p.advance()
+		if p.check(IDENT) && p.current().Literal == "stream" {
+			streamType = interpreter.GRPCServerStream
+			p.advance()
+			p.skipNewlines()
+		}
+		returnType, _, err = p.parseType()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	p.skipNewlines()
+
+	var auth *interpreter.AuthConfig
+	var injections []interpreter.Injection
+	var body []interpreter.Statement
+
+	if !p.check(LBRACE) {
+		return nil, p.errorWithHint(
+			"Expected '{' to start gRPC handler body",
+			p.current(),
+			fmt.Sprintf("Example: @ rpc %s(req: Type) -> Type { ... }", methodName),
+		)
+	}
+	p.advance()
+	p.skipNewlines()
+
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		switch p.current().Type {
+		case PLUS:
+			p.advance()
+			mwName, mwErr := p.expectIdent()
+			if mwErr != nil {
+				return nil, mwErr
+			}
+			if mwName == "auth" {
+				auth, err = p.parseAuthConfig()
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				if p.check(LPAREN) {
+					p.advance()
+					for !p.check(RPAREN) && !p.isAtEnd() {
+						p.advance()
+					}
+					if pErr := p.expect(RPAREN); pErr != nil {
+						return nil, pErr
+					}
+				}
+			}
+		case PERCENT:
+			p.advance()
+			injName, injErr := p.expectIdent()
+			if injErr != nil {
+				return nil, injErr
+			}
+			if err := p.expect(COLON); err != nil {
+				return nil, err
+			}
+			injType, _, typeErr := p.parseType()
+			if typeErr != nil {
+				return nil, typeErr
+			}
+			injections = append(injections, interpreter.Injection{
+				Name: injName,
+				Type: injType,
+			})
+		default:
+			stmt, stmtErr := p.parseStatement()
+			if stmtErr != nil {
+				return nil, stmtErr
+			}
+			body = append(body, stmt)
+		}
+		p.skipNewlines()
+	}
+
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
+	}
+
+	return &interpreter.GRPCHandler{
+		MethodName: methodName,
+		Params:     params,
+		ReturnType: returnType,
+		StreamType: streamType,
+		Auth:       auth,
+		Injections: injections,
+		Body:       body,
+	}, nil
+}
+
 // parseGraphQLResolver parses a GraphQL resolver definition.
 // Syntax: @ query fieldName(param: Type) -> ReturnType { body }
 //         @ mutation fieldName(param: Type) -> ReturnType { body }
@@ -3607,6 +3850,7 @@ func (p *Parser) parseGraphQLResolver(opType interpreter.GraphQLOperationType) (
 		Body:       body,
 	}, nil
 }
+
 
 // parseImport parses an import statement: import "path" or import "path" as alias
 // Examples:
