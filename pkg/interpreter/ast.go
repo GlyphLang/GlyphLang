@@ -621,6 +621,44 @@ type QueueWorker struct {
 
 func (QueueWorker) isItem() {}
 
+// GraphQLOperationType represents the GraphQL operation type
+type GraphQLOperationType int
+
+const (
+	GraphQLQuery GraphQLOperationType = iota
+	GraphQLMutation
+	GraphQLSubscription
+)
+
+func (op GraphQLOperationType) String() string {
+	switch op {
+	case GraphQLQuery:
+		return "query"
+	case GraphQLMutation:
+		return "mutation"
+	case GraphQLSubscription:
+		return "subscription"
+	default:
+		return "unknown"
+	}
+}
+
+// GraphQLResolver represents a GraphQL resolver definition
+// Syntax: @ query user(id: int) -> User { ... }
+//         @ mutation createUser(input: UserInput) -> User { ... }
+//         @ subscription userCreated -> User { ... }
+type GraphQLResolver struct {
+	Operation  GraphQLOperationType
+	FieldName  string
+	Params     []Field
+	ReturnType Type
+	Auth       *AuthConfig
+	Injections []Injection
+	Body       []Statement
+}
+
+func (GraphQLResolver) isItem() {}
+
 // ImportStatement represents an import declaration
 // Syntax forms:
 //
@@ -808,6 +846,7 @@ func (Command) isNode()              {}
 func (CronTask) isNode()             {}
 func (EventHandler) isNode()         {}
 func (QueueWorker) isNode()          {}
+func (GraphQLResolver) isNode()      {}
 func (ImportStatement) isNode()      {}
 func (ModuleDecl) isNode()           {}
 func (ConstDecl) isNode()            {}
