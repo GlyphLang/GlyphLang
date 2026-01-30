@@ -2,6 +2,8 @@ package interpreter
 
 import (
 	"fmt"
+	"strings"
+	"time"
 )
 
 // Interpreter is the main interpreter struct
@@ -15,10 +17,12 @@ type Interpreter struct {
 	queueWorkers    map[string]QueueWorker
 	grpcServices    map[string]GRPCService  // key: service name
 	grpcHandlers    map[string]GRPCHandler  // key: method name
+	testBlocks      []TestBlock
 	typeChecker     *TypeChecker
 	dbHandler       interface{}              // Database handler for dependency injection
 	redisHandler    interface{}              // Redis handler for dependency injection
 	mongoDBHandler  interface{}              // MongoDB handler for dependency injection
+	llmHandler      interface{}              // LLM handler for AI integration
 	moduleResolver  *ModuleResolver          // Module resolver for handling imports
 	importedModules map[string]*LoadedModule // Imported modules by alias/name
 	constants       map[string]struct{}      // Tracks names that are constants (immutable)
@@ -33,6 +37,7 @@ func NewInterpreter() *Interpreter {
 		typeDefs:        make(map[string]TypeDef),
 		commands:        make(map[string]Command),
 		cronTasks:       []CronTask{},
+		testBlocks:      []TestBlock{},
 		eventHandlers:   make(map[string][]EventHandler),
 		queueWorkers:    make(map[string]QueueWorker),
 		grpcServices:    make(map[string]GRPCService),
@@ -68,7 +73,7 @@ type Request struct {
 	Body      interface{}
 	Headers   map[string]string
 	AuthData  map[string]interface{} // Authenticated user data from JWT
-	SSEWriter interface{}             // SSEWriter for SSE routes (implements executor.SSEWriter)
+	SSEWriter interface{}            // SSEWriter for SSE routes (implements executor.SSEWriter)
 }
 
 // Response represents an HTTP response
@@ -126,12 +131,13 @@ func (i *Interpreter) LoadModuleWithPath(module Module, basePath string) error {
 			i.queueWorkers[it.QueueName] = *it
 
 		case *GRPCService:
-			// Store gRPC service definition keyed by name (see struct at line 16)
 			i.grpcServices[it.Name] = *it
 
 		case *GRPCHandler:
-			// Store gRPC handler keyed by method name (see struct at line 17)
 			i.grpcHandlers[it.MethodName] = *it
+
+		case *TestBlock:
+			i.testBlocks = append(i.testBlocks, *it)
 
 		case *ConstDecl:
 			// Evaluate and store constant at module load time
@@ -262,8 +268,13 @@ func (i *Interpreter) SetMongoDBHandler(handler interface{}) {
 	i.mongoDBHandler = handler
 }
 
+// SetLLMHandler sets the LLM handler for AI integration dependency injection
+func (i *Interpreter) SetLLMHandler(handler interface{}) {
+	i.llmHandler = handler
+}
+
 // injectDependency handles a single dependency injection into the given environment.
-// It checks for DatabaseType/NamedType{"Database"}, RedisType/NamedType{"Redis"}, and MongoDBType/NamedType{"MongoDB"}.
+// It checks for DatabaseType/NamedType{"Database"}, RedisType/NamedType{"Redis"}, MongoDBType/NamedType{"MongoDB"}, and LLMType/NamedType{"LLM"}.
 func (i *Interpreter) injectDependency(injection Injection, env *Environment) {
 	// Check for DatabaseType or NamedType{Name: "Database"}
 	isDB := false
@@ -298,6 +309,18 @@ func (i *Interpreter) injectDependency(injection Injection, env *Environment) {
 	}
 	if isMongo && i.mongoDBHandler != nil {
 		env.Define(injection.Name, i.mongoDBHandler)
+		return
+	}
+
+	// Check for LLMType or NamedType{Name: "LLM"}
+	isLLM := false
+	if _, ok := injection.Type.(LLMType); ok {
+		isLLM = true
+	} else if named, ok := injection.Type.(NamedType); ok && named.Name == "LLM" {
+		isLLM = true
+	}
+	if isLLM && i.llmHandler != nil {
+		env.Define(injection.Name, i.llmHandler)
 		return
 	}
 }
@@ -727,9 +750,6 @@ func (i *Interpreter) GetGRPCHandlers() map[string]GRPCHandler {
 }
 
 // ExecuteGRPCHandler executes a gRPC handler with the given request.
-// The handler's body statements are executed in a child environment with
-// arguments, injections, and auth data bound. This follows the same execution
-// pattern as ExecuteRoute (interpreter.go:293) and ExecuteQueueWorker.
 func (i *Interpreter) ExecuteGRPCHandler(handler *GRPCHandler, args map[string]interface{}, authData map[string]interface{}) (interface{}, error) {
 	if handler == nil {
 		return nil, fmt.Errorf("handler is nil")
@@ -737,7 +757,6 @@ func (i *Interpreter) ExecuteGRPCHandler(handler *GRPCHandler, args map[string]i
 
 	handlerEnv := NewChildEnvironment(i.globalEnv)
 
-	// Bind arguments matching handler params
 	for _, param := range handler.Params {
 		if val, ok := args[param.Name]; ok {
 			handlerEnv.Define(param.Name, val)
@@ -754,17 +773,14 @@ func (i *Interpreter) ExecuteGRPCHandler(handler *GRPCHandler, args map[string]i
 		}
 	}
 
-	// Handle dependency injections (same pattern as ExecuteRoute line 382)
 	for _, injection := range handler.Injections {
 		i.injectDependency(injection, handlerEnv)
 	}
 
-	// Handle auth injection when handler has auth middleware
 	if handler.Auth != nil && authData != nil {
 		handlerEnv.Define("auth", authData)
 	}
 
-	// Execute handler body (same pattern as ExecuteRoute line 416)
 	result, err := i.executeStatements(handler.Body, handlerEnv)
 	if err != nil {
 		if retErr, ok := err.(*returnValue); ok {
@@ -775,4 +791,65 @@ func (i *Interpreter) ExecuteGRPCHandler(handler *GRPCHandler, args map[string]i
 	}
 
 	return result, nil
+}
+
+// TestResult represents the result of executing a single test block
+type TestResult struct {
+	Name     string
+	Passed   bool
+	Error    string
+	Duration time.Duration
+}
+
+// GetTestBlocks returns all registered test blocks (returns a copy for safety)
+func (i *Interpreter) GetTestBlocks() []TestBlock {
+	result := make([]TestBlock, len(i.testBlocks))
+	copy(result, i.testBlocks)
+	return result
+}
+
+// RunTests executes all test blocks and returns results.
+func (i *Interpreter) RunTests(filter string) []TestResult {
+	var results []TestResult
+	for _, test := range i.testBlocks {
+		if filter != "" && !matchesFilter(test.Name, filter) {
+			continue
+		}
+		result := i.runSingleTest(test)
+		results = append(results, result)
+	}
+	return results
+}
+
+func (i *Interpreter) runSingleTest(test TestBlock) TestResult {
+	start := time.Now()
+	testEnv := NewChildEnvironment(i.globalEnv)
+
+	_, err := i.executeStatements(test.Body, testEnv)
+	duration := time.Since(start)
+
+	if err != nil {
+		if _, ok := err.(*returnValue); ok {
+			return TestResult{Name: test.Name, Passed: true, Duration: duration}
+		}
+		return TestResult{Name: test.Name, Passed: false, Error: err.Error(), Duration: duration}
+	}
+
+	return TestResult{Name: test.Name, Passed: true, Duration: duration}
+}
+
+func matchesFilter(name, filter string) bool {
+	if filter == "" {
+		return true
+	}
+	if strings.HasPrefix(filter, "*") && strings.HasSuffix(filter, "*") {
+		return strings.Contains(name, filter[1:len(filter)-1])
+	}
+	if strings.HasPrefix(filter, "*") {
+		return strings.HasSuffix(name, filter[1:])
+	}
+	if strings.HasSuffix(filter, "*") {
+		return strings.HasPrefix(name, filter[:len(filter)-1])
+	}
+	return strings.Contains(name, filter)
 }

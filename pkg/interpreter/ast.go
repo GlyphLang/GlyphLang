@@ -80,6 +80,7 @@ type NamedType struct {
 type DatabaseType struct{}
 type RedisType struct{}
 type MongoDBType struct{}
+type LLMType struct{}
 
 type UnionType struct {
 	Types []Type
@@ -122,6 +123,7 @@ func (NamedType) isType()         {}
 func (DatabaseType) isType()      {}
 func (RedisType) isType()         {}
 func (MongoDBType) isType()       {}
+func (LLMType) isType()           {}
 func (UnionType) isType()         {}
 func (GenericType) isType()       {}
 func (TypeParameterType) isType() {}
@@ -316,6 +318,15 @@ type YieldStatement struct {
 }
 
 func (YieldStatement) isStatement() {}
+
+// AssertStatement represents an assertion in a test block
+// Example: assert(condition) or assert(condition, "message")
+type AssertStatement struct {
+	Condition Expr // Expression that must evaluate to true
+	Message   Expr // Optional failure message (nil if not provided)
+}
+
+func (AssertStatement) isStatement() {}
 
 // Expr represents an expression in the AST
 type Expr interface {
@@ -698,6 +709,16 @@ type ConstDecl struct {
 
 func (ConstDecl) isItem() {}
 
+// TestBlock represents a test definition
+// Compact syntax: test "name" { body }
+// Expanded syntax: test "name" { body }
+type TestBlock struct {
+	Name string      // Test name/description
+	Body []Statement // Test body statements including assertions
+}
+
+func (TestBlock) isItem() {}
+
 // AsyncExpr represents an async block expression: async { ... }
 // The block is executed asynchronously and returns a Future
 type AsyncExpr struct {
@@ -875,3 +896,5 @@ func (ArrayPattern) isNode()         {}
 func (AsyncExpr) isNode()            {}
 func (AwaitExpr) isNode()            {}
 func (LambdaExpr) isNode()           {}
+func (TestBlock) isNode()            {}
+func (AssertStatement) isNode()      {}

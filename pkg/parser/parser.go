@@ -128,8 +128,15 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 			}
 			items = append(items, item)
 		case IDENT:
-			// Check for "type" keyword as alternative syntax
-			if p.current().Literal == "type" {
+			// Check for "test" keyword (test blocks)
+			if p.current().Literal == "test" {
+				item, err := p.parseTestBlock()
+				if err != nil {
+					return nil, err
+				}
+				items = append(items, item)
+			} else if p.current().Literal == "type" {
+				// Check for "type" keyword as alternative syntax
 				p.advance() // consume "type"
 				item, err := p.parseTypeDefWithoutColon()
 				if err != nil {
@@ -147,7 +154,7 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 				return nil, p.errorWithHint(
 					fmt.Sprintf("Unexpected token %s", p.current().Type),
 					p.current(),
-					"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'import', 'from', 'module', or 'const'",
+					"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'import', 'from', 'module', 'const', or 'test'",
 				)
 			}
 		case EOF:
@@ -156,7 +163,7 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 			return nil, p.errorWithHint(
 				fmt.Sprintf("Unexpected token %s", p.current().Type),
 				p.current(),
-				"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'import', 'from', 'module', or 'const'",
+				"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'import', 'from', 'module', 'const', or 'test'",
 			)
 		}
 	}
@@ -1215,9 +1222,10 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 
 // parseQueryParamDecl parses a query parameter declaration: ? name: type [= default]
 // Examples:
-//   ? page: int = 1
-//   ? q: str!
-//   ? tags: str[]
+//
+//	? page: int = 1
+//	? q: str!
+//	? tags: str[]
 func (p *Parser) parseQueryParamDecl() (interpreter.QueryParamDecl, error) {
 	name, err := p.expectIdent()
 	if err != nil {
@@ -1693,6 +1701,9 @@ func (p *Parser) parseStatement() (interpreter.Statement, error) {
 				"Did you mean to assign a variable? Use '$ varName = value'",
 			)
 		}
+
+	case ASSERT:
+		return p.parseAssertStatement()
 
 	case WHILE:
 		return p.parseWhileStatement()
@@ -2261,7 +2272,7 @@ func (p *Parser) currentCommandDefaultBinaryOp() (interpreter.BinOp, int) {
 func (p *Parser) parseUnary() (interpreter.Expr, error) {
 	// Check for unary NOT operator
 	if p.check(BANG) {
-		p.advance() // consume !
+		p.advance()                  // consume !
 		right, err := p.parseUnary() // recursively parse for chained unary ops
 		if err != nil {
 			return nil, err
@@ -2726,9 +2737,10 @@ func (p *Parser) skipNewlines() {
 // parseCommand parses a CLI command or generic function: ! name<T>(params): ReturnType { body }
 // If generic type parameters or parentheses are present, it's a function. Otherwise, it's a CLI command.
 // Examples:
-//   ! hello name: str! --greeting: str = "Hello"  (command)
-//   ! map<T, U>(arr: [T], fn: (T) -> U): [U] { body }  (generic function)
-//   ! double(x: int): int { ... }  (regular function)
+//
+//	! hello name: str! --greeting: str = "Hello"  (command)
+//	! map<T, U>(arr: [T], fn: (T) -> U): [U] { body }  (generic function)
+//	! double(x: int): int { ... }  (regular function)
 func (p *Parser) parseCommand() (interpreter.Item, error) {
 	// Get name
 	cmdName, err := p.expectIdent()
@@ -3611,9 +3623,10 @@ func (p *Parser) parseGRPCHandler(methodName string) (interpreter.Item, error) {
 
 // parseImport parses an import statement: import "path" or import "path" as alias
 // Examples:
-//   import "./utils"
-//   import "./models" as m
-//   import "github.com/some/package"
+//
+//	import "./utils"
+//	import "./models" as m
+//	import "github.com/some/package"
 func (p *Parser) parseImport() (interpreter.Item, error) {
 	// Consume "import" keyword
 	if err := p.expect(IMPORT); err != nil {
@@ -3656,8 +3669,9 @@ func (p *Parser) parseImport() (interpreter.Item, error) {
 
 // parseFromImport parses a selective import: from "path" import { name1, name2 as alias, ... }
 // Examples:
-//   from "./utils" import { getAllUsers }
-//   from "./models" import { User, Order as Ord }
+//
+//	from "./utils" import { getAllUsers }
+//	from "./models" import { User, Order as Ord }
 func (p *Parser) parseFromImport() (interpreter.Item, error) {
 	// Consume "from" keyword
 	if err := p.expect(FROM); err != nil {
@@ -4412,6 +4426,90 @@ func (p *Parser) ParseExpression() (interpreter.Expr, error) {
 	p.skipNewlines()
 
 	return expr, nil
+}
+
+// parseTestBlock parses a test block: test "name" { body }
+// "test" is parsed as an IDENT (not a dedicated token) to avoid conflicts with
+// identifiers like /test in route paths.
+func (p *Parser) parseTestBlock() (interpreter.Item, error) {
+	// Consume "test" identifier
+	p.advance()
+
+	// Parse test name (string literal)
+	if !p.check(STRING) {
+		return nil, p.errorWithHint(
+			fmt.Sprintf("Expected test name (string), got %s", p.current().Type),
+			p.current(),
+			"Test blocks must have a name: test \"description\" { ... }",
+		)
+	}
+	name := p.current().Literal
+	p.advance()
+
+	p.skipNewlines()
+
+	// Parse body
+	if err := p.expect(LBRACE); err != nil {
+		return nil, err
+	}
+
+	p.skipNewlines()
+
+	var body []interpreter.Statement
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		stmt, err := p.parseStatement()
+		if err != nil {
+			return nil, err
+		}
+		body = append(body, stmt)
+		p.skipNewlines()
+	}
+
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
+	}
+
+	return &interpreter.TestBlock{
+		Name: name,
+		Body: body,
+	}, nil
+}
+
+// parseAssertStatement parses an assert statement: assert(condition) or assert(condition, "message")
+func (p *Parser) parseAssertStatement() (interpreter.Statement, error) {
+	if err := p.expect(ASSERT); err != nil {
+		return nil, err
+	}
+
+	if err := p.expect(LPAREN); err != nil {
+		return nil, p.errorWithHint(
+			fmt.Sprintf("Expected '(' after assert, got %s", p.current().Type),
+			p.current(),
+			"Assert syntax: assert(condition) or assert(condition, \"message\")",
+		)
+	}
+
+	condition, err := p.parseExpr()
+	if err != nil {
+		return nil, err
+	}
+
+	var message interpreter.Expr
+	if p.match(COMMA) {
+		message, err = p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if err := p.expect(RPAREN); err != nil {
+		return nil, err
+	}
+
+	return interpreter.AssertStatement{
+		Condition: condition,
+		Message:   message,
+	}, nil
 }
 
 // ParseStatement parses a single statement from the token stream.
