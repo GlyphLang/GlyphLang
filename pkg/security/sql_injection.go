@@ -10,13 +10,13 @@ import (
 
 // SecurityWarning represents a security issue found in code
 type SecurityWarning struct {
-	Type        string // "XSS", "SQL_INJECTION", etc.
-	Severity    string // "HIGH", "MEDIUM", "LOW", "CRITICAL"
-	Message     string
-	Location    string
-	Suggestion  string
-	UnsafeCode  string // For SQL injection context
-	Expr        interpreter.Expr // For XSS context (can be nil)
+	Type       string // "XSS", "SQL_INJECTION", etc.
+	Severity   string // "HIGH", "MEDIUM", "LOW", "CRITICAL"
+	Message    string
+	Location   string
+	Suggestion string
+	UnsafeCode string           // For SQL injection context
+	Expr       interpreter.Expr // For XSS context (can be nil)
 }
 
 // SQLInjectionDetector detects potential SQL injection vulnerabilities
@@ -130,11 +130,27 @@ func IsSafeQuery(expr interpreter.Expr) bool {
 	return len(detector.warnings) == 0
 }
 
-// SanitizeSQL escapes dangerous characters
-func SanitizeSQL(input string) string {
-	input = regexp.MustCompile(`--.*$`).ReplaceAllString(input, "")
-	input = regexp.MustCompile(`/\*.*?\*/`).ReplaceAllString(input, "")
+// Pre-compiled regexps for StripSQLComments
+var (
+	sqlLineCommentPattern  = regexp.MustCompile(`--.*$`)
+	sqlBlockCommentPattern = regexp.MustCompile(`/\*.*?\*/`)
+)
+
+// StripSQLComments removes SQL comments and escapes single quotes.
+// WARNING: This is NOT a security measure against SQL injection.
+// Always use parameterized queries for user-supplied values.
+// This function only strips comments and performs basic escaping.
+func StripSQLComments(input string) string {
+	input = sqlLineCommentPattern.ReplaceAllString(input, "")
+	input = sqlBlockCommentPattern.ReplaceAllString(input, "")
 	input = strings.ReplaceAll(input, "'", "''")
 	input = strings.ReplaceAll(input, "\x00", "")
 	return input
+}
+
+// SanitizeSQL is an alias for StripSQLComments for backward compatibility.
+// WARNING: This is NOT a security measure against SQL injection.
+// Always use parameterized queries for user-supplied values.
+func SanitizeSQL(input string) string {
+	return StripSQLComments(input)
 }

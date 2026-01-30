@@ -29,8 +29,8 @@ type GraphQLRequest struct {
 
 // GraphQLResponse represents a GraphQL response.
 type GraphQLResponse struct {
-	Data   interface{}      `json:"data,omitempty"`
-	Errors []GraphQLError   `json:"errors,omitempty"`
+	Data   interface{}    `json:"data,omitempty"`
+	Errors []GraphQLError `json:"errors,omitempty"`
 }
 
 // GraphQLError represents a GraphQL error.

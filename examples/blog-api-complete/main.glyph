@@ -387,8 +387,8 @@
   ]
 
   > {
-    :query = query,
-    :category = category,
+    :search_query = query,
+    :search_category = category,
     :results = results,
     :count = 2,
     :took_ms = 12

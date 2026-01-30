@@ -8,50 +8,50 @@ import (
 
 // Interpreter is the main interpreter struct
 type Interpreter struct {
-	globalEnv       *Environment
-	functions       map[string]Function
-	typeDefs        map[string]TypeDef
-	commands        map[string]Command
-	cronTasks       []CronTask
-	eventHandlers   map[string][]EventHandler
-	queueWorkers    map[string]QueueWorker
-	grpcServices    map[string]GRPCService  // key: service name
-	grpcHandlers     map[string]GRPCHandler   // key: method name
+	globalEnv        *Environment
+	functions        map[string]Function
+	typeDefs         map[string]TypeDef
+	commands         map[string]Command
+	cronTasks        []CronTask
+	eventHandlers    map[string][]EventHandler
+	queueWorkers     map[string]QueueWorker
+	grpcServices     map[string]GRPCService     // key: service name
+	grpcHandlers     map[string]GRPCHandler     // key: method name
 	graphqlResolvers map[string]GraphQLResolver // key: "operation.fieldName"
 	testBlocks       []TestBlock
-	typeChecker     *TypeChecker
-	dbHandler       interface{}              // Database handler for dependency injection
-	redisHandler    interface{}              // Redis handler for dependency injection
-	mongoDBHandler  interface{}              // MongoDB handler for dependency injection
-	llmHandler      interface{}              // LLM handler for AI integration
-	moduleResolver  *ModuleResolver          // Module resolver for handling imports
-	importedModules map[string]*LoadedModule // Imported modules by alias/name
-	constants       map[string]struct{}      // Tracks names that are constants (immutable)
-	contracts       map[string]ContractDef   // Contract definitions by name
-	traitDefs       map[string]TraitDef      // Trait definitions by name
+	typeChecker      *TypeChecker
+	dbHandler        interface{}              // Database handler for dependency injection
+	redisHandler     interface{}              // Redis handler for dependency injection
+	mongoDBHandler   interface{}              // MongoDB handler for dependency injection
+	llmHandler       interface{}              // LLM handler for AI integration
+	moduleResolver   *ModuleResolver          // Module resolver for handling imports
+	importedModules  map[string]*LoadedModule // Imported modules by alias/name
+	constants        map[string]struct{}      // Tracks names that are constants (immutable)
+	contracts        map[string]ContractDef   // Contract definitions by name
+	traitDefs        map[string]TraitDef      // Trait definitions by name
 }
 
 // NewInterpreter creates a new interpreter instance
 func NewInterpreter() *Interpreter {
 	typeChecker := NewTypeChecker()
 	return &Interpreter{
-		globalEnv:       NewEnvironment(),
-		functions:       make(map[string]Function),
-		typeDefs:        make(map[string]TypeDef),
-		commands:        make(map[string]Command),
-		cronTasks:       []CronTask{},
-		testBlocks:      []TestBlock{},
-		eventHandlers:   make(map[string][]EventHandler),
-		queueWorkers:    make(map[string]QueueWorker),
-		grpcServices:    make(map[string]GRPCService),
+		globalEnv:        NewEnvironment(),
+		functions:        make(map[string]Function),
+		typeDefs:         make(map[string]TypeDef),
+		commands:         make(map[string]Command),
+		cronTasks:        []CronTask{},
+		testBlocks:       []TestBlock{},
+		eventHandlers:    make(map[string][]EventHandler),
+		queueWorkers:     make(map[string]QueueWorker),
+		grpcServices:     make(map[string]GRPCService),
 		grpcHandlers:     make(map[string]GRPCHandler),
 		graphqlResolvers: make(map[string]GraphQLResolver),
 		typeChecker:      typeChecker,
-		moduleResolver:  NewModuleResolver(),
-		importedModules: make(map[string]*LoadedModule),
-		constants:       make(map[string]struct{}),
-		contracts:       make(map[string]ContractDef),
-		traitDefs:       make(map[string]TraitDef),
+		moduleResolver:   NewModuleResolver(),
+		importedModules:  make(map[string]*LoadedModule),
+		constants:        make(map[string]struct{}),
+		contracts:        make(map[string]ContractDef),
+		traitDefs:        make(map[string]TraitDef),
 	}
 }
 

@@ -36,8 +36,8 @@ func (m *MockDB) Exec(ctx context.Context, query string, args ...interface{}) (s
 func (m *MockDB) Begin(ctx context.Context) (*sql.Tx, error)                        { return nil, nil }
 func (m *MockDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) { return nil, nil }
 func (m *MockDB) Prepare(ctx context.Context, query string) (*sql.Stmt, error)      { return nil, nil }
-func (m *MockDB) Stats() sql.DBStats                                                 { return sql.DBStats{} }
-func (m *MockDB) Driver() string                                                     { return "mock" }
+func (m *MockDB) Stats() sql.DBStats                                                { return sql.DBStats{} }
+func (m *MockDB) Driver() string                                                    { return "mock" }
 
 type mockResult struct {
 	lastInsertID int64
@@ -215,9 +215,9 @@ func TestStructToMap(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		input   interface{}
-		wantErr bool
+		name     string
+		input    interface{}
+		wantErr  bool
 		validate func(*testing.T, map[string]interface{})
 	}{
 		{

@@ -56,13 +56,13 @@ const (
 	WHILE   // while
 
 	// Keywords
-	SWITCH   // switch
-	CASE     // case
-	DEFAULT  // default
-	FOR      // for
-	IN       // in
-	MACRO    // macro
-	QUOTE    // quote
+	SWITCH    // switch
+	CASE      // case
+	DEFAULT   // default
+	FOR       // for
+	IN        // in
+	MACRO     // macro
+	QUOTE     // quote
 	MATCH     // match
 	WHEN      // when (for guards in match)
 	FATARROW  // =>

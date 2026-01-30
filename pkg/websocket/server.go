@@ -14,13 +14,38 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		// Allow all origins for now (should be configurable in production)
-		return true
-	},
+// newUpgrader creates a WebSocket upgrader with configurable origin checking.
+// If allowedOrigins is nil or empty, no origins are allowed (secure by default).
+// Pass []string{"*"} to allow all origins (not recommended for production).
+func newUpgrader(allowedOrigins []string) websocket.Upgrader {
+	return websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin: func(r *http.Request) bool {
+			if len(allowedOrigins) == 0 {
+				// Secure default: only allow same-origin requests
+				origin := r.Header.Get("Origin")
+				if origin == "" {
+					return true // No Origin header (non-browser client)
+				}
+				u, err := url.Parse(origin)
+				if err != nil {
+					return false
+				}
+				return u.Host == r.Host
+			}
+			for _, allowed := range allowedOrigins {
+				if allowed == "*" {
+					return true
+				}
+				origin := r.Header.Get("Origin")
+				if origin == allowed {
+					return true
+				}
+			}
+			return false
+		},
+	}
 }
 
 // Hub maintains the set of active connections and broadcasts messages
@@ -109,25 +134,25 @@ func NewHubWithConfig(config *Config) *Hub {
 	config.Validate()
 
 	return &Hub{
-		connections:      make(map[*Connection]bool),
-		handleMessage:    make(chan *MessageContext, 256),
-		register:         make(chan *Connection),
-		unregister:       make(chan *Connection),
-		broadcast:        make(chan []byte, 256),
-		broadcastToRoom:  make(chan *RoomMessage, 256),
-		joinRoom:         make(chan *RoomAction, 256),
-		leaveRoom:        make(chan *RoomAction, 256),
-		roomManager:      NewRoomManagerWithConfig(config),
+		connections:       make(map[*Connection]bool),
+		handleMessage:     make(chan *MessageContext, 256),
+		register:          make(chan *Connection),
+		unregister:        make(chan *Connection),
+		broadcast:         make(chan []byte, 256),
+		broadcastToRoom:   make(chan *RoomMessage, 256),
+		joinRoom:          make(chan *RoomAction, 256),
+		leaveRoom:         make(chan *RoomAction, 256),
+		roomManager:       NewRoomManagerWithConfig(config),
 		handler:           NewHandler(),
 		onConnect:         make([]EventHandler, 0),
 		onDisconnect:      make([]EventHandler, 0),
 		routeOnConnect:    make(map[string][]EventHandler),
 		routeOnDisconnect: make(map[string][]EventHandler),
 		shutdown:          make(chan struct{}),
-		started:          make(chan struct{}),
-		config:           config,
-		metrics:          NewMetrics(),
-		connectionStates: make(map[string]*ConnectionState),
+		started:           make(chan struct{}),
+		config:            config,
+		metrics:           NewMetrics(),
+		connectionStates:  make(map[string]*ConnectionState),
 	}
 }
 
@@ -428,14 +453,21 @@ type Server struct {
 	upgrader websocket.Upgrader
 }
 
-// NewServer creates a new WebSocket server
+// NewServer creates a new WebSocket server with same-origin checking by default
 func NewServer() *Server {
+	return NewServerWithOrigins(nil)
+}
+
+// NewServerWithOrigins creates a new WebSocket server with configurable allowed origins.
+// Pass nil or empty slice for same-origin only (secure default).
+// Pass []string{"*"} to allow all origins (not recommended for production).
+func NewServerWithOrigins(allowedOrigins []string) *Server {
 	hub := NewHub()
 	go hub.Run()
 
 	return &Server{
 		hub:      hub,
-		upgrader: upgrader,
+		upgrader: newUpgrader(allowedOrigins),
 	}
 }
 

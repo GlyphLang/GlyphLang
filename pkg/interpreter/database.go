@@ -72,12 +72,12 @@ var allowedMethods = map[string]bool{
 	"CreateIndex":    true,
 	"DropIndex":      true,
 	// LLM methods
-	"Complete":     true,
-	"Chat":         true,
-	"Stream":       true,
-	"Embed":        true,
-	"ListModels":   true,
-	"TokenCount":   true,
+	"Complete":   true,
+	"Chat":       true,
+	"Stream":     true,
+	"Embed":      true,
+	"ListModels": true,
+	"TokenCount": true,
 	// Common safe methods
 	"String": true,
 	"Int":    true,

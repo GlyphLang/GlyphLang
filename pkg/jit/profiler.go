@@ -17,11 +17,11 @@ type ExecutionProfile struct {
 	LastExecuted   time.Time
 
 	// Type profiling - track actual types seen at runtime
-	TypeProfile    *TypeProfile
+	TypeProfile *TypeProfile
 
 	// Call graph data
-	CalledBy       map[string]int64 // caller -> count
-	Calls          map[string]int64 // callee -> count
+	CalledBy map[string]int64 // caller -> count
+	Calls    map[string]int64 // callee -> count
 }
 
 // TypeProfile tracks runtime type information for adaptive optimization
@@ -35,17 +35,17 @@ type TypeProfile struct {
 
 // CallGraphNode represents a node in the call graph
 type CallGraphNode struct {
-	Name        string
-	Callers     map[string]int64 // caller -> count
-	Callees     map[string]int64 // callee -> count
-	IsHot       bool             // true if this is a hot path
+	Name    string
+	Callers map[string]int64 // caller -> count
+	Callees map[string]int64 // callee -> count
+	IsHot   bool             // true if this is a hot path
 }
 
 // Profiler collects runtime profiling data
 type Profiler struct {
-	profiles   map[string]*ExecutionProfile
-	callGraph  map[string]*CallGraphNode
-	mutex      sync.RWMutex
+	profiles  map[string]*ExecutionProfile
+	callGraph map[string]*CallGraphNode
+	mutex     sync.RWMutex
 
 	// Configuration
 	maxProfiles int // Maximum number of profiles to keep
@@ -68,14 +68,14 @@ func (p *Profiler) RecordExecution(name string, executionTime time.Duration) {
 	profile, exists := p.profiles[name]
 	if !exists {
 		profile = &ExecutionProfile{
-			Name:          name,
+			Name:           name,
 			ExecutionCount: 0,
-			TotalTime:     0,
-			MinTime:       executionTime,
-			MaxTime:       executionTime,
-			TypeProfile:   NewTypeProfile(),
-			CalledBy:      make(map[string]int64),
-			Calls:         make(map[string]int64),
+			TotalTime:      0,
+			MinTime:        executionTime,
+			MaxTime:        executionTime,
+			TypeProfile:    NewTypeProfile(),
+			CalledBy:       make(map[string]int64),
+			Calls:          make(map[string]int64),
 		}
 		p.profiles[name] = profile
 	}
@@ -395,11 +395,11 @@ func (p *Profiler) getOrCreateProfile(name string) *ExecutionProfile {
 	profile, exists := p.profiles[name]
 	if !exists {
 		profile = &ExecutionProfile{
-			Name:          name,
+			Name:           name,
 			ExecutionCount: 0,
-			TypeProfile:   NewTypeProfile(),
-			CalledBy:      make(map[string]int64),
-			Calls:         make(map[string]int64),
+			TypeProfile:    NewTypeProfile(),
+			CalledBy:       make(map[string]int64),
+			Calls:          make(map[string]int64),
 		}
 		p.profiles[name] = profile
 	}
@@ -448,11 +448,11 @@ func NewTypeProfile() *TypeProfile {
 
 // ProfilerStats returns statistics about the profiler itself
 type ProfilerStats struct {
-	TotalProfiles     int
-	HotPathCount      int
-	TotalExecutions   int64
+	TotalProfiles      int
+	HotPathCount       int
+	TotalExecutions    int64
 	TotalExecutionTime time.Duration
-	CallGraphSize     int
+	CallGraphSize      int
 }
 
 // GetStats returns profiler statistics

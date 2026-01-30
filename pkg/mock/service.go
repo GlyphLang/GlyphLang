@@ -16,10 +16,10 @@ type Call struct {
 // injection system. Methods can be stubbed with return values or dynamic
 // functions, and all calls are tracked for assertions.
 type Service struct {
-	mu      sync.RWMutex
-	stubs   map[string]interface{}      // method -> return value or func
-	calls   map[string][]Call           // method -> call history
-	tables  map[string]*TableMock       // sub-object mocks (e.g., db.users)
+	mu     sync.RWMutex
+	stubs  map[string]interface{} // method -> return value or func
+	calls  map[string][]Call      // method -> call history
+	tables map[string]*TableMock  // sub-object mocks (e.g., db.users)
 }
 
 // NewService creates a new mock Service.

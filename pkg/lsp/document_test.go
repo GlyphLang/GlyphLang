@@ -278,9 +278,9 @@ ghi`
 	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	tests := []struct {
-		name     string
-		pos      Position
-		offset   int
+		name      string
+		pos       Position
+		offset    int
 		roundTrip bool
 	}{
 		{

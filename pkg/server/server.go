@@ -13,13 +13,13 @@ import (
 
 // Server represents the HTTP server
 type Server struct {
-	router       *Router
-	handler      *Handler
-	httpServer   *http.Server
-	interpreter  Interpreter
-	middlewares  []Middleware
-	addr         string
-	wsServer     *ws.Server // WebSocket server
+	router      *Router
+	handler     *Handler
+	httpServer  *http.Server
+	interpreter Interpreter
+	middlewares []Middleware
+	addr        string
+	wsServer    *ws.Server // WebSocket server
 }
 
 // ServerOption is a functional option for configuring the server

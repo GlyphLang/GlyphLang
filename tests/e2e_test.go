@@ -1381,11 +1381,16 @@ func TestDatabaseIntegrationE2E(t *testing.T) {
 func TestSecurityFeaturesE2E(t *testing.T) {
 	// Test 1: Rate Limiting
 	t.Run("RateLimiting", func(t *testing.T) {
+		// Configure 127.0.0.1 as a trusted proxy so X-Forwarded-For is honored
+		// in the test environment (httptest uses localhost connections)
+		server.SetTrustedProxies([]string{"127.0.0.1"})
+		defer server.SetTrustedProxies(nil)
+
 		// Create a server with rate limiting middleware
 		// Use a very small burst size to ensure we can exhaust it quickly
 		rateLimitConfig := server.RateLimiterConfig{
-			RequestsPerMinute: 1,  // Very slow refill rate
-			BurstSize:         3,  // Small burst size
+			RequestsPerMinute: 1, // Very slow refill rate
+			BurstSize:         3, // Small burst size
 		}
 
 		srv := server.NewServer(

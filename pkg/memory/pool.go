@@ -14,21 +14,21 @@ import (
 
 // Pool is a generic object pool that manages reusable objects
 type Pool[T any] struct {
-	pool     sync.Pool
-	factory  func() T
-	reset    func(*T)
-	stats    PoolStats
-	maxSize  int64
-	curSize  int64
+	pool    sync.Pool
+	factory func() T
+	reset   func(*T)
+	stats   PoolStats
+	maxSize int64
+	curSize int64
 }
 
 // PoolStats tracks pool usage statistics
 type PoolStats struct {
-	Gets      uint64
-	Puts      uint64
-	Misses    uint64 // New allocations
-	Hits      uint64 // Reused objects
-	Discards  uint64 // Objects discarded (pool full)
+	Gets     uint64
+	Puts     uint64
+	Misses   uint64 // New allocations
+	Hits     uint64 // Reused objects
+	Discards uint64 // Objects discarded (pool full)
 }
 
 // NewPool creates a new object pool
@@ -104,12 +104,12 @@ type BufferPool struct {
 
 // BufferPoolStats tracks buffer pool statistics
 type BufferPoolStats struct {
-	SmallGets   uint64
-	SmallPuts   uint64
-	MediumGets  uint64
-	MediumPuts  uint64
-	LargeGets   uint64
-	LargePuts   uint64
+	SmallGets  uint64
+	SmallPuts  uint64
+	MediumGets uint64
+	MediumPuts uint64
+	LargeGets  uint64
+	LargePuts  uint64
 }
 
 // NewBufferPool creates a new buffer pool
@@ -409,12 +409,12 @@ func (p *RequestContextPool) Stats() PoolStats {
 // ========================================
 
 var (
-	globalBufferPool   *BufferPool
-	globalBytesPool    *BytesBufferPool
-	globalMapPool      *MapPool
-	globalSlicePool    *SlicePool
-	globalContextPool  *RequestContextPool
-	initOnce           sync.Once
+	globalBufferPool  *BufferPool
+	globalBytesPool   *BytesBufferPool
+	globalMapPool     *MapPool
+	globalSlicePool   *SlicePool
+	globalContextPool *RequestContextPool
+	initOnce          sync.Once
 )
 
 // initGlobalPools initializes all global pools

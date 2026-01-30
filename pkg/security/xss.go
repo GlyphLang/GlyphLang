@@ -150,13 +150,13 @@ func (d *XSSDetector) analyzeVariable(varExpr interpreter.VariableExpr, inHTMLCo
 func (d *XSSDetector) analyzeFunctionCall(call interpreter.FunctionCallExpr, inHTMLContext bool) {
 	// Check for functions that output HTML
 	htmlOutputFunctions := map[string]bool{
-		"render":      true,
-		"renderHTML":  true,
-		"toHTML":      true,
-		"innerHTML":   true,
-		"write":       true,
-		"writeHTML":   true,
-		"sendHTML":    true,
+		"render":     true,
+		"renderHTML": true,
+		"toHTML":     true,
+		"innerHTML":  true,
+		"write":      true,
+		"writeHTML":  true,
+		"sendHTML":   true,
 	}
 
 	if htmlOutputFunctions[call.Name] {
@@ -289,42 +289,30 @@ func SuggestHTMLEscape(expr interpreter.Expr) string {
 	return fmt.Sprintf("Use escapeHTML(%s) to prevent XSS attacks", exprStr)
 }
 
-// EscapeHTML escapes HTML special characters
+// EscapeHTML escapes HTML special characters.
+// Ampersand must be replaced first to avoid double-escaping.
 func EscapeHTML(s string) string {
-	replacements := map[string]string{
-		"&":  "&amp;",
-		"<":  "&lt;",
-		">":  "&gt;",
-		"\"": "&quot;",
-		"'":  "&#39;",
-	}
-
-	result := s
-	for old, new := range replacements {
-		result = strings.ReplaceAll(result, old, new)
-	}
-	return result
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	s = strings.ReplaceAll(s, "\"", "&quot;")
+	s = strings.ReplaceAll(s, "'", "&#39;")
+	return s
 }
 
-// EscapeJS escapes characters for JavaScript context
+// EscapeJS escapes characters for JavaScript context.
+// Backslash must be replaced first to avoid double-escaping.
 func EscapeJS(s string) string {
-	replacements := map[string]string{
-		"\\": "\\\\",
-		"\"": "\\\"",
-		"'":  "\\'",
-		"\n": "\\n",
-		"\r": "\\r",
-		"\t": "\\t",
-		"<":  "\\u003C",
-		">":  "\\u003E",
-		"&":  "\\u0026",
-	}
-
-	result := s
-	for old, new := range replacements {
-		result = strings.ReplaceAll(result, old, new)
-	}
-	return result
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, "\"", "\\\"")
+	s = strings.ReplaceAll(s, "'", "\\'")
+	s = strings.ReplaceAll(s, "\n", "\\n")
+	s = strings.ReplaceAll(s, "\r", "\\r")
+	s = strings.ReplaceAll(s, "\t", "\\t")
+	s = strings.ReplaceAll(s, "<", "\\u003C")
+	s = strings.ReplaceAll(s, ">", "\\u003E")
+	s = strings.ReplaceAll(s, "&", "\\u0026")
+	return s
 }
 
 // Helper functions

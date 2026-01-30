@@ -598,9 +598,9 @@ func TestOpJumpUnconditional(t *testing.T) {
 	// Jump over the "Push 1" instruction to "Push 2"
 	jumpTarget := uint32(startOffset + 5 + 5)
 
-	bytecode = addInstruction(bytecode, OpJump, &jumpTarget)  // Jump to Push 2
-	bytecode = addInstruction(bytecode, OpPush, &operand0)    // Push 1 (skipped)
-	bytecode = addInstruction(bytecode, OpPush, &operand1)    // Push 2
+	bytecode = addInstruction(bytecode, OpJump, &jumpTarget) // Jump to Push 2
+	bytecode = addInstruction(bytecode, OpPush, &operand0)   // Push 1 (skipped)
+	bytecode = addInstruction(bytecode, OpPush, &operand1)   // Push 2
 	bytecode = addInstruction(bytecode, OpHalt, nil)
 
 	vm := NewVM()
@@ -644,9 +644,9 @@ func TestOpReturn(t *testing.T) {
 	bytecode := createBytecodeHeader(constants)
 
 	operand0 := uint32(0)
-	bytecode = addInstruction(bytecode, OpPush, &operand0)  // Push 42
-	bytecode = addInstruction(bytecode, OpReturn, nil)      // Return
-	bytecode = addInstruction(bytecode, OpPush, &operand0)  // This should not be executed
+	bytecode = addInstruction(bytecode, OpPush, &operand0) // Push 42
+	bytecode = addInstruction(bytecode, OpReturn, nil)     // Return
+	bytecode = addInstruction(bytecode, OpPush, &operand0) // This should not be executed
 	bytecode = addInstruction(bytecode, OpHalt, nil)
 
 	vm := NewVM()
@@ -1136,26 +1136,26 @@ func TestWebSocketOperationsNoHandler(t *testing.T) {
 
 // MockWebSocketHandler implements WebSocketHandler for testing
 type MockWebSocketHandler struct {
-	sentMessages     []interface{}
+	sentMessages      []interface{}
 	broadcastMessages []interface{}
-	roomMessages     map[string][]interface{}
-	joinedRooms      []string
-	leftRooms        []string
-	closeReason      string
-	closed           bool
-	rooms            []string
-	clients          map[string][]string
-	connectionCount  int
-	uptime           int64
+	roomMessages      map[string][]interface{}
+	joinedRooms       []string
+	leftRooms         []string
+	closeReason       string
+	closed            bool
+	rooms             []string
+	clients           map[string][]string
+	connectionCount   int
+	uptime            int64
 }
 
 func NewMockWebSocketHandler() *MockWebSocketHandler {
 	return &MockWebSocketHandler{
-		roomMessages: make(map[string][]interface{}),
-		clients:      make(map[string][]string),
-		rooms:        []string{"room1", "room2"},
+		roomMessages:    make(map[string][]interface{}),
+		clients:         make(map[string][]string),
+		rooms:           []string{"room1", "room2"},
 		connectionCount: 5,
-		uptime:       1000,
+		uptime:          1000,
 	}
 }
 
@@ -1513,7 +1513,7 @@ func TestUnknownOpcode(t *testing.T) {
 // TestParseBytecodeErrors tests bytecode parsing error cases
 func TestParseBytecodeErrors(t *testing.T) {
 	t.Run("unsupported_version", func(t *testing.T) {
-		bytecode := []byte{0x47, 0x4C, 0x59, 0x50} // Magic
+		bytecode := []byte{0x47, 0x4C, 0x59, 0x50}          // Magic
 		bytecode = append(bytecode, 0x02, 0x00, 0x00, 0x00) // Version 2 (unsupported)
 
 		vm := NewVM()
@@ -1524,10 +1524,10 @@ func TestParseBytecodeErrors(t *testing.T) {
 	})
 
 	t.Run("truncated_constant", func(t *testing.T) {
-		bytecode := []byte{0x47, 0x4C, 0x59, 0x50} // Magic
+		bytecode := []byte{0x47, 0x4C, 0x59, 0x50}          // Magic
 		bytecode = append(bytecode, 0x01, 0x00, 0x00, 0x00) // Version 1
 		bytecode = append(bytecode, 0x01, 0x00, 0x00, 0x00) // 1 constant
-		bytecode = append(bytecode, 0x01) // Int type, but no value
+		bytecode = append(bytecode, 0x01)                   // Int type, but no value
 
 		vm := NewVM()
 		_, err := vm.Execute(bytecode)
@@ -1537,10 +1537,10 @@ func TestParseBytecodeErrors(t *testing.T) {
 	})
 
 	t.Run("unknown_constant_type", func(t *testing.T) {
-		bytecode := []byte{0x47, 0x4C, 0x59, 0x50} // Magic
+		bytecode := []byte{0x47, 0x4C, 0x59, 0x50}          // Magic
 		bytecode = append(bytecode, 0x01, 0x00, 0x00, 0x00) // Version 1
 		bytecode = append(bytecode, 0x01, 0x00, 0x00, 0x00) // 1 constant
-		bytecode = append(bytecode, 0xFF) // Unknown constant type
+		bytecode = append(bytecode, 0xFF)                   // Unknown constant type
 
 		vm := NewVM()
 		_, err := vm.Execute(bytecode)

@@ -20,29 +20,29 @@ import (
 
 // ProjectContext represents the complete AI-optimized context for a Glyph project
 type ProjectContext struct {
-	Version     string                 `json:"version"`
-	Generated   time.Time              `json:"generated"`
-	ProjectHash string                 `json:"project_hash"`
-	Files       map[string]*FileContext `json:"files"`
-	Types       map[string]*TypeInfo    `json:"types"`
-	Routes      []*RouteInfo            `json:"routes"`
+	Version     string                   `json:"version"`
+	Generated   time.Time                `json:"generated"`
+	ProjectHash string                   `json:"project_hash"`
+	Files       map[string]*FileContext  `json:"files"`
+	Types       map[string]*TypeInfo     `json:"types"`
+	Routes      []*RouteInfo             `json:"routes"`
 	Functions   map[string]*FunctionInfo `json:"functions"`
 	Commands    map[string]*CommandInfo  `json:"commands"`
-	Patterns    []string                `json:"patterns"`
+	Patterns    []string                 `json:"patterns"`
 }
 
 // FileContext represents context for a single file
 type FileContext struct {
-	Path     string `json:"path"`
-	Hash     string `json:"hash"`
+	Path     string    `json:"path"`
+	Hash     string    `json:"hash"`
 	Modified time.Time `json:"modified"`
-	Summary  string `json:"summary"`
+	Summary  string    `json:"summary"`
 }
 
 // TypeInfo represents a compact type definition
 type TypeInfo struct {
 	Name       string   `json:"name"`
-	Fields     []string `json:"fields"`     // Compact field representations: "name: type" or "name: type!"
+	Fields     []string `json:"fields"`                // Compact field representations: "name: type" or "name: type!"
 	TypeParams []string `json:"type_params,omitempty"` // Generic type parameters
 	Hash       string   `json:"hash"`
 }
@@ -51,7 +51,7 @@ type TypeInfo struct {
 type RouteInfo struct {
 	Method      string   `json:"method"`
 	Path        string   `json:"path"`
-	Params      []string `json:"params,omitempty"`      // Path parameters
+	Params      []string `json:"params,omitempty"`       // Path parameters
 	QueryParams []string `json:"query_params,omitempty"` // Query parameters
 	Returns     string   `json:"returns,omitempty"`
 	Auth        string   `json:"auth,omitempty"`
@@ -62,7 +62,7 @@ type RouteInfo struct {
 // FunctionInfo represents a compact function definition
 type FunctionInfo struct {
 	Name       string   `json:"name"`
-	Params     []string `json:"params"`     // "name: type"
+	Params     []string `json:"params"` // "name: type"
 	Returns    string   `json:"returns"`
 	TypeParams []string `json:"type_params,omitempty"`
 	Hash       string   `json:"hash"`
@@ -608,14 +608,14 @@ func (ctx *ProjectContext) ToCompact() string {
 
 // ContextDiff represents changes between two context versions
 type ContextDiff struct {
-	PreviousHash string              `json:"previous_hash"`
-	CurrentHash  string              `json:"current_hash"`
-	HasChanges   bool                `json:"has_changes"`
-	Files        *FilesDiff          `json:"files,omitempty"`
-	Types        *ItemsDiff          `json:"types,omitempty"`
-	Routes       *RoutesDiff         `json:"routes,omitempty"`
-	Functions    *ItemsDiff          `json:"functions,omitempty"`
-	Commands     *ItemsDiff          `json:"commands,omitempty"`
+	PreviousHash string      `json:"previous_hash"`
+	CurrentHash  string      `json:"current_hash"`
+	HasChanges   bool        `json:"has_changes"`
+	Files        *FilesDiff  `json:"files,omitempty"`
+	Types        *ItemsDiff  `json:"types,omitempty"`
+	Routes       *RoutesDiff `json:"routes,omitempty"`
+	Functions    *ItemsDiff  `json:"functions,omitempty"`
+	Commands     *ItemsDiff  `json:"commands,omitempty"`
 }
 
 // FilesDiff represents file-level changes
@@ -1036,15 +1036,15 @@ func truncateHash(hash string) string {
 
 // TargetedContext represents context optimized for a specific task
 type TargetedContext struct {
-	Task        string              `json:"task"`
-	Description string              `json:"description"`
-	Types       map[string]*TypeInfo `json:"types,omitempty"`
-	Routes      []*RouteInfo        `json:"routes,omitempty"`
+	Task        string                   `json:"task"`
+	Description string                   `json:"description"`
+	Types       map[string]*TypeInfo     `json:"types,omitempty"`
+	Routes      []*RouteInfo             `json:"routes,omitempty"`
 	Functions   map[string]*FunctionInfo `json:"functions,omitempty"`
-	Commands    map[string]*CommandInfo `json:"commands,omitempty"`
-	Patterns    []string            `json:"patterns,omitempty"`
-	Injections  []string            `json:"available_injections,omitempty"`
-	Syntax      *SyntaxGuide        `json:"syntax,omitempty"`
+	Commands    map[string]*CommandInfo  `json:"commands,omitempty"`
+	Patterns    []string                 `json:"patterns,omitempty"`
+	Injections  []string                 `json:"available_injections,omitempty"`
+	Syntax      *SyntaxGuide             `json:"syntax,omitempty"`
 }
 
 // SyntaxGuide provides quick reference for Glyph syntax

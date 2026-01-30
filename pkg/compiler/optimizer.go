@@ -18,9 +18,9 @@ const (
 // Optimizer performs optimization passes on AST
 type Optimizer struct {
 	level       OptimizationLevel
-	constants   map[string]interpreter.Literal       // Track constant values for variables
-	expressions map[string]string                    // Track expression -> variable name for CSE
-	copies      map[string]string                    // Track variable copies (x = y means copies[x] = y)
+	constants   map[string]interpreter.Literal // Track constant values for variables
+	expressions map[string]string              // Track expression -> variable name for CSE
+	copies      map[string]string              // Track variable copies (x = y means copies[x] = y)
 }
 
 // NewOptimizer creates a new optimizer instance
@@ -1025,11 +1025,11 @@ func (o *Optimizer) ApplyPeepholeOptimizations(stmts []interpreter.Statement) []
 
 // InlineCandidate represents a function that can be inlined
 type InlineCandidate struct {
-	Name       string
-	Params     []string
-	Body       []interpreter.Statement
-	BodySize   int
-	CallCount  int
+	Name        string
+	Params      []string
+	Body        []interpreter.Statement
+	BodySize    int
+	CallCount   int
 	IsRecursive bool
 }
 
@@ -1467,13 +1467,13 @@ func log2(n int64) int {
 
 // OptimizationStats tracks statistics about optimizations performed
 type OptimizationStats struct {
-	ConstantsFolded      int
-	DeadCodeEliminated   int
-	CopiesPropagated     int
+	ConstantsFolded       int
+	DeadCodeEliminated    int
+	CopiesPropagated      int
 	ExpressionsEliminated int
-	LoopInvariants       int
-	FunctionsInlined     int
-	StrengthReductions   int
+	LoopInvariants        int
+	FunctionsInlined      int
+	StrengthReductions    int
 }
 
 // GetStats returns optimization statistics

@@ -26,9 +26,9 @@ type VerifyResult struct {
 
 // BreakingChange represents a breaking change between two contract versions
 type BreakingChange struct {
-	Type    string // "removed", "return_type_changed", "added" (informational)
+	Type     string // "removed", "return_type_changed", "added" (informational)
 	Endpoint string
-	Detail  string
+	Detail   string
 }
 
 func (b BreakingChange) String() string {
@@ -54,10 +54,10 @@ type ConsumerExpectation struct {
 
 // ConsumerResult contains the result of consumer contract verification
 type ConsumerResult struct {
-	Consumer    string
-	Provider    string
-	Failures    []string
-	Passed      bool
+	Consumer string
+	Provider string
+	Failures []string
+	Passed   bool
 }
 
 // Verify checks if the routes in a module satisfy a contract definition.

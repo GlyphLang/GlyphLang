@@ -74,10 +74,10 @@ func TestHubConnectionRegistration(t *testing.T) {
 
 	// Create mock connection
 	mockConn := &Connection{
-		ID:   "test-conn",
-		send: make(chan []byte, 256),
-		hub:  hub,
-		Data: make(map[string]interface{}),
+		ID:    "test-conn",
+		send:  make(chan []byte, 256),
+		hub:   hub,
+		Data:  make(map[string]interface{}),
 		rooms: make(map[string]bool),
 	}
 
@@ -113,10 +113,10 @@ func TestHubConnectionUnregistration(t *testing.T) {
 	defer hub.Shutdown()
 
 	mockConn := &Connection{
-		ID:   "test-conn",
-		send: make(chan []byte, 256),
-		hub:  hub,
-		Data: make(map[string]interface{}),
+		ID:    "test-conn",
+		send:  make(chan []byte, 256),
+		hub:   hub,
+		Data:  make(map[string]interface{}),
 		rooms: make(map[string]bool),
 	}
 
@@ -153,17 +153,17 @@ func TestHubBroadcast(t *testing.T) {
 
 	// Create two mock connections
 	conn1 := &Connection{
-		ID:   "conn1",
-		send: make(chan []byte, 256),
-		hub:  hub,
-		Data: make(map[string]interface{}),
+		ID:    "conn1",
+		send:  make(chan []byte, 256),
+		hub:   hub,
+		Data:  make(map[string]interface{}),
 		rooms: make(map[string]bool),
 	}
 	conn2 := &Connection{
-		ID:   "conn2",
-		send: make(chan []byte, 256),
-		hub:  hub,
-		Data: make(map[string]interface{}),
+		ID:    "conn2",
+		send:  make(chan []byte, 256),
+		hub:   hub,
+		Data:  make(map[string]interface{}),
 		rooms: make(map[string]bool),
 	}
 
@@ -257,10 +257,10 @@ func TestHubGetConnection(t *testing.T) {
 	defer hub.Shutdown()
 
 	conn := &Connection{
-		ID:   "test-conn-123",
-		send: make(chan []byte, 256),
-		hub:  hub,
-		Data: make(map[string]interface{}),
+		ID:    "test-conn-123",
+		send:  make(chan []byte, 256),
+		hub:   hub,
+		Data:  make(map[string]interface{}),
 		rooms: make(map[string]bool),
 	}
 
@@ -291,10 +291,10 @@ func TestHubOnConnectHandler(t *testing.T) {
 	defer hub.Shutdown()
 
 	conn := &Connection{
-		ID:   "test-conn",
-		send: make(chan []byte, 256),
-		hub:  hub,
-		Data: make(map[string]interface{}),
+		ID:    "test-conn",
+		send:  make(chan []byte, 256),
+		hub:   hub,
+		Data:  make(map[string]interface{}),
 		rooms: make(map[string]bool),
 	}
 
@@ -321,10 +321,10 @@ func TestHubOnDisconnectHandler(t *testing.T) {
 	defer hub.Shutdown()
 
 	conn := &Connection{
-		ID:   "test-conn",
-		send: make(chan []byte, 256),
-		hub:  hub,
-		Data: make(map[string]interface{}),
+		ID:    "test-conn",
+		send:  make(chan []byte, 256),
+		hub:   hub,
+		Data:  make(map[string]interface{}),
 		rooms: make(map[string]bool),
 	}
 
@@ -357,10 +357,10 @@ func TestHubBroadcastJSON(t *testing.T) {
 	defer hub.Shutdown()
 
 	conn := &Connection{
-		ID:   "test-conn",
-		send: make(chan []byte, 256),
-		hub:  hub,
-		Data: make(map[string]interface{}),
+		ID:    "test-conn",
+		send:  make(chan []byte, 256),
+		hub:   hub,
+		Data:  make(map[string]interface{}),
 		rooms: make(map[string]bool),
 	}
 

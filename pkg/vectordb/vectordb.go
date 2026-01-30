@@ -78,7 +78,7 @@ type Provider interface {
 
 // Client is the main vector database client that wraps a provider
 type Client struct {
-	provider Provider
+	provider  Provider
 	dimension int
 }
 
