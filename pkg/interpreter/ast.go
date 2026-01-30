@@ -12,13 +12,41 @@ type Item interface {
 
 // TypeDef represents a type definition
 // Example: : Result<T, E> { ok: T?, error: E? }
+// With traits: : User impl Serializable { id: int, name: string, toJson() -> string { ... } }
 type TypeDef struct {
 	Name       string
 	TypeParams []TypeParameter // Generic type parameters (e.g., T, E)
 	Fields     []Field
+	Traits     []string    // Trait names this type implements
+	Methods    []MethodDef // Method implementations (for trait conformance)
 }
 
 func (TypeDef) isItem() {}
+
+// TraitMethodSignature represents a method signature in a trait definition
+type TraitMethodSignature struct {
+	Name       string
+	Params     []Field
+	ReturnType Type
+}
+
+// TraitDef represents a trait/interface definition
+// Example: trait Serializable { toJson() -> string }
+type TraitDef struct {
+	Name       string
+	TypeParams []TypeParameter
+	Methods    []TraitMethodSignature
+}
+
+func (TraitDef) isItem() {}
+
+// MethodDef represents a method implementation on a type
+type MethodDef struct {
+	Name       string
+	Params     []Field
+	ReturnType Type
+	Body       []Statement
+}
 
 // Route represents an HTTP route
 type Route struct {
@@ -914,6 +942,7 @@ type Node interface {
 // Make existing types implement Node
 func (TypeDef) isNode()              {}
 func (ContractDef) isNode()          {}
+func (TraitDef) isNode()             {}
 func (Route) isNode()                {}
 func (Function) isNode()             {}
 func (WebSocketRoute) isNode()       {}

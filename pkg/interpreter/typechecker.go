@@ -10,6 +10,7 @@ import (
 type TypeChecker struct {
 	typeDefs  map[string]TypeDef
 	functions map[string]Function
+	traitDefs map[string]TraitDef
 	// typeScope maps type parameter names to their resolved types during generic instantiation
 	typeScope map[string]Type
 }
@@ -19,6 +20,7 @@ func NewTypeChecker() *TypeChecker {
 	return &TypeChecker{
 		typeDefs:  make(map[string]TypeDef),
 		functions: make(map[string]Function),
+		traitDefs: make(map[string]TraitDef),
 		typeScope: make(map[string]Type),
 	}
 }
@@ -31,6 +33,11 @@ func (tc *TypeChecker) SetTypeDefs(typeDefs map[string]TypeDef) {
 // SetFunctions updates the functions map
 func (tc *TypeChecker) SetFunctions(functions map[string]Function) {
 	tc.functions = functions
+}
+
+// SetTraitDefs updates the trait definitions map
+func (tc *TypeChecker) SetTraitDefs(traitDefs map[string]TraitDef) {
+	tc.traitDefs = traitDefs
 }
 
 // CoerceNumeric converts int64 to float64 when needed for numeric operations
@@ -489,11 +496,10 @@ func (tc *TypeChecker) InstantiateGenericFunction(fn Function, typeArgs []Type) 
 	}, typeArgMap, nil
 }
 
-// TypeSatisfiesConstraint checks if a type satisfies a constraint (trait bound)
+// TypeSatisfiesConstraint checks if a type satisfies a constraint (trait bound).
+// Supports built-in constraints (Comparable, Numeric, Any, Hashable, Serializable)
+// and user-defined traits by checking whether the type declares the trait in its impl list.
 func (tc *TypeChecker) TypeSatisfiesConstraint(t Type, constraint Type) bool {
-	// For now, we implement basic constraint checking
-	// In a full implementation, this would check if the type implements the required trait/interface
-
 	if constraint == nil {
 		return true // No constraint means any type is valid
 	}
@@ -515,11 +521,51 @@ func (tc *TypeChecker) TypeSatisfiesConstraint(t Type, constraint Type) bool {
 			}
 		case "Any":
 			return true
+		case "Hashable":
+			// Primitives are hashable
+			switch t.(type) {
+			case IntType, StringType, BoolType:
+				return true
+			}
+		}
+
+		// Check user-defined trait: if the constraint is a known trait, check if
+		// the type declares an impl for it via its TypeDef.Traits field
+		if _, isTrait := tc.traitDefs[namedConstraint.Name]; isTrait {
+			return tc.typeImplsTrait(t, namedConstraint.Name)
 		}
 	}
 
 	// Default: types are compatible if they match
 	return tc.TypesCompatible(t, constraint)
+}
+
+// typeImplsTrait checks whether a named type implements a given trait
+// by looking up its TypeDef and checking the Traits field.
+func (tc *TypeChecker) typeImplsTrait(t Type, traitName string) bool {
+	var typeName string
+	switch tt := t.(type) {
+	case NamedType:
+		typeName = tt.Name
+	case GenericType:
+		if named, ok := tt.BaseType.(NamedType); ok {
+			typeName = named.Name
+		}
+	default:
+		return false
+	}
+
+	td, ok := tc.typeDefs[typeName]
+	if !ok {
+		return false
+	}
+
+	for _, implTrait := range td.Traits {
+		if implTrait == traitName {
+			return true
+		}
+	}
+	return false
 }
 
 // InferTypeArguments infers type arguments from function call arguments
