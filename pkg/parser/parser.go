@@ -484,6 +484,18 @@ func (p *Parser) parseFieldWithContext(typeParamNames []string) (interpreter.Fie
 		return interpreter.Field{}, err
 	}
 
+	// Parse validation annotations: @minLen(2) @email @pattern("[A-Z]")
+	// Annotations are optional and follow the type declaration.
+	// The Annotations field on interpreter.Field is defined in ast.go.
+	var annotations []interpreter.FieldAnnotation
+	for p.check(AT) {
+		ann, parseErr := p.parseFieldAnnotation()
+		if parseErr != nil {
+			return interpreter.Field{}, parseErr
+		}
+		annotations = append(annotations, ann)
+	}
+
 	// Check for default value: = expr
 	var defaultValue interpreter.Expr
 	if p.check(EQUALS) {
@@ -505,7 +517,77 @@ func (p *Parser) parseFieldWithContext(typeParamNames []string) (interpreter.Fie
 		TypeAnnotation: typeAnnotation,
 		Required:       required,
 		Default:        defaultValue,
+		Annotations:    annotations,
 	}, nil
+}
+
+// parseFieldAnnotation parses a single validation annotation like @minLen(2)
+// or @email. Returns an error if the annotation has invalid syntax.
+func (p *Parser) parseFieldAnnotation() (interpreter.FieldAnnotation, error) {
+	p.advance() // consume @
+
+	name, err := p.expectIdent()
+	if err != nil {
+		return interpreter.FieldAnnotation{}, err
+	}
+
+	ann := interpreter.FieldAnnotation{Name: name}
+
+	// Parse optional parameters: @minLen(2), @range(0, 150), @oneOf(["a", "b"])
+	if p.check(LPAREN) {
+		p.advance() // consume (
+		for !p.check(RPAREN) && !p.isAtEnd() {
+			tok := p.current()
+			switch tok.Type {
+			case INTEGER:
+				val, parseErr := strconv.ParseInt(tok.Literal, 10, 64)
+				if parseErr != nil {
+					return interpreter.FieldAnnotation{}, fmt.Errorf("line %d: invalid integer in annotation @%s: %s", tok.Line, name, tok.Literal)
+				}
+				ann.Params = append(ann.Params, val)
+				p.advance()
+			case FLOAT:
+				val, parseErr := strconv.ParseFloat(tok.Literal, 64)
+				if parseErr != nil {
+					return interpreter.FieldAnnotation{}, fmt.Errorf("line %d: invalid float in annotation @%s: %s", tok.Line, name, tok.Literal)
+				}
+				ann.Params = append(ann.Params, val)
+				p.advance()
+			case STRING:
+				ann.Params = append(ann.Params, tok.Literal)
+				p.advance()
+			case LBRACKET:
+				// Parse string array: ["a", "b", "c"]
+				p.advance() // consume [
+				var items []string
+				for !p.check(RBRACKET) && !p.isAtEnd() {
+					if p.check(COMMA) {
+						p.advance()
+						continue
+					}
+					if p.current().Type == STRING {
+						items = append(items, p.current().Literal)
+						p.advance()
+					} else {
+						return interpreter.FieldAnnotation{}, fmt.Errorf("line %d: expected string in annotation array, got %s", p.current().Line, p.current().Type.String())
+					}
+				}
+				if p.check(RBRACKET) {
+					p.advance() // consume ]
+				}
+				ann.Params = append(ann.Params, items)
+			case COMMA:
+				p.advance() // skip comma between parameters
+			default:
+				return interpreter.FieldAnnotation{}, fmt.Errorf("line %d: unexpected token in annotation @%s: %s", tok.Line, name, tok.Literal)
+			}
+		}
+		if err := p.expect(RPAREN); err != nil {
+			return interpreter.FieldAnnotation{}, err
+		}
+	}
+
+	return ann, nil
 }
 
 // validateDefaultType validates that a literal default value matches the declared type
@@ -1089,6 +1171,12 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 		return p.parseEventHandler()
 	case "queue", "worker":
 		return p.parseQueueWorker()
+	case "query":
+		return p.parseGraphQLResolver(interpreter.GraphQLQuery)
+	case "mutation":
+		return p.parseGraphQLResolver(interpreter.GraphQLMutation)
+	case "subscription":
+		return p.parseGraphQLResolver(interpreter.GraphQLSubscription)
 	}
 
 	// Check for HTTP method shorthand: @ GET /path
@@ -1118,7 +1206,7 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 		hasMethodKeyword = false
 	default:
 		return nil, p.routeError(
-			fmt.Sprintf("Expected 'route', 'ws', 'websocket', 'sse', or HTTP method after '@', but found '%s'", routeKw),
+			fmt.Sprintf("Expected 'route', 'ws', 'websocket', 'sse', 'query', 'mutation', 'subscription', or HTTP method after '@', but found '%s'", routeKw),
 			p.tokens[p.position-1],
 		)
 	}
@@ -3555,6 +3643,148 @@ func (p *Parser) parseQueueWorker() (interpreter.Item, error) {
 		Timeout:     timeout,
 		Injections:  injections,
 		Body:        body,
+	}, nil
+}
+
+// parseGraphQLResolver parses a GraphQL resolver definition.
+// Syntax: @ query fieldName(param: Type) -> ReturnType { body }
+//         @ mutation fieldName(param: Type) -> ReturnType { body }
+//         @ subscription fieldName -> ReturnType { body }
+func (p *Parser) parseGraphQLResolver(opType interpreter.GraphQLOperationType) (interpreter.Item, error) {
+	// Parse field name (required)
+	fieldName, err := p.expectIdent()
+	if err != nil {
+		return nil, p.errorWithHint(
+			"Expected field name for GraphQL resolver",
+			p.current(),
+			fmt.Sprintf("Example: @ %s user(id: int) -> User { ... }", opType),
+		)
+	}
+
+	// Parse optional parameters: (param: Type, param2: Type)
+	var params []interpreter.Field
+	if p.check(LPAREN) {
+		p.advance() // consume '('
+		for !p.check(RPAREN) && !p.isAtEnd() {
+			paramName, err := p.expectIdent()
+			if err != nil {
+				return nil, err
+			}
+			if err := p.expect(COLON); err != nil {
+				return nil, err
+			}
+			paramType, required, err := p.parseType()
+			if err != nil {
+				return nil, err
+			}
+			params = append(params, interpreter.Field{
+				Name:           paramName,
+				TypeAnnotation: paramType,
+				Required:       required,
+			})
+			if !p.check(RPAREN) {
+				if err := p.expect(COMMA); err != nil {
+					return nil, err
+				}
+			}
+		}
+		if err := p.expect(RPAREN); err != nil {
+			return nil, err
+		}
+	}
+
+	// Parse optional return type: -> Type
+	var returnType interpreter.Type
+	if p.check(ARROW) {
+		p.advance()
+		returnType, _, err = p.parseType()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	p.skipNewlines()
+
+	// Parse body block with optional auth and injections
+	var auth *interpreter.AuthConfig
+	var injections []interpreter.Injection
+	var body []interpreter.Statement
+
+	if !p.check(LBRACE) {
+		return nil, p.errorWithHint(
+			"Expected '{' to start resolver body",
+			p.current(),
+			fmt.Sprintf("Example: @ %s %s { ... }", opType, fieldName),
+		)
+	}
+	p.advance() // consume '{'
+	p.skipNewlines()
+
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		switch p.current().Type {
+		case PLUS:
+			// Middleware: + auth(jwt)
+			p.advance()
+			middlewareName, err := p.expectIdent()
+			if err != nil {
+				return nil, err
+			}
+			if middlewareName == "auth" {
+				auth, err = p.parseAuthConfig()
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				if p.check(LPAREN) {
+					p.advance()
+					for !p.check(RPAREN) && !p.isAtEnd() {
+						p.advance()
+					}
+					p.expect(RPAREN)
+				}
+			}
+
+		case PERCENT:
+			// Dependency injection: % db: Database
+			p.advance()
+			injName, err := p.expectIdent()
+			if err != nil {
+				return nil, err
+			}
+			if err := p.expect(COLON); err != nil {
+				return nil, err
+			}
+			injType, _, err := p.parseType()
+			if err != nil {
+				return nil, err
+			}
+			injections = append(injections, interpreter.Injection{
+				Name: injName,
+				Type: injType,
+			})
+
+		default:
+			stmt, err := p.parseStatement()
+			if err != nil {
+				return nil, err
+			}
+			body = append(body, stmt)
+		}
+		p.skipNewlines()
+	}
+
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
+	}
+
+	return &interpreter.GraphQLResolver{
+		Operation:  opType,
+		FieldName:  fieldName,
+		Params:     params,
+		ReturnType: returnType,
+		Auth:       auth,
+		Injections: injections,
+		Body:       body,
 	}, nil
 }
 
