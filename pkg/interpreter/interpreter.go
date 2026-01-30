@@ -2,6 +2,8 @@ package interpreter
 
 import (
 	"fmt"
+	"strings"
+	"time"
 )
 
 // Interpreter is the main interpreter struct
@@ -13,10 +15,12 @@ type Interpreter struct {
 	cronTasks       []CronTask
 	eventHandlers   map[string][]EventHandler
 	queueWorkers    map[string]QueueWorker
+	testBlocks      []TestBlock
 	typeChecker     *TypeChecker
 	dbHandler       interface{}              // Database handler for dependency injection
 	redisHandler    interface{}              // Redis handler for dependency injection
 	mongoDBHandler  interface{}              // MongoDB handler for dependency injection
+	llmHandler      interface{}              // LLM handler for AI integration
 	moduleResolver  *ModuleResolver          // Module resolver for handling imports
 	importedModules map[string]*LoadedModule // Imported modules by alias/name
 	constants       map[string]struct{}      // Tracks names that are constants (immutable)
@@ -32,6 +36,7 @@ func NewInterpreter() *Interpreter {
 		typeDefs:        make(map[string]TypeDef),
 		commands:        make(map[string]Command),
 		cronTasks:       []CronTask{},
+		testBlocks:      []TestBlock{},
 		eventHandlers:   make(map[string][]EventHandler),
 		queueWorkers:    make(map[string]QueueWorker),
 		typeChecker:     typeChecker,
@@ -66,7 +71,7 @@ type Request struct {
 	Body      interface{}
 	Headers   map[string]string
 	AuthData  map[string]interface{} // Authenticated user data from JWT
-	SSEWriter interface{}             // SSEWriter for SSE routes (implements executor.SSEWriter)
+	SSEWriter interface{}            // SSEWriter for SSE routes (implements executor.SSEWriter)
 }
 
 // Response represents an HTTP response
@@ -125,6 +130,11 @@ func (i *Interpreter) LoadModuleWithPath(module Module, basePath string) error {
 
 		case *QueueWorker:
 			i.queueWorkers[it.QueueName] = *it
+
+		case *TestBlock:
+			// Store test blocks for later execution by the test runner.
+			// testBlocks is initialized as []TestBlock{} in NewInterpreter (line 35).
+			i.testBlocks = append(i.testBlocks, *it)
 
 		case *ConstDecl:
 			// Evaluate and store constant at module load time
@@ -256,8 +266,13 @@ func (i *Interpreter) SetMongoDBHandler(handler interface{}) {
 	i.mongoDBHandler = handler
 }
 
+// SetLLMHandler sets the LLM handler for AI integration dependency injection
+func (i *Interpreter) SetLLMHandler(handler interface{}) {
+	i.llmHandler = handler
+}
+
 // injectDependency handles a single dependency injection into the given environment.
-// It checks for DatabaseType/NamedType{"Database"}, RedisType/NamedType{"Redis"}, and MongoDBType/NamedType{"MongoDB"}.
+// It checks for DatabaseType/NamedType{"Database"}, RedisType/NamedType{"Redis"}, MongoDBType/NamedType{"MongoDB"}, and LLMType/NamedType{"LLM"}.
 func (i *Interpreter) injectDependency(injection Injection, env *Environment) {
 	// Check for DatabaseType or NamedType{Name: "Database"}
 	isDB := false
@@ -292,6 +307,18 @@ func (i *Interpreter) injectDependency(injection Injection, env *Environment) {
 	}
 	if isMongo && i.mongoDBHandler != nil {
 		env.Define(injection.Name, i.mongoDBHandler)
+		return
+	}
+
+	// Check for LLMType or NamedType{Name: "LLM"}
+	isLLM := false
+	if _, ok := injection.Type.(LLMType); ok {
+		isLLM = true
+	} else if named, ok := injection.Type.(NamedType); ok && named.Name == "LLM" {
+		isLLM = true
+	}
+	if isLLM && i.llmHandler != nil {
+		env.Define(injection.Name, i.llmHandler)
 		return
 	}
 }
@@ -734,4 +761,69 @@ func (i *Interpreter) ExecuteQueueWorker(worker *QueueWorker, message interface{
 	}
 
 	return result, nil
+}
+
+// TestResult represents the result of executing a single test block
+type TestResult struct {
+	Name     string
+	Passed   bool
+	Error    string
+	Duration time.Duration
+}
+
+// GetTestBlocks returns all registered test blocks (returns a copy for safety)
+func (i *Interpreter) GetTestBlocks() []TestBlock {
+	result := make([]TestBlock, len(i.testBlocks))
+	copy(result, i.testBlocks)
+	return result
+}
+
+// RunTests executes all test blocks and returns results.
+// If filter is non-empty, only tests whose names match are executed.
+func (i *Interpreter) RunTests(filter string) []TestResult {
+	var results []TestResult
+	for _, test := range i.testBlocks {
+		if filter != "" && !matchesFilter(test.Name, filter) {
+			continue
+		}
+		result := i.runSingleTest(test)
+		results = append(results, result)
+	}
+	return results
+}
+
+// runSingleTest executes a single test block in an isolated child environment
+func (i *Interpreter) runSingleTest(test TestBlock) TestResult {
+	start := time.Now()
+	testEnv := NewChildEnvironment(i.globalEnv)
+
+	_, err := i.executeStatements(test.Body, testEnv)
+	duration := time.Since(start)
+
+	if err != nil {
+		if _, ok := err.(*returnValue); ok {
+			return TestResult{Name: test.Name, Passed: true, Duration: duration}
+		}
+		return TestResult{Name: test.Name, Passed: false, Error: err.Error(), Duration: duration}
+	}
+
+	return TestResult{Name: test.Name, Passed: true, Duration: duration}
+}
+
+// matchesFilter checks if a test name matches a filter string.
+// Supports * as a wildcard at the start or end of the filter, otherwise uses substring matching.
+func matchesFilter(name, filter string) bool {
+	if filter == "" {
+		return true
+	}
+	if strings.HasPrefix(filter, "*") && strings.HasSuffix(filter, "*") {
+		return strings.Contains(name, filter[1:len(filter)-1])
+	}
+	if strings.HasPrefix(filter, "*") {
+		return strings.HasSuffix(name, filter[1:])
+	}
+	if strings.HasSuffix(filter, "*") {
+		return strings.HasPrefix(name, filter[:len(filter)-1])
+	}
+	return strings.Contains(name, filter)
 }
