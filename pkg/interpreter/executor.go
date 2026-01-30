@@ -11,6 +11,21 @@ func (r *returnValue) Error() string {
 	return "return"
 }
 
+// AssertionError represents a failed test assertion
+type AssertionError struct {
+	Message string
+}
+
+func (a *AssertionError) Error() string {
+	return a.Message
+}
+
+// IsAssertionError checks if an error is an assertion error
+func IsAssertionError(err error) bool {
+	_, ok := err.(*AssertionError)
+	return ok
+}
+
 // ValidationError is a special error type for validation failures
 // This error indicates a 400 Bad Request should be returned
 type ValidationError struct {
@@ -59,6 +74,9 @@ func (i *Interpreter) ExecuteStatement(stmt Statement, env *Environment) (interf
 
 	case YieldStatement:
 		return i.executeYield(s, env)
+
+	case AssertStatement:
+		return i.executeAssert(s, env)
 
 	default:
 		return nil, fmt.Errorf("unsupported statement type: %T", stmt)
@@ -442,4 +460,36 @@ func (i *Interpreter) executeYield(stmt YieldStatement, env *Environment) (inter
 	}
 
 	return nil, nil
+}
+
+// executeAssert executes an assertion statement
+func (i *Interpreter) executeAssert(stmt AssertStatement, env *Environment) (interface{}, error) {
+	result, err := i.EvaluateExpression(stmt.Condition, env)
+	if err != nil {
+		return nil, &AssertionError{
+			Message: fmt.Sprintf("assertion error: %v", err),
+		}
+	}
+
+	boolResult, ok := result.(bool)
+	if !ok {
+		return nil, &AssertionError{
+			Message: fmt.Sprintf("assertion condition must evaluate to boolean, got %T", result),
+		}
+	}
+
+	if !boolResult {
+		message := "assertion failed"
+		if stmt.Message != nil {
+			msg, err := i.EvaluateExpression(stmt.Message, env)
+			if err == nil {
+				if msgStr, ok := msg.(string); ok {
+					message = msgStr
+				}
+			}
+		}
+		return nil, &AssertionError{Message: message}
+	}
+
+	return true, nil
 }
