@@ -294,9 +294,9 @@ func TestIntegration_ExampleFiles(t *testing.T) {
 // Test error handling throughout the pipeline
 func TestIntegration_ErrorHandling(t *testing.T) {
 	tests := []struct {
-		name          string
-		source        string
-		expectLexErr  bool
+		name           string
+		source         string
+		expectLexErr   bool
 		expectParseErr bool
 	}{
 		{

@@ -11,12 +11,12 @@ import (
 
 // TypeSpecialization represents specialized code for specific type combinations
 type TypeSpecialization struct {
-	Name          string
-	Types         map[string]string // variable -> type
-	Bytecode      []byte
-	HitCount      int64
-	MissCount     int64
-	IsValid       bool
+	Name      string
+	Types     map[string]string // variable -> type
+	Bytecode  []byte
+	HitCount  int64
+	MissCount int64
+	IsValid   bool
 }
 
 // SpecializationCache caches type-specialized code
@@ -209,11 +209,11 @@ func (tsc *TypeSpecializedCompiler) CompileWithTypeInfo(route *interpreter.Route
 
 // InlineCandidate represents a function that could be inlined
 type InlineCandidate struct {
-	Name       string
-	CallCount  int64
+	Name        string
+	CallCount   int64
 	CallerCount int
-	BodySize   int
-	Score      float64 // Higher = better candidate for inlining
+	BodySize    int
+	Score       float64 // Higher = better candidate for inlining
 }
 
 // InliningDecision contains the decision about whether to inline a function
@@ -225,19 +225,19 @@ type InliningDecision struct {
 
 // InliningOracle decides whether functions should be inlined
 type InliningOracle struct {
-	profiler          *Profiler
-	maxInlineSize     int
-	minCallCount      int64
-	inlineThreshold   float64
+	profiler        *Profiler
+	maxInlineSize   int
+	minCallCount    int64
+	inlineThreshold float64
 }
 
 // NewInliningOracle creates a new inlining oracle
 func NewInliningOracle(profiler *Profiler) *InliningOracle {
 	return &InliningOracle{
 		profiler:        profiler,
-		maxInlineSize:   20,    // Max statements to inline
-		minCallCount:    10,    // Min calls before considering inlining
-		inlineThreshold: 0.5,   // Score threshold for inlining
+		maxInlineSize:   20,  // Max statements to inline
+		minCallCount:    10,  // Min calls before considering inlining
+		inlineThreshold: 0.5, // Score threshold for inlining
 	}
 }
 
@@ -318,9 +318,9 @@ func (io *InliningOracle) GetInlineCandidates() []InlineCandidate {
 
 // AdaptiveRecompilationTrigger determines when to trigger recompilation
 type AdaptiveRecompilationTrigger struct {
-	profiler           *Profiler
-	executionThreshold int64
-	timeThreshold      float64 // Average time increase threshold (ratio)
+	profiler            *Profiler
+	executionThreshold  int64
+	timeThreshold       float64 // Average time increase threshold (ratio)
 	typeChangeThreshold int
 }
 
@@ -328,9 +328,9 @@ type AdaptiveRecompilationTrigger struct {
 func NewAdaptiveRecompilationTrigger(profiler *Profiler) *AdaptiveRecompilationTrigger {
 	return &AdaptiveRecompilationTrigger{
 		profiler:            profiler,
-		executionThreshold:  50,   // Recompile after this many executions
-		timeThreshold:       1.5,  // Recompile if time increases by 50%
-		typeChangeThreshold: 5,    // Recompile after this many type changes
+		executionThreshold:  50,  // Recompile after this many executions
+		timeThreshold:       1.5, // Recompile if time increases by 50%
+		typeChangeThreshold: 5,   // Recompile after this many type changes
 	}
 }
 
@@ -390,8 +390,8 @@ type DeoptimizationRecord struct {
 
 // DeoptimizationTracker tracks deoptimization events
 type DeoptimizationTracker struct {
-	records []DeoptimizationRecord
-	mutex   sync.RWMutex
+	records    []DeoptimizationRecord
+	mutex      sync.RWMutex
 	maxRecords int
 }
 

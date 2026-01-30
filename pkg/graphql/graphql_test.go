@@ -629,3 +629,334 @@ func TestApplySelectionsScalar(t *testing.T) {
 	result := executor.applySelections("hello", nil)
 	assert.Equal(t, "hello", result)
 }
+
+// TestSkipBalanced verifies parsing of queries with variable definitions
+func TestSkipBalanced(t *testing.T) {
+	q, err := ParseQuery(`query GetUser($id: Int!) { user }`)
+	require.NoError(t, err)
+	assert.Equal(t, "query", q.OperationType)
+	assert.Equal(t, "GetUser", q.Name)
+	require.Len(t, q.Selections, 1)
+	assert.Equal(t, "user", q.Selections[0].Name)
+}
+
+// TestSkipBalancedNested verifies parsing of queries with nested variable definitions
+func TestSkipBalancedNested(t *testing.T) {
+	q, err := ParseQuery(`query Search($filter: Filter(inner: String)) { results }`)
+	require.NoError(t, err)
+	assert.Equal(t, "query", q.OperationType)
+	assert.Equal(t, "Search", q.Name)
+	require.Len(t, q.Selections, 1)
+	assert.Equal(t, "results", q.Selections[0].Name)
+}
+
+// TestSkipBalancedUnbalanced verifies error on unbalanced parentheses
+func TestSkipBalancedUnbalanced(t *testing.T) {
+	_, err := ParseQuery(`query Broken($id: Int { user }`)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unbalanced")
+}
+
+// TestReadStringEscapeSequences verifies parsing of escape sequences in strings
+func TestReadStringEscapeSequences(t *testing.T) {
+	// Escaped double quote
+	q, err := ParseQuery(`{ user(name: "hello \"world\"") }`)
+	require.NoError(t, err)
+	assert.Equal(t, `hello "world"`, q.Selections[0].Args["name"])
+
+	// Escaped backslash
+	q, err = ParseQuery(`{ user(path: "C:\\Users\\admin") }`)
+	require.NoError(t, err)
+	assert.Equal(t, `C:\Users\admin`, q.Selections[0].Args["path"])
+
+	// Escaped newline
+	q, err = ParseQuery(`{ user(bio: "line1\nline2") }`)
+	require.NoError(t, err)
+	assert.Equal(t, "line1\nline2", q.Selections[0].Args["bio"])
+
+	// Escaped tab
+	q, err = ParseQuery(`{ user(data: "col1\tcol2") }`)
+	require.NoError(t, err)
+	assert.Equal(t, "col1\tcol2", q.Selections[0].Args["data"])
+
+	// Other escape (unknown, passes through the character after backslash literally)
+	q, err = ParseQuery(`{ user(data: "hello\rworld") }`)
+	require.NoError(t, err)
+	assert.Equal(t, "hellorworld", q.Selections[0].Args["data"])
+}
+
+// TestReadStringUnterminated verifies error on unterminated string
+func TestReadStringUnterminated(t *testing.T) {
+	_, err := ParseQuery(`{ user(name: "unterminated) }`)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unterminated string")
+}
+
+// TestParseValueFalse verifies parsing false boolean argument
+func TestParseValueFalse(t *testing.T) {
+	q, err := ParseQuery(`{ users(active: false) }`)
+	require.NoError(t, err)
+	require.Len(t, q.Selections, 1)
+	assert.Equal(t, false, q.Selections[0].Args["active"])
+}
+
+// TestParseValueEnumArgument verifies parsing an enum argument (unquoted identifier)
+func TestParseValueEnumArgument(t *testing.T) {
+	q, err := ParseQuery(`{ users(status: ACTIVE) }`)
+	require.NoError(t, err)
+	require.Len(t, q.Selections, 1)
+	assert.Equal(t, "ACTIVE", q.Selections[0].Args["status"])
+}
+
+// TestParseValueUnexpectedCharacter verifies error on unexpected character in value
+func TestParseValueUnexpectedCharacter(t *testing.T) {
+	_, err := ParseQuery(`{ user(id: @bad) }`)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unexpected character")
+}
+
+// TestParseValueEndOfInput verifies error on unexpected end of input in value
+func TestParseValueEndOfInput(t *testing.T) {
+	_, err := ParseQuery(`{ user(id: `)
+	assert.Error(t, err)
+}
+
+// TestParseValueNegativeNumber verifies parsing negative integer argument
+func TestParseValueNegativeNumber(t *testing.T) {
+	q, err := ParseQuery(`{ items(offset: -5) }`)
+	require.NoError(t, err)
+	require.Len(t, q.Selections, 1)
+	assert.Equal(t, int64(-5), q.Selections[0].Args["offset"])
+}
+
+// TestParseArgumentsMissingColon verifies error when colon is missing after argument name
+func TestParseArgumentsMissingColon(t *testing.T) {
+	_, err := ParseQuery(`{ user(id 42) }`)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "expected ':'")
+}
+
+// TestParseArgumentsUnterminatedArgs verifies error on unterminated arguments
+func TestParseArgumentsUnterminatedArgs(t *testing.T) {
+	_, err := ParseQuery(`{ user(id: 42 `)
+	assert.Error(t, err)
+}
+
+// TestParseArgumentsEmptyArgName verifies error when argument name is empty
+func TestParseArgumentsEmptyArgName(t *testing.T) {
+	_, err := ParseQuery(`{ user(: 42) }`)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "expected argument name")
+}
+
+// TestTypeToGraphQLUnionType verifies GraphQL type for union types
+func TestTypeToGraphQLUnionType(t *testing.T) {
+	// Union with types - uses first type
+	unionType := interpreter.UnionType{
+		Types: []interpreter.Type{interpreter.StringType{}, interpreter.IntType{}},
+	}
+	assert.Equal(t, "String", typeToGraphQL(unionType))
+
+	// Empty union - defaults to String
+	emptyUnion := interpreter.UnionType{Types: []interpreter.Type{}}
+	assert.Equal(t, "String", typeToGraphQL(emptyUnion))
+}
+
+// TestConvertFieldArrayType verifies convertField sets IsList for array types
+func TestConvertFieldArrayType(t *testing.T) {
+	field := interpreter.Field{
+		Name:           "tags",
+		TypeAnnotation: interpreter.ArrayType{ElementType: interpreter.StringType{}},
+		Required:       true,
+	}
+	fd := convertField(field)
+	assert.Equal(t, "tags", fd.Name)
+	assert.Equal(t, "[String]", fd.Type)
+	assert.True(t, fd.IsList, "IsList should be true for array types")
+	assert.False(t, fd.IsNullable, "IsNullable should be false when Required is true")
+}
+
+// TestConvertFieldNonArrayType verifies convertField for non-array types
+func TestConvertFieldNonArrayType(t *testing.T) {
+	field := interpreter.Field{
+		Name:           "name",
+		TypeAnnotation: interpreter.StringType{},
+		Required:       false,
+	}
+	fd := convertField(field)
+	assert.Equal(t, "name", fd.Name)
+	assert.Equal(t, "String", fd.Type)
+	assert.False(t, fd.IsList, "IsList should be false for non-array types")
+	assert.True(t, fd.IsNullable, "IsNullable should be true when Required is false")
+}
+
+// TestIntrospectWithFieldArgs verifies Introspect returns argument info for fields
+func TestIntrospectWithFieldArgs(t *testing.T) {
+	typeDefs := map[string]interpreter.TypeDef{
+		"User": {
+			Name: "User",
+			Fields: []interpreter.Field{
+				{Name: "id", TypeAnnotation: interpreter.IntType{}},
+				{Name: "name", TypeAnnotation: interpreter.StringType{}},
+			},
+		},
+	}
+	resolvers := map[string]interpreter.GraphQLResolver{
+		"query.user": {
+			Operation:  interpreter.GraphQLQuery,
+			FieldName:  "user",
+			Params:     []interpreter.Field{{Name: "id", TypeAnnotation: interpreter.IntType{}, Required: true}},
+			ReturnType: interpreter.NamedType{Name: "User"},
+		},
+		"mutation.updateUser": {
+			Operation:  interpreter.GraphQLMutation,
+			FieldName:  "updateUser",
+			Params:     []interpreter.Field{{Name: "id", TypeAnnotation: interpreter.IntType{}, Required: true}, {Name: "name", TypeAnnotation: interpreter.StringType{}, Required: false}},
+			ReturnType: interpreter.NamedType{Name: "User"},
+		},
+	}
+
+	schema := BuildSchema(typeDefs, resolvers)
+	require.NotNil(t, schema)
+	interp := interpreter.NewInterpreter()
+	executor := NewExecutor(schema, interp)
+
+	result := executor.Introspect()
+
+	// Verify queryType and mutationType are set
+	assert.Equal(t, "Query", result["queryType"])
+	assert.Equal(t, "Mutation", result["mutationType"])
+
+	// Verify types are returned
+	types, ok := result["types"].([]interface{})
+	require.True(t, ok, "types should be a slice")
+
+	// Find the Query type and verify it has fields with args
+	foundQueryWithArgs := false
+	for _, typeInfo := range types {
+		typeMap, ok := typeInfo.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if typeMap["name"] == "Query" {
+			fields, ok := typeMap["fields"].([]interface{})
+			if !ok {
+				continue
+			}
+			for _, f := range fields {
+				fieldMap, ok := f.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				if fieldMap["name"] == "user" {
+					args, hasArgs := fieldMap["args"]
+					if hasArgs {
+						foundQueryWithArgs = true
+						argSlice, ok := args.([]interface{})
+						require.True(t, ok, "args should be a slice")
+						require.Len(t, argSlice, 1)
+						argMap, ok := argSlice[0].(map[string]interface{})
+						require.True(t, ok, "arg should be a map")
+						assert.Equal(t, "id", argMap["name"])
+						assert.Equal(t, "Int", argMap["type"])
+						assert.Equal(t, true, argMap["required"])
+					}
+				}
+			}
+		}
+	}
+	assert.True(t, foundQueryWithArgs, "should find Query type with field args")
+}
+
+// TestIntrospectNoMutation verifies Introspect omits mutationType when not set
+func TestIntrospectNoMutation(t *testing.T) {
+	typeDefs := map[string]interpreter.TypeDef{}
+	resolvers := map[string]interpreter.GraphQLResolver{
+		"query.hello": {
+			Operation:  interpreter.GraphQLQuery,
+			FieldName:  "hello",
+			ReturnType: interpreter.StringType{},
+		},
+	}
+
+	schema := BuildSchema(typeDefs, resolvers)
+	require.NotNil(t, schema)
+	interp := interpreter.NewInterpreter()
+	executor := NewExecutor(schema, interp)
+
+	result := executor.Introspect()
+	assert.Equal(t, "Query", result["queryType"])
+	_, hasMutation := result["mutationType"]
+	assert.False(t, hasMutation, "mutationType should not be present when no mutation resolvers exist")
+}
+
+// TestExecutorParseError verifies executor returns error on invalid query syntax
+func TestExecutorParseError(t *testing.T) {
+	interp := interpreter.NewInterpreter()
+	schema := &Schema{
+		Types:     make(map[string]*ObjectType),
+		Resolvers: make(map[string]interpreter.GraphQLResolver),
+		Query:     &ObjectType{Name: "Query", Fields: map[string]*FieldDef{}},
+	}
+	executor := NewExecutor(schema, interp)
+
+	resp := executor.Execute(GraphQLRequest{
+		Query: `not a valid query`,
+	}, nil)
+
+	require.NotEmpty(t, resp.Errors)
+	assert.Contains(t, resp.Errors[0].Message, "parse error")
+}
+
+// TestExecutorVariablesMerge verifies that request variables are merged into the query
+func TestExecutorVariablesMerge(t *testing.T) {
+	interp := interpreter.NewInterpreter()
+
+	module := interpreter.Module{
+		Items: []interpreter.Item{
+			&interpreter.GraphQLResolver{
+				Operation:  interpreter.GraphQLQuery,
+				FieldName:  "hello",
+				ReturnType: interpreter.StringType{},
+				Body: []interpreter.Statement{
+					interpreter.ReturnStatement{
+						Value: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "world"}},
+					},
+				},
+			},
+		},
+	}
+	err := interp.LoadModule(module)
+	require.NoError(t, err)
+
+	resolvers := interp.GetGraphQLResolvers()
+	schema := BuildSchema(interp.GetTypeDefs(), resolvers)
+	require.NotNil(t, schema)
+	executor := NewExecutor(schema, interp)
+
+	resp := executor.Execute(GraphQLRequest{
+		Query:     `{ hello }`,
+		Variables: map[string]interface{}{"key": "value"},
+	}, nil)
+
+	require.Empty(t, resp.Errors)
+}
+
+// TestExecutorNoMutationType verifies error when mutation type is not defined
+func TestExecutorNoMutationType(t *testing.T) {
+	interp := interpreter.NewInterpreter()
+	schema := &Schema{
+		Types:     make(map[string]*ObjectType),
+		Resolvers: make(map[string]interpreter.GraphQLResolver),
+		// Query is set but Mutation is nil
+		Query: &ObjectType{Name: "Query", Fields: map[string]*FieldDef{}},
+	}
+	executor := NewExecutor(schema, interp)
+
+	resp := executor.Execute(GraphQLRequest{
+		Query: `mutation { createUser }`,
+	}, nil)
+
+	require.NotEmpty(t, resp.Errors)
+	assert.Contains(t, resp.Errors[0].Message, "no mutation type defined")
+}

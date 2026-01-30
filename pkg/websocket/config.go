@@ -16,16 +16,16 @@ type Config struct {
 	MaxMissedPongs    int
 
 	// Reconnection settings
-	EnableReconnection   bool
-	ReconnectionTimeout  time.Duration
-	MaxReconnectionTime  time.Duration
-	PreserveClientState  bool
+	EnableReconnection  bool
+	ReconnectionTimeout time.Duration
+	MaxReconnectionTime time.Duration
+	PreserveClientState bool
 
 	// Message queueing
-	MessageQueueSize      int
-	MessageQueueStrategy  QueueStrategy
-	MaxMessageSize        int64
-	WriteWait             time.Duration
+	MessageQueueSize     int
+	MessageQueueStrategy QueueStrategy
+	MaxMessageSize       int64
+	WriteWait            time.Duration
 
 	// Read settings
 	ReadWait time.Duration

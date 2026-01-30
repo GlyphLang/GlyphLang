@@ -46,8 +46,8 @@ type HealthChecker interface {
 
 // HealthCheckFunc is a function type that implements HealthChecker
 type HealthCheckFunc struct {
-	name     string
-	checkFn  func(ctx context.Context) *CheckResult
+	name    string
+	checkFn func(ctx context.Context) *CheckResult
 }
 
 // Check implements HealthChecker
@@ -281,8 +281,8 @@ func (s *Server) RegisterHealthRoutes(hm *HealthManager) error {
 
 // DatabaseHealthChecker checks database connectivity
 type DatabaseHealthChecker struct {
-	name    string
-	pingFn  func(ctx context.Context) error
+	name   string
+	pingFn func(ctx context.Context) error
 }
 
 // NewDatabaseHealthChecker creates a new database health checker

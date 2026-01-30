@@ -102,6 +102,9 @@ type VM struct {
 
 	// WebSocket context (set when executing WebSocket handlers)
 	wsHandler WebSocketHandler
+
+	// Maximum number of execution steps (0 = unlimited)
+	maxSteps int
 }
 
 // NewVM creates a new virtual machine
@@ -142,10 +145,15 @@ func (vm *VM) Execute(bytecode []byte) (Value, error) {
 	vm.pc = offset
 	vm.halted = false
 
-	// Execute instructions
+	// Execute instructions with step limit to prevent infinite loops
+	steps := 0
 	for !vm.halted && vm.pc < len(vm.code) {
 		if err := vm.step(); err != nil {
 			return nil, err
+		}
+		steps++
+		if vm.maxSteps > 0 && steps > vm.maxSteps {
+			return nil, fmt.Errorf("execution exceeded maximum step limit (%d steps)", vm.maxSteps)
 		}
 	}
 
@@ -1670,6 +1678,12 @@ func floatToString(f float64) string {
 	return fmt.Sprintf("%g", f)
 }
 
+// SetMaxSteps sets the maximum number of execution steps.
+// 0 means unlimited (default). Use this to prevent infinite loops.
+func (vm *VM) SetMaxSteps(maxSteps int) {
+	vm.maxSteps = maxSteps
+}
+
 // SetWebSocketHandler sets the WebSocket handler for WS operations
 func (vm *VM) SetWebSocketHandler(handler WebSocketHandler) {
 	vm.wsHandler = handler
@@ -1945,23 +1959,24 @@ func (vm *VM) execAsync() error {
 		Done: make(chan struct{}),
 	}
 
+	// Copy locals, globals, constants, and builtins BEFORE launching the goroutine
+	// to avoid data races on concurrent map access
+	asyncVM := NewVM()
+	asyncConstants := make([]Value, len(vm.constants))
+	copy(asyncConstants, vm.constants)
+	asyncVM.constants = asyncConstants
+	for k, v := range vm.locals {
+		asyncVM.locals[k] = v
+	}
+	for k, v := range vm.globals {
+		asyncVM.globals[k] = v
+	}
+	for k, v := range vm.builtins {
+		asyncVM.builtins[k] = v
+	}
+
 	go func() {
 		defer close(future.Done)
-
-		// Create a new VM for the async execution
-		asyncVM := NewVM()
-		asyncVM.constants = vm.constants
-
-		// Copy current locals to async VM
-		for k, v := range vm.locals {
-			asyncVM.locals[k] = v
-		}
-		for k, v := range vm.globals {
-			asyncVM.globals[k] = v
-		}
-		for k, v := range vm.builtins {
-			asyncVM.builtins[k] = v
-		}
 
 		// Execute the async body
 		result, execErr := asyncVM.Execute(asyncBody)

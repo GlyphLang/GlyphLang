@@ -60,7 +60,7 @@ type PKCEParams struct {
 
 // Manager manages OAuth2 providers and authentication flows
 type Manager struct {
-	mu sync.RWMutex
+	mu        sync.RWMutex
 	providers map[string]*ProviderConfig
 	// TokenExchanger is a pluggable function for exchanging auth codes for tokens.
 	// This allows injection of mock implementations for testing.

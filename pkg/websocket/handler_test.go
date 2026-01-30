@@ -41,10 +41,10 @@ func TestHandlerOnMessage(t *testing.T) {
 
 	hub := NewHub()
 	conn := &Connection{
-		ID:   "test-conn",
-		send: make(chan []byte, 256),
-		hub:  hub,
-		Data: make(map[string]interface{}),
+		ID:    "test-conn",
+		send:  make(chan []byte, 256),
+		hub:   hub,
+		Data:  make(map[string]interface{}),
 		rooms: make(map[string]bool),
 	}
 
@@ -75,10 +75,10 @@ func TestHandlerOnEvent(t *testing.T) {
 
 	hub := NewHub()
 	conn := &Connection{
-		ID:   "test-conn",
-		send: make(chan []byte, 256),
-		hub:  hub,
-		Data: make(map[string]interface{}),
+		ID:    "test-conn",
+		send:  make(chan []byte, 256),
+		hub:   hub,
+		Data:  make(map[string]interface{}),
 		rooms: make(map[string]bool),
 	}
 
@@ -102,10 +102,10 @@ func TestHandlerJoinRoomHandler(t *testing.T) {
 	handler := hub.handler
 
 	conn := &Connection{
-		ID:   "test-conn",
-		send: make(chan []byte, 256),
-		hub:  hub,
-		Data: make(map[string]interface{}),
+		ID:    "test-conn",
+		send:  make(chan []byte, 256),
+		hub:   hub,
+		Data:  make(map[string]interface{}),
 		rooms: make(map[string]bool),
 	}
 
@@ -136,10 +136,10 @@ func TestHandlerLeaveRoomHandler(t *testing.T) {
 	handler := hub.handler
 
 	conn := &Connection{
-		ID:   "test-conn",
-		send: make(chan []byte, 256),
-		hub:  hub,
-		Data: make(map[string]interface{}),
+		ID:    "test-conn",
+		send:  make(chan []byte, 256),
+		hub:   hub,
+		Data:  make(map[string]interface{}),
 		rooms: make(map[string]bool),
 	}
 
@@ -173,10 +173,10 @@ func TestHandlerPingPongHandler(t *testing.T) {
 
 	hub := NewHub()
 	conn := &Connection{
-		ID:   "test-conn",
-		send: make(chan []byte, 256),
-		hub:  hub,
-		Data: make(map[string]interface{}),
+		ID:    "test-conn",
+		send:  make(chan []byte, 256),
+		hub:   hub,
+		Data:  make(map[string]interface{}),
 		rooms: make(map[string]bool),
 	}
 
@@ -285,10 +285,10 @@ func TestHandlerClear(t *testing.T) {
 func TestMessageContextReply(t *testing.T) {
 	hub := NewHub()
 	conn := &Connection{
-		ID:   "test-conn",
-		send: make(chan []byte, 256),
-		hub:  hub,
-		Data: make(map[string]interface{}),
+		ID:    "test-conn",
+		send:  make(chan []byte, 256),
+		hub:   hub,
+		Data:  make(map[string]interface{}),
 		rooms: make(map[string]bool),
 	}
 
@@ -316,10 +316,10 @@ func TestMessageContextReply(t *testing.T) {
 func TestMessageContextReplyJSON(t *testing.T) {
 	hub := NewHub()
 	conn := &Connection{
-		ID:   "test-conn",
-		send: make(chan []byte, 256),
-		hub:  hub,
-		Data: make(map[string]interface{}),
+		ID:    "test-conn",
+		send:  make(chan []byte, 256),
+		hub:   hub,
+		Data:  make(map[string]interface{}),
 		rooms: make(map[string]bool),
 	}
 
@@ -345,10 +345,10 @@ func TestMessageContextReplyJSON(t *testing.T) {
 func TestMessageContextReplyError(t *testing.T) {
 	hub := NewHub()
 	conn := &Connection{
-		ID:   "test-conn",
-		send: make(chan []byte, 256),
-		hub:  hub,
-		Data: make(map[string]interface{}),
+		ID:    "test-conn",
+		send:  make(chan []byte, 256),
+		hub:   hub,
+		Data:  make(map[string]interface{}),
 		rooms: make(map[string]bool),
 	}
 

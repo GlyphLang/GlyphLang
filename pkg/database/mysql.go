@@ -193,26 +193,27 @@ func (m *MySQLDB) BulkInsert(ctx context.Context, table string, columns []string
 		return fmt.Errorf("invalid column name: %w", err)
 	}
 
-	// Build the bulk insert query with ? placeholders
-	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES ", sanitizedTable, strings.Join(sanitizedColumns, ", "))
+	// Build the bulk insert query using strings.Builder for O(n) performance
+	var qb strings.Builder
+	fmt.Fprintf(&qb, "INSERT INTO %s (%s) VALUES ", sanitizedTable, strings.Join(sanitizedColumns, ", "))
 
 	var args []interface{}
 	for i, row := range values {
 		if i > 0 {
-			query += ", "
+			qb.WriteString(", ")
 		}
-		query += "("
+		qb.WriteByte('(')
 		for j := range row {
 			if j > 0 {
-				query += ", "
+				qb.WriteString(", ")
 			}
-			query += "?"
+			qb.WriteByte('?')
 			args = append(args, row[j])
 		}
-		query += ")"
+		qb.WriteByte(')')
 	}
 
-	_, err = m.Exec(ctx, query, args...)
+	_, err = m.Exec(ctx, qb.String(), args...)
 	return err
 }
 

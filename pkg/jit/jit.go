@@ -19,20 +19,20 @@ const (
 type OptimizationTier int
 
 const (
-	TierInterpreted OptimizationTier = iota // No compilation
-	TierBaseline                             // Basic compilation, no optimization
-	TierOptimized                            // Standard optimizations
-	TierHighlyOptimized                      // Aggressive optimizations for hot code
+	TierInterpreted     OptimizationTier = iota // No compilation
+	TierBaseline                                // Basic compilation, no optimization
+	TierOptimized                               // Standard optimizations
+	TierHighlyOptimized                         // Aggressive optimizations for hot code
 )
 
 // CompilationUnit represents a compiled route or function
 type CompilationUnit struct {
-	Name         string
-	Bytecode     []byte
-	Tier         OptimizationTier
-	CompiledAt   time.Time
+	Name           string
+	Bytecode       []byte
+	Tier           OptimizationTier
+	CompiledAt     time.Time
 	ExecutionCount int64
-	LastExecuted time.Time
+	LastExecuted   time.Time
 }
 
 // JITCompiler manages just-in-time compilation
@@ -46,8 +46,8 @@ type JITCompiler struct {
 	profiler *Profiler
 
 	// Compiled units cache
-	units     map[string]*CompilationUnit
-	unitsMux  sync.RWMutex
+	units    map[string]*CompilationUnit
+	unitsMux sync.RWMutex
 
 	// Type specialization
 	specializationCache *SpecializationCache
@@ -63,26 +63,26 @@ type JITCompiler struct {
 	deoptTracker *DeoptimizationTracker
 
 	// Statistics
-	stats JITStats
+	stats    JITStats
 	statsMux sync.RWMutex
 }
 
 // JITStats tracks JIT compilation statistics
 type JITStats struct {
-	TotalCompilations       int64
-	BaselineCompilations    int64
-	OptimizedCompilations   int64
-	AggressiveCompilations  int64
-	Recompilations          int64
-	CacheHits               int64
-	CacheMisses             int64
-	TotalExecutionTime      time.Duration
-	TotalCompilationTime    time.Duration
-	SpecializationHits      int64
-	SpecializationMisses    int64
-	InlinedFunctions        int64
-	Deoptimizations         int64
-	AdaptiveRecompilations  int64
+	TotalCompilations      int64
+	BaselineCompilations   int64
+	OptimizedCompilations  int64
+	AggressiveCompilations int64
+	Recompilations         int64
+	CacheHits              int64
+	CacheMisses            int64
+	TotalExecutionTime     time.Duration
+	TotalCompilationTime   time.Duration
+	SpecializationHits     int64
+	SpecializationMisses   int64
+	InlinedFunctions       int64
+	Deoptimizations        int64
+	AdaptiveRecompilations int64
 }
 
 // NewJITCompiler creates a new JIT compiler instance
@@ -148,12 +148,12 @@ func (jit *JITCompiler) CompileRoute(name string, route *interpreter.Route) ([]b
 
 	// Create compilation unit
 	unit = &CompilationUnit{
-		Name:         name,
-		Bytecode:     bytecode,
-		Tier:         tier,
-		CompiledAt:   time.Now(),
+		Name:           name,
+		Bytecode:       bytecode,
+		Tier:           tier,
+		CompiledAt:     time.Now(),
 		ExecutionCount: 0,
-		LastExecuted: time.Now(),
+		LastExecuted:   time.Now(),
 	}
 
 	// Cache the unit
@@ -218,11 +218,11 @@ func (jit *JITCompiler) shouldRecompile(unit *CompilationUnit) bool {
 	case TierInterpreted, TierBaseline:
 		// Upgrade to optimized if executed frequently
 		return profile.ExecutionCount >= int64(hotPathThreshold/2) &&
-		       timeSinceCompile > recompileWindow
+			timeSinceCompile > recompileWindow
 	case TierOptimized:
 		// Upgrade to highly optimized if very hot
 		return profile.ExecutionCount >= int64(hotPathThreshold) &&
-		       timeSinceCompile > recompileWindow
+			timeSinceCompile > recompileWindow
 	default:
 		return false
 	}
@@ -534,7 +534,7 @@ func (jit *JITCompiler) GetDetailedStats() map[string]interface{} {
 			"totalExecutions": profilerStats.TotalExecutions,
 			"callGraphSize":   profilerStats.CallGraphSize,
 		},
-		"deoptimizations": stats.Deoptimizations,
+		"deoptimizations":  stats.Deoptimizations,
 		"inlinedFunctions": stats.InlinedFunctions,
 		"timing": map[string]string{
 			"totalCompilationTime": stats.TotalCompilationTime.String(),

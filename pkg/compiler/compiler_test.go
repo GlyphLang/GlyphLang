@@ -14,28 +14,28 @@ func TestCompileLiteral(t *testing.T) {
 		expected vm.Value
 	}{
 		{
-			name: "int literal",
-			expr: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+			name:     "int literal",
+			expr:     &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
 			expected: vm.IntValue{Val: 42},
 		},
 		{
-			name: "float literal",
-			expr: &interpreter.LiteralExpr{Value: interpreter.FloatLiteral{Value: 3.14}},
+			name:     "float literal",
+			expr:     &interpreter.LiteralExpr{Value: interpreter.FloatLiteral{Value: 3.14}},
 			expected: vm.FloatValue{Val: 3.14},
 		},
 		{
-			name: "string literal",
-			expr: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "hello"}},
+			name:     "string literal",
+			expr:     &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "hello"}},
 			expected: vm.StringValue{Val: "hello"},
 		},
 		{
-			name: "bool literal true",
-			expr: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
+			name:     "bool literal true",
+			expr:     &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
 			expected: vm.BoolValue{Val: true},
 		},
 		{
-			name: "bool literal false",
-			expr: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: false}},
+			name:     "bool literal false",
+			expr:     &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: false}},
 			expected: vm.BoolValue{Val: false},
 		},
 		{
@@ -366,7 +366,7 @@ func TestCompileArithmeticExpression(t *testing.T) {
 			&interpreter.AssignStatement{
 				Target: "result",
 				Value: &interpreter.BinaryOpExpr{
-					Op: interpreter.Add,
+					Op:   interpreter.Add,
 					Left: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
 					Right: &interpreter.BinaryOpExpr{
 						Op:    interpreter.Mul,
@@ -3285,7 +3285,7 @@ func TestFunctionInliner(t *testing.T) {
 
 	// Define a simple function using interpreter.Function
 	funcDef := interpreter.Function{
-		Name: "add",
+		Name:   "add",
 		Params: []interpreter.Field{{Name: "a", TypeAnnotation: interpreter.IntType{}}, {Name: "b", TypeAnnotation: interpreter.IntType{}}},
 		Body: []interpreter.Statement{
 			&interpreter.ReturnStatement{
@@ -3388,4 +3388,861 @@ func TestOptimizerGetStats(t *testing.T) {
 	stats := opt.GetStats()
 	// Stats should have some data
 	_ = stats
+}
+
+// =================================================================
+// Match expression tests (compileMatchExpr, compilePatternMatch,
+// compileLiteralValue)
+// =================================================================
+
+func TestCompileMatchExpr_LiteralPatterns(t *testing.T) {
+	// match x { 1 => 10, 2 => 20, _ => 0 }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	matchExpr := &interpreter.MatchExpr{
+		Value: &interpreter.VariableExpr{Name: "x"},
+		Cases: []interpreter.MatchCase{
+			{
+				Pattern: interpreter.LiteralPattern{
+					Value: interpreter.IntLiteral{Value: 1},
+				},
+				Body: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+			},
+			{
+				Pattern: interpreter.LiteralPattern{
+					Value: interpreter.IntLiteral{Value: 2},
+				},
+				Body: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 20}},
+			},
+			{
+				Pattern: interpreter.WildcardPattern{},
+				Body:    &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+			},
+		},
+	}
+
+	err := c.compileMatchExpr(matchExpr)
+	if err != nil {
+		t.Fatalf("compileMatchExpr() error: %v", err)
+	}
+
+	// Verify bytecode was generated (non-empty code)
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from match expression")
+	}
+}
+
+func TestCompileMatchExpr_VariablePattern(t *testing.T) {
+	// match x { y => y + 1 }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	matchExpr := &interpreter.MatchExpr{
+		Value: &interpreter.VariableExpr{Name: "x"},
+		Cases: []interpreter.MatchCase{
+			{
+				Pattern: interpreter.VariablePattern{Name: "y"},
+				Body: &interpreter.BinaryOpExpr{
+					Op:    interpreter.Add,
+					Left:  &interpreter.VariableExpr{Name: "y"},
+					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+				},
+			},
+		},
+	}
+
+	err := c.compileMatchExpr(matchExpr)
+	if err != nil {
+		t.Fatalf("compileMatchExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from match with variable pattern")
+	}
+}
+
+func TestCompileMatchExpr_WildcardPattern(t *testing.T) {
+	// match x { _ => 99 }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	matchExpr := &interpreter.MatchExpr{
+		Value: &interpreter.VariableExpr{Name: "x"},
+		Cases: []interpreter.MatchCase{
+			{
+				Pattern: interpreter.WildcardPattern{},
+				Body:    &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 99}},
+			},
+		},
+	}
+
+	err := c.compileMatchExpr(matchExpr)
+	if err != nil {
+		t.Fatalf("compileMatchExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from match with wildcard pattern")
+	}
+}
+
+func TestCompileMatchExpr_ObjectPattern(t *testing.T) {
+	// match x { {name} => name }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	matchExpr := &interpreter.MatchExpr{
+		Value: &interpreter.VariableExpr{Name: "x"},
+		Cases: []interpreter.MatchCase{
+			{
+				Pattern: interpreter.ObjectPattern{
+					Fields: []interpreter.ObjectPatternField{
+						{Key: "name", Pattern: nil}, // bind field to variable
+					},
+				},
+				Body: &interpreter.VariableExpr{Name: "name"},
+			},
+		},
+	}
+
+	err := c.compileMatchExpr(matchExpr)
+	if err != nil {
+		t.Fatalf("compileMatchExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from match with object pattern")
+	}
+}
+
+func TestCompileMatchExpr_ObjectPatternWithNestedLiteral(t *testing.T) {
+	// match x { {status: 200} => "ok" }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	matchExpr := &interpreter.MatchExpr{
+		Value: &interpreter.VariableExpr{Name: "x"},
+		Cases: []interpreter.MatchCase{
+			{
+				Pattern: interpreter.ObjectPattern{
+					Fields: []interpreter.ObjectPatternField{
+						{
+							Key: "status",
+							Pattern: interpreter.LiteralPattern{
+								Value: interpreter.IntLiteral{Value: 200},
+							},
+						},
+					},
+				},
+				Body: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "ok"}},
+			},
+		},
+	}
+
+	err := c.compileMatchExpr(matchExpr)
+	if err != nil {
+		t.Fatalf("compileMatchExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from match with nested object pattern")
+	}
+}
+
+func TestCompileMatchExpr_ArrayPattern(t *testing.T) {
+	// match x { [first, second] => first }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	matchExpr := &interpreter.MatchExpr{
+		Value: &interpreter.VariableExpr{Name: "x"},
+		Cases: []interpreter.MatchCase{
+			{
+				Pattern: interpreter.ArrayPattern{
+					Elements: []interpreter.Pattern{
+						interpreter.VariablePattern{Name: "first"},
+						interpreter.VariablePattern{Name: "second"},
+					},
+				},
+				Body: &interpreter.VariableExpr{Name: "first"},
+			},
+		},
+	}
+
+	err := c.compileMatchExpr(matchExpr)
+	if err != nil {
+		t.Fatalf("compileMatchExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from match with array pattern")
+	}
+}
+
+func TestCompileMatchExpr_ArrayPatternWithRest(t *testing.T) {
+	// match x { [head, ...rest] => head }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	restName := "rest"
+	matchExpr := &interpreter.MatchExpr{
+		Value: &interpreter.VariableExpr{Name: "x"},
+		Cases: []interpreter.MatchCase{
+			{
+				Pattern: interpreter.ArrayPattern{
+					Elements: []interpreter.Pattern{
+						interpreter.VariablePattern{Name: "head"},
+					},
+					Rest: &restName,
+				},
+				Body: &interpreter.VariableExpr{Name: "head"},
+			},
+		},
+	}
+
+	err := c.compileMatchExpr(matchExpr)
+	if err != nil {
+		t.Fatalf("compileMatchExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from match with rest pattern")
+	}
+}
+
+func TestCompileMatchExpr_WithGuard(t *testing.T) {
+	// match x { y when y > 0 => y, _ => 0 }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	matchExpr := &interpreter.MatchExpr{
+		Value: &interpreter.VariableExpr{Name: "x"},
+		Cases: []interpreter.MatchCase{
+			{
+				Pattern: interpreter.VariablePattern{Name: "y"},
+				Guard: &interpreter.BinaryOpExpr{
+					Op:    interpreter.Gt,
+					Left:  &interpreter.VariableExpr{Name: "y"},
+					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				},
+				Body: &interpreter.VariableExpr{Name: "y"},
+			},
+			{
+				Pattern: interpreter.WildcardPattern{},
+				Body:    &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+			},
+		},
+	}
+
+	err := c.compileMatchExpr(matchExpr)
+	if err != nil {
+		t.Fatalf("compileMatchExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from match with guard")
+	}
+}
+
+func TestCompileMatchExpr_ValueTypes(t *testing.T) {
+	// Test MatchExpr as value type in compileExpression
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	// Pointer type
+	matchExpr := &interpreter.MatchExpr{
+		Value: &interpreter.VariableExpr{Name: "x"},
+		Cases: []interpreter.MatchCase{
+			{
+				Pattern: interpreter.WildcardPattern{},
+				Body:    &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+			},
+		},
+	}
+	err := c.compileExpression(matchExpr)
+	if err != nil {
+		t.Fatalf("compileExpression(*MatchExpr) error: %v", err)
+	}
+
+	// Value type
+	c.code = make([]byte, 0)
+	matchExprVal := interpreter.MatchExpr{
+		Value: &interpreter.VariableExpr{Name: "x"},
+		Cases: []interpreter.MatchCase{
+			{
+				Pattern: interpreter.WildcardPattern{},
+				Body:    &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+			},
+		},
+	}
+	err = c.compileExpression(matchExprVal)
+	if err != nil {
+		t.Fatalf("compileExpression(MatchExpr) error: %v", err)
+	}
+}
+
+func TestCompileMatchExpr_MultipleLiteralPatterns(t *testing.T) {
+	// match x { 1 => "one", 2 => "two", 3 => "three" }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	matchExpr := &interpreter.MatchExpr{
+		Value: &interpreter.VariableExpr{Name: "x"},
+		Cases: []interpreter.MatchCase{
+			{
+				Pattern: interpreter.LiteralPattern{Value: interpreter.IntLiteral{Value: 1}},
+				Body:    &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "one"}},
+			},
+			{
+				Pattern: interpreter.LiteralPattern{Value: interpreter.IntLiteral{Value: 2}},
+				Body:    &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "two"}},
+			},
+			{
+				Pattern: interpreter.LiteralPattern{Value: interpreter.IntLiteral{Value: 3}},
+				Body:    &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "three"}},
+			},
+		},
+	}
+
+	err := c.compileMatchExpr(matchExpr)
+	if err != nil {
+		t.Fatalf("compileMatchExpr() error: %v", err)
+	}
+}
+
+// Test compileLiteralValue with all literal types
+func TestCompileLiteralValue_AllTypes(t *testing.T) {
+	tests := []struct {
+		name string
+		lit  interpreter.Literal
+	}{
+		{"int", interpreter.IntLiteral{Value: 42}},
+		{"float", interpreter.FloatLiteral{Value: 3.14}},
+		{"string", interpreter.StringLiteral{Value: "hello"}},
+		{"bool true", interpreter.BoolLiteral{Value: true}},
+		{"bool false", interpreter.BoolLiteral{Value: false}},
+		{"null", interpreter.NullLiteral{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := NewCompiler()
+			err := c.compileLiteralValue(tt.lit)
+			if err != nil {
+				t.Fatalf("compileLiteralValue(%s) error: %v", tt.name, err)
+			}
+			if len(c.code) == 0 {
+				t.Error("expected non-empty bytecode")
+			}
+		})
+	}
+}
+
+// =================================================================
+// Async/Await expression tests (compileAsyncExpr, compileAwaitExpr)
+// =================================================================
+
+func TestCompileAsyncExpr_Basic(t *testing.T) {
+	// async { > 42 }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+
+	asyncExpr := &interpreter.AsyncExpr{
+		Body: []interpreter.Statement{
+			&interpreter.ReturnStatement{
+				Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+			},
+		},
+	}
+
+	err := c.compileAsyncExpr(asyncExpr)
+	if err != nil {
+		t.Fatalf("compileAsyncExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from async expression")
+	}
+}
+
+func TestCompileAsyncExpr_WithAssignment(t *testing.T) {
+	// async { $ x = 10, > x }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+
+	asyncExpr := &interpreter.AsyncExpr{
+		Body: []interpreter.Statement{
+			&interpreter.AssignStatement{
+				Target: "x",
+				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+			},
+			&interpreter.ReturnStatement{
+				Value: &interpreter.VariableExpr{Name: "x"},
+			},
+		},
+	}
+
+	err := c.compileAsyncExpr(asyncExpr)
+	if err != nil {
+		t.Fatalf("compileAsyncExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from async expression with assignment")
+	}
+}
+
+func TestCompileAsyncExpr_EmptyBody(t *testing.T) {
+	// async { }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+
+	asyncExpr := &interpreter.AsyncExpr{
+		Body: []interpreter.Statement{},
+	}
+
+	err := c.compileAsyncExpr(asyncExpr)
+	if err != nil {
+		t.Fatalf("compileAsyncExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from empty async expression")
+	}
+}
+
+func TestCompileAsyncExpr_NoExplicitReturn(t *testing.T) {
+	// async { $ x = 42 } -- no explicit return, should add halt
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+
+	asyncExpr := &interpreter.AsyncExpr{
+		Body: []interpreter.Statement{
+			&interpreter.AssignStatement{
+				Target: "x",
+				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+			},
+		},
+	}
+
+	err := c.compileAsyncExpr(asyncExpr)
+	if err != nil {
+		t.Fatalf("compileAsyncExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode")
+	}
+}
+
+func TestCompileAsyncExpr_ValueType(t *testing.T) {
+	// Test AsyncExpr as value type in compileExpression
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+
+	// Pointer type
+	asyncPtrExpr := &interpreter.AsyncExpr{
+		Body: []interpreter.Statement{
+			&interpreter.ReturnStatement{
+				Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+			},
+		},
+	}
+	err := c.compileExpression(asyncPtrExpr)
+	if err != nil {
+		t.Fatalf("compileExpression(*AsyncExpr) error: %v", err)
+	}
+
+	// Value type
+	c.code = make([]byte, 0)
+	asyncValExpr := interpreter.AsyncExpr{
+		Body: []interpreter.Statement{
+			&interpreter.ReturnStatement{
+				Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+			},
+		},
+	}
+	err = c.compileExpression(asyncValExpr)
+	if err != nil {
+		t.Fatalf("compileExpression(AsyncExpr) error: %v", err)
+	}
+}
+
+func TestCompileAwaitExpr_Basic(t *testing.T) {
+	// await someExpr
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	futIdx := c.addConstant(vm.StringValue{Val: "future"})
+	c.symbolTable.Define("future", futIdx)
+
+	awaitExpr := &interpreter.AwaitExpr{
+		Expr: &interpreter.VariableExpr{Name: "future"},
+	}
+
+	err := c.compileAwaitExpr(awaitExpr)
+	if err != nil {
+		t.Fatalf("compileAwaitExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from await expression")
+	}
+}
+
+func TestCompileAwaitExpr_WithLiteral(t *testing.T) {
+	// await 42
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+
+	awaitExpr := &interpreter.AwaitExpr{
+		Expr: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+	}
+
+	err := c.compileAwaitExpr(awaitExpr)
+	if err != nil {
+		t.Fatalf("compileAwaitExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from await expression")
+	}
+}
+
+func TestCompileAwaitExpr_ValueType(t *testing.T) {
+	// Test AwaitExpr as value type in compileExpression
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+
+	// Pointer type
+	awaitPtrExpr := &interpreter.AwaitExpr{
+		Expr: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+	}
+	err := c.compileExpression(awaitPtrExpr)
+	if err != nil {
+		t.Fatalf("compileExpression(*AwaitExpr) error: %v", err)
+	}
+
+	// Value type
+	c.code = make([]byte, 0)
+	awaitValExpr := interpreter.AwaitExpr{
+		Expr: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+	}
+	err = c.compileExpression(awaitValExpr)
+	if err != nil {
+		t.Fatalf("compileExpression(AwaitExpr) error: %v", err)
+	}
+}
+
+// =================================================================
+// Additional compileExpression coverage
+// =================================================================
+
+func TestCompileExpression_UnsupportedType(t *testing.T) {
+	c := NewCompiler()
+	// Pass a nil expression which is an unsupported type
+	err := c.compileExpression(nil)
+	if err == nil {
+		t.Fatal("expected error for nil expression, got nil")
+	}
+}
+
+func TestCompileStatement_UnsupportedType(t *testing.T) {
+	c := NewCompiler()
+	// Pass a nil statement which is an unsupported type
+	err := c.compileStatement(nil)
+	if err == nil {
+		t.Fatal("expected error for nil statement, got nil")
+	}
+}
+
+func TestCompileUnaryOp_Not(t *testing.T) {
+	// Test: !true => false
+	route := &interpreter.Route{
+		Body: []interpreter.Statement{
+			&interpreter.ReturnStatement{
+				Value: &interpreter.UnaryOpExpr{
+					Op:    interpreter.Not,
+					Right: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
+				},
+			},
+		},
+	}
+
+	c := NewCompilerWithOptLevel(OptNone)
+	bytecode, err := c.CompileRoute(route)
+	if err != nil {
+		t.Fatalf("CompileRoute() error: %v", err)
+	}
+
+	vmInstance := vm.NewVM()
+	result, err := vmInstance.Execute(bytecode)
+	if err != nil {
+		t.Fatalf("Execute() error: %v", err)
+	}
+
+	expected := vm.BoolValue{Val: false}
+	if !valuesEqual(result, expected) {
+		t.Errorf("Expected %v, got %v", expected, result)
+	}
+}
+
+func TestCompileUnaryOp_Neg(t *testing.T) {
+	// Test: -42 => -42
+	route := &interpreter.Route{
+		Body: []interpreter.Statement{
+			&interpreter.ReturnStatement{
+				Value: &interpreter.UnaryOpExpr{
+					Op:    interpreter.Neg,
+					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+				},
+			},
+		},
+	}
+
+	c := NewCompilerWithOptLevel(OptNone)
+	bytecode, err := c.CompileRoute(route)
+	if err != nil {
+		t.Fatalf("CompileRoute() error: %v", err)
+	}
+
+	vmInstance := vm.NewVM()
+	result, err := vmInstance.Execute(bytecode)
+	if err != nil {
+		t.Fatalf("Execute() error: %v", err)
+	}
+
+	expected := vm.IntValue{Val: -42}
+	if !valuesEqual(result, expected) {
+		t.Errorf("Expected %v, got %v", expected, result)
+	}
+}
+
+func TestCompileUnaryOp_UnsupportedOp(t *testing.T) {
+	c := NewCompiler()
+	// Use an invalid unary op value
+	expr := &interpreter.UnaryOpExpr{
+		Op:    interpreter.UnOp(99),
+		Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+	}
+	err := c.compileUnaryOp(expr)
+	if err == nil {
+		t.Fatal("expected error for unsupported unary operator, got nil")
+	}
+}
+
+func TestCompileBinaryOp_UnsupportedOp(t *testing.T) {
+	c := NewCompiler()
+	// Use an invalid binary op value
+	expr := &interpreter.BinaryOpExpr{
+		Op:    interpreter.BinOp(99),
+		Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+		Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+	}
+	err := c.compileBinaryOp(expr)
+	if err == nil {
+		t.Fatal("expected error for unsupported binary operator, got nil")
+	}
+}
+
+func TestCompileReturnStatement_WithExpression(t *testing.T) {
+	// return (x + y)
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+	yIdx := c.addConstant(vm.StringValue{Val: "y"})
+	c.symbolTable.Define("y", yIdx)
+
+	stmt := &interpreter.ReturnStatement{
+		Value: &interpreter.BinaryOpExpr{
+			Op:    interpreter.Add,
+			Left:  &interpreter.VariableExpr{Name: "x"},
+			Right: &interpreter.VariableExpr{Name: "y"},
+		},
+	}
+
+	err := c.compileReturnStatement(stmt)
+	if err != nil {
+		t.Fatalf("compileReturnStatement() error: %v", err)
+	}
+
+	// Verify code has OpReturn
+	foundReturn := false
+	for _, b := range c.code {
+		if b == byte(vm.OpReturn) {
+			foundReturn = true
+			break
+		}
+	}
+	if !foundReturn {
+		t.Error("expected OpReturn in bytecode")
+	}
+}
+
+func TestCompileReturnStatement_ErrorInExpression(t *testing.T) {
+	c := NewCompiler()
+	// Reference undefined variable
+	stmt := &interpreter.ReturnStatement{
+		Value: &interpreter.VariableExpr{Name: "undefined_var"},
+	}
+
+	err := c.compileReturnStatement(stmt)
+	if err == nil {
+		t.Fatal("expected error for undefined variable in return, got nil")
+	}
+}
+
+func TestCompileArrayIndex_ErrorInArray(t *testing.T) {
+	c := NewCompiler()
+	// Array expression references undefined variable
+	expr := &interpreter.ArrayIndexExpr{
+		Array: &interpreter.VariableExpr{Name: "undefined_arr"},
+		Index: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+	}
+
+	err := c.compileArrayIndex(expr)
+	if err == nil {
+		t.Fatal("expected error for undefined array, got nil")
+	}
+}
+
+func TestCompileArrayIndex_ErrorInIndex(t *testing.T) {
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	arrIdx := c.addConstant(vm.StringValue{Val: "arr"})
+	c.symbolTable.Define("arr", arrIdx)
+
+	// Index references undefined variable
+	expr := &interpreter.ArrayIndexExpr{
+		Array: &interpreter.VariableExpr{Name: "arr"},
+		Index: &interpreter.VariableExpr{Name: "undefined_idx"},
+	}
+
+	err := c.compileArrayIndex(expr)
+	if err == nil {
+		t.Fatal("expected error for undefined index, got nil")
+	}
+}
+
+// =================================================================
+// Additional compileStatement coverage
+// =================================================================
+
+func TestCompileStatement_SwitchValueType(t *testing.T) {
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	// SwitchStatement as value type
+	switchStmt := interpreter.SwitchStatement{
+		Value: &interpreter.VariableExpr{Name: "x"},
+		Cases: []interpreter.SwitchCase{
+			{
+				Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+				Body: []interpreter.Statement{
+					&interpreter.ReturnStatement{
+						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "one"}},
+					},
+				},
+			},
+		},
+		Default: []interpreter.Statement{
+			&interpreter.ReturnStatement{
+				Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "other"}},
+			},
+		},
+	}
+
+	err := c.compileStatement(switchStmt)
+	if err != nil {
+		t.Fatalf("compileStatement(SwitchStatement value) failed: %v", err)
+	}
+}
+
+func TestCompileStatement_ForValueType(t *testing.T) {
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	itemsIdx := c.addConstant(vm.StringValue{Val: "items"})
+	c.symbolTable.Define("items", itemsIdx)
+
+	// ForStatement as value type
+	forStmt := interpreter.ForStatement{
+		ValueVar: "item",
+		Iterable: &interpreter.VariableExpr{Name: "items"},
+		Body: []interpreter.Statement{
+			&interpreter.AssignStatement{
+				Target: "x",
+				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+			},
+		},
+	}
+
+	err := c.compileStatement(forStmt)
+	if err != nil {
+		t.Fatalf("compileStatement(ForStatement value) failed: %v", err)
+	}
+}
+
+func TestCompileStatement_ReassignValueType(t *testing.T) {
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	// ReassignStatement as value type
+	reassignStmt := interpreter.ReassignStatement{
+		Target: "x",
+		Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+	}
+
+	err := c.compileStatement(reassignStmt)
+	if err != nil {
+		t.Fatalf("compileStatement(ReassignStatement value) failed: %v", err)
+	}
+}
+
+func TestCompileStatement_ValidationValueType(t *testing.T) {
+	c := NewCompiler()
+
+	// ValidationStatement as value type
+	validationStmt := interpreter.ValidationStatement{}
+
+	err := c.compileStatement(validationStmt)
+	if err != nil {
+		t.Fatalf("compileStatement(ValidationStatement value) failed: %v", err)
+	}
+}
+
+func TestCompileStatement_ValidationPtrType(t *testing.T) {
+	c := NewCompiler()
+
+	// ValidationStatement as pointer type
+	validationStmt := &interpreter.ValidationStatement{}
+
+	err := c.compileStatement(validationStmt)
+	if err != nil {
+		t.Fatalf("compileStatement(*ValidationStatement) failed: %v", err)
+	}
 }

@@ -653,10 +653,10 @@ func (QueueWorker) isItem() {}
 type GRPCStreamType int
 
 const (
-	GRPCUnary           GRPCStreamType = iota // No streaming
-	GRPCServerStream                          // Server streams responses
-	GRPCClientStream                          // Client streams requests
-	GRPCBidirectional                         // Both directions stream
+	GRPCUnary         GRPCStreamType = iota // No streaming
+	GRPCServerStream                        // Server streams responses
+	GRPCClientStream                        // Client streams requests
+	GRPCBidirectional                       // Both directions stream
 )
 
 func (s GRPCStreamType) String() string {
@@ -730,8 +730,9 @@ func (op GraphQLOperationType) String() string {
 
 // GraphQLResolver represents a GraphQL resolver definition
 // Syntax: @ query user(id: int) -> User { ... }
-//         @ mutation createUser(input: UserInput) -> User { ... }
-//         @ subscription userCreated -> User { ... }
+//
+//	@ mutation createUser(input: UserInput) -> User { ... }
+//	@ subscription userCreated -> User { ... }
 type GraphQLResolver struct {
 	Operation  GraphQLOperationType
 	FieldName  string
@@ -743,7 +744,6 @@ type GraphQLResolver struct {
 }
 
 func (GraphQLResolver) isItem() {}
-
 
 // ImportStatement represents an import declaration
 // Syntax forms:

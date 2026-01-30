@@ -213,29 +213,30 @@ func (p *PostgresDB) BulkInsert(ctx context.Context, table string, columns []str
 		return fmt.Errorf("invalid column name: %w", err)
 	}
 
-	// Build the bulk insert query with sanitized identifiers
-	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES ", sanitizedTable, strings.Join(sanitizedColumns, ", "))
+	// Build the bulk insert query using strings.Builder for O(n) performance
+	var qb strings.Builder
+	fmt.Fprintf(&qb, "INSERT INTO %s (%s) VALUES ", sanitizedTable, strings.Join(sanitizedColumns, ", "))
 
 	var args []interface{}
 	placeholderIndex := 1
 
 	for i, row := range values {
 		if i > 0 {
-			query += ", "
+			qb.WriteString(", ")
 		}
-		query += "("
+		qb.WriteByte('(')
 		for j := range row {
 			if j > 0 {
-				query += ", "
+				qb.WriteString(", ")
 			}
-			query += fmt.Sprintf("$%d", placeholderIndex)
+			fmt.Fprintf(&qb, "$%d", placeholderIndex)
 			placeholderIndex++
 			args = append(args, row[j])
 		}
-		query += ")"
+		qb.WriteByte(')')
 	}
 
-	_, err = p.Exec(ctx, query, args...)
+	_, err = p.Exec(ctx, qb.String(), args...)
 	return err
 }
 
@@ -363,29 +364,19 @@ func (p *PostgresDB) GetLastInsertID(ctx context.Context, table string, idColumn
 		return 0, fmt.Errorf("invalid column name: %w", err)
 	}
 
-	// Use the sanitized identifiers in the query
-	// Note: pg_get_serial_sequence takes text arguments, so we need unquoted names for it
-	// We use the validated (but unquoted) names since we've confirmed they're safe
-	query := fmt.Sprintf("SELECT CURRVAL(pg_get_serial_sequence('%s', '%s'))", table, idColumn)
-	_ = sanitizedTable  // Used for validation only
-	_ = sanitizedColumn // Used for validation only
+	// Identifiers have been validated above by SanitizeIdentifier.
+	// pg_get_serial_sequence takes text arguments (not SQL identifiers),
+	// so we use the validated original names in a parameterized query.
+	_ = sanitizedTable
+	_ = sanitizedColumn
+	query := "SELECT CURRVAL(pg_get_serial_sequence($1, $2))"
 
 	var id int64
-	err = p.QueryRow(ctx, query).Scan(&id)
+	err = p.QueryRow(ctx, query, table, idColumn).Scan(&id)
 	return id, err
 }
 
-// Helper function to create a columns string
-func columnsString(columns []string) string {
-	result := ""
-	for i, col := range columns {
-		if i > 0 {
-			result += ", "
-		}
-		result += col
-	}
-	return result
-}
+// columnsString is unused dead code - use strings.Join(columns, ", ") instead.
 
 // WithTimeout wraps a context with a timeout
 func WithTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {

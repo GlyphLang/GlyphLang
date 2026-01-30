@@ -144,7 +144,7 @@ func TestContainsCallToFunctions(t *testing.T) {
 	t.Run("if statement with call in condition", func(t *testing.T) {
 		stmt := &interpreter.IfStatement{
 			Condition: &interpreter.FunctionCallExpr{Name: "check"},
-			ThenBlock:      []interpreter.Statement{},
+			ThenBlock: []interpreter.Statement{},
 		}
 		result := containsCallTo([]interpreter.Statement{stmt}, "check")
 		if !result {
@@ -754,7 +754,6 @@ func TestCompileBinaryOpMoreCases(t *testing.T) {
 	}
 }
 
-
 // TestExprHasSideEffectsValueTypes tests side effects with value types (not pointers)
 func TestExprHasSideEffectsValueTypes(t *testing.T) {
 	// Test with value types (not pointers) for full coverage
@@ -1117,4 +1116,3 @@ func TestCompileExpressionValueTypes(t *testing.T) {
 		t.Errorf("compileExpression(UnaryOpExpr value) failed: %v", err)
 	}
 }
-

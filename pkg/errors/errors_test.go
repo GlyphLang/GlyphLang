@@ -608,12 +608,12 @@ func TestIsSimilar(t *testing.T) {
 		s2       string
 		expected bool
 	}{
-		{"count", "count", false},  // Exact match is not similar
-		{"count", "cunt", true},    // Typo
-		{"userx", "user", true},    // Small edit distance
-		{"users", "user", true},    // Prefix
-		{"total", "count", false},  // Completely different
-		{"hello", "hi", false},     // Too different
+		{"count", "count", false}, // Exact match is not similar
+		{"count", "cunt", true},   // Typo
+		{"userx", "user", true},   // Small edit distance
+		{"users", "user", true},   // Prefix
+		{"total", "count", false}, // Completely different
+		{"hello", "hi", false},    // Too different
 	}
 
 	for _, tt := range tests {

@@ -186,13 +186,13 @@ func TestXSSDetector_DetectXSS(t *testing.T) {
 
 func TestRequiresHTMLEscape(t *testing.T) {
 	tests := []struct {
-		name          string
-		expr          interpreter.Expr
-		expectEscape  bool
+		name         string
+		expr         interpreter.Expr
+		expectEscape bool
 	}{
 		{
-			name: "User input variable",
-			expr: interpreter.VariableExpr{Name: "request"},
+			name:         "User input variable",
+			expr:         interpreter.VariableExpr{Name: "request"},
 			expectEscape: true,
 		},
 		{
@@ -204,8 +204,8 @@ func TestRequiresHTMLEscape(t *testing.T) {
 			expectEscape: true,
 		},
 		{
-			name: "Safe variable",
-			expr: interpreter.VariableExpr{Name: "staticContent"},
+			name:         "Safe variable",
+			expr:         interpreter.VariableExpr{Name: "staticContent"},
 			expectEscape: false,
 		},
 		{
@@ -246,23 +246,23 @@ func TestEscapeHTML(t *testing.T) {
 	// This doesn't affect the security detectors which work correctly.
 
 	tests := []struct {
-		name        string
-		input       string
+		name         string
+		input        string
 		shouldEscape bool
 	}{
 		{
-			name:        "Angle brackets should be escaped",
-			input:       "<script>",
+			name:         "Angle brackets should be escaped",
+			input:        "<script>",
 			shouldEscape: true,
 		},
 		{
-			name:        "Ampersand should be escaped",
-			input:       "Tom & Jerry",
+			name:         "Ampersand should be escaped",
+			input:        "Tom & Jerry",
 			shouldEscape: true,
 		},
 		{
-			name:        "Plain text should not change significantly",
-			input:       "Hello World",
+			name:         "Plain text should not change significantly",
+			input:        "Hello World",
 			shouldEscape: false,
 		},
 	}
@@ -286,9 +286,9 @@ func containsSubstring(s, substr string) bool {
 
 func TestEscapeJS(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       string
-		mustContain []string
+		name           string
+		input          string
+		mustContain    []string
 		mustNotContain []string
 	}{
 		{
@@ -302,9 +302,9 @@ func TestEscapeJS(t *testing.T) {
 			mustContain: []string{`\n`},
 		},
 		{
-			name:        "Escape dangerous HTML characters",
-			input:       "<script>alert(1)</script>",
-			mustContain: []string{`\u003C`, `\u003E`},
+			name:           "Escape dangerous HTML characters",
+			input:          "<script>alert(1)</script>",
+			mustContain:    []string{`\u003C`, `\u003E`},
 			mustNotContain: []string{"<", ">"},
 		},
 		{
@@ -419,8 +419,8 @@ func TestIsSafeQuery(t *testing.T) {
 // TestXSSDetector_FunctionCall tests XSS detection in function calls
 func TestXSSDetector_FunctionCall(t *testing.T) {
 	tests := []struct {
-		name        string
-		expr        interpreter.Expr
+		name          string
+		expr          interpreter.Expr
 		expectWarning bool
 	}{
 		{

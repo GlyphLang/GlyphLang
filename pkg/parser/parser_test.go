@@ -2289,9 +2289,9 @@ func TestParser_Directive_ComplexBody(t *testing.T) {
 // TestParser_UnaryOperators tests parsing of unary operators (! and -)
 func TestParser_UnaryOperators(t *testing.T) {
 	tests := []struct {
-		name     string
-		source   string
-		checkFn  func(t *testing.T, module *interpreter.Module)
+		name    string
+		source  string
+		checkFn func(t *testing.T, module *interpreter.Module)
 	}{
 		{
 			name: "unary not operator",
@@ -2407,10 +2407,10 @@ func TestParser_ArrayIndexing(t *testing.T) {
 // TestParser_RateLimitVariations tests different rate limit formats
 func TestParser_RateLimitVariations(t *testing.T) {
 	tests := []struct {
-		name            string
-		source          string
-		expectedReqs    uint32
-		expectedWindow  string
+		name           string
+		source         string
+		expectedReqs   uint32
+		expectedWindow string
 	}{
 		{
 			name: "integer with slash format",
@@ -2821,7 +2821,6 @@ func TestParser_ComparisonOperators(t *testing.T) {
 	}
 }
 
-
 // TestParser_ParserErrors tests that parser reports errors correctly
 func TestParser_ParserErrors(t *testing.T) {
 	tests := []struct {
@@ -2905,7 +2904,6 @@ func TestParser_FieldAccessExpressions(t *testing.T) {
 		})
 	}
 }
-
 
 // TestParser_StringConcatenation tests string concatenation
 func TestParser_StringConcatenation(t *testing.T) {

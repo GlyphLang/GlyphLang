@@ -288,11 +288,11 @@ func TestWriteError(t *testing.T) {
 
 func TestWrapError(t *testing.T) {
 	tests := []struct {
-		name          string
-		err           error
-		defaultMsg    string
-		expectedType  string
-		expectedCode  int
+		name         string
+		err          error
+		defaultMsg   string
+		expectedType string
+		expectedCode int
 	}{
 		{
 			name:         "nil error",

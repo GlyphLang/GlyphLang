@@ -231,15 +231,37 @@ func BasicAuthMiddleware(validTokens map[string]bool) Middleware {
 
 // BasicAuthMiddlewareWithConfig provides token-based authentication with custom rate limit config
 func BasicAuthMiddlewareWithConfig(validTokens map[string]bool, config AuthRateLimitConfig) Middleware {
-	// Track failed auth attempts per IP
+	// Track failed auth attempts per IP.
+	// maxAuthTrackers caps the map size to prevent unbounded memory growth.
+	const maxAuthTrackers = 10000
 	var mu sync.Mutex
 	failureTrackers := make(map[string]*authFailureTracker)
+
+	// evictStaleTrackers removes entries that have not been updated within
+	// the ResetAfter window. Called under mu.Lock when the map exceeds capacity.
+	evictStaleTrackers := func() {
+		now := time.Now()
+		stale := make([]string, 0)
+		for ip, t := range failureTrackers {
+			if now.Sub(t.lastFailure) > config.ResetAfter {
+				stale = append(stale, ip)
+			}
+		}
+		for _, ip := range stale {
+			delete(failureTrackers, ip)
+		}
+	}
 
 	return func(next RouteHandler) RouteHandler {
 		return func(ctx *Context) error {
 			clientIP := getClientIP(ctx.Request)
 
 			mu.Lock()
+			// Evict stale entries when map exceeds capacity
+			if len(failureTrackers) > maxAuthTrackers {
+				evictStaleTrackers()
+			}
+
 			tracker, exists := failureTrackers[clientIP]
 			if !exists {
 				tracker = &authFailureTracker{}
@@ -312,22 +334,43 @@ func recordAuthFailure(clientIP string, trackers map[string]*authFailureTracker,
 	}
 }
 
-// getClientIP extracts the real client IP address from an HTTP request
-// It checks X-Forwarded-For and X-Real-IP headers (for proxy setups)
-// before falling back to RemoteAddr
+// TrustedProxies holds the set of trusted proxy IPs.
+// Only requests from these IPs will have X-Forwarded-For/X-Real-IP headers honored.
+// If empty, proxy headers are ignored and RemoteAddr is always used (secure default).
+var TrustedProxies = map[string]bool{}
+
+// SetTrustedProxies configures the set of trusted proxy IP addresses.
+// Only requests from these addresses will have their X-Forwarded-For
+// and X-Real-IP headers honored for client IP extraction.
+func SetTrustedProxies(proxies []string) {
+	m := make(map[string]bool, len(proxies))
+	for _, p := range proxies {
+		m[p] = true
+	}
+	TrustedProxies = m
+}
+
+// getClientIP extracts the real client IP address from an HTTP request.
+// Proxy headers (X-Forwarded-For, X-Real-IP) are only trusted when
+// the request comes from a configured trusted proxy.
 func getClientIP(r *http.Request) string {
-	// Check X-Forwarded-For header (may contain multiple IPs, take the first)
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		parts := strings.Split(xff, ",")
-		return strings.TrimSpace(parts[0])
+	remoteIP := r.RemoteAddr
+	// Strip port from RemoteAddr if present
+	if idx := strings.LastIndex(remoteIP, ":"); idx != -1 {
+		remoteIP = remoteIP[:idx]
 	}
 
-	// Check X-Real-IP header
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
+	// Only trust proxy headers from configured trusted proxies
+	if TrustedProxies[remoteIP] {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			parts := strings.Split(xff, ",")
+			return strings.TrimSpace(parts[0])
+		}
+		if xri := r.Header.Get("X-Real-IP"); xri != "" {
+			return xri
+		}
 	}
 
-	// Fall back to RemoteAddr
 	return r.RemoteAddr
 }
 
@@ -347,6 +390,7 @@ func RateLimitMiddleware(config RateLimiterConfig) Middleware {
 		requestCount int
 	}
 
+	const maxRateLimitEntries = 10000
 	var mu sync.Mutex
 	limits := make(map[string]*clientLimit)
 
@@ -356,6 +400,20 @@ func RateLimitMiddleware(config RateLimiterConfig) Middleware {
 			clientIP := getClientIP(ctx.Request)
 
 			mu.Lock()
+
+			// Evict stale entries when map exceeds capacity
+			if len(limits) > maxRateLimitEntries {
+				now := time.Now()
+				stale := make([]string, 0)
+				for ip, l := range limits {
+					if now.Sub(l.lastRefill) > 5*time.Minute {
+						stale = append(stale, ip)
+					}
+				}
+				for _, ip := range stale {
+					delete(limits, ip)
+				}
+			}
 
 			// Get or create limit for this client
 			limit, exists := limits[clientIP]
@@ -421,10 +479,13 @@ func TimeoutMiddleware(timeout time.Duration) Middleware {
 				done <- err
 			}()
 
+			timer := time.NewTimer(timeout)
+			defer timer.Stop()
+
 			select {
 			case err := <-done:
 				return err
-			case <-time.After(timeout):
+			case <-timer.C:
 				// Only send timeout error if handler hasn't started writing
 				if tw.tryClaimResponse() {
 					log.Printf("[TIMEOUT] Request timeout after %v: %s %s",
@@ -497,16 +558,18 @@ func (tw *timeoutWriter) Write(b []byte) (int, error) {
 // It should be added early in the middleware chain to trace the entire request lifecycle
 //
 // Usage:
-//   import "github.com/glyphlang/glyph/pkg/tracing"
 //
-//   config := tracing.DefaultMiddlewareConfig()
-//   server := NewServer(
-//       WithMiddleware(TracingMiddleware(config)),
-//   )
+//	import "github.com/glyphlang/glyph/pkg/tracing"
+//
+//	config := tracing.DefaultMiddlewareConfig()
+//	server := NewServer(
+//	    WithMiddleware(TracingMiddleware(config)),
+//	)
 //
 // Note: This requires the tracing package to be initialized first:
-//   tp, err := tracing.InitTracing(tracing.DefaultConfig())
-//   defer tp.Shutdown(context.Background())
+//
+//	tp, err := tracing.InitTracing(tracing.DefaultConfig())
+//	defer tp.Shutdown(context.Background())
 func TracingMiddleware(config interface{}) Middleware {
 	// The actual implementation is in pkg/tracing/integration.go
 	// This is just a placeholder that can be replaced when tracing is properly initialized

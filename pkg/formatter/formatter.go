@@ -2,19 +2,21 @@
 // and expanded human-readable syntax.
 //
 // Compact (Glyph) syntax uses symbols:
-//   : -> type definition
-//   @ -> route
-//   $ -> variable assignment (let)
-//   > -> return
-//   + -> middleware
-//   % -> inject
-//   ~ -> event handler
-//   * -> cron task
-//   ! -> command
-//   & -> queue worker
+//
+//	: -> type definition
+//	@ -> route
+//	$ -> variable assignment (let)
+//	> -> return
+//	+ -> middleware
+//	% -> inject
+//	~ -> event handler
+//	* -> cron task
+//	! -> command
+//	& -> queue worker
 //
 // Expanded syntax uses keywords:
-//   type, route, let, return, middleware, inject, event, cron, command, queue
+//
+//	type, route, let, return, middleware, inject, event, cron, command, queue
 package formatter
 
 import (

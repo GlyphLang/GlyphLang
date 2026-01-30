@@ -516,4 +516,3 @@ func BenchmarkHandlerJSON(b *testing.B) {
 		server.GetHandler().ServeHTTP(w, req)
 	}
 }
-

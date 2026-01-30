@@ -4012,8 +4012,9 @@ func (p *Parser) parseGRPCHandler(methodName string) (interpreter.Item, error) {
 
 // parseGraphQLResolver parses a GraphQL resolver definition.
 // Syntax: @ query fieldName(param: Type) -> ReturnType { body }
-//         @ mutation fieldName(param: Type) -> ReturnType { body }
-//         @ subscription fieldName -> ReturnType { body }
+//
+//	@ mutation fieldName(param: Type) -> ReturnType { body }
+//	@ subscription fieldName -> ReturnType { body }
 func (p *Parser) parseGraphQLResolver(opType interpreter.GraphQLOperationType) (interpreter.Item, error) {
 	// Parse field name (required)
 	fieldName, err := p.expectIdent()
@@ -4151,7 +4152,6 @@ func (p *Parser) parseGraphQLResolver(opType interpreter.GraphQLOperationType) (
 		Body:       body,
 	}, nil
 }
-
 
 // parseImport parses an import statement: import "path" or import "path" as alias
 // Examples:

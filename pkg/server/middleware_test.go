@@ -805,12 +805,16 @@ func TestCORSMiddleware_WildcardSecurity(t *testing.T) {
 
 // TestGetClientIP tests IP extraction from requests
 func TestGetClientIP(t *testing.T) {
+	// Configure 10.0.0.1 as a trusted proxy for proxy header tests
+	SetTrustedProxies([]string{"10.0.0.1"})
+	defer SetTrustedProxies(nil)
+
 	tests := []struct {
-		name           string
-		remoteAddr     string
-		xForwardedFor  string
-		xRealIP        string
-		expectedIP     string
+		name          string
+		remoteAddr    string
+		xForwardedFor string
+		xRealIP       string
+		expectedIP    string
 	}{
 		{
 			name:       "use RemoteAddr when no proxy headers",
@@ -818,29 +822,36 @@ func TestGetClientIP(t *testing.T) {
 			expectedIP: "192.168.1.100:12345",
 		},
 		{
-			name:          "prefer X-Forwarded-For over RemoteAddr",
+			name:          "prefer X-Forwarded-For over RemoteAddr from trusted proxy",
 			remoteAddr:    "10.0.0.1:12345",
 			xForwardedFor: "203.0.113.195",
 			expectedIP:    "203.0.113.195",
 		},
 		{
-			name:          "X-Forwarded-For with multiple IPs uses first",
+			name:          "X-Forwarded-For with multiple IPs uses first from trusted proxy",
 			remoteAddr:    "10.0.0.1:12345",
 			xForwardedFor: "203.0.113.195, 70.41.3.18, 150.172.238.178",
 			expectedIP:    "203.0.113.195",
 		},
 		{
-			name:       "prefer X-Real-IP over RemoteAddr",
+			name:       "prefer X-Real-IP over RemoteAddr from trusted proxy",
 			remoteAddr: "10.0.0.1:12345",
 			xRealIP:    "203.0.113.100",
 			expectedIP: "203.0.113.100",
 		},
 		{
-			name:          "prefer X-Forwarded-For over X-Real-IP",
+			name:          "prefer X-Forwarded-For over X-Real-IP from trusted proxy",
 			remoteAddr:    "10.0.0.1:12345",
 			xForwardedFor: "203.0.113.195",
 			xRealIP:       "203.0.113.100",
 			expectedIP:    "203.0.113.195",
+		},
+		{
+			name:          "ignore proxy headers from untrusted proxy",
+			remoteAddr:    "192.168.1.50:12345",
+			xForwardedFor: "203.0.113.195",
+			xRealIP:       "203.0.113.100",
+			expectedIP:    "192.168.1.50:12345",
 		},
 	}
 

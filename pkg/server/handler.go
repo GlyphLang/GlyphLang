@@ -82,20 +82,30 @@ func parseQueryParams(r *http.Request) map[string][]string {
 	return r.URL.Query()
 }
 
+// maxRequestBodySize is the maximum allowed request body size (10 MB)
+const maxRequestBodySize = 10 * 1024 * 1024
+
 // parseJSONBody parses JSON request body into the context
 func parseJSONBody(r *http.Request, ctx *Context) error {
+	defer r.Body.Close()
+
 	// Check Content-Type
 	contentType := r.Header.Get("Content-Type")
-	if !strings.Contains(contentType, "application/json") && contentType != "" {
+	if contentType == "" {
+		contentType = "application/json" // default for missing Content-Type
+	}
+	if !strings.Contains(contentType, "application/json") {
 		return fmt.Errorf("expected application/json content type, got %s", contentType)
 	}
 
-	// Read body
-	body, err := io.ReadAll(r.Body)
+	// Read body with size limit to prevent DoS
+	body, err := io.ReadAll(io.LimitReader(r.Body, maxRequestBodySize+1))
 	if err != nil {
 		return fmt.Errorf("failed to read body: %w", err)
 	}
-	defer r.Body.Close()
+	if int64(len(body)) > maxRequestBodySize {
+		return fmt.Errorf("request body too large (max %d bytes)", maxRequestBodySize)
+	}
 
 	// Skip empty bodies
 	if len(body) == 0 {
@@ -156,9 +166,6 @@ func (h *Handler) handleError(w http.ResponseWriter, r *http.Request, statusCode
 		"code":    statusCode,
 	}
 
-	if err != nil {
-		response["details"] = err.Error()
-	}
-
+	// Do not expose internal error details to clients
 	json.NewEncoder(w).Encode(response)
 }
