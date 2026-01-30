@@ -208,8 +208,19 @@ func GetHover(doc *Document, pos Position) *Hover {
 	return nil
 }
 
-// GetCompletion returns completion items at a position
+// GetCompletion returns completion items at a position.
+// For .glyphx files, returns expanded syntax keywords and snippets.
+// For .glyph files, returns compact syntax keywords and snippets.
+// The IsGlyphX() method on Document (defined in document.go:119) determines the syntax mode.
 func GetCompletion(doc *Document, pos Position) []CompletionItem {
+	if doc.IsGlyphX() {
+		return getExpandedCompletion(doc, pos)
+	}
+	return getCompactCompletion(doc, pos)
+}
+
+// getCompactCompletion returns completions for compact .glyph syntax
+func getCompactCompletion(doc *Document, pos Position) []CompletionItem {
 	var items []CompletionItem
 
 	// Add keywords
@@ -247,17 +258,7 @@ func GetCompletion(doc *Document, pos Position) []CompletionItem {
 	}
 
 	// Add defined types
-	if doc.AST != nil {
-		for _, item := range doc.AST.Items {
-			if typeDef, ok := item.(*interpreter.TypeDef); ok {
-				items = append(items, CompletionItem{
-					Label:  typeDef.Name,
-					Kind:   CompletionItemKindStruct,
-					Detail: "Type definition",
-				})
-			}
-		}
-	}
+	items = append(items, getDefinedTypeCompletions(doc)...)
 
 	// Add route snippets
 	items = append(items, CompletionItem{
@@ -320,6 +321,163 @@ func GetCompletion(doc *Document, pos Position) []CompletionItem {
 		InsertTextFormat: 2,
 	})
 
+	return items
+}
+
+// getExpandedCompletion returns completions for expanded .glyphx syntax.
+// The expanded syntax uses human-readable keywords (route, type, let, return, etc.)
+// instead of the compact symbol-based syntax (@, :, $, >, etc.).
+func getExpandedCompletion(doc *Document, pos Position) []CompletionItem {
+	var items []CompletionItem
+
+	// Expanded syntax keywords (human-readable forms that map to compact symbols)
+	expandedKeywords := []struct {
+		label  string
+		detail string
+	}{
+		{"route", "Define an HTTP route handler (expands to @)"},
+		{"type", "Define a type (expands to :)"},
+		{"let", "Declare a variable (expands to $)"},
+		{"return", "Return a value (expands to >)"},
+		{"middleware", "Apply middleware (expands to +)"},
+		{"use", "Import/use a service (expands to %)"},
+		{"expects", "Declare expected input (expands to <)"},
+		{"validate", "Add validation (expands to ?)"},
+		{"handle", "Handle an event (expands to ~)"},
+		{"cron", "Define a scheduled task (expands to *)"},
+		{"command", "Define a CLI command (expands to !)"},
+		{"queue", "Define a queue worker (expands to &)"},
+		{"func", "Define a function (expands to =)"},
+		{"if", "Conditional statement"},
+		{"else", "Alternative branch"},
+		{"while", "Loop while condition is true"},
+		{"for", "Iterate over collection"},
+		{"in", "Iteration keyword"},
+		{"switch", "Multi-way branch"},
+		{"case", "Switch case"},
+		{"default", "Default case"},
+		{"true", "Boolean true"},
+		{"false", "Boolean false"},
+		{"null", "Null value"},
+		{"async", "Async modifier"},
+		{"await", "Await expression"},
+		{"import", "Import module"},
+		{"from", "Import source"},
+	}
+
+	for _, kw := range expandedKeywords {
+		items = append(items, CompletionItem{
+			Label:  kw.label,
+			Kind:   CompletionItemKindKeyword,
+			Detail: kw.detail,
+		})
+	}
+
+	// Add built-in types
+	types := []string{"int", "str", "string", "bool", "float"}
+	for _, t := range types {
+		items = append(items, CompletionItem{
+			Label:  t,
+			Kind:   CompletionItemKindClass,
+			Detail: "Built-in type",
+		})
+	}
+
+	// Add HTTP methods
+	methods := []string{"GET", "POST", "PUT", "DELETE", "PATCH"}
+	for _, m := range methods {
+		items = append(items, CompletionItem{
+			Label:  m,
+			Kind:   CompletionItemKindKeyword,
+			Detail: "HTTP method",
+		})
+	}
+
+	// Add defined types from AST
+	items = append(items, getDefinedTypeCompletions(doc)...)
+
+	// Expanded syntax snippets using human-readable keywords
+	items = append(items, CompletionItem{
+		Label:            "route-get",
+		Kind:             CompletionItemKindSnippet,
+		Detail:           "GET route (expanded)",
+		InsertText:       "route GET /${1:path} {\n  return {${2:response}}\n}",
+		InsertTextFormat: 2,
+	})
+
+	items = append(items, CompletionItem{
+		Label:            "route-post",
+		Kind:             CompletionItemKindSnippet,
+		Detail:           "POST route (expanded)",
+		InsertText:       "route POST /${1:path} {\n  return {${2:response}}\n}",
+		InsertTextFormat: 2,
+	})
+
+	items = append(items, CompletionItem{
+		Label:            "command-snippet",
+		Kind:             CompletionItemKindSnippet,
+		Detail:           "CLI command (expanded)",
+		InsertText:       "command ${1:name} ${2:param}: ${3:str}!\n  return ${4:\"result\"}",
+		InsertTextFormat: 2,
+	})
+
+	items = append(items, CompletionItem{
+		Label:            "cron-snippet",
+		Kind:             CompletionItemKindSnippet,
+		Detail:           "Scheduled task (expanded)",
+		InsertText:       "cron \"${1:0 0 * * *}\"\n  return ${2:\"task executed\"}",
+		InsertTextFormat: 2,
+	})
+
+	items = append(items, CompletionItem{
+		Label:            "handle-snippet",
+		Kind:             CompletionItemKindSnippet,
+		Detail:           "Event handler (expanded)",
+		InsertText:       "handle \"${1:event.type}\"\n  return ${2:\"event handled\"}",
+		InsertTextFormat: 2,
+	})
+
+	items = append(items, CompletionItem{
+		Label:            "queue-snippet",
+		Kind:             CompletionItemKindSnippet,
+		Detail:           "Queue worker (expanded)",
+		InsertText:       "queue \"${1:queue.name}\"\n  return ${2:\"message processed\"}",
+		InsertTextFormat: 2,
+	})
+
+	items = append(items, CompletionItem{
+		Label:            "typedef",
+		Kind:             CompletionItemKindSnippet,
+		Detail:           "Type definition (expanded)",
+		InsertText:       "type ${1:TypeName} {\n  ${2:field}: ${3:str}!\n}",
+		InsertTextFormat: 2,
+	})
+
+	items = append(items, CompletionItem{
+		Label:            "func-snippet",
+		Kind:             CompletionItemKindSnippet,
+		Detail:           "Function definition (expanded)",
+		InsertText:       "func ${1:name}(${2:param}: ${3:str}) {\n  return ${4:\"result\"}\n}",
+		InsertTextFormat: 2,
+	})
+
+	return items
+}
+
+// getDefinedTypeCompletions returns completions for types defined in the document AST
+func getDefinedTypeCompletions(doc *Document) []CompletionItem {
+	var items []CompletionItem
+	if doc.AST != nil {
+		for _, item := range doc.AST.Items {
+			if typeDef, ok := item.(*interpreter.TypeDef); ok {
+				items = append(items, CompletionItem{
+					Label:  typeDef.Name,
+					Kind:   CompletionItemKindStruct,
+					Detail: "Type definition",
+				})
+			}
+		}
+	}
 	return items
 }
 
@@ -951,28 +1109,45 @@ func checkTypes(module *interpreter.Module) []Diagnostic {
 	return diagnostics
 }
 
-// getKeywordInfo returns information about a keyword
+// getKeywordInfo returns information about a keyword.
+// Covers both compact (.glyph) and expanded (.glyphx) syntax keywords.
 func getKeywordInfo(keyword string) string {
 	keywordDocs := map[string]string{
-		"route":   "**route** - Defines an HTTP route handler (explicit form)\n\nExample:\n```glyph\n@ route /api/users [GET]\n  > {users: []}\n```",
-		"GET":     "**GET** - HTTP GET method for retrieving resources\n\nExample:\n```glyph\n@ GET /api/users\n  > {users: []}\n```",
-		"POST":    "**POST** - HTTP POST method for creating resources\n\nExample:\n```glyph\n@ POST /api/users\n  > {created: true}\n```",
-		"PUT":     "**PUT** - HTTP PUT method for replacing resources\n\nExample:\n```glyph\n@ PUT /api/users/:id\n  > {updated: true}\n```",
-		"DELETE":  "**DELETE** - HTTP DELETE method for removing resources\n\nExample:\n```glyph\n@ DELETE /api/users/:id\n  > {deleted: true}\n```",
-		"PATCH":   "**PATCH** - HTTP PATCH method for partial updates\n\nExample:\n```glyph\n@ PATCH /api/users/:id\n  > {patched: true}\n```",
-		"command": "**command** - Defines a CLI command\n\nExample:\n```glyph\n! command hello name: str!\n  > \"Hello \" + name\n```",
-		"cron":    "**cron** - Defines a scheduled task\n\nExample:\n```glyph\n* cron \"0 0 * * *\"\n  > \"Daily task executed\"\n```",
-		"event":   "**event** - Defines an event handler\n\nExample:\n```glyph\n~ event \"user.created\"\n  > \"Handle user creation\"\n```",
-		"queue":   "**queue** - Defines a message queue worker\n\nExample:\n```glyph\n& queue \"email.send\"\n  > \"Process email\"\n```",
+		// Shared keywords (same in both syntaxes)
+		"route":   "**route** - Defines an HTTP route handler\n\nCompact: `@ route /path [METHOD]`\nExpanded: `route /path [METHOD]`",
+		"GET":     "**GET** - HTTP GET method for retrieving resources",
+		"POST":    "**POST** - HTTP POST method for creating resources",
+		"PUT":     "**PUT** - HTTP PUT method for replacing resources",
+		"DELETE":  "**DELETE** - HTTP DELETE method for removing resources",
+		"PATCH":   "**PATCH** - HTTP PATCH method for partial updates",
+		"command": "**command** - Defines a CLI command\n\nCompact: `! command name`\nExpanded: `command name`",
+		"cron":    "**cron** - Defines a scheduled task\n\nCompact: `* cron \"schedule\"`\nExpanded: `cron \"schedule\"`",
+		"event":   "**event** - Defines an event handler\n\nCompact: `~ event \"type\"`\nExpanded: `handle \"type\"`",
+		"queue":   "**queue** - Defines a message queue worker\n\nCompact: `& queue \"name\"`\nExpanded: `queue \"name\"`",
 		"if":      "**if** - Conditional statement\n\nExample:\n```glyph\nif condition {\n  > {success: true}\n}\n```",
 		"else":    "**else** - Alternative branch for if statement",
-		"while":   "**while** - Loop that executes while condition is true\n\nExample:\n```glyph\nwhile count < 10 {\n  $ count = count + 1\n}\n```",
-		"for":     "**for** - Iterates over arrays or objects\n\nExample:\n```glyph\nfor item in items {\n  > item\n}\n```",
-		"switch":  "**switch** - Multi-way branch statement\n\nExample:\n```glyph\nswitch value {\n  case 1 { > \"one\" }\n  default { > \"other\" }\n}\n```",
+		"while":   "**while** - Loop that executes while condition is true",
+		"for":     "**for** - Iterates over arrays or objects",
+		"switch":  "**switch** - Multi-way branch statement",
 		"case":    "**case** - Branch in switch statement",
 		"default": "**default** - Default branch in switch statement",
 		"true":    "**true** - Boolean literal",
 		"false":   "**false** - Boolean literal",
+		// Expanded-only keywords (map to compact symbols)
+		"type":       "**type** - Define a type definition\n\nExpanded form of `:` in compact syntax\n\nExample:\n```glyphx\ntype User {\n  name: str!\n  email: str!\n}\n```",
+		"let":        "**let** - Declare a variable\n\nExpanded form of `$` in compact syntax\n\nExample:\n```glyphx\nlet result = db.query()\n```",
+		"return":     "**return** - Return a value from a handler\n\nExpanded form of `>` in compact syntax\n\nExample:\n```glyphx\nreturn {users: []}\n```",
+		"middleware": "**middleware** - Apply middleware to a route\n\nExpanded form of `+` in compact syntax\n\nExample:\n```glyphx\nmiddleware auth(jwt)\n```",
+		"use":        "**use** - Import or use a service\n\nExpanded form of `%` in compact syntax\n\nExample:\n```glyphx\nuse database(postgres)\n```",
+		"expects":    "**expects** - Declare expected input\n\nExpanded form of `<` in compact syntax\n\nExample:\n```glyphx\nexpects {name: str!, email: str!}\n```",
+		"validate":   "**validate** - Add validation rules\n\nExpanded form of `?` in compact syntax\n\nExample:\n```glyphx\nvalidate body.email email\n```",
+		"handle":     "**handle** - Handle an event\n\nExpanded form of `~` in compact syntax\n\nExample:\n```glyphx\nhandle \"user.created\" {\n  return \"event processed\"\n}\n```",
+		"func":       "**func** - Define a function\n\nExpanded form of `=` in compact syntax\n\nExample:\n```glyphx\nfunc greet(name: str) {\n  return \"Hello \" + name\n}\n```",
+		"null":       "**null** - Null literal value",
+		"async":      "**async** - Mark an operation as asynchronous",
+		"await":      "**await** - Wait for an async operation to complete",
+		"import":     "**import** - Import a module or dependency",
+		"from":       "**from** - Specify the source for an import",
 	}
 
 	return keywordDocs[keyword]

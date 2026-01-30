@@ -74,6 +74,8 @@ const (
 	AS        // as
 	MODULE    // module
 	CONST     // const
+	TEST      // test
+	ASSERT    // assert
 )
 
 // Token represents a lexical token
@@ -209,6 +211,10 @@ func (t TokenType) String() string {
 		return "MODULE"
 	case CONST:
 		return "CONST"
+	case TEST:
+		return "TEST"
+	case ASSERT:
+		return "ASSERT"
 	default:
 		return "UNKNOWN"
 	}
