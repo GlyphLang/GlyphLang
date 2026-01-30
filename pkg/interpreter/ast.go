@@ -47,12 +47,22 @@ type Function struct {
 
 func (Function) isItem() {}
 
+// FieldAnnotation represents a declarative validation annotation on a type
+// field such as @minLen(2), @email, or @pattern("[A-Z]"). Annotations are
+// parsed from type definitions and processed by the validation schema builder
+// in pkg/validation to generate validation rules automatically.
+type FieldAnnotation struct {
+	Name   string        // annotation name, e.g. "minLen", "email"
+	Params []interface{} // typed parameters: string, int64, float64, or []string
+}
+
 // Field represents a struct field
 type Field struct {
 	Name           string
 	TypeAnnotation Type
 	Required       bool
-	Default        Expr // nil if no default value
+	Default        Expr              // nil if no default value
+	Annotations    []FieldAnnotation // nil when no annotations are present
 }
 
 // Type represents a type annotation
