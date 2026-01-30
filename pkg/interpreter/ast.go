@@ -89,6 +89,8 @@ type NamedType struct {
 
 type DatabaseType struct{}
 type RedisType struct{}
+type MongoDBType struct{}
+type LLMType struct{}
 
 type UnionType struct {
 	Types []Type
@@ -130,6 +132,8 @@ func (OptionalType) isType()      {}
 func (NamedType) isType()         {}
 func (DatabaseType) isType()      {}
 func (RedisType) isType()         {}
+func (MongoDBType) isType()       {}
+func (LLMType) isType()           {}
 func (UnionType) isType()         {}
 func (GenericType) isType()       {}
 func (TypeParameterType) isType() {}
@@ -145,6 +149,7 @@ const (
 	Delete
 	Patch
 	WebSocket // WebSocket upgrade
+	SSE       // Server-Sent Events
 )
 
 func (m HttpMethod) String() string {
@@ -161,6 +166,8 @@ func (m HttpMethod) String() string {
 		return "PATCH"
 	case WebSocket:
 		return "WS"
+	case SSE:
+		return "SSE"
 	default:
 		return "UNKNOWN"
 	}
@@ -313,6 +320,23 @@ type ExpressionStatement struct {
 }
 
 func (ExpressionStatement) isStatement() {}
+
+// YieldStatement sends a value as a Server-Sent Event in SSE routes.
+type YieldStatement struct {
+	Value     Expr   // The event data to send
+	EventType string // Optional named event type (empty for default "message")
+}
+
+func (YieldStatement) isStatement() {}
+
+// AssertStatement represents an assertion in a test block
+// Example: assert(condition) or assert(condition, "message")
+type AssertStatement struct {
+	Condition Expr // Expression that must evaluate to true
+	Message   Expr // Optional failure message (nil if not provided)
+}
+
+func (AssertStatement) isStatement() {}
 
 // Expr represents an expression in the AST
 type Expr interface {
@@ -638,6 +662,16 @@ type ConstDecl struct {
 
 func (ConstDecl) isItem() {}
 
+// TestBlock represents a test definition
+// Compact syntax: test "name" { body }
+// Expanded syntax: test "name" { body }
+type TestBlock struct {
+	Name string      // Test name/description
+	Body []Statement // Test body statements including assertions
+}
+
+func (TestBlock) isItem() {}
+
 // AsyncExpr represents an async block expression: async { ... }
 // The block is executed asynchronously and returns a Future
 type AsyncExpr struct {
@@ -791,6 +825,7 @@ func (WsBroadcastStatement) isNode() {}
 func (WsCloseStatement) isNode()     {}
 func (ValidationStatement) isNode()  {}
 func (ExpressionStatement) isNode()  {}
+func (YieldStatement) isNode()       {}
 func (WebSocketEvent) isNode()       {}
 func (LiteralExpr) isNode()          {}
 func (VariableExpr) isNode()         {}
@@ -812,3 +847,5 @@ func (ArrayPattern) isNode()         {}
 func (AsyncExpr) isNode()            {}
 func (AwaitExpr) isNode()            {}
 func (LambdaExpr) isNode()           {}
+func (TestBlock) isNode()            {}
+func (AssertStatement) isNode()      {}

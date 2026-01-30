@@ -3276,3 +3276,69 @@ func TestParser_FieldNoAnnotations(t *testing.T) {
 	require.True(t, ok)
 	assert.Empty(t, td.Fields[0].Annotations)
 }
+
+func TestParser_SSERoute(t *testing.T) {
+	input := `@ sse /events {
+		yield { msg: "hello" }
+	}`
+
+	lexer := NewLexer(input)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+	require.Len(t, module.Items, 1)
+
+	route, ok := module.Items[0].(*interpreter.Route)
+	require.True(t, ok, "expected *interpreter.Route, got %T", module.Items[0])
+	assert.Equal(t, interpreter.SSE, route.Method)
+	assert.Equal(t, "/events", route.Path)
+	require.Len(t, route.Body, 1)
+
+	yieldStmt, ok := route.Body[0].(interpreter.YieldStatement)
+	require.True(t, ok, "expected YieldStatement, got %T", route.Body[0])
+	assert.NotNil(t, yieldStmt.Value)
+}
+
+func TestParser_SSERouteWithPathParams(t *testing.T) {
+	input := `@ sse /events/:userId {
+		yield "connected"
+	}`
+
+	lexer := NewLexer(input)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+	require.Len(t, module.Items, 1)
+
+	route, ok := module.Items[0].(*interpreter.Route)
+	require.True(t, ok)
+	assert.Equal(t, interpreter.SSE, route.Method)
+	assert.Equal(t, "/events/:userId", route.Path)
+}
+
+func TestParser_YieldStatement(t *testing.T) {
+	input := `@ GET /test {
+		yield "data"
+	}`
+
+	lexer := NewLexer(input)
+	tokens, err := lexer.Tokenize()
+	require.NoError(t, err)
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	require.NoError(t, err)
+
+	route, ok := module.Items[0].(*interpreter.Route)
+	require.True(t, ok)
+	require.Len(t, route.Body, 1)
+
+	_, ok = route.Body[0].(interpreter.YieldStatement)
+	assert.True(t, ok, "expected YieldStatement, got %T", route.Body[0])
+}

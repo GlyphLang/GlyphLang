@@ -57,6 +57,27 @@ var allowedMethods = map[string]bool{
 	"Keys":      true,
 	"Ping":      true,
 	"FlushAll":  true,
+	// MongoDB methods - follows same pattern as Database/Redis methods above;
+	// authorization is enforced at route level via auth() directives
+	"Collection":     true,
+	"FindOne":        true,
+	"InsertOne":      true,
+	"InsertMany":     true,
+	"UpdateOne":      true,
+	"UpdateMany":     true,
+	"DeleteOne":      true,
+	"DeleteMany":     true,
+	"CountDocuments": true,
+	"Aggregate":      true,
+	"CreateIndex":    true,
+	"DropIndex":      true,
+	// LLM methods
+	"Complete":     true,
+	"Chat":         true,
+	"Stream":       true,
+	"Embed":        true,
+	"ListModels":   true,
+	"TokenCount":   true,
 	// Common safe methods
 	"String": true,
 	"Int":    true,
