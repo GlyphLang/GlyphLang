@@ -1,0 +1,80 @@
+{
+  "name": "glyphlang",
+  "displayName": "GlyphLang",
+  "description": "Syntax highlighting and language support for Glyph (.glyph) and expanded Glyph (.glyphx) files",
+  "version": "0.2.0",
+  "publisher": "GlyphLang",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GlyphLang/GlyphLang"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "glyph",
+        "aliases": ["Glyph", "glyph"],
+        "extensions": [".glyph"],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "glyphx",
+        "aliases": ["GlyphX", "glyphx", "Glyph Expanded"],
+        "extensions": [".glyphx"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "glyph",
+        "scopeName": "source.glyph",
+        "path": "./syntaxes/glyph.tmLanguage.json"
+      },
+      {
+        "language": "glyphx",
+        "scopeName": "source.glyphx",
+        "path": "./syntaxes/glyphx.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "GlyphLang",
+      "properties": {
+        "glyph.lsp.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Glyph Language Server"
+        },
+        "glyph.lsp.path": {
+          "type": "string",
+          "default": "glyph",
+          "description": "Path to the glyph CLI binary"
+        },
+        "glyph.autoExpandOnOpen": {
+          "type": "boolean",
+          "default": false,
+          "description": "Auto-expand .glyph to .glyphx when opening"
+        },
+        "glyph.autoCompactOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Auto-compact .glyphx to .glyph when saving"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "glyph.expandToGlyphx",
+        "title": "Glyph: Expand to .glyphx"
+      },
+      {
+        "command": "glyph.compactToGlyph",
+        "title": "Glyph: Compact to .glyph"
+      }
+    ]
+  }
+}
