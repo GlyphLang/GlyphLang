@@ -16,8 +16,9 @@ type Interpreter struct {
 	eventHandlers   map[string][]EventHandler
 	queueWorkers    map[string]QueueWorker
 	grpcServices    map[string]GRPCService  // key: service name
-	grpcHandlers    map[string]GRPCHandler  // key: method name
-	testBlocks      []TestBlock
+	grpcHandlers     map[string]GRPCHandler   // key: method name
+	graphqlResolvers map[string]GraphQLResolver // key: "operation.fieldName"
+	testBlocks       []TestBlock
 	typeChecker     *TypeChecker
 	dbHandler       interface{}              // Database handler for dependency injection
 	redisHandler    interface{}              // Redis handler for dependency injection
@@ -41,8 +42,9 @@ func NewInterpreter() *Interpreter {
 		eventHandlers:   make(map[string][]EventHandler),
 		queueWorkers:    make(map[string]QueueWorker),
 		grpcServices:    make(map[string]GRPCService),
-		grpcHandlers:    make(map[string]GRPCHandler),
-		typeChecker:     typeChecker,
+		grpcHandlers:     make(map[string]GRPCHandler),
+		graphqlResolvers: make(map[string]GraphQLResolver),
+		typeChecker:      typeChecker,
 		moduleResolver:  NewModuleResolver(),
 		importedModules: make(map[string]*LoadedModule),
 		constants:       make(map[string]struct{}),
@@ -136,7 +138,12 @@ func (i *Interpreter) LoadModuleWithPath(module Module, basePath string) error {
 		case *GRPCHandler:
 			i.grpcHandlers[it.MethodName] = *it
 
+		case *GraphQLResolver:
+			key := it.Operation.String() + "." + it.FieldName
+			i.graphqlResolvers[key] = *it
+
 		case *TestBlock:
+			// Store test blocks for later execution by the test runner.
 			i.testBlocks = append(i.testBlocks, *it)
 
 		case *ConstDecl:
@@ -749,6 +756,24 @@ func (i *Interpreter) GetGRPCHandlers() map[string]GRPCHandler {
 	return result
 }
 
+// GetGraphQLResolvers returns a copy of the registered GraphQL resolvers
+func (i *Interpreter) GetGraphQLResolvers() map[string]GraphQLResolver {
+	result := make(map[string]GraphQLResolver, len(i.graphqlResolvers))
+	for k, v := range i.graphqlResolvers {
+		result[k] = v
+	}
+	return result
+}
+
+// GetTypeDefs returns a copy of the registered type definitions
+func (i *Interpreter) GetTypeDefs() map[string]TypeDef {
+	result := make(map[string]TypeDef, len(i.typeDefs))
+	for k, v := range i.typeDefs {
+		result[k] = v
+	}
+	return result
+}
+
 // ExecuteGRPCHandler executes a gRPC handler with the given request.
 func (i *Interpreter) ExecuteGRPCHandler(handler *GRPCHandler, args map[string]interface{}, authData map[string]interface{}) (interface{}, error) {
 	if handler == nil {
@@ -782,6 +807,51 @@ func (i *Interpreter) ExecuteGRPCHandler(handler *GRPCHandler, args map[string]i
 	}
 
 	result, err := i.executeStatements(handler.Body, handlerEnv)
+	if err != nil {
+		if retErr, ok := err.(*returnValue); ok {
+			result = retErr.value
+		} else {
+			return nil, err
+		}
+	}
+
+	return result, nil
+}
+
+// ExecuteGraphQLResolver executes a single GraphQL resolver with the given arguments.
+func (i *Interpreter) ExecuteGraphQLResolver(resolver *GraphQLResolver, args map[string]interface{}, authData map[string]interface{}) (interface{}, error) {
+	if resolver == nil {
+		return nil, fmt.Errorf("resolver is nil")
+	}
+
+	resolverEnv := NewChildEnvironment(i.globalEnv)
+
+	// Bind arguments matching resolver params
+	for _, param := range resolver.Params {
+		if val, ok := args[param.Name]; ok {
+			resolverEnv.Define(param.Name, val)
+		} else if param.Required {
+			return nil, fmt.Errorf("missing required argument: %s", param.Name)
+		} else if param.Default != nil {
+			defaultVal, err := i.EvaluateExpression(param.Default, resolverEnv)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating default for %s: %v", param.Name, err)
+			}
+			resolverEnv.Define(param.Name, defaultVal)
+		} else {
+			resolverEnv.Define(param.Name, nil)
+		}
+	}
+
+	for _, injection := range resolver.Injections {
+		i.injectDependency(injection, resolverEnv)
+	}
+
+	if resolver.Auth != nil && authData != nil {
+		resolverEnv.Define("auth", authData)
+	}
+
+	result, err := i.executeStatements(resolver.Body, resolverEnv)
 	if err != nil {
 		if retErr, ok := err.(*returnValue); ok {
 			result = retErr.value
@@ -838,6 +908,7 @@ func (i *Interpreter) runSingleTest(test TestBlock) TestResult {
 	return TestResult{Name: test.Name, Passed: true, Duration: duration}
 }
 
+// matchesFilter checks if a test name matches a filter string.
 func matchesFilter(name, filter string) bool {
 	if filter == "" {
 		return true
