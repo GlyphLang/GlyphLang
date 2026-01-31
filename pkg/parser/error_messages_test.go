@@ -44,8 +44,8 @@ func TestImprovedErrorMessages(t *testing.T) {
 			},
 		},
 		{
-			name: "unexpected token at top level",
-			input: `{ invalid: "top level" }`,
+			name:        "unexpected token at top level",
+			input:       `{ invalid: "top level" }`,
 			expectError: true,
 			errorCheck: func(err error) bool {
 				return strings.Contains(err.Error(), "Unexpected token") &&

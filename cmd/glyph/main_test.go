@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/glyphlang/glyph/pkg/ast"
 	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/server"
 	"github.com/stretchr/testify/assert"
@@ -35,14 +36,14 @@ func TestChangeExtension(t *testing.T) {
 
 func TestConvertHTTPMethod(t *testing.T) {
 	tests := []struct {
-		input    interpreter.HttpMethod
+		input    ast.HttpMethod
 		expected string
 	}{
-		{interpreter.Get, "GET"},
-		{interpreter.Post, "POST"},
-		{interpreter.Put, "PUT"},
-		{interpreter.Delete, "DELETE"},
-		{interpreter.Patch, "PATCH"},
+		{ast.Get, "GET"},
+		{ast.Post, "POST"},
+		{ast.Put, "PUT"},
+		{ast.Delete, "DELETE"},
+		{ast.Patch, "PATCH"},
 	}
 
 	for _, tt := range tests {
@@ -64,10 +65,10 @@ func TestParseSource(t *testing.T) {
 	assert.Len(t, module.Items, 1)
 
 	// Verify the route was created
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 	assert.Equal(t, "/hello", route.Path)
-	assert.Equal(t, interpreter.Get, route.Method)
+	assert.Equal(t, ast.Get, route.Method)
 }
 
 func TestGetHelloWorldTemplate(t *testing.T) {
@@ -119,10 +120,10 @@ func TestRunInitCommand(t *testing.T) {
 func TestExecuteRoute(t *testing.T) {
 	// Create a simple route with empty body
 	// This test just verifies the function signature is correct
-	route := &interpreter.Route{
+	route := &ast.Route{
 		Path:   "/test",
-		Method: interpreter.Get,
-		Body:   []interpreter.Statement{},
+		Method: ast.Get,
+		Body:   []ast.Statement{},
 	}
 
 	// Create test context and interpreter

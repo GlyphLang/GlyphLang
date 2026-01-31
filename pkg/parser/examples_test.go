@@ -1,11 +1,11 @@
 package parser
 
 import (
+	"github.com/glyphlang/glyph/pkg/ast"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -36,9 +36,9 @@ func TestExamples_HelloWorld(t *testing.T) {
 	assert.GreaterOrEqual(t, len(module.Items), 3, "should have at least 3 items")
 
 	// Check for routes
-	routes := []*interpreter.Route{}
+	routes := []*ast.Route{}
 	for _, item := range module.Items {
-		if route, ok := item.(*interpreter.Route); ok {
+		if route, ok := item.(*ast.Route); ok {
 			routes = append(routes, route)
 		}
 	}
@@ -80,9 +80,9 @@ func TestExamples_RestApi(t *testing.T) {
 	assert.Greater(t, len(module.Items), 0, "should have items")
 
 	// Check for type definitions
-	typeDefs := []*interpreter.TypeDef{}
+	typeDefs := []*ast.TypeDef{}
 	for _, item := range module.Items {
-		if typeDef, ok := item.(*interpreter.TypeDef); ok {
+		if typeDef, ok := item.(*ast.TypeDef); ok {
 			typeDefs = append(typeDefs, typeDef)
 		}
 	}
@@ -99,9 +99,9 @@ func TestExamples_RestApi(t *testing.T) {
 	assert.True(t, hasUserType, "should have User type definition")
 
 	// Check for routes
-	routes := []*interpreter.Route{}
+	routes := []*ast.Route{}
 	for _, item := range module.Items {
-		if route, ok := item.(*interpreter.Route); ok {
+		if route, ok := item.(*ast.Route); ok {
 			routes = append(routes, route)
 		}
 	}
@@ -118,7 +118,7 @@ func TestExamples_RestApi(t *testing.T) {
 	assert.True(t, hasAuthRoute, "should have at least one route with auth")
 
 	// Verify different HTTP methods are used
-	methods := make(map[interpreter.HttpMethod]bool)
+	methods := make(map[ast.HttpMethod]bool)
 	for _, route := range routes {
 		methods[route.Method] = true
 	}
@@ -192,7 +192,7 @@ func TestExamples_SimpleRoute(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 	assert.Equal(t, "/hello", route.Path)
 }
@@ -211,7 +211,7 @@ func TestExamples_PathParam(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 	assert.Equal(t, "/users/:id", route.Path)
 }
@@ -235,7 +235,7 @@ func TestExamples_JsonResponse(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 	assert.Equal(t, "/data", route.Path)
 }
@@ -265,7 +265,7 @@ func TestExamples_MultipleRoutes(t *testing.T) {
 
 	paths := []string{}
 	for _, item := range module.Items {
-		if route, ok := item.(*interpreter.Route); ok {
+		if route, ok := item.(*ast.Route); ok {
 			paths = append(paths, route.Path)
 		}
 	}
@@ -288,7 +288,7 @@ func TestExamples_WithAuth(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 	require.NotNil(t, route.Auth)
 	assert.Equal(t, "jwt", route.Auth.AuthType)
@@ -308,9 +308,9 @@ func TestExamples_PostRoute(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
-	assert.Equal(t, interpreter.Post, route.Method)
+	assert.Equal(t, ast.Post, route.Method)
 }
 
 func TestExamples_ErrorHandling(t *testing.T) {
@@ -332,7 +332,7 @@ func TestExamples_ErrorHandling(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 	assert.Greater(t, len(route.Body), 0)
 }

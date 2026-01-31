@@ -16,8 +16,8 @@ func TestNewRoom(t *testing.T) {
 func TestRoomAddConnection(t *testing.T) {
 	room := NewRoom("test-room")
 	conn := &Connection{
-		ID:   "conn1",
-		Data: make(map[string]interface{}),
+		ID:    "conn1",
+		Data:  make(map[string]interface{}),
 		rooms: make(map[string]bool),
 	}
 
@@ -30,8 +30,8 @@ func TestRoomAddConnection(t *testing.T) {
 func TestRoomRemoveConnection(t *testing.T) {
 	room := NewRoom("test-room")
 	conn := &Connection{
-		ID:   "conn1",
-		Data: make(map[string]interface{}),
+		ID:    "conn1",
+		Data:  make(map[string]interface{}),
 		rooms: make(map[string]bool),
 	}
 
@@ -47,15 +47,15 @@ func TestRoomBroadcast(t *testing.T) {
 	room := NewRoom("test-room")
 
 	conn1 := &Connection{
-		ID:   "conn1",
-		send: make(chan []byte, 256),
-		Data: make(map[string]interface{}),
+		ID:    "conn1",
+		send:  make(chan []byte, 256),
+		Data:  make(map[string]interface{}),
 		rooms: make(map[string]bool),
 	}
 	conn2 := &Connection{
-		ID:   "conn2",
-		send: make(chan []byte, 256),
-		Data: make(map[string]interface{}),
+		ID:    "conn2",
+		send:  make(chan []byte, 256),
+		Data:  make(map[string]interface{}),
 		rooms: make(map[string]bool),
 	}
 
@@ -74,15 +74,15 @@ func TestRoomBroadcastExclude(t *testing.T) {
 	room := NewRoom("test-room")
 
 	conn1 := &Connection{
-		ID:   "conn1",
-		send: make(chan []byte, 256),
-		Data: make(map[string]interface{}),
+		ID:    "conn1",
+		send:  make(chan []byte, 256),
+		Data:  make(map[string]interface{}),
 		rooms: make(map[string]bool),
 	}
 	conn2 := &Connection{
-		ID:   "conn2",
-		send: make(chan []byte, 256),
-		Data: make(map[string]interface{}),
+		ID:    "conn2",
+		send:  make(chan []byte, 256),
+		Data:  make(map[string]interface{}),
 		rooms: make(map[string]bool),
 	}
 

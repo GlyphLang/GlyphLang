@@ -10,13 +10,26 @@ import (
 	"github.com/glyphlang/glyph/pkg/server"
 )
 
+// demoInterpreter implements the server.Interpreter interface for demo purposes.
+// The server.Interpreter interface requires: Execute(route *server.Route, ctx *server.Context) (interface{}, error)
+type demoInterpreter struct {
+	Response interface{}
+}
+
+func (d *demoInterpreter) Execute(route *server.Route, ctx *server.Context) (interface{}, error) {
+	if d.Response != nil {
+		return d.Response, nil
+	}
+	return map[string]interface{}{"message": "Demo response"}, nil
+}
+
 func main() {
 	// Create server with middleware
 	srv := server.NewServer(
 		server.WithAddr(":8080"),
 		server.WithMiddleware(server.LoggingMiddleware()),
 		server.WithMiddleware(server.RecoveryMiddleware()),
-		server.WithInterpreter(&server.MockInterpreter{
+		server.WithInterpreter(&demoInterpreter{
 			Response: map[string]interface{}{
 				"status": "ok",
 				"server": "Glyph Demo Server",

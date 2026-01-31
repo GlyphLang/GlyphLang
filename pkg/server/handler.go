@@ -82,20 +82,30 @@ func parseQueryParams(r *http.Request) map[string][]string {
 	return r.URL.Query()
 }
 
+// maxRequestBodySize is the maximum allowed request body size (10 MB).
+const maxRequestBodySize = 10 << 20
+
 // parseJSONBody parses JSON request body into the context
 func parseJSONBody(r *http.Request, ctx *Context) error {
+	defer r.Body.Close()
+
 	// Check Content-Type
 	contentType := r.Header.Get("Content-Type")
-	if !strings.Contains(contentType, "application/json") && contentType != "" {
+	if contentType == "" {
+		contentType = "application/json" // default for missing Content-Type
+	}
+	if !strings.Contains(contentType, "application/json") {
 		return fmt.Errorf("expected application/json content type, got %s", contentType)
 	}
+
+	// Limit request body size to prevent denial-of-service
+	r.Body = http.MaxBytesReader(ctx.ResponseWriter, r.Body, maxRequestBodySize)
 
 	// Read body
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read body: %w", err)
 	}
-	defer r.Body.Close()
 
 	// Skip empty bodies
 	if len(body) == 0 {
@@ -141,12 +151,13 @@ func SendError(ctx *Context, statusCode int, message string) error {
 	})
 }
 
-// handleError logs and sends an error response
+// handleError logs and sends an error response.
+// Full error details are logged server-side but never exposed to clients.
 func (h *Handler) handleError(w http.ResponseWriter, r *http.Request, statusCode int, message string, err error) {
-	// Log the error
+	// Log the full error detail server-side
 	log.Printf("[ERROR] %s %s: %s - %v", r.Method, r.URL.Path, message, err)
 
-	// Send JSON error response
+	// Send JSON error response without internal details
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 
@@ -156,9 +167,6 @@ func (h *Handler) handleError(w http.ResponseWriter, r *http.Request, statusCode
 		"code":    statusCode,
 	}
 
-	if err != nil {
-		response["details"] = err.Error()
-	}
-
+	// Do not expose internal error details to clients
 	json.NewEncoder(w).Encode(response)
 }

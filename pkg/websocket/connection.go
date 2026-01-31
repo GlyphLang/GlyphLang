@@ -45,13 +45,13 @@ type Connection struct {
 	routePattern string
 
 	// Heartbeat tracking
-	missedPongs    int
-	lastPongTime   time.Time
-	heartbeatMu    sync.RWMutex
+	missedPongs  int
+	lastPongTime time.Time
+	heartbeatMu  sync.RWMutex
 
 	// Message queue for backpressure handling
-	messageQueue   [][]byte
-	queueMu        sync.Mutex
+	messageQueue [][]byte
+	queueMu      sync.Mutex
 }
 
 // RoutePattern returns the route pattern this connection matched

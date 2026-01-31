@@ -1,9 +1,9 @@
 package parser
 
 import (
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -39,7 +39,7 @@ func TestParser_FunctionParamOrdering_ValidOrder(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	fn, ok := module.Items[0].(*interpreter.Function)
+	fn, ok := module.Items[0].(*ast.Function)
 	require.True(t, ok)
 	require.Len(t, fn.Params, 3)
 
@@ -64,12 +64,12 @@ func TestParser_FieldDefaultExpression(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 	require.Len(t, typeDef.Fields, 1)
 
 	// Should parse as a binary expression
-	_, ok = typeDef.Fields[0].Default.(interpreter.BinaryOpExpr)
+	_, ok = typeDef.Fields[0].Default.(ast.BinaryOpExpr)
 	assert.True(t, ok, "default should be a binary expression")
 }
 
@@ -87,12 +87,12 @@ func TestParser_FieldDefaultArrayLiteral(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 	require.Len(t, typeDef.Fields, 1)
 
 	// Should parse as an array expression
-	_, ok = typeDef.Fields[0].Default.(interpreter.ArrayExpr)
+	_, ok = typeDef.Fields[0].Default.(ast.ArrayExpr)
 	assert.True(t, ok, "default should be an array expression")
 }
 
@@ -110,12 +110,12 @@ func TestParser_FieldDefaultFloat(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 
-	lit, ok := typeDef.Fields[0].Default.(interpreter.LiteralExpr)
+	lit, ok := typeDef.Fields[0].Default.(ast.LiteralExpr)
 	require.True(t, ok)
-	floatLit, ok := lit.Value.(interpreter.FloatLiteral)
+	floatLit, ok := lit.Value.(ast.FloatLiteral)
 	require.True(t, ok)
 	assert.Equal(t, 0.5, floatLit.Value)
 }
@@ -134,7 +134,7 @@ func TestParser_GenericFunctionParamDefaults(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	fn, ok := module.Items[0].(*interpreter.Function)
+	fn, ok := module.Items[0].(*ast.Function)
 	require.True(t, ok)
 	require.Len(t, fn.Params, 2)
 
@@ -178,7 +178,7 @@ func TestParser_OptionalParamWithoutDefault(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	fn, ok := module.Items[0].(*interpreter.Function)
+	fn, ok := module.Items[0].(*ast.Function)
 	require.True(t, ok)
 	require.Len(t, fn.Params, 2)
 
@@ -340,7 +340,7 @@ func TestParser_FieldDefaultCorrectTypes(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 	require.Len(t, typeDef.Fields, 4)
 
@@ -365,7 +365,7 @@ func TestParser_FieldDefaultComplexExpressionNotValidated(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 	require.Len(t, typeDef.Fields, 1)
 	assert.NotNil(t, typeDef.Fields[0].Default)
@@ -385,7 +385,7 @@ func TestParser_OptionalFieldDefaultMatchingType(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 	require.Len(t, typeDef.Fields, 1)
 	assert.NotNil(t, typeDef.Fields[0].Default)
@@ -427,7 +427,7 @@ func TestParser_AnyTypeAcceptsAllDefaults(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err, "'any' type should accept any literal default")
 
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 	require.Len(t, typeDef.Fields, 4)
 
@@ -452,7 +452,7 @@ func TestParser_OptionalAnyTypeAcceptsDefaults(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err, "optional 'any' type should accept defaults")
 
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 	require.Len(t, typeDef.Fields, 2)
 }
@@ -472,7 +472,7 @@ func TestParser_TimestampTypeAcceptsValidDefaults(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err, "'timestamp' should accept int and string defaults")
 
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 	require.Len(t, typeDef.Fields, 2)
 	assert.NotNil(t, typeDef.Fields[0].Default)
@@ -512,7 +512,7 @@ func TestParser_ObjectTypeAcceptsDefaults(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err, "'object' type should accept any literal default")
 
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 	require.Len(t, typeDef.Fields, 2)
 }

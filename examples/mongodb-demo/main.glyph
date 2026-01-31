@@ -1,0 +1,119 @@
+# MongoDB Demo
+# Demonstrates MongoDB integration for document-oriented data storage
+
+# Define types
+: User {
+  _id: str
+  username: str!
+  email: str!
+  role: str
+}
+
+: ApiResponse {
+  success: bool!
+  message: str
+  data: any
+}
+
+# Get all users
+@ GET /api/users -> ApiResponse {
+  + ratelimit(200/min)
+  % mongo: MongoDB
+
+  $ users = mongo.Collection("users").Find({})
+
+  > {
+    success: true,
+    message: "Users retrieved",
+    data: users
+  }
+}
+
+# Get a user by ID
+@ GET /api/users/:id -> ApiResponse {
+  + ratelimit(200/min)
+  % mongo: MongoDB
+
+  $ user = mongo.Collection("users").FindOne({ _id: id })
+
+  if user == null {
+    > {
+      success: false,
+      message: "User not found",
+      data: null
+    }
+  } else {
+    > {
+      success: true,
+      message: "User found",
+      data: user
+    }
+  }
+}
+
+# Create a new user
+@ POST /api/users -> ApiResponse {
+  + auth(jwt)
+  + ratelimit(50/min)
+  % mongo: MongoDB
+
+  $ insertedId = mongo.Collection("users").InsertOne(input)
+
+  > {
+    success: true,
+    message: "User created",
+    data: insertedId
+  }
+}
+
+# Update a user
+@ PUT /api/users/:id -> ApiResponse {
+  + auth(jwt)
+  + ratelimit(50/min)
+  % mongo: MongoDB
+
+  $ modified = mongo.Collection("users").UpdateOne({ _id: id }, input)
+
+  if modified == 0 {
+    > {
+      success: false,
+      message: "User not found",
+      data: null
+    }
+  } else {
+    > {
+      success: true,
+      message: "User updated",
+      data: modified
+    }
+  }
+}
+
+# Delete a user
+@ DELETE /api/users/:id -> ApiResponse {
+  + auth(jwt)
+  + ratelimit(20/min)
+  % mongo: MongoDB
+
+  $ deleted = mongo.Collection("users").DeleteOne({ _id: id })
+
+  > {
+    success: true,
+    message: "User deleted",
+    data: deleted
+  }
+}
+
+# Count users by role
+@ GET /api/users/count/:role -> ApiResponse {
+  + ratelimit(200/min)
+  % mongo: MongoDB
+
+  $ count = mongo.Collection("users").CountDocuments({ role: role })
+
+  > {
+    success: true,
+    message: "Count retrieved",
+    data: count
+  }
+}

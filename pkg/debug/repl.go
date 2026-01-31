@@ -341,11 +341,10 @@ func (r *REPL) cmdEval(args []string) error {
 	r.printf("Expression: %s\n", exprStr)
 	r.printf("Note: This feature requires VM state exposure and expression-only parsing\n")
 
-	// TODO: When VM exposes locals/globals:
-	// 1. Create a lexer and tokenize the expression
-	// 2. Parse it as an expression (would need parser.parseExpr to be public)
-	// 3. Create an interpreter with VM's current state
-	// 4. Evaluate and return the result
+	// Expression evaluation requires:
+	// 1. VM exposing locals/globals for state inspection
+	// 2. A public parseExpr method or standalone expression parser
+	// 3. An interpreter that can evaluate with the VM's current state
 
 	return nil
 }

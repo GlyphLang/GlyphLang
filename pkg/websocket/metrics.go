@@ -22,19 +22,19 @@ type Metrics struct {
 	bytesSent        int64
 
 	// Error metrics
-	readErrors     int64
-	writeErrors    int64
-	handlerErrors  int64
+	readErrors    int64
+	writeErrors   int64
+	handlerErrors int64
 
 	// Room metrics
 	activeRooms int64
 
 	// Heartbeat metrics
-	missedPongs    int64
+	missedPongs     int64
 	successfulPongs int64
 
 	// Queue metrics
-	queueOverflows int64
+	queueOverflows  int64
 	droppedMessages int64
 
 	// Timestamp tracking
@@ -45,8 +45,8 @@ type Metrics struct {
 	connMetrics map[string]*ConnectionMetrics
 	connMu      sync.RWMutex
 
-	// Enabled flag
-	enabled bool
+	// Enabled flag (accessed atomically for thread safety)
+	enabled atomic.Bool
 }
 
 // ConnectionMetrics tracks metrics for a specific connection
@@ -66,32 +66,32 @@ func NewMetrics() *Metrics {
 	m := &Metrics{
 		startTime:   time.Now(),
 		connMetrics: make(map[string]*ConnectionMetrics),
-		enabled:     true,
 	}
+	m.enabled.Store(true)
 	m.lastMessageTime.Store(time.Time{})
 	return m
 }
 
 // Enable enables metrics collection
 func (m *Metrics) Enable() {
-	m.enabled = true
+	m.enabled.Store(true)
 }
 
 // Disable disables metrics collection
 func (m *Metrics) Disable() {
-	m.enabled = false
+	m.enabled.Store(false)
 }
 
 // IsEnabled returns whether metrics are enabled
 func (m *Metrics) IsEnabled() bool {
-	return m.enabled
+	return m.enabled.Load()
 }
 
 // Connection metrics
 
 // IncrementConnections increments the active connections counter
 func (m *Metrics) IncrementConnections() {
-	if !m.enabled {
+	if !m.enabled.Load() {
 		return
 	}
 	atomic.AddInt64(&m.activeConnections, 1)
@@ -100,7 +100,7 @@ func (m *Metrics) IncrementConnections() {
 
 // DecrementConnections decrements the active connections counter
 func (m *Metrics) DecrementConnections() {
-	if !m.enabled {
+	if !m.enabled.Load() {
 		return
 	}
 	atomic.AddInt64(&m.activeConnections, -1)
@@ -109,7 +109,7 @@ func (m *Metrics) DecrementConnections() {
 
 // IncrementRejectedConnections increments the rejected connections counter
 func (m *Metrics) IncrementRejectedConnections() {
-	if !m.enabled {
+	if !m.enabled.Load() {
 		return
 	}
 	atomic.AddInt64(&m.rejectedConnections, 1)
@@ -139,7 +139,7 @@ func (m *Metrics) GetRejectedConnections() int64 {
 
 // IncrementMessagesSent increments the messages sent counter
 func (m *Metrics) IncrementMessagesSent(bytes int64) {
-	if !m.enabled {
+	if !m.enabled.Load() {
 		return
 	}
 	atomic.AddInt64(&m.messagesSent, 1)
@@ -149,7 +149,7 @@ func (m *Metrics) IncrementMessagesSent(bytes int64) {
 
 // IncrementMessagesReceived increments the messages received counter
 func (m *Metrics) IncrementMessagesReceived(bytes int64) {
-	if !m.enabled {
+	if !m.enabled.Load() {
 		return
 	}
 	atomic.AddInt64(&m.messagesReceived, 1)
@@ -159,7 +159,7 @@ func (m *Metrics) IncrementMessagesReceived(bytes int64) {
 
 // IncrementMessagesFailed increments the failed messages counter
 func (m *Metrics) IncrementMessagesFailed() {
-	if !m.enabled {
+	if !m.enabled.Load() {
 		return
 	}
 	atomic.AddInt64(&m.messagesFailed, 1)
@@ -194,7 +194,7 @@ func (m *Metrics) GetBytesSent() int64 {
 
 // IncrementReadErrors increments the read errors counter
 func (m *Metrics) IncrementReadErrors() {
-	if !m.enabled {
+	if !m.enabled.Load() {
 		return
 	}
 	atomic.AddInt64(&m.readErrors, 1)
@@ -202,7 +202,7 @@ func (m *Metrics) IncrementReadErrors() {
 
 // IncrementWriteErrors increments the write errors counter
 func (m *Metrics) IncrementWriteErrors() {
-	if !m.enabled {
+	if !m.enabled.Load() {
 		return
 	}
 	atomic.AddInt64(&m.writeErrors, 1)
@@ -210,7 +210,7 @@ func (m *Metrics) IncrementWriteErrors() {
 
 // IncrementHandlerErrors increments the handler errors counter
 func (m *Metrics) IncrementHandlerErrors() {
-	if !m.enabled {
+	if !m.enabled.Load() {
 		return
 	}
 	atomic.AddInt64(&m.handlerErrors, 1)
@@ -240,7 +240,7 @@ func (m *Metrics) GetTotalErrors() int64 {
 
 // IncrementRooms increments the active rooms counter
 func (m *Metrics) IncrementRooms() {
-	if !m.enabled {
+	if !m.enabled.Load() {
 		return
 	}
 	atomic.AddInt64(&m.activeRooms, 1)
@@ -248,7 +248,7 @@ func (m *Metrics) IncrementRooms() {
 
 // DecrementRooms decrements the active rooms counter
 func (m *Metrics) DecrementRooms() {
-	if !m.enabled {
+	if !m.enabled.Load() {
 		return
 	}
 	atomic.AddInt64(&m.activeRooms, -1)
@@ -263,7 +263,7 @@ func (m *Metrics) GetActiveRooms() int64 {
 
 // IncrementMissedPongs increments the missed pongs counter
 func (m *Metrics) IncrementMissedPongs() {
-	if !m.enabled {
+	if !m.enabled.Load() {
 		return
 	}
 	atomic.AddInt64(&m.missedPongs, 1)
@@ -271,7 +271,7 @@ func (m *Metrics) IncrementMissedPongs() {
 
 // IncrementSuccessfulPongs increments the successful pongs counter
 func (m *Metrics) IncrementSuccessfulPongs() {
-	if !m.enabled {
+	if !m.enabled.Load() {
 		return
 	}
 	atomic.AddInt64(&m.successfulPongs, 1)
@@ -291,7 +291,7 @@ func (m *Metrics) GetSuccessfulPongs() int64 {
 
 // IncrementQueueOverflows increments the queue overflows counter
 func (m *Metrics) IncrementQueueOverflows() {
-	if !m.enabled {
+	if !m.enabled.Load() {
 		return
 	}
 	atomic.AddInt64(&m.queueOverflows, 1)
@@ -299,7 +299,7 @@ func (m *Metrics) IncrementQueueOverflows() {
 
 // IncrementDroppedMessages increments the dropped messages counter
 func (m *Metrics) IncrementDroppedMessages() {
-	if !m.enabled {
+	if !m.enabled.Load() {
 		return
 	}
 	atomic.AddInt64(&m.droppedMessages, 1)
@@ -340,7 +340,7 @@ func (m *Metrics) GetUptime() time.Duration {
 
 // RegisterConnection registers a new connection for metrics tracking
 func (m *Metrics) RegisterConnection(connID string) {
-	if !m.enabled {
+	if !m.enabled.Load() {
 		return
 	}
 	m.connMu.Lock()
@@ -354,7 +354,7 @@ func (m *Metrics) RegisterConnection(connID string) {
 
 // UnregisterConnection removes a connection from metrics tracking
 func (m *Metrics) UnregisterConnection(connID string) {
-	if !m.enabled {
+	if !m.enabled.Load() {
 		return
 	}
 	m.connMu.Lock()
@@ -365,37 +365,37 @@ func (m *Metrics) UnregisterConnection(connID string) {
 
 // IncrementConnectionMessagesSent increments messages sent for a connection
 func (m *Metrics) IncrementConnectionMessagesSent(connID string, bytes int64) {
-	if !m.enabled {
+	if !m.enabled.Load() {
 		return
 	}
-	m.connMu.RLock()
-	defer m.connMu.RUnlock()
+	m.connMu.Lock()
+	defer m.connMu.Unlock()
 
 	if cm, ok := m.connMetrics[connID]; ok {
-		atomic.AddInt64(&cm.MessagesSent, 1)
-		atomic.AddInt64(&cm.BytesSent, bytes)
+		cm.MessagesSent++
+		cm.BytesSent += bytes
 		cm.LastMessageAt = time.Now()
 	}
 }
 
 // IncrementConnectionMessagesReceived increments messages received for a connection
 func (m *Metrics) IncrementConnectionMessagesReceived(connID string, bytes int64) {
-	if !m.enabled {
+	if !m.enabled.Load() {
 		return
 	}
-	m.connMu.RLock()
-	defer m.connMu.RUnlock()
+	m.connMu.Lock()
+	defer m.connMu.Unlock()
 
 	if cm, ok := m.connMetrics[connID]; ok {
-		atomic.AddInt64(&cm.MessagesReceived, 1)
-		atomic.AddInt64(&cm.BytesReceived, bytes)
+		cm.MessagesReceived++
+		cm.BytesReceived += bytes
 		cm.LastMessageAt = time.Now()
 	}
 }
 
 // IncrementConnectionErrors increments errors for a connection
 func (m *Metrics) IncrementConnectionErrors(connID string) {
-	if !m.enabled {
+	if !m.enabled.Load() {
 		return
 	}
 	m.connMu.RLock()
@@ -408,7 +408,7 @@ func (m *Metrics) IncrementConnectionErrors(connID string) {
 
 // IncrementConnectionMissedPongs increments missed pongs for a connection
 func (m *Metrics) IncrementConnectionMissedPongs(connID string) {
-	if !m.enabled {
+	if !m.enabled.Load() {
 		return
 	}
 	m.connMu.RLock()
@@ -490,29 +490,29 @@ func (m *Metrics) Reset() {
 
 // Snapshot returns a snapshot of current metrics
 type MetricsSnapshot struct {
-	ActiveConnections     int64
-	TotalConnections      int64
-	TotalDisconnections   int64
-	RejectedConnections   int64
-	MessagesSent          int64
-	MessagesReceived      int64
-	MessagesFailed        int64
-	BytesReceived         int64
-	BytesSent             int64
-	ReadErrors            int64
-	WriteErrors           int64
-	HandlerErrors         int64
-	TotalErrors           int64
-	ActiveRooms           int64
-	MissedPongs           int64
-	SuccessfulPongs       int64
-	QueueOverflows        int64
-	DroppedMessages       int64
-	LastMessageTime       time.Time
-	StartTime             time.Time
-	Uptime                time.Duration
-	MessagesPerSecond     float64
-	ConnectionsPerSecond  float64
+	ActiveConnections    int64
+	TotalConnections     int64
+	TotalDisconnections  int64
+	RejectedConnections  int64
+	MessagesSent         int64
+	MessagesReceived     int64
+	MessagesFailed       int64
+	BytesReceived        int64
+	BytesSent            int64
+	ReadErrors           int64
+	WriteErrors          int64
+	HandlerErrors        int64
+	TotalErrors          int64
+	ActiveRooms          int64
+	MissedPongs          int64
+	SuccessfulPongs      int64
+	QueueOverflows       int64
+	DroppedMessages      int64
+	LastMessageTime      time.Time
+	StartTime            time.Time
+	Uptime               time.Duration
+	MessagesPerSecond    float64
+	ConnectionsPerSecond float64
 }
 
 // GetSnapshot returns a snapshot of current metrics
@@ -521,27 +521,27 @@ func (m *Metrics) GetSnapshot() *MetricsSnapshot {
 	uptimeSeconds := uptime.Seconds()
 
 	snapshot := &MetricsSnapshot{
-		ActiveConnections:    m.GetActiveConnections(),
-		TotalConnections:     m.GetTotalConnections(),
-		TotalDisconnections:  m.GetTotalDisconnections(),
-		RejectedConnections:  m.GetRejectedConnections(),
-		MessagesSent:         m.GetMessagesSent(),
-		MessagesReceived:     m.GetMessagesReceived(),
-		MessagesFailed:       m.GetMessagesFailed(),
-		BytesReceived:        m.GetBytesReceived(),
-		BytesSent:            m.GetBytesSent(),
-		ReadErrors:           m.GetReadErrors(),
-		WriteErrors:          m.GetWriteErrors(),
-		HandlerErrors:        m.GetHandlerErrors(),
-		TotalErrors:          m.GetTotalErrors(),
-		ActiveRooms:          m.GetActiveRooms(),
-		MissedPongs:          m.GetMissedPongs(),
-		SuccessfulPongs:      m.GetSuccessfulPongs(),
-		QueueOverflows:       m.GetQueueOverflows(),
-		DroppedMessages:      m.GetDroppedMessages(),
-		LastMessageTime:      m.GetLastMessageTime(),
-		StartTime:            m.GetStartTime(),
-		Uptime:               uptime,
+		ActiveConnections:   m.GetActiveConnections(),
+		TotalConnections:    m.GetTotalConnections(),
+		TotalDisconnections: m.GetTotalDisconnections(),
+		RejectedConnections: m.GetRejectedConnections(),
+		MessagesSent:        m.GetMessagesSent(),
+		MessagesReceived:    m.GetMessagesReceived(),
+		MessagesFailed:      m.GetMessagesFailed(),
+		BytesReceived:       m.GetBytesReceived(),
+		BytesSent:           m.GetBytesSent(),
+		ReadErrors:          m.GetReadErrors(),
+		WriteErrors:         m.GetWriteErrors(),
+		HandlerErrors:       m.GetHandlerErrors(),
+		TotalErrors:         m.GetTotalErrors(),
+		ActiveRooms:         m.GetActiveRooms(),
+		MissedPongs:         m.GetMissedPongs(),
+		SuccessfulPongs:     m.GetSuccessfulPongs(),
+		QueueOverflows:      m.GetQueueOverflows(),
+		DroppedMessages:     m.GetDroppedMessages(),
+		LastMessageTime:     m.GetLastMessageTime(),
+		StartTime:           m.GetStartTime(),
+		Uptime:              uptime,
 	}
 
 	// Calculate rates

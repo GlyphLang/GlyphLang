@@ -205,8 +205,8 @@ func TestEnhancedErrorFormatting(t *testing.T) {
 		snippet,
 		GetTypeMismatchSuggestion("int", "string", "variable declaration"),
 	).WithTypes("int", "string").
-	  WithContext("in route /users GET").
-	  WithFixedLine(`    $ userCount: int = 0`)
+		WithContext("in route /users GET").
+		WithFixedLine(`    $ userCount: int = 0`)
 
 	formatted := err.FormatError(false)
 

@@ -213,10 +213,10 @@ func StructuredRecoveryMiddleware(logger *Logger) server.Middleware {
 
 					// Create context logger
 					ctxLogger := logger.WithRequestID(requestID).WithFields(map[string]interface{}{
-						"method":     ctx.Request.Method,
-						"path":       ctx.Request.URL.Path,
-						"remote_ip":  ctx.Request.RemoteAddr,
-						"panic":      r,
+						"method":    ctx.Request.Method,
+						"path":      ctx.Request.URL.Path,
+						"remote_ip": ctx.Request.RemoteAddr,
+						"panic":     r,
 					})
 
 					// Log panic with stack trace

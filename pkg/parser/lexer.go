@@ -399,6 +399,8 @@ func (l *Lexer) readIdentifier() Token {
 		tok.Type = MODULE
 	case "const":
 		tok.Type = CONST
+	case "assert":
+		tok.Type = ASSERT
 	default:
 		tok.Type = IDENT
 	}

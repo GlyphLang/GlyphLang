@@ -406,6 +406,9 @@ func (l *ExpandedLexer) readIdentifier() Token {
 		tok.Type = MODULE
 	case "const":
 		tok.Type = CONST
+	case "assert":
+		// assert keyword - uses dedicated ASSERT token (defined in token.go:78)
+		tok.Type = ASSERT
 	default:
 		tok.Type = IDENT
 	}

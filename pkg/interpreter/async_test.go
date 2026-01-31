@@ -1,6 +1,8 @@
 package interpreter
 
 import (
+	. "github.com/glyphlang/glyph/pkg/ast"
+
 	"errors"
 	"sync/atomic"
 	"testing"

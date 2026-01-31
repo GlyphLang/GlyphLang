@@ -326,10 +326,10 @@ func TestDirectiveSymbolNames(t *testing.T) {
 
 	// Verify specific symbol names
 	expectedNames := map[string]bool{
-		"! greet":               false,
-		"* cleanup":             false,
-		"~ order.created":       false,
-		"& notification.send":   false,
+		"! greet":             false,
+		"* cleanup":           false,
+		"~ order.created":     false,
+		"& notification.send": false,
 	}
 
 	for _, sym := range symbols {

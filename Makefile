@@ -17,23 +17,26 @@ help:
 	@echo "  fmt           - Format code"
 	@echo "  lint          - Run linters"
 
+# Version injection
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+
 # Build targets
 build:
 	@echo "Building Go CLI..."
-	go build -o glyph ./cmd/glyph
+	go build -ldflags "-X main.version=$(VERSION)" -o glyph ./cmd/glyph
 
 build-windows:
 	@echo "Building Go CLI for Windows..."
-	go build -o glyph.exe ./cmd/glyph
+	go build -ldflags "-X main.version=$(VERSION)" -o glyph.exe ./cmd/glyph
 
 # Cross-platform build
 build-all:
 	@echo "Building for all platforms..."
 	@mkdir -p dist
-	GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o dist/glyph-windows-amd64.exe ./cmd/glyph
-	GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/glyph-linux-amd64 ./cmd/glyph
-	GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o dist/glyph-darwin-amd64 ./cmd/glyph
-	GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/glyph-darwin-arm64 ./cmd/glyph
+	GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -X main.version=$(VERSION)" -o dist/glyph-windows-amd64.exe ./cmd/glyph
+	GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=$(VERSION)" -o dist/glyph-linux-amd64 ./cmd/glyph
+	GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w -X main.version=$(VERSION)" -o dist/glyph-darwin-amd64 ./cmd/glyph
+	GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w -X main.version=$(VERSION)" -o dist/glyph-darwin-arm64 ./cmd/glyph
 	@echo "Built binaries in dist/"
 
 # Windows installer (requires Inno Setup)

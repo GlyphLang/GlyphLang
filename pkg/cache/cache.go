@@ -19,14 +19,14 @@ import (
 
 // Entry represents a cached item
 type Entry struct {
-	Key        string
-	Value      interface{}
-	ExpiresAt  time.Time
-	CreatedAt  time.Time
-	AccessedAt time.Time
+	Key         string
+	Value       interface{}
+	ExpiresAt   time.Time
+	CreatedAt   time.Time
+	AccessedAt  time.Time
 	AccessCount uint64
-	Size       int64
-	Tags       []string
+	Size        int64
+	Tags        []string
 }
 
 // IsExpired checks if the entry has expired
@@ -68,14 +68,14 @@ type Stats struct {
 
 // LRUCache implements an LRU (Least Recently Used) cache
 type LRUCache struct {
-	mu         sync.RWMutex
-	capacity   int
-	items      map[string]*list.Element
-	evictList  *list.List
-	ttl        time.Duration
-	onEvict    func(key string, value interface{})
-	stats      Stats
-	maxSize    int64 // Maximum size in bytes
+	mu          sync.RWMutex
+	capacity    int
+	items       map[string]*list.Element
+	evictList   *list.List
+	ttl         time.Duration
+	onEvict     func(key string, value interface{})
+	stats       Stats
+	maxSize     int64 // Maximum size in bytes
 	currentSize int64
 }
 

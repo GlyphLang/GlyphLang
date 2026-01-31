@@ -12,9 +12,9 @@ type StepMode int
 
 const (
 	StepContinue StepMode = iota // Run until next breakpoint
-	StepInto                      // Step into function calls
-	StepOver                      // Step over function calls
-	StepOut                       // Step out of current function
+	StepInto                     // Step into function calls
+	StepOver                     // Step over function calls
+	StepOut                      // Step out of current function
 )
 
 // Breakpoint represents a breakpoint in the code
@@ -29,7 +29,7 @@ type Breakpoint struct {
 // CallFrame represents a single function call on the call stack
 type CallFrame struct {
 	FuncName   string
-	ReturnAddr int              // Return address (PC to return to)
+	ReturnAddr int                 // Return address (PC to return to)
 	Locals     map[string]vm.Value // Local variables at this frame
 }
 

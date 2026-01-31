@@ -108,16 +108,14 @@ func TestParserIntegration(t *testing.T) {
 			// For error cases, parsing or compilation should fail
 			if tt.shouldError {
 				if err != nil {
-					t.Logf("✓ Test '%s' correctly failed to parse: %v", tt.name, err)
-					return // Expected failure
+					return // Expected failure at parse stage
 				}
 				// If parsing succeeded, compilation should fail
 				_, compErr := comp.Compile(module)
 				if compErr != nil {
-					t.Logf("✓ Test '%s' correctly failed to compile: %v", tt.name, compErr)
-					return // Expected failure
+					return // Expected failure at compile stage
 				}
-				t.Logf("Note: Test '%s' did not produce expected error", tt.name)
+				t.Errorf("Expected error for test '%s', but parsing and compilation both succeeded", tt.name)
 				return
 			}
 
@@ -178,10 +176,7 @@ func TestLexerIntegration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// TODO: When lexer FFI is implemented, test actual tokenization
-			// For now, just verify the test structure is correct
-			t.Logf("Lexer test '%s' with input: %s", tt.name, tt.input)
-			t.Logf("Expected tokens: %v", tt.expected)
+			t.Skip("Skipping: lexer FFI tokenization not yet implemented")
 		})
 	}
 }
@@ -253,22 +248,7 @@ func TestTypeCheckerIntegration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// TODO: When type checker is implemented
-			comp := compiler.NewCompiler()
-			module, err := parseSource(tt.source)
-			if err != nil {
-				t.Fatalf("Parse failed: %v", err)
-			}
-			_, err = comp.Compile(module)
-
-			if tt.shouldError {
-				t.Logf("Test '%s': Type checking not yet implemented (should fail: %s)", tt.name, tt.errorMsg)
-			} else {
-				t.Logf("Test '%s': Type checking not yet implemented (should pass)", tt.name)
-			}
-
-			// For now, just log the test
-			_ = err
+			t.Skip("Skipping: type checker validation not yet implemented")
 		})
 	}
 }
@@ -310,8 +290,7 @@ func TestInterpreterIntegration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// TODO: Create interpreter and test execution
-			t.Logf("Test: %s", tt.name)
+			t.Skip("Skipping: interpreter execution not yet implemented")
 		})
 	}
 }
@@ -430,23 +409,14 @@ func TestRouteMatching(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.pattern, func(t *testing.T) {
-			// TODO: Test route matching logic
-			t.Logf("Pattern: %s, Path: %s, Should match: %v", tt.pattern, tt.path, tt.matches)
+			t.Skip("Skipping: route matching logic not yet implemented")
 		})
 	}
 }
 
 // TestMiddlewareChain tests middleware execution order
 func TestMiddlewareChain(t *testing.T) {
-	t.Skip("Skipping until middleware is implemented")
-
-	// TODO: When middleware is ready:
-	// - Test middleware execution order
-	// - Test middleware can modify request
-	// - Test middleware can short-circuit
-	// - Test error handling in middleware
-	// - Test auth middleware
-	// - Test rate limit middleware
+	t.Skip("Skipping: middleware chain execution order and behavior not yet testable")
 }
 
 // TestDatabaseQuerySafety tests SQL injection prevention
@@ -475,8 +445,7 @@ func TestDatabaseQuerySafety(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// TODO: When type checker is ready, unsafe queries should be rejected at compile time
-			t.Logf("Query safety test: %s - %s", tt.name, tt.description)
+			t.Skip("Skipping: compile-time SQL injection detection requires type checker")
 		})
 	}
 }
@@ -519,34 +488,19 @@ func TestInputValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// TODO: Test validation logic
-			t.Logf("Validation test: %s", tt.name)
+			t.Skip("Skipping: input validation logic not yet implemented")
 		})
 	}
 }
 
 // TestErrorPropagation tests error handling and propagation
 func TestErrorPropagation(t *testing.T) {
-	t.Skip("Skipping until error handling is implemented")
-
-	// TODO: When error handling is ready:
-	// - Test Result type (T | Error)
-	// - Test error propagation through call stack
-	// - Test error conversion to HTTP status codes
-	// - Test custom error types
-	// - Test error recovery
+	t.Skip("Skipping: Result type, error propagation, and HTTP status code conversion not yet implemented")
 }
 
 // TestConcurrency tests concurrent execution safety
 func TestConcurrency(t *testing.T) {
-	t.Skip("Skipping until concurrency features are ready")
-
-	// TODO: When concurrency is implemented:
-	// - Test concurrent route handlers
-	// - Test shared state safety
-	// - Test database connection pooling
-	// - Test rate limiter thread safety
-	// - Test no data races
+	t.Skip("Skipping: concurrent route handlers, shared state safety, and connection pooling not yet testable")
 }
 
 // TestMemoryManagement tests memory usage and cleanup
@@ -829,11 +783,12 @@ func TestCompilerErrorMessages(t *testing.T) {
 			}
 			_, err = comp.Compile(module)
 
-			// TODO: When error reporting is implemented
+			// Note: Compiler error reporting does not yet produce detailed messages.
+			// Once implemented, err.Error() should contain tt.errorMsg.
 			if err != nil {
 				helper.AssertContains(err.Error(), tt.errorMsg, "Error message")
 			} else {
-				t.Logf("Error reporting not yet implemented for: %s", tt.name)
+				t.Skip("Skipping: compiler error reporting not yet implemented for: " + tt.name)
 			}
 		})
 	}

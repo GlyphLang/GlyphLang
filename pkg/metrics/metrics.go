@@ -18,12 +18,12 @@ type Metrics struct {
 	requestErrors   *prometheus.CounterVec
 
 	// Resource usage metrics
-	goroutines    prometheus.Gauge
-	memoryAlloc   prometheus.Gauge
-	memoryTotal   prometheus.Gauge
-	memorySystem  prometheus.Gauge
-	gcPauseNs     prometheus.Gauge
-	numGC         prometheus.Gauge
+	goroutines   prometheus.Gauge
+	memoryAlloc  prometheus.Gauge
+	memoryTotal  prometheus.Gauge
+	memorySystem prometheus.Gauge
+	gcPauseNs    prometheus.Gauge
+	numGC        prometheus.Gauge
 
 	// Custom business metrics
 	customCounters   map[string]*prometheus.CounterVec

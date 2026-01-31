@@ -3,10 +3,10 @@ package compiler
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"math"
 	"strings"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/server"
 	"github.com/glyphlang/glyph/pkg/vm"
 )
@@ -70,7 +70,7 @@ func (c *Compiler) Reset() {
 }
 
 // Compile compiles an AST module to bytecode
-func (c *Compiler) Compile(module *interpreter.Module) ([]byte, error) {
+func (c *Compiler) Compile(module *ast.Module) ([]byte, error) {
 	// First, expand all macros in the module
 	expandedModule, err := c.macroExpander.ExpandModule(module)
 	if err != nil {
@@ -79,7 +79,7 @@ func (c *Compiler) Compile(module *interpreter.Module) ([]byte, error) {
 
 	// For now, compile the first route we find
 	for _, item := range expandedModule.Items {
-		if route, ok := item.(*interpreter.Route); ok {
+		if route, ok := item.(*ast.Route); ok {
 			return c.CompileRoute(route)
 		}
 	}
@@ -88,7 +88,7 @@ func (c *Compiler) Compile(module *interpreter.Module) ([]byte, error) {
 	// Type-only modules are valid but don't produce executable bytecode
 	hasTypeDefs := false
 	for _, item := range expandedModule.Items {
-		if _, ok := item.(*interpreter.TypeDef); ok {
+		if _, ok := item.(*ast.TypeDef); ok {
 			hasTypeDefs = true
 			break
 		}
@@ -111,7 +111,7 @@ func (c *Compiler) Compile(module *interpreter.Module) ([]byte, error) {
 }
 
 // CompileRoute compiles a route to bytecode
-func (c *Compiler) CompileRoute(route *interpreter.Route) ([]byte, error) {
+func (c *Compiler) CompileRoute(route *ast.Route) ([]byte, error) {
 	// Reset compiler state for each route
 	c.Reset()
 
@@ -171,7 +171,7 @@ func (c *Compiler) CompileRoute(route *interpreter.Route) ([]byte, error) {
 }
 
 // CompileCommand compiles a CLI command to bytecode
-func (c *Compiler) CompileCommand(cmd *interpreter.Command) ([]byte, error) {
+func (c *Compiler) CompileCommand(cmd *ast.Command) ([]byte, error) {
 	c.Reset()
 
 	// Create command scope
@@ -199,7 +199,7 @@ func (c *Compiler) CompileCommand(cmd *interpreter.Command) ([]byte, error) {
 }
 
 // CompileCronTask compiles a cron task to bytecode
-func (c *Compiler) CompileCronTask(task *interpreter.CronTask) ([]byte, error) {
+func (c *Compiler) CompileCronTask(task *ast.CronTask) ([]byte, error) {
 	c.Reset()
 
 	// Create task scope
@@ -227,7 +227,7 @@ func (c *Compiler) CompileCronTask(task *interpreter.CronTask) ([]byte, error) {
 }
 
 // CompileEventHandler compiles an event handler to bytecode
-func (c *Compiler) CompileEventHandler(handler *interpreter.EventHandler) ([]byte, error) {
+func (c *Compiler) CompileEventHandler(handler *ast.EventHandler) ([]byte, error) {
 	c.Reset()
 
 	// Create handler scope
@@ -261,7 +261,7 @@ func (c *Compiler) CompileEventHandler(handler *interpreter.EventHandler) ([]byt
 }
 
 // CompileQueueWorker compiles a queue worker to bytecode
-func (c *Compiler) CompileQueueWorker(worker *interpreter.QueueWorker) ([]byte, error) {
+func (c *Compiler) CompileQueueWorker(worker *ast.QueueWorker) ([]byte, error) {
 	c.Reset()
 
 	// Create worker scope
@@ -294,44 +294,56 @@ func (c *Compiler) CompileQueueWorker(worker *interpreter.QueueWorker) ([]byte, 
 	return c.buildBytecode(), nil
 }
 
-// compileStatement compiles a statement
-func (c *Compiler) compileStatement(stmt interpreter.Statement) error {
+// normalizeStatement converts pointer-typed statements to their value form.
+// The parser produces value types, but other call sites (JIT, LSP, tests)
+// construct pointer types. This normalizer lets compileStatement use a single
+// case per type. Tracked for AST-wide cleanup in P2-4.
+func normalizeStatement(stmt ast.Statement) ast.Statement {
 	switch s := stmt.(type) {
-	case *interpreter.AssignStatement:
-		return c.compileAssignStatement(s)
-	case interpreter.AssignStatement:
+	case *ast.AssignStatement:
+		return *s
+	case *ast.ReturnStatement:
+		return *s
+	case *ast.IfStatement:
+		return *s
+	case *ast.WhileStatement:
+		return *s
+	case *ast.ValidationStatement:
+		return *s
+	case *ast.ForStatement:
+		return *s
+	case *ast.SwitchStatement:
+		return *s
+	case *ast.ExpressionStatement:
+		return *s
+	case *ast.ReassignStatement:
+		return *s
+	default:
+		return stmt
+	}
+}
+
+// compileStatement compiles a statement node into bytecode.
+func (c *Compiler) compileStatement(stmt ast.Statement) error {
+	stmt = normalizeStatement(stmt)
+	switch s := stmt.(type) {
+	case ast.AssignStatement:
 		return c.compileAssignStatement(&s)
-	case *interpreter.ReturnStatement:
-		return c.compileReturnStatement(s)
-	case interpreter.ReturnStatement:
+	case ast.ReturnStatement:
 		return c.compileReturnStatement(&s)
-	case *interpreter.IfStatement:
-		return c.compileIfStatement(s)
-	case interpreter.IfStatement:
+	case ast.IfStatement:
 		return c.compileIfStatement(&s)
-	case *interpreter.WhileStatement:
-		return c.compileWhileStatement(s)
-	case interpreter.WhileStatement:
+	case ast.WhileStatement:
 		return c.compileWhileStatement(&s)
-	case *interpreter.ValidationStatement:
-		return c.compileValidationStatement(s)
-	case interpreter.ValidationStatement:
+	case ast.ValidationStatement:
 		return c.compileValidationStatement(&s)
-	case *interpreter.ForStatement:
-		return c.compileForStatement(s)
-	case interpreter.ForStatement:
+	case ast.ForStatement:
 		return c.compileForStatement(&s)
-	case *interpreter.SwitchStatement:
-		return c.compileSwitchStatement(s)
-	case interpreter.SwitchStatement:
+	case ast.SwitchStatement:
 		return c.compileSwitchStatement(&s)
-	case *interpreter.ExpressionStatement:
-		return c.compileExpressionStatement(s)
-	case interpreter.ExpressionStatement:
+	case ast.ExpressionStatement:
 		return c.compileExpressionStatement(&s)
-	case *interpreter.ReassignStatement:
-		return c.compileReassignStatement(s)
-	case interpreter.ReassignStatement:
+	case ast.ReassignStatement:
 		return c.compileReassignStatement(&s)
 	default:
 		return fmt.Errorf("unsupported statement type: %T", stmt)
@@ -339,7 +351,7 @@ func (c *Compiler) compileStatement(stmt interpreter.Statement) error {
 }
 
 // compileAssignStatement compiles variable assignment
-func (c *Compiler) compileAssignStatement(stmt *interpreter.AssignStatement) error {
+func (c *Compiler) compileAssignStatement(stmt *ast.AssignStatement) error {
 	// Check for redeclaration in current scope (issue #70)
 	// Variables declared with $ cannot be redeclared in the same scope
 	if _, exists := c.symbolTable.ResolveLocal(stmt.Target); exists {
@@ -367,7 +379,7 @@ func (c *Compiler) compileAssignStatement(stmt *interpreter.AssignStatement) err
 }
 
 // compileReassignStatement compiles variable reassignment (without $ prefix)
-func (c *Compiler) compileReassignStatement(stmt *interpreter.ReassignStatement) error {
+func (c *Compiler) compileReassignStatement(stmt *ast.ReassignStatement) error {
 	// Check that the variable exists (must be previously declared)
 	if _, exists := c.symbolTable.Resolve(stmt.Target); !exists {
 		return &SemanticError{Message: fmt.Sprintf("cannot assign to undeclared variable '%s'", stmt.Target)}
@@ -388,7 +400,7 @@ func (c *Compiler) compileReassignStatement(stmt *interpreter.ReassignStatement)
 }
 
 // compileReturnStatement compiles return statement
-func (c *Compiler) compileReturnStatement(stmt *interpreter.ReturnStatement) error {
+func (c *Compiler) compileReturnStatement(stmt *ast.ReturnStatement) error {
 	// Compile return value
 	if err := c.compileExpression(stmt.Value); err != nil {
 		return err
@@ -401,7 +413,7 @@ func (c *Compiler) compileReturnStatement(stmt *interpreter.ReturnStatement) err
 }
 
 // compileIfStatement compiles if statement
-func (c *Compiler) compileIfStatement(stmt *interpreter.IfStatement) error {
+func (c *Compiler) compileIfStatement(stmt *ast.IfStatement) error {
 	// Compile condition
 	if err := c.compileExpression(stmt.Condition); err != nil {
 		return err
@@ -455,7 +467,7 @@ func (c *Compiler) compileIfStatement(stmt *interpreter.IfStatement) error {
 }
 
 // compileWhileStatement compiles while loop
-func (c *Compiler) compileWhileStatement(stmt *interpreter.WhileStatement) error {
+func (c *Compiler) compileWhileStatement(stmt *ast.WhileStatement) error {
 	// Remember loop start
 	loopStart := len(c.code)
 
@@ -492,14 +504,14 @@ func (c *Compiler) compileWhileStatement(stmt *interpreter.WhileStatement) error
 }
 
 // compileValidationStatement compiles validation statement (no-op in compiled mode for now)
-func (c *Compiler) compileValidationStatement(stmt *interpreter.ValidationStatement) error {
+func (c *Compiler) compileValidationStatement(stmt *ast.ValidationStatement) error {
 	// For now, validation statements are ignored in compiled mode
 	// In production, you might want to compile them as actual validation calls
 	return nil
 }
 
 // compileExpressionStatement compiles expression statement (e.g., function call)
-func (c *Compiler) compileExpressionStatement(stmt *interpreter.ExpressionStatement) error {
+func (c *Compiler) compileExpressionStatement(stmt *ast.ExpressionStatement) error {
 	// Compile the expression (side effects like function calls)
 	if err := c.compileExpression(stmt.Expr); err != nil {
 		return err
@@ -510,7 +522,7 @@ func (c *Compiler) compileExpressionStatement(stmt *interpreter.ExpressionStatem
 }
 
 // compileForStatement compiles for loop statement
-func (c *Compiler) compileForStatement(stmt *interpreter.ForStatement) error {
+func (c *Compiler) compileForStatement(stmt *ast.ForStatement) error {
 	// Create scope for loop variables
 	parentSymbolTable := c.symbolTable
 	c.symbolTable = c.symbolTable.EnterScope(BlockScope)
@@ -594,7 +606,7 @@ func (c *Compiler) compileForStatement(stmt *interpreter.ForStatement) error {
 }
 
 // compileSwitchStatement compiles switch statement
-func (c *Compiler) compileSwitchStatement(stmt *interpreter.SwitchStatement) error {
+func (c *Compiler) compileSwitchStatement(stmt *ast.SwitchStatement) error {
 	// Create a temporary variable to store the switch value
 	switchVarName := fmt.Sprintf("__switch_%d", c.labelCounter)
 	c.labelCounter++
@@ -673,55 +685,55 @@ func (c *Compiler) compileSwitchStatement(stmt *interpreter.SwitchStatement) err
 }
 
 // compileExpression compiles an expression
-func (c *Compiler) compileExpression(expr interpreter.Expr) error {
+func (c *Compiler) compileExpression(expr ast.Expr) error {
 	switch e := expr.(type) {
-	case *interpreter.LiteralExpr:
+	case *ast.LiteralExpr:
 		return c.compileLiteral(e)
-	case interpreter.LiteralExpr:
+	case ast.LiteralExpr:
 		return c.compileLiteral(&e)
-	case *interpreter.VariableExpr:
+	case *ast.VariableExpr:
 		return c.compileVariable(e)
-	case interpreter.VariableExpr:
+	case ast.VariableExpr:
 		return c.compileVariable(&e)
-	case *interpreter.BinaryOpExpr:
+	case *ast.BinaryOpExpr:
 		return c.compileBinaryOp(e)
-	case interpreter.BinaryOpExpr:
+	case ast.BinaryOpExpr:
 		return c.compileBinaryOp(&e)
-	case *interpreter.ObjectExpr:
+	case *ast.ObjectExpr:
 		return c.compileObject(e)
-	case interpreter.ObjectExpr:
+	case ast.ObjectExpr:
 		return c.compileObject(&e)
-	case *interpreter.ArrayExpr:
+	case *ast.ArrayExpr:
 		return c.compileArray(e)
-	case interpreter.ArrayExpr:
+	case ast.ArrayExpr:
 		return c.compileArray(&e)
-	case *interpreter.FieldAccessExpr:
+	case *ast.FieldAccessExpr:
 		return c.compileFieldAccess(e)
-	case interpreter.FieldAccessExpr:
+	case ast.FieldAccessExpr:
 		return c.compileFieldAccess(&e)
-	case *interpreter.FunctionCallExpr:
+	case *ast.FunctionCallExpr:
 		return c.compileFunctionCall(e)
-	case interpreter.FunctionCallExpr:
+	case ast.FunctionCallExpr:
 		return c.compileFunctionCall(&e)
-	case *interpreter.ArrayIndexExpr:
+	case *ast.ArrayIndexExpr:
 		return c.compileArrayIndex(e)
-	case interpreter.ArrayIndexExpr:
+	case ast.ArrayIndexExpr:
 		return c.compileArrayIndex(&e)
-	case *interpreter.UnaryOpExpr:
+	case *ast.UnaryOpExpr:
 		return c.compileUnaryOp(e)
-	case interpreter.UnaryOpExpr:
+	case ast.UnaryOpExpr:
 		return c.compileUnaryOp(&e)
-	case *interpreter.MatchExpr:
+	case *ast.MatchExpr:
 		return c.compileMatchExpr(e)
-	case interpreter.MatchExpr:
+	case ast.MatchExpr:
 		return c.compileMatchExpr(&e)
-	case *interpreter.AsyncExpr:
+	case *ast.AsyncExpr:
 		return c.compileAsyncExpr(e)
-	case interpreter.AsyncExpr:
+	case ast.AsyncExpr:
 		return c.compileAsyncExpr(&e)
-	case *interpreter.AwaitExpr:
+	case *ast.AwaitExpr:
 		return c.compileAwaitExpr(e)
-	case interpreter.AwaitExpr:
+	case ast.AwaitExpr:
 		return c.compileAwaitExpr(&e)
 	default:
 		return fmt.Errorf("unsupported expression type: %T", expr)
@@ -729,19 +741,19 @@ func (c *Compiler) compileExpression(expr interpreter.Expr) error {
 }
 
 // compileLiteral compiles a literal value
-func (c *Compiler) compileLiteral(expr *interpreter.LiteralExpr) error {
+func (c *Compiler) compileLiteral(expr *ast.LiteralExpr) error {
 	var val vm.Value
 
 	switch lit := expr.Value.(type) {
-	case interpreter.IntLiteral:
+	case ast.IntLiteral:
 		val = vm.IntValue{Val: lit.Value}
-	case interpreter.FloatLiteral:
+	case ast.FloatLiteral:
 		val = vm.FloatValue{Val: lit.Value}
-	case interpreter.StringLiteral:
+	case ast.StringLiteral:
 		val = vm.StringValue{Val: lit.Value}
-	case interpreter.BoolLiteral:
+	case ast.BoolLiteral:
 		val = vm.BoolValue{Val: lit.Value}
-	case interpreter.NullLiteral:
+	case ast.NullLiteral:
 		val = vm.NullValue{}
 	default:
 		return fmt.Errorf("unsupported literal type: %T", expr.Value)
@@ -755,7 +767,7 @@ func (c *Compiler) compileLiteral(expr *interpreter.LiteralExpr) error {
 }
 
 // compileVariable compiles variable reference
-func (c *Compiler) compileVariable(expr *interpreter.VariableExpr) error {
+func (c *Compiler) compileVariable(expr *ast.VariableExpr) error {
 	// Look up symbol
 	symbol, ok := c.symbolTable.Resolve(expr.Name)
 	if !ok {
@@ -769,7 +781,7 @@ func (c *Compiler) compileVariable(expr *interpreter.VariableExpr) error {
 }
 
 // compileBinaryOp compiles binary operation
-func (c *Compiler) compileBinaryOp(expr *interpreter.BinaryOpExpr) error {
+func (c *Compiler) compileBinaryOp(expr *ast.BinaryOpExpr) error {
 	// Compile left operand
 	if err := c.compileExpression(expr.Left); err != nil {
 		return err
@@ -782,29 +794,29 @@ func (c *Compiler) compileBinaryOp(expr *interpreter.BinaryOpExpr) error {
 
 	// Emit operation
 	switch expr.Op {
-	case interpreter.Add:
+	case ast.Add:
 		c.emit(vm.OpAdd)
-	case interpreter.Sub:
+	case ast.Sub:
 		c.emit(vm.OpSub)
-	case interpreter.Mul:
+	case ast.Mul:
 		c.emit(vm.OpMul)
-	case interpreter.Div:
+	case ast.Div:
 		c.emit(vm.OpDiv)
-	case interpreter.Eq:
+	case ast.Eq:
 		c.emit(vm.OpEq)
-	case interpreter.Ne:
+	case ast.Ne:
 		c.emit(vm.OpNe)
-	case interpreter.Lt:
+	case ast.Lt:
 		c.emit(vm.OpLt)
-	case interpreter.Le:
+	case ast.Le:
 		c.emit(vm.OpLe)
-	case interpreter.Gt:
+	case ast.Gt:
 		c.emit(vm.OpGt)
-	case interpreter.Ge:
+	case ast.Ge:
 		c.emit(vm.OpGe)
-	case interpreter.And:
+	case ast.And:
 		c.emit(vm.OpAnd)
-	case interpreter.Or:
+	case ast.Or:
 		c.emit(vm.OpOr)
 	default:
 		return fmt.Errorf("unsupported binary operator: %v", expr.Op)
@@ -814,7 +826,7 @@ func (c *Compiler) compileBinaryOp(expr *interpreter.BinaryOpExpr) error {
 }
 
 // compileUnaryOp compiles unary operation
-func (c *Compiler) compileUnaryOp(expr *interpreter.UnaryOpExpr) error {
+func (c *Compiler) compileUnaryOp(expr *ast.UnaryOpExpr) error {
 	// Compile the operand
 	if err := c.compileExpression(expr.Right); err != nil {
 		return err
@@ -822,9 +834,9 @@ func (c *Compiler) compileUnaryOp(expr *interpreter.UnaryOpExpr) error {
 
 	// Emit operation
 	switch expr.Op {
-	case interpreter.Not:
+	case ast.Not:
 		c.emit(vm.OpNot)
-	case interpreter.Neg:
+	case ast.Neg:
 		c.emit(vm.OpNeg)
 	default:
 		return fmt.Errorf("unsupported unary operator: %v", expr.Op)
@@ -834,7 +846,7 @@ func (c *Compiler) compileUnaryOp(expr *interpreter.UnaryOpExpr) error {
 }
 
 // compileObject compiles object literal
-func (c *Compiler) compileObject(expr *interpreter.ObjectExpr) error {
+func (c *Compiler) compileObject(expr *ast.ObjectExpr) error {
 	// Compile each field (key-value pairs)
 	for _, field := range expr.Fields {
 		// Push key (field name)
@@ -854,7 +866,7 @@ func (c *Compiler) compileObject(expr *interpreter.ObjectExpr) error {
 }
 
 // compileArray compiles array literal
-func (c *Compiler) compileArray(expr *interpreter.ArrayExpr) error {
+func (c *Compiler) compileArray(expr *ast.ArrayExpr) error {
 	// Compile each element
 	for _, elem := range expr.Elements {
 		if err := c.compileExpression(elem); err != nil {
@@ -869,7 +881,7 @@ func (c *Compiler) compileArray(expr *interpreter.ArrayExpr) error {
 }
 
 // compileFieldAccess compiles field access (obj.field)
-func (c *Compiler) compileFieldAccess(expr *interpreter.FieldAccessExpr) error {
+func (c *Compiler) compileFieldAccess(expr *ast.FieldAccessExpr) error {
 	// Compile object expression
 	if err := c.compileExpression(expr.Object); err != nil {
 		return err
@@ -886,7 +898,7 @@ func (c *Compiler) compileFieldAccess(expr *interpreter.FieldAccessExpr) error {
 }
 
 // compileArrayIndex compiles array indexing (array[index])
-func (c *Compiler) compileArrayIndex(expr *interpreter.ArrayIndexExpr) error {
+func (c *Compiler) compileArrayIndex(expr *ast.ArrayIndexExpr) error {
 	// Compile array expression (pushes array onto stack)
 	if err := c.compileExpression(expr.Array); err != nil {
 		return err
@@ -906,7 +918,7 @@ func (c *Compiler) compileArrayIndex(expr *interpreter.ArrayIndexExpr) error {
 }
 
 // compileFunctionCall compiles a function call
-func (c *Compiler) compileFunctionCall(expr *interpreter.FunctionCallExpr) error {
+func (c *Compiler) compileFunctionCall(expr *ast.FunctionCallExpr) error {
 	// Check for WebSocket functions first (ws.*)
 	if strings.HasPrefix(expr.Name, "ws.") {
 		handled, err := c.compileFunctionCallForWs(expr)
@@ -1090,8 +1102,8 @@ func serializeConstant(c vm.Value) []byte {
 
 // Utility functions
 
-func isReturnStatement(stmt interpreter.Statement) bool {
-	_, ok := stmt.(*interpreter.ReturnStatement)
+func isReturnStatement(stmt ast.Statement) bool {
+	_, ok := stmt.(*ast.ReturnStatement)
 	return ok
 }
 
@@ -1122,7 +1134,7 @@ func valuesEqual(a, b vm.Value) bool {
 
 // compileMatchExpr compiles a match expression
 // Match expressions are compiled as a series of conditional jumps similar to switch
-func (c *Compiler) compileMatchExpr(expr *interpreter.MatchExpr) error {
+func (c *Compiler) compileMatchExpr(expr *ast.MatchExpr) error {
 	// Create a temporary variable to store the match value
 	matchVarName := fmt.Sprintf("__match_%d", c.labelCounter)
 	c.labelCounter++
@@ -1189,11 +1201,11 @@ func (c *Compiler) compileMatchExpr(expr *interpreter.MatchExpr) error {
 
 // compilePatternMatch compiles pattern matching logic
 // Returns a slice of jump locations that should jump to the next case
-func (c *Compiler) compilePatternMatch(pattern interpreter.Pattern, matchVarIdx int) ([]int, error) {
+func (c *Compiler) compilePatternMatch(pattern ast.Pattern, matchVarIdx int) ([]int, error) {
 	var jumpToNextCase []int
 
 	switch p := pattern.(type) {
-	case interpreter.LiteralPattern:
+	case ast.LiteralPattern:
 		// Load match value
 		c.emitWithOperand(vm.OpLoadVar, uint32(matchVarIdx))
 		// Push the literal
@@ -1207,17 +1219,17 @@ func (c *Compiler) compilePatternMatch(pattern interpreter.Pattern, matchVarIdx 
 		c.emitWithOperand(vm.OpJumpIfFalse, 0)
 		jumpToNextCase = append(jumpToNextCase, jumpLoc)
 
-	case interpreter.VariablePattern:
+	case ast.VariablePattern:
 		// Variable pattern always matches, just bind the value
 		c.emitWithOperand(vm.OpLoadVar, uint32(matchVarIdx))
 		varIdx := c.addConstant(vm.StringValue{Val: p.Name})
 		c.symbolTable.Define(p.Name, varIdx)
 		c.emitWithOperand(vm.OpStoreVar, uint32(varIdx))
 
-	case interpreter.WildcardPattern:
+	case ast.WildcardPattern:
 		// Wildcard always matches, no code needed
 
-	case interpreter.ObjectPattern:
+	case ast.ObjectPattern:
 		// For object patterns, we need to check if the value is an object
 		// and if it has all the required fields
 		for _, field := range p.Fields {
@@ -1250,7 +1262,7 @@ func (c *Compiler) compilePatternMatch(pattern interpreter.Pattern, matchVarIdx 
 			}
 		}
 
-	case interpreter.ArrayPattern:
+	case ast.ArrayPattern:
 		// For array patterns, check length and match elements
 		// This is a simplified implementation
 		for idx, elemPattern := range p.Elements {
@@ -1294,19 +1306,19 @@ func (c *Compiler) compilePatternMatch(pattern interpreter.Pattern, matchVarIdx 
 }
 
 // compileLiteralValue compiles a literal value from a pattern
-func (c *Compiler) compileLiteralValue(lit interpreter.Literal) error {
+func (c *Compiler) compileLiteralValue(lit ast.Literal) error {
 	var val vm.Value
 
 	switch l := lit.(type) {
-	case interpreter.IntLiteral:
+	case ast.IntLiteral:
 		val = vm.IntValue{Val: l.Value}
-	case interpreter.FloatLiteral:
+	case ast.FloatLiteral:
 		val = vm.FloatValue{Val: l.Value}
-	case interpreter.StringLiteral:
+	case ast.StringLiteral:
 		val = vm.StringValue{Val: l.Value}
-	case interpreter.BoolLiteral:
+	case ast.BoolLiteral:
 		val = vm.BoolValue{Val: l.Value}
-	case interpreter.NullLiteral:
+	case ast.NullLiteral:
 		val = vm.NullValue{}
 	default:
 		return fmt.Errorf("unsupported literal type in pattern: %T", lit)
@@ -1319,7 +1331,7 @@ func (c *Compiler) compileLiteralValue(lit interpreter.Literal) error {
 
 // compileAsyncExpr compiles an async block expression
 // The async block body is compiled inline and wrapped with OpAsync
-func (c *Compiler) compileAsyncExpr(expr *interpreter.AsyncExpr) error {
+func (c *Compiler) compileAsyncExpr(expr *ast.AsyncExpr) error {
 	// Create a temporary compiler to compile the async body
 	bodyCompiler := &Compiler{
 		code:        make([]byte, 0),
@@ -1353,7 +1365,7 @@ func (c *Compiler) compileAsyncExpr(expr *interpreter.AsyncExpr) error {
 }
 
 // compileAwaitExpr compiles an await expression
-func (c *Compiler) compileAwaitExpr(expr *interpreter.AwaitExpr) error {
+func (c *Compiler) compileAwaitExpr(expr *ast.AwaitExpr) error {
 	// Compile the expression being awaited (should produce a future)
 	if err := c.compileExpression(expr.Expr); err != nil {
 		return err

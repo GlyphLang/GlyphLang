@@ -1,9 +1,9 @@
 package parser
 
 import (
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -98,7 +98,7 @@ func TestParser_CLICommand_MultipleFlagDefaults(t *testing.T) {
 			require.NoError(t, parseErr, "Parser should not error")
 			require.Len(t, module.Items, 1, "Should have 1 item")
 
-			cmd, ok := module.Items[0].(*interpreter.Command)
+			cmd, ok := module.Items[0].(*ast.Command)
 			require.True(t, ok, "Expected Command, got %T", module.Items[0])
 
 			// Check flags

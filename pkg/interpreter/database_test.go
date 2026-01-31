@@ -54,7 +54,6 @@ func TestCallMethod_AllowedMethods(t *testing.T) {
 		{name: "Create is allowed", methodName: "Create", wantErr: false},
 		{name: "Update is allowed", methodName: "Update", wantErr: false},
 		{name: "Delete is allowed", methodName: "Delete", wantErr: false},
-		{name: "Query is allowed", methodName: "Query", wantErr: false},
 		{name: "First is allowed", methodName: "First", wantErr: false},
 		{name: "All is allowed", methodName: "All", wantErr: false},
 		{name: "Where is allowed", methodName: "Where", wantErr: false},
@@ -190,7 +189,7 @@ func TestAllowedMethodsWhitelist(t *testing.T) {
 	// Verify the whitelist contains expected database/ORM methods
 	expectedMethods := []string{
 		"Get", "Find", "Create", "Update", "Delete",
-		"Query", "First", "All", "Where", "Count",
+		"First", "All", "Where", "Count",
 		"Save", "Insert", "Select", "Limit", "Offset", "Order",
 		"String", "Int", "Bool", "Float", "Len", "IsZero",
 	}
@@ -202,7 +201,7 @@ func TestAllowedMethodsWhitelist(t *testing.T) {
 	// Verify dangerous methods are NOT in whitelist
 	dangerousMethods := []string{
 		"Exec", "Run", "Call", "Invoke", "System", "Shell", "Eval", "Execute",
-		"DangerousMethod", "ArbitraryMethod", "UnsafeCall",
+		"DangerousMethod", "ArbitraryMethod", "UnsafeCall", "Query",
 	}
 
 	for _, method := range dangerousMethods {
