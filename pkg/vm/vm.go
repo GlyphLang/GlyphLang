@@ -1836,7 +1836,6 @@ func (vm *VM) execAsync() error {
 		asyncVM.globals = globalsCopy
 		asyncVM.builtins = builtinsCopy
 
-
 		// Execute the async body
 		result, execErr := asyncVM.Execute(asyncBody)
 		if execErr != nil {

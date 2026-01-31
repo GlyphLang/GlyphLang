@@ -753,21 +753,21 @@ func TestParseArgumentsEmptyArgName(t *testing.T) {
 // TestTypeToGraphQLUnionType verifies GraphQL type for union types
 func TestTypeToGraphQLUnionType(t *testing.T) {
 	// Union with types - uses first type
-	unionType := interpreter.UnionType{
-		Types: []interpreter.Type{interpreter.StringType{}, interpreter.IntType{}},
+	unionType := ast.UnionType{
+		Types: []ast.Type{ast.StringType{}, ast.IntType{}},
 	}
 	assert.Equal(t, "String", typeToGraphQL(unionType))
 
 	// Empty union - defaults to String
-	emptyUnion := interpreter.UnionType{Types: []interpreter.Type{}}
+	emptyUnion := ast.UnionType{Types: []ast.Type{}}
 	assert.Equal(t, "String", typeToGraphQL(emptyUnion))
 }
 
 // TestConvertFieldArrayType verifies convertField sets IsList for array types
 func TestConvertFieldArrayType(t *testing.T) {
-	field := interpreter.Field{
+	field := ast.Field{
 		Name:           "tags",
-		TypeAnnotation: interpreter.ArrayType{ElementType: interpreter.StringType{}},
+		TypeAnnotation: ast.ArrayType{ElementType: ast.StringType{}},
 		Required:       true,
 	}
 	fd := convertField(field)
@@ -779,9 +779,9 @@ func TestConvertFieldArrayType(t *testing.T) {
 
 // TestConvertFieldNonArrayType verifies convertField for non-array types
 func TestConvertFieldNonArrayType(t *testing.T) {
-	field := interpreter.Field{
+	field := ast.Field{
 		Name:           "name",
-		TypeAnnotation: interpreter.StringType{},
+		TypeAnnotation: ast.StringType{},
 		Required:       false,
 	}
 	fd := convertField(field)
@@ -793,27 +793,27 @@ func TestConvertFieldNonArrayType(t *testing.T) {
 
 // TestIntrospectWithFieldArgs verifies Introspect returns argument info for fields
 func TestIntrospectWithFieldArgs(t *testing.T) {
-	typeDefs := map[string]interpreter.TypeDef{
+	typeDefs := map[string]ast.TypeDef{
 		"User": {
 			Name: "User",
-			Fields: []interpreter.Field{
-				{Name: "id", TypeAnnotation: interpreter.IntType{}},
-				{Name: "name", TypeAnnotation: interpreter.StringType{}},
+			Fields: []ast.Field{
+				{Name: "id", TypeAnnotation: ast.IntType{}},
+				{Name: "name", TypeAnnotation: ast.StringType{}},
 			},
 		},
 	}
-	resolvers := map[string]interpreter.GraphQLResolver{
+	resolvers := map[string]ast.GraphQLResolver{
 		"query.user": {
-			Operation:  interpreter.GraphQLQuery,
+			Operation:  ast.GraphQLQuery,
 			FieldName:  "user",
-			Params:     []interpreter.Field{{Name: "id", TypeAnnotation: interpreter.IntType{}, Required: true}},
-			ReturnType: interpreter.NamedType{Name: "User"},
+			Params:     []ast.Field{{Name: "id", TypeAnnotation: ast.IntType{}, Required: true}},
+			ReturnType: ast.NamedType{Name: "User"},
 		},
 		"mutation.updateUser": {
-			Operation:  interpreter.GraphQLMutation,
+			Operation:  ast.GraphQLMutation,
 			FieldName:  "updateUser",
-			Params:     []interpreter.Field{{Name: "id", TypeAnnotation: interpreter.IntType{}, Required: true}, {Name: "name", TypeAnnotation: interpreter.StringType{}, Required: false}},
-			ReturnType: interpreter.NamedType{Name: "User"},
+			Params:     []ast.Field{{Name: "id", TypeAnnotation: ast.IntType{}, Required: true}, {Name: "name", TypeAnnotation: ast.StringType{}, Required: false}},
+			ReturnType: ast.NamedType{Name: "User"},
 		},
 	}
 
@@ -871,12 +871,12 @@ func TestIntrospectWithFieldArgs(t *testing.T) {
 
 // TestIntrospectNoMutation verifies Introspect omits mutationType when not set
 func TestIntrospectNoMutation(t *testing.T) {
-	typeDefs := map[string]interpreter.TypeDef{}
-	resolvers := map[string]interpreter.GraphQLResolver{
+	typeDefs := map[string]ast.TypeDef{}
+	resolvers := map[string]ast.GraphQLResolver{
 		"query.hello": {
-			Operation:  interpreter.GraphQLQuery,
+			Operation:  ast.GraphQLQuery,
 			FieldName:  "hello",
-			ReturnType: interpreter.StringType{},
+			ReturnType: ast.StringType{},
 		},
 	}
 
@@ -896,7 +896,7 @@ func TestExecutorParseError(t *testing.T) {
 	interp := interpreter.NewInterpreter()
 	schema := &Schema{
 		Types:     make(map[string]*ObjectType),
-		Resolvers: make(map[string]interpreter.GraphQLResolver),
+		Resolvers: make(map[string]ast.GraphQLResolver),
 		Query:     &ObjectType{Name: "Query", Fields: map[string]*FieldDef{}},
 	}
 	executor := NewExecutor(schema, interp)
@@ -913,15 +913,15 @@ func TestExecutorParseError(t *testing.T) {
 func TestExecutorVariablesMerge(t *testing.T) {
 	interp := interpreter.NewInterpreter()
 
-	module := interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.GraphQLResolver{
-				Operation:  interpreter.GraphQLQuery,
+	module := ast.Module{
+		Items: []ast.Item{
+			&ast.GraphQLResolver{
+				Operation:  ast.GraphQLQuery,
 				FieldName:  "hello",
-				ReturnType: interpreter.StringType{},
-				Body: []interpreter.Statement{
-					interpreter.ReturnStatement{
-						Value: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "world"}},
+				ReturnType: ast.StringType{},
+				Body: []ast.Statement{
+					ast.ReturnStatement{
+						Value: ast.LiteralExpr{Value: ast.StringLiteral{Value: "world"}},
 					},
 				},
 			},
@@ -948,7 +948,7 @@ func TestExecutorNoMutationType(t *testing.T) {
 	interp := interpreter.NewInterpreter()
 	schema := &Schema{
 		Types:     make(map[string]*ObjectType),
-		Resolvers: make(map[string]interpreter.GraphQLResolver),
+		Resolvers: make(map[string]ast.GraphQLResolver),
 		// Query is set but Mutation is nil
 		Query: &ObjectType{Name: "Query", Fields: map[string]*FieldDef{}},
 	}

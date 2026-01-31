@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 )
 
 // TestREPLBasicExpression tests basic expression evaluation.
@@ -809,7 +809,7 @@ func TestLoadFileValidFile(t *testing.T) {
 		t.Fatalf("Expected function 'greet' in environment: %v", err)
 	}
 
-	if _, ok := val.(interpreter.Function); !ok {
+	if _, ok := val.(ast.Function); !ok {
 		t.Errorf("Expected 'greet' to be a Function, got %T", val)
 	}
 }
@@ -931,7 +931,7 @@ func TestEvaluateFunctionDefinition(t *testing.T) {
 	if envErr != nil {
 		t.Fatalf("Expected 'square' in environment: %v", envErr)
 	}
-	if _, ok := val.(interpreter.Function); !ok {
+	if _, ok := val.(ast.Function); !ok {
 		t.Errorf("Expected 'square' to be a Function, got %T", val)
 	}
 }
@@ -1056,12 +1056,12 @@ func TestVarsShortAlias(t *testing.T) {
 func TestFormatFunctionSignature(t *testing.T) {
 	tests := []struct {
 		name     string
-		fn       interpreter.Function
+		fn       ast.Function
 		expected string
 	}{
 		{
 			name: "simple function no params",
-			fn: interpreter.Function{
+			fn: ast.Function{
 				Name:   "hello",
 				Params: nil,
 			},
@@ -1069,32 +1069,32 @@ func TestFormatFunctionSignature(t *testing.T) {
 		},
 		{
 			name: "function with typed params",
-			fn: interpreter.Function{
+			fn: ast.Function{
 				Name: "add",
-				Params: []interpreter.Field{
-					{Name: "a", TypeAnnotation: interpreter.IntType{}, Required: false},
-					{Name: "b", TypeAnnotation: interpreter.IntType{}, Required: false},
+				Params: []ast.Field{
+					{Name: "a", TypeAnnotation: ast.IntType{}, Required: false},
+					{Name: "b", TypeAnnotation: ast.IntType{}, Required: false},
 				},
-				ReturnType: interpreter.IntType{},
+				ReturnType: ast.IntType{},
 			},
 			expected: "add(a: int, b: int) -> int",
 		},
 		{
 			name: "function with required params",
-			fn: interpreter.Function{
+			fn: ast.Function{
 				Name: "greet",
-				Params: []interpreter.Field{
-					{Name: "name", TypeAnnotation: interpreter.StringType{}, Required: true},
+				Params: []ast.Field{
+					{Name: "name", TypeAnnotation: ast.StringType{}, Required: true},
 				},
-				ReturnType: interpreter.StringType{},
+				ReturnType: ast.StringType{},
 			},
 			expected: "greet(name: str!) -> str",
 		},
 		{
 			name: "function with no type annotation",
-			fn: interpreter.Function{
+			fn: ast.Function{
 				Name: "identity",
-				Params: []interpreter.Field{
+				Params: []ast.Field{
 					{Name: "x", TypeAnnotation: nil, Required: false},
 				},
 				ReturnType: nil,
@@ -1117,49 +1117,49 @@ func TestFormatFunctionSignature(t *testing.T) {
 func TestFormatType(t *testing.T) {
 	tests := []struct {
 		name     string
-		typ      interpreter.Type
+		typ      ast.Type
 		expected string
 	}{
 		{"nil type", nil, "any"},
-		{"int type", interpreter.IntType{}, "int"},
-		{"string type", interpreter.StringType{}, "str"},
-		{"bool type", interpreter.BoolType{}, "bool"},
-		{"float type", interpreter.FloatType{}, "float"},
-		{"array of int", interpreter.ArrayType{ElementType: interpreter.IntType{}}, "[int]"},
-		{"optional int", interpreter.OptionalType{InnerType: interpreter.IntType{}}, "int?"},
-		{"named type", interpreter.NamedType{Name: "User"}, "User"},
+		{"int type", ast.IntType{}, "int"},
+		{"string type", ast.StringType{}, "str"},
+		{"bool type", ast.BoolType{}, "bool"},
+		{"float type", ast.FloatType{}, "float"},
+		{"array of int", ast.ArrayType{ElementType: ast.IntType{}}, "[int]"},
+		{"optional int", ast.OptionalType{InnerType: ast.IntType{}}, "int?"},
+		{"named type", ast.NamedType{Name: "User"}, "User"},
 		{
 			"generic type with args",
-			interpreter.GenericType{
-				BaseType: interpreter.NamedType{Name: "List"},
-				TypeArgs: []interpreter.Type{interpreter.IntType{}},
+			ast.GenericType{
+				BaseType: ast.NamedType{Name: "List"},
+				TypeArgs: []ast.Type{ast.IntType{}},
 			},
 			"List<int>",
 		},
 		{
 			"generic type no args",
-			interpreter.GenericType{
-				BaseType: interpreter.NamedType{Name: "Any"},
+			ast.GenericType{
+				BaseType: ast.NamedType{Name: "Any"},
 				TypeArgs: nil,
 			},
 			"Any",
 		},
 		{
 			"function type",
-			interpreter.FunctionType{
-				ParamTypes: []interpreter.Type{interpreter.IntType{}, interpreter.IntType{}},
-				ReturnType: interpreter.IntType{},
+			ast.FunctionType{
+				ParamTypes: []ast.Type{ast.IntType{}, ast.IntType{}},
+				ReturnType: ast.IntType{},
 			},
 			"(int, int) -> int",
 		},
 		{
 			"nested array",
-			interpreter.ArrayType{ElementType: interpreter.ArrayType{ElementType: interpreter.StringType{}}},
+			ast.ArrayType{ElementType: ast.ArrayType{ElementType: ast.StringType{}}},
 			"[[str]]",
 		},
 		{
 			"optional string",
-			interpreter.OptionalType{InnerType: interpreter.StringType{}},
+			ast.OptionalType{InnerType: ast.StringType{}},
 			"str?",
 		},
 	}
@@ -1176,7 +1176,7 @@ func TestFormatType(t *testing.T) {
 
 // TestGetTypeNameFunction tests getTypeName with a Function value.
 func TestGetTypeNameFunction(t *testing.T) {
-	fn := interpreter.Function{
+	fn := ast.Function{
 		Name: "test",
 	}
 	result := getTypeName(fn)
@@ -1275,7 +1275,7 @@ func TestResetPreservesModuleResolver(t *testing.T) {
 }
 
 // TestEvaluateFunctionGenericFallback tests evaluateFunction when the module
-// has items but none match *interpreter.Function (the generic "Function defined" path).
+// has items but none match *ast.Function (the generic "Function defined" path).
 func TestEvaluateFunctionGenericFallback(t *testing.T) {
 	output := &bytes.Buffer{}
 	r := New(strings.NewReader(""), output, "test")
@@ -1337,19 +1337,19 @@ func TestFunctionsCommandMultiple(t *testing.T) {
 	r := New(strings.NewReader(""), output, "test")
 
 	// Define functions in the environment directly
-	fn1 := interpreter.Function{
+	fn1 := ast.Function{
 		Name: "alpha",
-		Params: []interpreter.Field{
-			{Name: "x", TypeAnnotation: interpreter.IntType{}, Required: true},
+		Params: []ast.Field{
+			{Name: "x", TypeAnnotation: ast.IntType{}, Required: true},
 		},
-		ReturnType: interpreter.IntType{},
+		ReturnType: ast.IntType{},
 	}
-	fn2 := interpreter.Function{
+	fn2 := ast.Function{
 		Name: "beta",
-		Params: []interpreter.Field{
-			{Name: "s", TypeAnnotation: interpreter.StringType{}, Required: false},
+		Params: []ast.Field{
+			{Name: "s", TypeAnnotation: ast.StringType{}, Required: false},
 		},
-		ReturnType: interpreter.StringType{},
+		ReturnType: ast.StringType{},
 	}
 	r.env.Define("alpha", fn1)
 	r.env.Define("beta", fn2)

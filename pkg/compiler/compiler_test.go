@@ -3410,24 +3410,24 @@ func TestCompileMatchExpr_LiteralPatterns(t *testing.T) {
 	xIdx := c.addConstant(vm.StringValue{Val: "x"})
 	c.symbolTable.Define("x", xIdx)
 
-	matchExpr := &interpreter.MatchExpr{
-		Value: &interpreter.VariableExpr{Name: "x"},
-		Cases: []interpreter.MatchCase{
+	matchExpr := &ast.MatchExpr{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.MatchCase{
 			{
-				Pattern: interpreter.LiteralPattern{
-					Value: interpreter.IntLiteral{Value: 1},
+				Pattern: ast.LiteralPattern{
+					Value: ast.IntLiteral{Value: 1},
 				},
-				Body: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+				Body: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
 			},
 			{
-				Pattern: interpreter.LiteralPattern{
-					Value: interpreter.IntLiteral{Value: 2},
+				Pattern: ast.LiteralPattern{
+					Value: ast.IntLiteral{Value: 2},
 				},
-				Body: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 20}},
+				Body: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 20}},
 			},
 			{
-				Pattern: interpreter.WildcardPattern{},
-				Body:    &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Pattern: ast.WildcardPattern{},
+				Body:    &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
 		},
 	}
@@ -3450,15 +3450,15 @@ func TestCompileMatchExpr_VariablePattern(t *testing.T) {
 	xIdx := c.addConstant(vm.StringValue{Val: "x"})
 	c.symbolTable.Define("x", xIdx)
 
-	matchExpr := &interpreter.MatchExpr{
-		Value: &interpreter.VariableExpr{Name: "x"},
-		Cases: []interpreter.MatchCase{
+	matchExpr := &ast.MatchExpr{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.MatchCase{
 			{
-				Pattern: interpreter.VariablePattern{Name: "y"},
-				Body: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Add,
-					Left:  &interpreter.VariableExpr{Name: "y"},
-					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+				Pattern: ast.VariablePattern{Name: "y"},
+				Body: &ast.BinaryOpExpr{
+					Op:    ast.Add,
+					Left:  &ast.VariableExpr{Name: "y"},
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 				},
 			},
 		},
@@ -3481,12 +3481,12 @@ func TestCompileMatchExpr_WildcardPattern(t *testing.T) {
 	xIdx := c.addConstant(vm.StringValue{Val: "x"})
 	c.symbolTable.Define("x", xIdx)
 
-	matchExpr := &interpreter.MatchExpr{
-		Value: &interpreter.VariableExpr{Name: "x"},
-		Cases: []interpreter.MatchCase{
+	matchExpr := &ast.MatchExpr{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.MatchCase{
 			{
-				Pattern: interpreter.WildcardPattern{},
-				Body:    &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 99}},
+				Pattern: ast.WildcardPattern{},
+				Body:    &ast.LiteralExpr{Value: ast.IntLiteral{Value: 99}},
 			},
 		},
 	}
@@ -3508,16 +3508,16 @@ func TestCompileMatchExpr_ObjectPattern(t *testing.T) {
 	xIdx := c.addConstant(vm.StringValue{Val: "x"})
 	c.symbolTable.Define("x", xIdx)
 
-	matchExpr := &interpreter.MatchExpr{
-		Value: &interpreter.VariableExpr{Name: "x"},
-		Cases: []interpreter.MatchCase{
+	matchExpr := &ast.MatchExpr{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.MatchCase{
 			{
-				Pattern: interpreter.ObjectPattern{
-					Fields: []interpreter.ObjectPatternField{
+				Pattern: ast.ObjectPattern{
+					Fields: []ast.ObjectPatternField{
 						{Key: "name", Pattern: nil}, // bind field to variable
 					},
 				},
-				Body: &interpreter.VariableExpr{Name: "name"},
+				Body: &ast.VariableExpr{Name: "name"},
 			},
 		},
 	}
@@ -3539,21 +3539,21 @@ func TestCompileMatchExpr_ObjectPatternWithNestedLiteral(t *testing.T) {
 	xIdx := c.addConstant(vm.StringValue{Val: "x"})
 	c.symbolTable.Define("x", xIdx)
 
-	matchExpr := &interpreter.MatchExpr{
-		Value: &interpreter.VariableExpr{Name: "x"},
-		Cases: []interpreter.MatchCase{
+	matchExpr := &ast.MatchExpr{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.MatchCase{
 			{
-				Pattern: interpreter.ObjectPattern{
-					Fields: []interpreter.ObjectPatternField{
+				Pattern: ast.ObjectPattern{
+					Fields: []ast.ObjectPatternField{
 						{
 							Key: "status",
-							Pattern: interpreter.LiteralPattern{
-								Value: interpreter.IntLiteral{Value: 200},
+							Pattern: ast.LiteralPattern{
+								Value: ast.IntLiteral{Value: 200},
 							},
 						},
 					},
 				},
-				Body: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "ok"}},
+				Body: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "ok"}},
 			},
 		},
 	}
@@ -3575,17 +3575,17 @@ func TestCompileMatchExpr_ArrayPattern(t *testing.T) {
 	xIdx := c.addConstant(vm.StringValue{Val: "x"})
 	c.symbolTable.Define("x", xIdx)
 
-	matchExpr := &interpreter.MatchExpr{
-		Value: &interpreter.VariableExpr{Name: "x"},
-		Cases: []interpreter.MatchCase{
+	matchExpr := &ast.MatchExpr{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.MatchCase{
 			{
-				Pattern: interpreter.ArrayPattern{
-					Elements: []interpreter.Pattern{
-						interpreter.VariablePattern{Name: "first"},
-						interpreter.VariablePattern{Name: "second"},
+				Pattern: ast.ArrayPattern{
+					Elements: []ast.Pattern{
+						ast.VariablePattern{Name: "first"},
+						ast.VariablePattern{Name: "second"},
 					},
 				},
-				Body: &interpreter.VariableExpr{Name: "first"},
+				Body: &ast.VariableExpr{Name: "first"},
 			},
 		},
 	}
@@ -3608,17 +3608,17 @@ func TestCompileMatchExpr_ArrayPatternWithRest(t *testing.T) {
 	c.symbolTable.Define("x", xIdx)
 
 	restName := "rest"
-	matchExpr := &interpreter.MatchExpr{
-		Value: &interpreter.VariableExpr{Name: "x"},
-		Cases: []interpreter.MatchCase{
+	matchExpr := &ast.MatchExpr{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.MatchCase{
 			{
-				Pattern: interpreter.ArrayPattern{
-					Elements: []interpreter.Pattern{
-						interpreter.VariablePattern{Name: "head"},
+				Pattern: ast.ArrayPattern{
+					Elements: []ast.Pattern{
+						ast.VariablePattern{Name: "head"},
 					},
 					Rest: &restName,
 				},
-				Body: &interpreter.VariableExpr{Name: "head"},
+				Body: &ast.VariableExpr{Name: "head"},
 			},
 		},
 	}
@@ -3640,21 +3640,21 @@ func TestCompileMatchExpr_WithGuard(t *testing.T) {
 	xIdx := c.addConstant(vm.StringValue{Val: "x"})
 	c.symbolTable.Define("x", xIdx)
 
-	matchExpr := &interpreter.MatchExpr{
-		Value: &interpreter.VariableExpr{Name: "x"},
-		Cases: []interpreter.MatchCase{
+	matchExpr := &ast.MatchExpr{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.MatchCase{
 			{
-				Pattern: interpreter.VariablePattern{Name: "y"},
-				Guard: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Gt,
-					Left:  &interpreter.VariableExpr{Name: "y"},
-					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Pattern: ast.VariablePattern{Name: "y"},
+				Guard: &ast.BinaryOpExpr{
+					Op:    ast.Gt,
+					Left:  &ast.VariableExpr{Name: "y"},
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 				},
-				Body: &interpreter.VariableExpr{Name: "y"},
+				Body: &ast.VariableExpr{Name: "y"},
 			},
 			{
-				Pattern: interpreter.WildcardPattern{},
-				Body:    &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Pattern: ast.WildcardPattern{},
+				Body:    &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
 		},
 	}
@@ -3677,12 +3677,12 @@ func TestCompileMatchExpr_ValueTypes(t *testing.T) {
 	c.symbolTable.Define("x", xIdx)
 
 	// Pointer type
-	matchExpr := &interpreter.MatchExpr{
-		Value: &interpreter.VariableExpr{Name: "x"},
-		Cases: []interpreter.MatchCase{
+	matchExpr := &ast.MatchExpr{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.MatchCase{
 			{
-				Pattern: interpreter.WildcardPattern{},
-				Body:    &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+				Pattern: ast.WildcardPattern{},
+				Body:    &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
 			},
 		},
 	}
@@ -3693,12 +3693,12 @@ func TestCompileMatchExpr_ValueTypes(t *testing.T) {
 
 	// Value type
 	c.code = make([]byte, 0)
-	matchExprVal := interpreter.MatchExpr{
-		Value: &interpreter.VariableExpr{Name: "x"},
-		Cases: []interpreter.MatchCase{
+	matchExprVal := ast.MatchExpr{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.MatchCase{
 			{
-				Pattern: interpreter.WildcardPattern{},
-				Body:    &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+				Pattern: ast.WildcardPattern{},
+				Body:    &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
 			},
 		},
 	}
@@ -3715,20 +3715,20 @@ func TestCompileMatchExpr_MultipleLiteralPatterns(t *testing.T) {
 	xIdx := c.addConstant(vm.StringValue{Val: "x"})
 	c.symbolTable.Define("x", xIdx)
 
-	matchExpr := &interpreter.MatchExpr{
-		Value: &interpreter.VariableExpr{Name: "x"},
-		Cases: []interpreter.MatchCase{
+	matchExpr := &ast.MatchExpr{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.MatchCase{
 			{
-				Pattern: interpreter.LiteralPattern{Value: interpreter.IntLiteral{Value: 1}},
-				Body:    &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "one"}},
+				Pattern: ast.LiteralPattern{Value: ast.IntLiteral{Value: 1}},
+				Body:    &ast.LiteralExpr{Value: ast.StringLiteral{Value: "one"}},
 			},
 			{
-				Pattern: interpreter.LiteralPattern{Value: interpreter.IntLiteral{Value: 2}},
-				Body:    &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "two"}},
+				Pattern: ast.LiteralPattern{Value: ast.IntLiteral{Value: 2}},
+				Body:    &ast.LiteralExpr{Value: ast.StringLiteral{Value: "two"}},
 			},
 			{
-				Pattern: interpreter.LiteralPattern{Value: interpreter.IntLiteral{Value: 3}},
-				Body:    &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "three"}},
+				Pattern: ast.LiteralPattern{Value: ast.IntLiteral{Value: 3}},
+				Body:    &ast.LiteralExpr{Value: ast.StringLiteral{Value: "three"}},
 			},
 		},
 	}
@@ -3743,14 +3743,14 @@ func TestCompileMatchExpr_MultipleLiteralPatterns(t *testing.T) {
 func TestCompileLiteralValue_AllTypes(t *testing.T) {
 	tests := []struct {
 		name string
-		lit  interpreter.Literal
+		lit  ast.Literal
 	}{
-		{"int", interpreter.IntLiteral{Value: 42}},
-		{"float", interpreter.FloatLiteral{Value: 3.14}},
-		{"string", interpreter.StringLiteral{Value: "hello"}},
-		{"bool true", interpreter.BoolLiteral{Value: true}},
-		{"bool false", interpreter.BoolLiteral{Value: false}},
-		{"null", interpreter.NullLiteral{}},
+		{"int", ast.IntLiteral{Value: 42}},
+		{"float", ast.FloatLiteral{Value: 3.14}},
+		{"string", ast.StringLiteral{Value: "hello"}},
+		{"bool true", ast.BoolLiteral{Value: true}},
+		{"bool false", ast.BoolLiteral{Value: false}},
+		{"null", ast.NullLiteral{}},
 	}
 
 	for _, tt := range tests {
@@ -3776,10 +3776,10 @@ func TestCompileAsyncExpr_Basic(t *testing.T) {
 	c := NewCompiler()
 	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
 
-	asyncExpr := &interpreter.AsyncExpr{
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+	asyncExpr := &ast.AsyncExpr{
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
 			},
 		},
 	}
@@ -3799,14 +3799,14 @@ func TestCompileAsyncExpr_WithAssignment(t *testing.T) {
 	c := NewCompiler()
 	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
 
-	asyncExpr := &interpreter.AsyncExpr{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	asyncExpr := &ast.AsyncExpr{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "x",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "x"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "x"},
 			},
 		},
 	}
@@ -3826,8 +3826,8 @@ func TestCompileAsyncExpr_EmptyBody(t *testing.T) {
 	c := NewCompiler()
 	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
 
-	asyncExpr := &interpreter.AsyncExpr{
-		Body: []interpreter.Statement{},
+	asyncExpr := &ast.AsyncExpr{
+		Body: []ast.Statement{},
 	}
 
 	err := c.compileAsyncExpr(asyncExpr)
@@ -3845,11 +3845,11 @@ func TestCompileAsyncExpr_NoExplicitReturn(t *testing.T) {
 	c := NewCompiler()
 	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
 
-	asyncExpr := &interpreter.AsyncExpr{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	asyncExpr := &ast.AsyncExpr{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "x",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
 			},
 		},
 	}
@@ -3870,10 +3870,10 @@ func TestCompileAsyncExpr_ValueType(t *testing.T) {
 	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
 
 	// Pointer type
-	asyncPtrExpr := &interpreter.AsyncExpr{
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+	asyncPtrExpr := &ast.AsyncExpr{
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 			},
 		},
 	}
@@ -3884,10 +3884,10 @@ func TestCompileAsyncExpr_ValueType(t *testing.T) {
 
 	// Value type
 	c.code = make([]byte, 0)
-	asyncValExpr := interpreter.AsyncExpr{
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+	asyncValExpr := ast.AsyncExpr{
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 			},
 		},
 	}
@@ -3904,8 +3904,8 @@ func TestCompileAwaitExpr_Basic(t *testing.T) {
 	futIdx := c.addConstant(vm.StringValue{Val: "future"})
 	c.symbolTable.Define("future", futIdx)
 
-	awaitExpr := &interpreter.AwaitExpr{
-		Expr: &interpreter.VariableExpr{Name: "future"},
+	awaitExpr := &ast.AwaitExpr{
+		Expr: &ast.VariableExpr{Name: "future"},
 	}
 
 	err := c.compileAwaitExpr(awaitExpr)
@@ -3923,8 +3923,8 @@ func TestCompileAwaitExpr_WithLiteral(t *testing.T) {
 	c := NewCompiler()
 	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
 
-	awaitExpr := &interpreter.AwaitExpr{
-		Expr: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+	awaitExpr := &ast.AwaitExpr{
+		Expr: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
 	}
 
 	err := c.compileAwaitExpr(awaitExpr)
@@ -3943,8 +3943,8 @@ func TestCompileAwaitExpr_ValueType(t *testing.T) {
 	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
 
 	// Pointer type
-	awaitPtrExpr := &interpreter.AwaitExpr{
-		Expr: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+	awaitPtrExpr := &ast.AwaitExpr{
+		Expr: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 	}
 	err := c.compileExpression(awaitPtrExpr)
 	if err != nil {
@@ -3953,8 +3953,8 @@ func TestCompileAwaitExpr_ValueType(t *testing.T) {
 
 	// Value type
 	c.code = make([]byte, 0)
-	awaitValExpr := interpreter.AwaitExpr{
-		Expr: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+	awaitValExpr := ast.AwaitExpr{
+		Expr: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 	}
 	err = c.compileExpression(awaitValExpr)
 	if err != nil {
@@ -3986,12 +3986,12 @@ func TestCompileStatement_UnsupportedType(t *testing.T) {
 
 func TestCompileUnaryOp_Not(t *testing.T) {
 	// Test: !true => false
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.UnaryOpExpr{
-					Op:    interpreter.Not,
-					Right: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.UnaryOpExpr{
+					Op:    ast.Not,
+					Right: &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
 				},
 			},
 		},
@@ -4017,12 +4017,12 @@ func TestCompileUnaryOp_Not(t *testing.T) {
 
 func TestCompileUnaryOp_Neg(t *testing.T) {
 	// Test: -42 => -42
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.UnaryOpExpr{
-					Op:    interpreter.Neg,
-					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.UnaryOpExpr{
+					Op:    ast.Neg,
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
 				},
 			},
 		},
@@ -4049,9 +4049,9 @@ func TestCompileUnaryOp_Neg(t *testing.T) {
 func TestCompileUnaryOp_UnsupportedOp(t *testing.T) {
 	c := NewCompiler()
 	// Use an invalid unary op value
-	expr := &interpreter.UnaryOpExpr{
-		Op:    interpreter.UnOp(99),
-		Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+	expr := &ast.UnaryOpExpr{
+		Op:    ast.UnOp(99),
+		Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 	}
 	err := c.compileUnaryOp(expr)
 	if err == nil {
@@ -4062,10 +4062,10 @@ func TestCompileUnaryOp_UnsupportedOp(t *testing.T) {
 func TestCompileBinaryOp_UnsupportedOp(t *testing.T) {
 	c := NewCompiler()
 	// Use an invalid binary op value
-	expr := &interpreter.BinaryOpExpr{
-		Op:    interpreter.BinOp(99),
-		Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-		Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+	expr := &ast.BinaryOpExpr{
+		Op:    ast.BinOp(99),
+		Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+		Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 	}
 	err := c.compileBinaryOp(expr)
 	if err == nil {
@@ -4082,11 +4082,11 @@ func TestCompileReturnStatement_WithExpression(t *testing.T) {
 	yIdx := c.addConstant(vm.StringValue{Val: "y"})
 	c.symbolTable.Define("y", yIdx)
 
-	stmt := &interpreter.ReturnStatement{
-		Value: &interpreter.BinaryOpExpr{
-			Op:    interpreter.Add,
-			Left:  &interpreter.VariableExpr{Name: "x"},
-			Right: &interpreter.VariableExpr{Name: "y"},
+	stmt := &ast.ReturnStatement{
+		Value: &ast.BinaryOpExpr{
+			Op:    ast.Add,
+			Left:  &ast.VariableExpr{Name: "x"},
+			Right: &ast.VariableExpr{Name: "y"},
 		},
 	}
 
@@ -4111,8 +4111,8 @@ func TestCompileReturnStatement_WithExpression(t *testing.T) {
 func TestCompileReturnStatement_ErrorInExpression(t *testing.T) {
 	c := NewCompiler()
 	// Reference undefined variable
-	stmt := &interpreter.ReturnStatement{
-		Value: &interpreter.VariableExpr{Name: "undefined_var"},
+	stmt := &ast.ReturnStatement{
+		Value: &ast.VariableExpr{Name: "undefined_var"},
 	}
 
 	err := c.compileReturnStatement(stmt)
@@ -4124,9 +4124,9 @@ func TestCompileReturnStatement_ErrorInExpression(t *testing.T) {
 func TestCompileArrayIndex_ErrorInArray(t *testing.T) {
 	c := NewCompiler()
 	// Array expression references undefined variable
-	expr := &interpreter.ArrayIndexExpr{
-		Array: &interpreter.VariableExpr{Name: "undefined_arr"},
-		Index: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+	expr := &ast.ArrayIndexExpr{
+		Array: &ast.VariableExpr{Name: "undefined_arr"},
+		Index: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 	}
 
 	err := c.compileArrayIndex(expr)
@@ -4142,9 +4142,9 @@ func TestCompileArrayIndex_ErrorInIndex(t *testing.T) {
 	c.symbolTable.Define("arr", arrIdx)
 
 	// Index references undefined variable
-	expr := &interpreter.ArrayIndexExpr{
-		Array: &interpreter.VariableExpr{Name: "arr"},
-		Index: &interpreter.VariableExpr{Name: "undefined_idx"},
+	expr := &ast.ArrayIndexExpr{
+		Array: &ast.VariableExpr{Name: "arr"},
+		Index: &ast.VariableExpr{Name: "undefined_idx"},
 	}
 
 	err := c.compileArrayIndex(expr)
@@ -4164,21 +4164,21 @@ func TestCompileStatement_SwitchValueType(t *testing.T) {
 	c.symbolTable.Define("x", xIdx)
 
 	// SwitchStatement as value type
-	switchStmt := interpreter.SwitchStatement{
-		Value: &interpreter.VariableExpr{Name: "x"},
-		Cases: []interpreter.SwitchCase{
+	switchStmt := ast.SwitchStatement{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.SwitchCase{
 			{
-				Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-				Body: []interpreter.Statement{
-					&interpreter.ReturnStatement{
-						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "one"}},
+				Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+				Body: []ast.Statement{
+					&ast.ReturnStatement{
+						Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "one"}},
 					},
 				},
 			},
 		},
-		Default: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "other"}},
+		Default: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "other"}},
 			},
 		},
 	}
@@ -4196,13 +4196,13 @@ func TestCompileStatement_ForValueType(t *testing.T) {
 	c.symbolTable.Define("items", itemsIdx)
 
 	// ForStatement as value type
-	forStmt := interpreter.ForStatement{
+	forStmt := ast.ForStatement{
 		ValueVar: "item",
-		Iterable: &interpreter.VariableExpr{Name: "items"},
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+		Iterable: &ast.VariableExpr{Name: "items"},
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "x",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 			},
 		},
 	}
@@ -4220,9 +4220,9 @@ func TestCompileStatement_ReassignValueType(t *testing.T) {
 	c.symbolTable.Define("x", xIdx)
 
 	// ReassignStatement as value type
-	reassignStmt := interpreter.ReassignStatement{
+	reassignStmt := ast.ReassignStatement{
 		Target: "x",
-		Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+		Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
 	}
 
 	err := c.compileStatement(reassignStmt)
@@ -4235,7 +4235,7 @@ func TestCompileStatement_ValidationValueType(t *testing.T) {
 	c := NewCompiler()
 
 	// ValidationStatement as value type
-	validationStmt := interpreter.ValidationStatement{}
+	validationStmt := ast.ValidationStatement{}
 
 	err := c.compileStatement(validationStmt)
 	if err != nil {
@@ -4247,7 +4247,7 @@ func TestCompileStatement_ValidationPtrType(t *testing.T) {
 	c := NewCompiler()
 
 	// ValidationStatement as pointer type
-	validationStmt := &interpreter.ValidationStatement{}
+	validationStmt := &ast.ValidationStatement{}
 
 	err := c.compileStatement(validationStmt)
 	if err != nil {

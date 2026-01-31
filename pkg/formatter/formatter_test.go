@@ -400,16 +400,16 @@ func strPtr(s string) *string {
 }
 
 // formatViaModule is a helper that wraps an item in a module and formats it.
-func formatViaModule(mode Mode, items ...interpreter.Item) string {
-	module := &interpreter.Module{Items: items}
+func formatViaModule(mode Mode, items ...ast.Item) string {
+	module := &ast.Module{Items: items}
 	f := New(mode)
 	return f.Format(module)
 }
 
 // formatRoute is a helper that wraps statements inside a Route and formats them.
-func formatRouteBody(mode Mode, stmts ...interpreter.Statement) string {
-	route := &interpreter.Route{
-		Method: interpreter.Get,
+func formatRouteBody(mode Mode, stmts ...ast.Statement) string {
+	route := &ast.Route{
+		Method: ast.Get,
 		Path:   "/test",
 		Body:   stmts,
 	}
@@ -417,19 +417,19 @@ func formatRouteBody(mode Mode, stmts ...interpreter.Statement) string {
 }
 
 func TestFormatFunction_Compact(t *testing.T) {
-	fn := &interpreter.Function{
+	fn := &ast.Function{
 		Name: "add",
-		Params: []interpreter.Field{
-			{Name: "a", TypeAnnotation: interpreter.IntType{}},
-			{Name: "b", TypeAnnotation: interpreter.IntType{}},
+		Params: []ast.Field{
+			{Name: "a", TypeAnnotation: ast.IntType{}},
+			{Name: "b", TypeAnnotation: ast.IntType{}},
 		},
-		ReturnType: interpreter.IntType{},
-		Body: []interpreter.Statement{
-			interpreter.ReturnStatement{
-				Value: interpreter.BinaryOpExpr{
-					Op:    interpreter.Add,
-					Left:  interpreter.VariableExpr{Name: "a"},
-					Right: interpreter.VariableExpr{Name: "b"},
+		ReturnType: ast.IntType{},
+		Body: []ast.Statement{
+			ast.ReturnStatement{
+				Value: ast.BinaryOpExpr{
+					Op:    ast.Add,
+					Left:  ast.VariableExpr{Name: "a"},
+					Right: ast.VariableExpr{Name: "b"},
 				},
 			},
 		},
@@ -444,14 +444,14 @@ func TestFormatFunction_Compact(t *testing.T) {
 }
 
 func TestFormatFunction_Expanded(t *testing.T) {
-	fn := &interpreter.Function{
+	fn := &ast.Function{
 		Name: "greet",
-		Params: []interpreter.Field{
-			{Name: "name", TypeAnnotation: interpreter.StringType{}},
+		Params: []ast.Field{
+			{Name: "name", TypeAnnotation: ast.StringType{}},
 		},
-		ReturnType: interpreter.StringType{},
-		Body: []interpreter.Statement{
-			interpreter.ReturnStatement{Value: interpreter.VariableExpr{Name: "name"}},
+		ReturnType: ast.StringType{},
+		Body: []ast.Statement{
+			ast.ReturnStatement{Value: ast.VariableExpr{Name: "name"}},
 		},
 	}
 	result := formatViaModule(Expanded, fn)
@@ -461,12 +461,12 @@ func TestFormatFunction_Expanded(t *testing.T) {
 }
 
 func TestFormatFunction_WithTypeParams(t *testing.T) {
-	fn := &interpreter.Function{
+	fn := &ast.Function{
 		Name:       "identity",
-		TypeParams: []interpreter.TypeParameter{{Name: "T"}, {Name: "U"}},
-		Params:     []interpreter.Field{{Name: "val"}},
-		Body: []interpreter.Statement{
-			interpreter.ReturnStatement{Value: interpreter.VariableExpr{Name: "val"}},
+		TypeParams: []ast.TypeParameter{{Name: "T"}, {Name: "U"}},
+		Params:     []ast.Field{{Name: "val"}},
+		Body: []ast.Statement{
+			ast.ReturnStatement{Value: ast.VariableExpr{Name: "val"}},
 		},
 	}
 	result := formatViaModule(Expanded, fn)
@@ -476,10 +476,10 @@ func TestFormatFunction_WithTypeParams(t *testing.T) {
 }
 
 func TestFormatFunction_NoReturnType(t *testing.T) {
-	fn := &interpreter.Function{
+	fn := &ast.Function{
 		Name:   "doSomething",
-		Params: []interpreter.Field{{Name: "x"}},
-		Body:   []interpreter.Statement{},
+		Params: []ast.Field{{Name: "x"}},
+		Body:   []ast.Statement{},
 	}
 	result := formatViaModule(Expanded, fn)
 	if strings.Contains(result, "->") {
@@ -488,15 +488,15 @@ func TestFormatFunction_NoReturnType(t *testing.T) {
 }
 
 func TestFormatWebSocketRoute_AllEventTypes(t *testing.T) {
-	ws := &interpreter.WebSocketRoute{
+	ws := &ast.WebSocketRoute{
 		Path: "/ws/chat",
-		Events: []interpreter.WebSocketEvent{
-			{EventType: interpreter.WSEventConnect, Body: []interpreter.Statement{
-				interpreter.ExpressionStatement{Expr: interpreter.FunctionCallExpr{Name: "log", Args: []interpreter.Expr{interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "connected"}}}}},
+		Events: []ast.WebSocketEvent{
+			{EventType: ast.WSEventConnect, Body: []ast.Statement{
+				ast.ExpressionStatement{Expr: ast.FunctionCallExpr{Name: "log", Args: []ast.Expr{ast.LiteralExpr{Value: ast.StringLiteral{Value: "connected"}}}}},
 			}},
-			{EventType: interpreter.WSEventDisconnect, Body: []interpreter.Statement{}},
-			{EventType: interpreter.WSEventMessage, Body: []interpreter.Statement{}},
-			{EventType: interpreter.WSEventError, Body: []interpreter.Statement{}},
+			{EventType: ast.WSEventDisconnect, Body: []ast.Statement{}},
+			{EventType: ast.WSEventMessage, Body: []ast.Statement{}},
+			{EventType: ast.WSEventError, Body: []ast.Statement{}},
 		},
 	}
 	compact := formatViaModule(Compact, ws)
@@ -515,7 +515,7 @@ func TestFormatWebSocketRoute_AllEventTypes(t *testing.T) {
 }
 
 func TestFormatImport_Simple(t *testing.T) {
-	imp := &interpreter.ImportStatement{Path: "utils/helpers"}
+	imp := &ast.ImportStatement{Path: "utils/helpers"}
 	result := formatViaModule(Compact, imp)
 	if !strings.Contains(result, `import "utils/helpers"`) {
 		t.Errorf("Simple import should format correctly, got: %s", result)
@@ -523,7 +523,7 @@ func TestFormatImport_Simple(t *testing.T) {
 }
 
 func TestFormatImport_WithAlias(t *testing.T) {
-	imp := &interpreter.ImportStatement{Path: "utils/helpers", Alias: "h"}
+	imp := &ast.ImportStatement{Path: "utils/helpers", Alias: "h"}
 	result := formatViaModule(Compact, imp)
 	if !strings.Contains(result, `import "utils/helpers" as h`) {
 		t.Errorf("Import with alias should format correctly, got: %s", result)
@@ -531,10 +531,10 @@ func TestFormatImport_WithAlias(t *testing.T) {
 }
 
 func TestFormatImport_Selective(t *testing.T) {
-	imp := &interpreter.ImportStatement{
+	imp := &ast.ImportStatement{
 		Path:      "math",
 		Selective: true,
-		Names: []interpreter.ImportName{
+		Names: []ast.ImportName{
 			{Name: "sqrt"},
 			{Name: "pow", Alias: "power"},
 		},
@@ -546,7 +546,7 @@ func TestFormatImport_Selective(t *testing.T) {
 }
 
 func TestFormatModuleDecl(t *testing.T) {
-	m := &interpreter.ModuleDecl{Name: "myapp"}
+	m := &ast.ModuleDecl{Name: "myapp"}
 	result := formatViaModule(Compact, m)
 	if !strings.Contains(result, `module "myapp"`) {
 		t.Errorf("Module decl should format correctly, got: %s", result)
@@ -554,7 +554,7 @@ func TestFormatModuleDecl(t *testing.T) {
 }
 
 func TestFormatMacroDef(t *testing.T) {
-	macro := &interpreter.MacroDef{Name: "log", Params: []string{"level", "msg"}}
+	macro := &ast.MacroDef{Name: "log", Params: []string{"level", "msg"}}
 	result := formatViaModule(Compact, macro)
 	if !strings.Contains(result, "macro! log(level, msg) {") {
 		t.Errorf("Macro def should format correctly, got: %s", result)
@@ -565,7 +565,7 @@ func TestFormatMacroDef(t *testing.T) {
 }
 
 func TestFormatMacroDef_NoParams(t *testing.T) {
-	macro := &interpreter.MacroDef{Name: "timestamp", Params: []string{}}
+	macro := &ast.MacroDef{Name: "timestamp", Params: []string{}}
 	result := formatViaModule(Compact, macro)
 	if !strings.Contains(result, "macro! timestamp() {") {
 		t.Errorf("Macro with no params should format correctly, got: %s", result)
@@ -574,8 +574,8 @@ func TestFormatMacroDef_NoParams(t *testing.T) {
 
 func TestFormatReassign(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.AssignStatement{Target: "x", Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}}},
-		interpreter.ReassignStatement{Target: "x", Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}}},
+		ast.AssignStatement{Target: "x", Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}}},
+		ast.ReassignStatement{Target: "x", Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}}},
 	)
 	if !strings.Contains(result, "$ x = 1") {
 		t.Errorf("Should contain assign, got: %s", result)
@@ -596,7 +596,7 @@ func TestFormatReassign(t *testing.T) {
 
 func TestFormatReassign_Pointer(t *testing.T) {
 	result := formatRouteBody(Expanded,
-		&interpreter.ReassignStatement{Target: "count", Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}}},
+		&ast.ReassignStatement{Target: "count", Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}}},
 	)
 	if !strings.Contains(result, "count = 5") {
 		t.Errorf("Pointer reassign should format correctly, got: %s", result)
@@ -605,13 +605,13 @@ func TestFormatReassign_Pointer(t *testing.T) {
 
 func TestFormatWhile(t *testing.T) {
 	result := formatRouteBody(Expanded,
-		interpreter.WhileStatement{
-			Condition: interpreter.BinaryOpExpr{
-				Op: interpreter.Lt, Left: interpreter.VariableExpr{Name: "i"}, Right: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+		ast.WhileStatement{
+			Condition: ast.BinaryOpExpr{
+				Op: ast.Lt, Left: ast.VariableExpr{Name: "i"}, Right: ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
 			},
-			Body: []interpreter.Statement{
-				interpreter.ReassignStatement{Target: "i", Value: interpreter.BinaryOpExpr{
-					Op: interpreter.Add, Left: interpreter.VariableExpr{Name: "i"}, Right: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+			Body: []ast.Statement{
+				ast.ReassignStatement{Target: "i", Value: ast.BinaryOpExpr{
+					Op: ast.Add, Left: ast.VariableExpr{Name: "i"}, Right: ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 				}},
 			},
 		},
@@ -626,10 +626,10 @@ func TestFormatWhile(t *testing.T) {
 
 func TestFormatWhile_Pointer(t *testing.T) {
 	result := formatRouteBody(Compact,
-		&interpreter.WhileStatement{
-			Condition: interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
-			Body: []interpreter.Statement{
-				interpreter.ReturnStatement{Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}}},
+		&ast.WhileStatement{
+			Condition: ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
+			Body: []ast.Statement{
+				ast.ReturnStatement{Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}}},
 			},
 		},
 	)
@@ -640,11 +640,11 @@ func TestFormatWhile_Pointer(t *testing.T) {
 
 func TestFormatFor_ValueOnly(t *testing.T) {
 	result := formatRouteBody(Expanded,
-		interpreter.ForStatement{
+		ast.ForStatement{
 			ValueVar: "item",
-			Iterable: interpreter.VariableExpr{Name: "items"},
-			Body: []interpreter.Statement{
-				interpreter.ExpressionStatement{Expr: interpreter.FunctionCallExpr{Name: "process", Args: []interpreter.Expr{interpreter.VariableExpr{Name: "item"}}}},
+			Iterable: ast.VariableExpr{Name: "items"},
+			Body: []ast.Statement{
+				ast.ExpressionStatement{Expr: ast.FunctionCallExpr{Name: "process", Args: []ast.Expr{ast.VariableExpr{Name: "item"}}}},
 			},
 		},
 	)
@@ -655,10 +655,10 @@ func TestFormatFor_ValueOnly(t *testing.T) {
 
 func TestFormatFor_KeyAndValue(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.ForStatement{
+		ast.ForStatement{
 			KeyVar: "idx", ValueVar: "val",
-			Iterable: interpreter.VariableExpr{Name: "arr"},
-			Body:     []interpreter.Statement{},
+			Iterable: ast.VariableExpr{Name: "arr"},
+			Body:     []ast.Statement{},
 		},
 	)
 	if !strings.Contains(result, "for idx, val in arr {") {
@@ -668,9 +668,9 @@ func TestFormatFor_KeyAndValue(t *testing.T) {
 
 func TestFormatFor_Pointer(t *testing.T) {
 	result := formatRouteBody(Compact,
-		&interpreter.ForStatement{
-			ValueVar: "x", Iterable: interpreter.VariableExpr{Name: "list"},
-			Body: []interpreter.Statement{},
+		&ast.ForStatement{
+			ValueVar: "x", Iterable: ast.VariableExpr{Name: "list"},
+			Body: []ast.Statement{},
 		},
 	)
 	if !strings.Contains(result, "for x in list {") {
@@ -680,18 +680,18 @@ func TestFormatFor_Pointer(t *testing.T) {
 
 func TestFormatSwitch_WithDefault(t *testing.T) {
 	result := formatRouteBody(Expanded,
-		interpreter.SwitchStatement{
-			Value: interpreter.VariableExpr{Name: "status"},
-			Cases: []interpreter.SwitchCase{
-				{Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 200}}, Body: []interpreter.Statement{
-					interpreter.ReturnStatement{Value: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "ok"}}},
+		ast.SwitchStatement{
+			Value: ast.VariableExpr{Name: "status"},
+			Cases: []ast.SwitchCase{
+				{Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 200}}, Body: []ast.Statement{
+					ast.ReturnStatement{Value: ast.LiteralExpr{Value: ast.StringLiteral{Value: "ok"}}},
 				}},
-				{Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 404}}, Body: []interpreter.Statement{
-					interpreter.ReturnStatement{Value: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "not found"}}},
+				{Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 404}}, Body: []ast.Statement{
+					ast.ReturnStatement{Value: ast.LiteralExpr{Value: ast.StringLiteral{Value: "not found"}}},
 				}},
 			},
-			Default: []interpreter.Statement{
-				interpreter.ReturnStatement{Value: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "error"}}},
+			Default: []ast.Statement{
+				ast.ReturnStatement{Value: ast.LiteralExpr{Value: ast.StringLiteral{Value: "error"}}},
 			},
 		},
 	)
@@ -711,10 +711,10 @@ func TestFormatSwitch_WithDefault(t *testing.T) {
 
 func TestFormatSwitch_NoDefault(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.SwitchStatement{
-			Value: interpreter.VariableExpr{Name: "x"},
-			Cases: []interpreter.SwitchCase{
-				{Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}}, Body: []interpreter.Statement{}},
+		ast.SwitchStatement{
+			Value: ast.VariableExpr{Name: "x"},
+			Cases: []ast.SwitchCase{
+				{Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}}, Body: []ast.Statement{}},
 			},
 		},
 	)
@@ -728,10 +728,10 @@ func TestFormatSwitch_NoDefault(t *testing.T) {
 
 func TestFormatSwitch_Pointer(t *testing.T) {
 	result := formatRouteBody(Compact,
-		&interpreter.SwitchStatement{
-			Value: interpreter.VariableExpr{Name: "y"},
-			Cases: []interpreter.SwitchCase{
-				{Value: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "a"}}, Body: []interpreter.Statement{}},
+		&ast.SwitchStatement{
+			Value: ast.VariableExpr{Name: "y"},
+			Cases: []ast.SwitchCase{
+				{Value: ast.LiteralExpr{Value: ast.StringLiteral{Value: "a"}}, Body: []ast.Statement{}},
 			},
 		},
 	)
@@ -742,9 +742,9 @@ func TestFormatSwitch_Pointer(t *testing.T) {
 
 func TestFormatDbQuery_Compact(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.DbQueryStatement{
+		ast.DbQueryStatement{
 			Var: "users", Query: "SELECT * FROM users WHERE id = ?",
-			Params: []interpreter.Expr{interpreter.VariableExpr{Name: "userId"}},
+			Params: []ast.Expr{ast.VariableExpr{Name: "userId"}},
 		},
 	)
 	if !strings.Contains(result, `$ users = db.query("SELECT * FROM users WHERE id = ?", userId)`) {
@@ -754,7 +754,7 @@ func TestFormatDbQuery_Compact(t *testing.T) {
 
 func TestFormatDbQuery_Expanded(t *testing.T) {
 	result := formatRouteBody(Expanded,
-		interpreter.DbQueryStatement{Var: "results", Query: "SELECT * FROM items"},
+		ast.DbQueryStatement{Var: "results", Query: "SELECT * FROM items"},
 	)
 	if !strings.Contains(result, `let results = db.query("SELECT * FROM items")`) {
 		t.Errorf("Expanded db query should use let prefix, got: %s", result)
@@ -763,7 +763,7 @@ func TestFormatDbQuery_Expanded(t *testing.T) {
 
 func TestFormatDbQuery_Pointer(t *testing.T) {
 	result := formatRouteBody(Compact,
-		&interpreter.DbQueryStatement{Var: "data", Query: "SELECT 1"},
+		&ast.DbQueryStatement{Var: "data", Query: "SELECT 1"},
 	)
 	if !strings.Contains(result, `$ data = db.query("SELECT 1")`) {
 		t.Errorf("Pointer db query should format correctly, got: %s", result)
@@ -772,8 +772,8 @@ func TestFormatDbQuery_Pointer(t *testing.T) {
 
 func TestFormatExpr_UnaryOps(t *testing.T) {
 	result := formatRouteBody(Expanded,
-		interpreter.AssignStatement{Target: "neg", Value: interpreter.UnaryOpExpr{Op: interpreter.Neg, Right: interpreter.VariableExpr{Name: "x"}}},
-		interpreter.AssignStatement{Target: "notVal", Value: interpreter.UnaryOpExpr{Op: interpreter.Not, Right: interpreter.VariableExpr{Name: "flag"}}},
+		ast.AssignStatement{Target: "neg", Value: ast.UnaryOpExpr{Op: ast.Neg, Right: ast.VariableExpr{Name: "x"}}},
+		ast.AssignStatement{Target: "notVal", Value: ast.UnaryOpExpr{Op: ast.Not, Right: ast.VariableExpr{Name: "flag"}}},
 	)
 	if !strings.Contains(result, "let neg = -x") {
 		t.Errorf("Unary neg should format as -x, got: %s", result)
@@ -785,7 +785,7 @@ func TestFormatExpr_UnaryOps(t *testing.T) {
 
 func TestFormatExpr_UnaryOp_Pointer(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.AssignStatement{Target: "neg", Value: &interpreter.UnaryOpExpr{Op: interpreter.Neg, Right: interpreter.VariableExpr{Name: "y"}}},
+		ast.AssignStatement{Target: "neg", Value: &ast.UnaryOpExpr{Op: ast.Neg, Right: ast.VariableExpr{Name: "y"}}},
 	)
 	if !strings.Contains(result, "$ neg = -y") {
 		t.Errorf("Pointer unary should format correctly, got: %s", result)
@@ -794,7 +794,7 @@ func TestFormatExpr_UnaryOp_Pointer(t *testing.T) {
 
 func TestFormatExpr_FieldAccess(t *testing.T) {
 	result := formatRouteBody(Expanded,
-		interpreter.AssignStatement{Target: "name", Value: interpreter.FieldAccessExpr{Object: interpreter.VariableExpr{Name: "user"}, Field: "name"}},
+		ast.AssignStatement{Target: "name", Value: ast.FieldAccessExpr{Object: ast.VariableExpr{Name: "user"}, Field: "name"}},
 	)
 	if !strings.Contains(result, "let name = user.name") {
 		t.Errorf("Field access should format as user.name, got: %s", result)
@@ -803,7 +803,7 @@ func TestFormatExpr_FieldAccess(t *testing.T) {
 
 func TestFormatExpr_FieldAccess_Pointer(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.AssignStatement{Target: "v", Value: &interpreter.FieldAccessExpr{Object: interpreter.VariableExpr{Name: "obj"}, Field: "val"}},
+		ast.AssignStatement{Target: "v", Value: &ast.FieldAccessExpr{Object: ast.VariableExpr{Name: "obj"}, Field: "val"}},
 	)
 	if !strings.Contains(result, "$ v = obj.val") {
 		t.Errorf("Pointer field access should format correctly, got: %s", result)
@@ -812,8 +812,8 @@ func TestFormatExpr_FieldAccess_Pointer(t *testing.T) {
 
 func TestFormatExpr_ArrayIndex(t *testing.T) {
 	result := formatRouteBody(Expanded,
-		interpreter.AssignStatement{Target: "first", Value: interpreter.ArrayIndexExpr{
-			Array: interpreter.VariableExpr{Name: "items"}, Index: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+		ast.AssignStatement{Target: "first", Value: ast.ArrayIndexExpr{
+			Array: ast.VariableExpr{Name: "items"}, Index: ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 		}},
 	)
 	if !strings.Contains(result, "let first = items[0]") {
@@ -823,8 +823,8 @@ func TestFormatExpr_ArrayIndex(t *testing.T) {
 
 func TestFormatExpr_ArrayIndex_Pointer(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.AssignStatement{Target: "el", Value: &interpreter.ArrayIndexExpr{
-			Array: interpreter.VariableExpr{Name: "arr"}, Index: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+		ast.AssignStatement{Target: "el", Value: &ast.ArrayIndexExpr{
+			Array: ast.VariableExpr{Name: "arr"}, Index: ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 		}},
 	)
 	if !strings.Contains(result, "$ el = arr[1]") {
@@ -834,8 +834,8 @@ func TestFormatExpr_ArrayIndex_Pointer(t *testing.T) {
 
 func TestFormatExpr_FunctionCallPointer(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.ExpressionStatement{Expr: &interpreter.FunctionCallExpr{
-			Name: "doStuff", Args: []interpreter.Expr{interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}}},
+		ast.ExpressionStatement{Expr: &ast.FunctionCallExpr{
+			Name: "doStuff", Args: []ast.Expr{ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}}},
 		}},
 	)
 	if !strings.Contains(result, "doStuff(42)") {
@@ -845,8 +845,8 @@ func TestFormatExpr_FunctionCallPointer(t *testing.T) {
 
 func TestFormatExpr_ObjectPointer(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.ReturnStatement{Value: &interpreter.ObjectExpr{
-			Fields: []interpreter.ObjectField{{Key: "a", Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}}}},
+		ast.ReturnStatement{Value: &ast.ObjectExpr{
+			Fields: []ast.ObjectField{{Key: "a", Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}}}},
 		}},
 	)
 	if !strings.Contains(result, "{a: 1}") {
@@ -856,8 +856,8 @@ func TestFormatExpr_ObjectPointer(t *testing.T) {
 
 func TestFormatExpr_ArrayPointer(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.ReturnStatement{Value: &interpreter.ArrayExpr{
-			Elements: []interpreter.Expr{interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}}, interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}}},
+		ast.ReturnStatement{Value: &ast.ArrayExpr{
+			Elements: []ast.Expr{ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}}, ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}}},
 		}},
 	)
 	if !strings.Contains(result, "[1, 2]") {
@@ -867,7 +867,7 @@ func TestFormatExpr_ArrayPointer(t *testing.T) {
 
 func TestFormatExpr_LiteralPointer(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.ReturnStatement{Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 99}}},
+		ast.ReturnStatement{Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 99}}},
 	)
 	if !strings.Contains(result, "> 99") {
 		t.Errorf("Pointer literal should format correctly, got: %s", result)
@@ -876,7 +876,7 @@ func TestFormatExpr_LiteralPointer(t *testing.T) {
 
 func TestFormatExpr_VariablePointer(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.ReturnStatement{Value: &interpreter.VariableExpr{Name: "foo"}},
+		ast.ReturnStatement{Value: &ast.VariableExpr{Name: "foo"}},
 	)
 	if !strings.Contains(result, "> foo") {
 		t.Errorf("Pointer variable should format correctly, got: %s", result)
@@ -885,7 +885,7 @@ func TestFormatExpr_VariablePointer(t *testing.T) {
 
 func TestFormatExpr_BinaryOpPointer(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.ReturnStatement{Value: &interpreter.BinaryOpExpr{Op: interpreter.Mul, Left: interpreter.VariableExpr{Name: "a"}, Right: interpreter.VariableExpr{Name: "b"}}},
+		ast.ReturnStatement{Value: &ast.BinaryOpExpr{Op: ast.Mul, Left: ast.VariableExpr{Name: "a"}, Right: ast.VariableExpr{Name: "b"}}},
 	)
 	if !strings.Contains(result, "> a * b") {
 		t.Errorf("Pointer binary op should format correctly, got: %s", result)
@@ -894,8 +894,8 @@ func TestFormatExpr_BinaryOpPointer(t *testing.T) {
 
 func TestFormatExpr_AwaitExpr(t *testing.T) {
 	result := formatRouteBody(Expanded,
-		interpreter.AssignStatement{Target: "result", Value: interpreter.AwaitExpr{
-			Expr: interpreter.FunctionCallExpr{Name: "fetchData", Args: []interpreter.Expr{}},
+		ast.AssignStatement{Target: "result", Value: ast.AwaitExpr{
+			Expr: ast.FunctionCallExpr{Name: "fetchData", Args: []ast.Expr{}},
 		}},
 	)
 	if !strings.Contains(result, "let result = await fetchData()") {
@@ -905,7 +905,7 @@ func TestFormatExpr_AwaitExpr(t *testing.T) {
 
 func TestFormatExpr_AwaitPointer(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.AssignStatement{Target: "r", Value: &interpreter.AwaitExpr{Expr: interpreter.VariableExpr{Name: "future"}}},
+		ast.AssignStatement{Target: "r", Value: &ast.AwaitExpr{Expr: ast.VariableExpr{Name: "future"}}},
 	)
 	if !strings.Contains(result, "$ r = await future") {
 		t.Errorf("Pointer await should format correctly, got: %s", result)
@@ -914,9 +914,9 @@ func TestFormatExpr_AwaitPointer(t *testing.T) {
 
 func TestFormatFunctionCall_WithTypeArgs(t *testing.T) {
 	result := formatRouteBody(Expanded,
-		interpreter.ExpressionStatement{Expr: interpreter.FunctionCallExpr{
-			Name: "parse", TypeArgs: []interpreter.Type{interpreter.IntType{}, interpreter.StringType{}},
-			Args: []interpreter.Expr{interpreter.VariableExpr{Name: "data"}},
+		ast.ExpressionStatement{Expr: ast.FunctionCallExpr{
+			Name: "parse", TypeArgs: []ast.Type{ast.IntType{}, ast.StringType{}},
+			Args: []ast.Expr{ast.VariableExpr{Name: "data"}},
 		}},
 	)
 	if !strings.Contains(result, "parse<int, str>(data)") {
@@ -926,7 +926,7 @@ func TestFormatFunctionCall_WithTypeArgs(t *testing.T) {
 
 func TestFormatFunctionCall_NoArgs(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.ExpressionStatement{Expr: interpreter.FunctionCallExpr{Name: "now", Args: []interpreter.Expr{}}},
+		ast.ExpressionStatement{Expr: ast.FunctionCallExpr{Name: "now", Args: []ast.Expr{}}},
 	)
 	if !strings.Contains(result, "now()") {
 		t.Errorf("No-arg function call should format correctly, got: %s", result)
@@ -935,12 +935,12 @@ func TestFormatFunctionCall_NoArgs(t *testing.T) {
 
 func TestFormatFunctionCall_MultipleArgs(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.ExpressionStatement{Expr: interpreter.FunctionCallExpr{
+		ast.ExpressionStatement{Expr: ast.FunctionCallExpr{
 			Name: "range",
-			Args: []interpreter.Expr{
-				interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
-				interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
-				interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+			Args: []ast.Expr{
+				ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
+				ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
+				ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 			},
 		}},
 	)
@@ -951,10 +951,10 @@ func TestFormatFunctionCall_MultipleArgs(t *testing.T) {
 
 func TestFormatLambda_ExprBody(t *testing.T) {
 	result := formatRouteBody(Expanded,
-		interpreter.AssignStatement{Target: "double", Value: interpreter.LambdaExpr{
-			Params: []interpreter.Field{{Name: "x", TypeAnnotation: interpreter.IntType{}}},
-			Body: interpreter.BinaryOpExpr{
-				Op: interpreter.Mul, Left: interpreter.VariableExpr{Name: "x"}, Right: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+		ast.AssignStatement{Target: "double", Value: ast.LambdaExpr{
+			Params: []ast.Field{{Name: "x", TypeAnnotation: ast.IntType{}}},
+			Body: ast.BinaryOpExpr{
+				Op: ast.Mul, Left: ast.VariableExpr{Name: "x"}, Right: ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 			},
 		}},
 	)
@@ -965,13 +965,13 @@ func TestFormatLambda_ExprBody(t *testing.T) {
 
 func TestFormatLambda_BlockBody(t *testing.T) {
 	result := formatRouteBody(Expanded,
-		interpreter.AssignStatement{Target: "fn", Value: interpreter.LambdaExpr{
-			Params: []interpreter.Field{{Name: "a"}, {Name: "b"}},
-			Block: []interpreter.Statement{
-				interpreter.AssignStatement{Target: "sum", Value: interpreter.BinaryOpExpr{
-					Op: interpreter.Add, Left: interpreter.VariableExpr{Name: "a"}, Right: interpreter.VariableExpr{Name: "b"},
+		ast.AssignStatement{Target: "fn", Value: ast.LambdaExpr{
+			Params: []ast.Field{{Name: "a"}, {Name: "b"}},
+			Block: []ast.Statement{
+				ast.AssignStatement{Target: "sum", Value: ast.BinaryOpExpr{
+					Op: ast.Add, Left: ast.VariableExpr{Name: "a"}, Right: ast.VariableExpr{Name: "b"},
 				}},
-				interpreter.ReturnStatement{Value: interpreter.VariableExpr{Name: "sum"}},
+				ast.ReturnStatement{Value: ast.VariableExpr{Name: "sum"}},
 			},
 		}},
 	)
@@ -985,10 +985,10 @@ func TestFormatLambda_BlockBody(t *testing.T) {
 
 func TestFormatLambda_Pointer(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.AssignStatement{Target: "inc", Value: &interpreter.LambdaExpr{
-			Params: []interpreter.Field{{Name: "n"}},
-			Body: interpreter.BinaryOpExpr{
-				Op: interpreter.Add, Left: interpreter.VariableExpr{Name: "n"}, Right: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+		ast.AssignStatement{Target: "inc", Value: &ast.LambdaExpr{
+			Params: []ast.Field{{Name: "n"}},
+			Body: ast.BinaryOpExpr{
+				Op: ast.Add, Left: ast.VariableExpr{Name: "n"}, Right: ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 			},
 		}},
 	)
@@ -999,9 +999,9 @@ func TestFormatLambda_Pointer(t *testing.T) {
 
 func TestFormatLambda_NoParams(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.AssignStatement{Target: "getZero", Value: interpreter.LambdaExpr{
-			Params: []interpreter.Field{},
-			Body:   interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+		ast.AssignStatement{Target: "getZero", Value: ast.LambdaExpr{
+			Params: []ast.Field{},
+			Body:   ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 		}},
 	)
 	if !strings.Contains(result, "() => 0") {
@@ -1011,12 +1011,12 @@ func TestFormatLambda_NoParams(t *testing.T) {
 
 func TestFormatMatch_Cases(t *testing.T) {
 	result := formatRouteBody(Expanded,
-		interpreter.AssignStatement{Target: "label", Value: interpreter.MatchExpr{
-			Value: interpreter.VariableExpr{Name: "code"},
-			Cases: []interpreter.MatchCase{
-				{Pattern: interpreter.LiteralPattern{Value: interpreter.IntLiteral{Value: 200}}, Body: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "OK"}}},
-				{Pattern: interpreter.LiteralPattern{Value: interpreter.IntLiteral{Value: 404}}, Body: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "Not Found"}}},
-				{Pattern: interpreter.WildcardPattern{}, Body: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "Unknown"}}},
+		ast.AssignStatement{Target: "label", Value: ast.MatchExpr{
+			Value: ast.VariableExpr{Name: "code"},
+			Cases: []ast.MatchCase{
+				{Pattern: ast.LiteralPattern{Value: ast.IntLiteral{Value: 200}}, Body: ast.LiteralExpr{Value: ast.StringLiteral{Value: "OK"}}},
+				{Pattern: ast.LiteralPattern{Value: ast.IntLiteral{Value: 404}}, Body: ast.LiteralExpr{Value: ast.StringLiteral{Value: "Not Found"}}},
+				{Pattern: ast.WildcardPattern{}, Body: ast.LiteralExpr{Value: ast.StringLiteral{Value: "Unknown"}}},
 			},
 		}},
 	)
@@ -1033,15 +1033,15 @@ func TestFormatMatch_Cases(t *testing.T) {
 
 func TestFormatMatch_WithGuard(t *testing.T) {
 	result := formatRouteBody(Expanded,
-		interpreter.AssignStatement{Target: "msg", Value: interpreter.MatchExpr{
-			Value: interpreter.VariableExpr{Name: "x"},
-			Cases: []interpreter.MatchCase{
+		ast.AssignStatement{Target: "msg", Value: ast.MatchExpr{
+			Value: ast.VariableExpr{Name: "x"},
+			Cases: []ast.MatchCase{
 				{
-					Pattern: interpreter.VariablePattern{Name: "n"},
-					Guard:   interpreter.BinaryOpExpr{Op: interpreter.Gt, Left: interpreter.VariableExpr{Name: "n"}, Right: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}}},
-					Body:    interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "positive"}},
+					Pattern: ast.VariablePattern{Name: "n"},
+					Guard:   ast.BinaryOpExpr{Op: ast.Gt, Left: ast.VariableExpr{Name: "n"}, Right: ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}}},
+					Body:    ast.LiteralExpr{Value: ast.StringLiteral{Value: "positive"}},
 				},
-				{Pattern: interpreter.WildcardPattern{}, Body: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "non-positive"}}},
+				{Pattern: ast.WildcardPattern{}, Body: ast.LiteralExpr{Value: ast.StringLiteral{Value: "non-positive"}}},
 			},
 		}},
 	)
@@ -1052,10 +1052,10 @@ func TestFormatMatch_WithGuard(t *testing.T) {
 
 func TestFormatMatch_Pointer(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.AssignStatement{Target: "r", Value: &interpreter.MatchExpr{
-			Value: interpreter.VariableExpr{Name: "val"},
-			Cases: []interpreter.MatchCase{
-				{Pattern: interpreter.WildcardPattern{}, Body: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}}},
+		ast.AssignStatement{Target: "r", Value: &ast.MatchExpr{
+			Value: ast.VariableExpr{Name: "val"},
+			Cases: []ast.MatchCase{
+				{Pattern: ast.WildcardPattern{}, Body: ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}}},
 			},
 		}},
 	)
@@ -1066,10 +1066,10 @@ func TestFormatMatch_Pointer(t *testing.T) {
 
 func TestFormatAsync_Body(t *testing.T) {
 	result := formatRouteBody(Expanded,
-		interpreter.AssignStatement{Target: "future", Value: interpreter.AsyncExpr{
-			Body: []interpreter.Statement{
-				interpreter.AssignStatement{Target: "data", Value: interpreter.FunctionCallExpr{Name: "fetch", Args: []interpreter.Expr{}}},
-				interpreter.ReturnStatement{Value: interpreter.VariableExpr{Name: "data"}},
+		ast.AssignStatement{Target: "future", Value: ast.AsyncExpr{
+			Body: []ast.Statement{
+				ast.AssignStatement{Target: "data", Value: ast.FunctionCallExpr{Name: "fetch", Args: []ast.Expr{}}},
+				ast.ReturnStatement{Value: ast.VariableExpr{Name: "data"}},
 			},
 		}},
 	)
@@ -1083,9 +1083,9 @@ func TestFormatAsync_Body(t *testing.T) {
 
 func TestFormatAsync_Pointer(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.AssignStatement{Target: "f", Value: &interpreter.AsyncExpr{
-			Body: []interpreter.Statement{
-				interpreter.ReturnStatement{Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}}},
+		ast.AssignStatement{Target: "f", Value: &ast.AsyncExpr{
+			Body: []ast.Statement{
+				ast.ReturnStatement{Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}}},
 			},
 		}},
 	)
@@ -1096,14 +1096,14 @@ func TestFormatAsync_Pointer(t *testing.T) {
 
 func TestFormatPattern_ObjectPattern(t *testing.T) {
 	result := formatRouteBody(Expanded,
-		interpreter.AssignStatement{Target: "result", Value: interpreter.MatchExpr{
-			Value: interpreter.VariableExpr{Name: "obj"},
-			Cases: []interpreter.MatchCase{{
-				Pattern: interpreter.ObjectPattern{Fields: []interpreter.ObjectPatternField{
+		ast.AssignStatement{Target: "result", Value: ast.MatchExpr{
+			Value: ast.VariableExpr{Name: "obj"},
+			Cases: []ast.MatchCase{{
+				Pattern: ast.ObjectPattern{Fields: []ast.ObjectPatternField{
 					{Key: "name"},
-					{Key: "age", Pattern: interpreter.VariablePattern{Name: "a"}},
+					{Key: "age", Pattern: ast.VariablePattern{Name: "a"}},
 				}},
-				Body: interpreter.VariableExpr{Name: "a"},
+				Body: ast.VariableExpr{Name: "a"},
 			}},
 		}},
 	)
@@ -1114,14 +1114,14 @@ func TestFormatPattern_ObjectPattern(t *testing.T) {
 
 func TestFormatPattern_ArrayPatternWithRest(t *testing.T) {
 	result := formatRouteBody(Expanded,
-		interpreter.AssignStatement{Target: "result", Value: interpreter.MatchExpr{
-			Value: interpreter.VariableExpr{Name: "arr"},
-			Cases: []interpreter.MatchCase{{
-				Pattern: interpreter.ArrayPattern{
-					Elements: []interpreter.Pattern{interpreter.VariablePattern{Name: "head"}},
+		ast.AssignStatement{Target: "result", Value: ast.MatchExpr{
+			Value: ast.VariableExpr{Name: "arr"},
+			Cases: []ast.MatchCase{{
+				Pattern: ast.ArrayPattern{
+					Elements: []ast.Pattern{ast.VariablePattern{Name: "head"}},
 					Rest:     strPtr("tail"),
 				},
-				Body: interpreter.VariableExpr{Name: "head"},
+				Body: ast.VariableExpr{Name: "head"},
 			}},
 		}},
 	)
@@ -1132,13 +1132,13 @@ func TestFormatPattern_ArrayPatternWithRest(t *testing.T) {
 
 func TestFormatPattern_ArrayPatternNoRest(t *testing.T) {
 	result := formatRouteBody(Expanded,
-		interpreter.AssignStatement{Target: "r", Value: interpreter.MatchExpr{
-			Value: interpreter.VariableExpr{Name: "pair"},
-			Cases: []interpreter.MatchCase{{
-				Pattern: interpreter.ArrayPattern{
-					Elements: []interpreter.Pattern{interpreter.VariablePattern{Name: "a"}, interpreter.VariablePattern{Name: "b"}},
+		ast.AssignStatement{Target: "r", Value: ast.MatchExpr{
+			Value: ast.VariableExpr{Name: "pair"},
+			Cases: []ast.MatchCase{{
+				Pattern: ast.ArrayPattern{
+					Elements: []ast.Pattern{ast.VariablePattern{Name: "a"}, ast.VariablePattern{Name: "b"}},
 				},
-				Body: interpreter.VariableExpr{Name: "a"},
+				Body: ast.VariableExpr{Name: "a"},
 			}},
 		}},
 	)
@@ -1149,11 +1149,11 @@ func TestFormatPattern_ArrayPatternNoRest(t *testing.T) {
 
 func TestFormatPattern_ArrayEmptyWithRest(t *testing.T) {
 	result := formatRouteBody(Expanded,
-		interpreter.AssignStatement{Target: "r", Value: interpreter.MatchExpr{
-			Value: interpreter.VariableExpr{Name: "list"},
-			Cases: []interpreter.MatchCase{{
-				Pattern: interpreter.ArrayPattern{Elements: []interpreter.Pattern{}, Rest: strPtr("all")},
-				Body:    interpreter.VariableExpr{Name: "all"},
+		ast.AssignStatement{Target: "r", Value: ast.MatchExpr{
+			Value: ast.VariableExpr{Name: "list"},
+			Cases: []ast.MatchCase{{
+				Pattern: ast.ArrayPattern{Elements: []ast.Pattern{}, Rest: strPtr("all")},
+				Body:    ast.VariableExpr{Name: "all"},
 			}},
 		}},
 	)
@@ -1163,15 +1163,15 @@ func TestFormatPattern_ArrayEmptyWithRest(t *testing.T) {
 }
 
 func TestFormatType_AllBasicTypes(t *testing.T) {
-	fields := []interpreter.Field{
-		{Name: "a", TypeAnnotation: interpreter.IntType{}},
-		{Name: "b", TypeAnnotation: interpreter.StringType{}},
-		{Name: "c", TypeAnnotation: interpreter.BoolType{}},
-		{Name: "d", TypeAnnotation: interpreter.FloatType{}},
-		{Name: "e", TypeAnnotation: interpreter.DatabaseType{}},
-		{Name: "f", TypeAnnotation: interpreter.NamedType{Name: "User"}},
+	fields := []ast.Field{
+		{Name: "a", TypeAnnotation: ast.IntType{}},
+		{Name: "b", TypeAnnotation: ast.StringType{}},
+		{Name: "c", TypeAnnotation: ast.BoolType{}},
+		{Name: "d", TypeAnnotation: ast.FloatType{}},
+		{Name: "e", TypeAnnotation: ast.DatabaseType{}},
+		{Name: "f", TypeAnnotation: ast.NamedType{Name: "User"}},
 	}
-	td := &interpreter.TypeDef{Name: "AllTypes", Fields: fields}
+	td := &ast.TypeDef{Name: "AllTypes", Fields: fields}
 	result := formatViaModule(Compact, td)
 	for _, expect := range []string{"a: int", "b: str", "c: bool", "d: float", "e: Database", "f: User"} {
 		if !strings.Contains(result, expect) {
@@ -1181,8 +1181,8 @@ func TestFormatType_AllBasicTypes(t *testing.T) {
 }
 
 func TestFormatType_ArrayType(t *testing.T) {
-	td := &interpreter.TypeDef{Name: "T", Fields: []interpreter.Field{
-		{Name: "ids", TypeAnnotation: interpreter.ArrayType{ElementType: interpreter.IntType{}}},
+	td := &ast.TypeDef{Name: "T", Fields: []ast.Field{
+		{Name: "ids", TypeAnnotation: ast.ArrayType{ElementType: ast.IntType{}}},
 	}}
 	result := formatViaModule(Compact, td)
 	if !strings.Contains(result, "ids: int[]") {
@@ -1191,8 +1191,8 @@ func TestFormatType_ArrayType(t *testing.T) {
 }
 
 func TestFormatType_OptionalType(t *testing.T) {
-	td := &interpreter.TypeDef{Name: "T", Fields: []interpreter.Field{
-		{Name: "bio", TypeAnnotation: interpreter.OptionalType{InnerType: interpreter.StringType{}}},
+	td := &ast.TypeDef{Name: "T", Fields: []ast.Field{
+		{Name: "bio", TypeAnnotation: ast.OptionalType{InnerType: ast.StringType{}}},
 	}}
 	result := formatViaModule(Compact, td)
 	if !strings.Contains(result, "bio: str?") {
@@ -1201,10 +1201,10 @@ func TestFormatType_OptionalType(t *testing.T) {
 }
 
 func TestFormatType_GenericType(t *testing.T) {
-	td := &interpreter.TypeDef{Name: "T", Fields: []interpreter.Field{
-		{Name: "map", TypeAnnotation: interpreter.GenericType{
-			BaseType: interpreter.NamedType{Name: "Map"},
-			TypeArgs: []interpreter.Type{interpreter.StringType{}, interpreter.IntType{}},
+	td := &ast.TypeDef{Name: "T", Fields: []ast.Field{
+		{Name: "map", TypeAnnotation: ast.GenericType{
+			BaseType: ast.NamedType{Name: "Map"},
+			TypeArgs: []ast.Type{ast.StringType{}, ast.IntType{}},
 		}},
 	}}
 	result := formatViaModule(Compact, td)
@@ -1214,8 +1214,8 @@ func TestFormatType_GenericType(t *testing.T) {
 }
 
 func TestFormatType_TypeParameterType(t *testing.T) {
-	td := &interpreter.TypeDef{Name: "Box", TypeParams: []interpreter.TypeParameter{{Name: "T"}},
-		Fields: []interpreter.Field{{Name: "value", TypeAnnotation: interpreter.TypeParameterType{Name: "T"}}},
+	td := &ast.TypeDef{Name: "Box", TypeParams: []ast.TypeParameter{{Name: "T"}},
+		Fields: []ast.Field{{Name: "value", TypeAnnotation: ast.TypeParameterType{Name: "T"}}},
 	}
 	result := formatViaModule(Compact, td)
 	if !strings.Contains(result, "value: T") {
@@ -1224,10 +1224,10 @@ func TestFormatType_TypeParameterType(t *testing.T) {
 }
 
 func TestFormatType_FunctionType(t *testing.T) {
-	td := &interpreter.TypeDef{Name: "T", Fields: []interpreter.Field{
-		{Name: "cb", TypeAnnotation: interpreter.FunctionType{
-			ParamTypes: []interpreter.Type{interpreter.StringType{}, interpreter.IntType{}},
-			ReturnType: interpreter.BoolType{},
+	td := &ast.TypeDef{Name: "T", Fields: []ast.Field{
+		{Name: "cb", TypeAnnotation: ast.FunctionType{
+			ParamTypes: []ast.Type{ast.StringType{}, ast.IntType{}},
+			ReturnType: ast.BoolType{},
 		}},
 	}}
 	result := formatViaModule(Compact, td)
@@ -1237,9 +1237,9 @@ func TestFormatType_FunctionType(t *testing.T) {
 }
 
 func TestFormatType_UnionType(t *testing.T) {
-	td := &interpreter.TypeDef{Name: "T", Fields: []interpreter.Field{
-		{Name: "val", TypeAnnotation: interpreter.UnionType{
-			Types: []interpreter.Type{interpreter.StringType{}, interpreter.IntType{}, interpreter.BoolType{}},
+	td := &ast.TypeDef{Name: "T", Fields: []ast.Field{
+		{Name: "val", TypeAnnotation: ast.UnionType{
+			Types: []ast.Type{ast.StringType{}, ast.IntType{}, ast.BoolType{}},
 		}},
 	}}
 	result := formatViaModule(Compact, td)
@@ -1249,8 +1249,8 @@ func TestFormatType_UnionType(t *testing.T) {
 }
 
 func TestFormatType_FutureType(t *testing.T) {
-	td := &interpreter.TypeDef{Name: "T", Fields: []interpreter.Field{
-		{Name: "task", TypeAnnotation: interpreter.FutureType{ResultType: interpreter.StringType{}}},
+	td := &ast.TypeDef{Name: "T", Fields: []ast.Field{
+		{Name: "task", TypeAnnotation: ast.FutureType{ResultType: ast.StringType{}}},
 	}}
 	result := formatViaModule(Compact, td)
 	if !strings.Contains(result, "task: Future<str>") {
@@ -1260,11 +1260,11 @@ func TestFormatType_FutureType(t *testing.T) {
 
 func TestFormatObject_MoreThanThreeFields(t *testing.T) {
 	result := formatRouteBody(Expanded,
-		interpreter.ReturnStatement{Value: interpreter.ObjectExpr{Fields: []interpreter.ObjectField{
-			{Key: "a", Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}}},
-			{Key: "b", Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}}},
-			{Key: "c", Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}}},
-			{Key: "d", Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 4}}},
+		ast.ReturnStatement{Value: ast.ObjectExpr{Fields: []ast.ObjectField{
+			{Key: "a", Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}}},
+			{Key: "b", Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}}},
+			{Key: "c", Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}}},
+			{Key: "d", Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 4}}},
 		}}},
 	)
 	// With >3 fields, multi-line format is used with trailing commas (except last)
@@ -1278,10 +1278,10 @@ func TestFormatObject_MoreThanThreeFields(t *testing.T) {
 
 func TestFormatObject_ThreeFieldsInline(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.ReturnStatement{Value: interpreter.ObjectExpr{Fields: []interpreter.ObjectField{
-			{Key: "r", Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 255}}},
-			{Key: "g", Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 128}}},
-			{Key: "b", Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}}},
+		ast.ReturnStatement{Value: ast.ObjectExpr{Fields: []ast.ObjectField{
+			{Key: "r", Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 255}}},
+			{Key: "g", Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 128}}},
+			{Key: "b", Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}}},
 		}}},
 	)
 	if !strings.Contains(result, "{r: 255, g: 128, b: 0}") {
@@ -1291,10 +1291,10 @@ func TestFormatObject_ThreeFieldsInline(t *testing.T) {
 
 func TestFormatArray_MultipleElements(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.ReturnStatement{Value: interpreter.ArrayExpr{Elements: []interpreter.Expr{
-			interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-			interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
-			interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+		ast.ReturnStatement{Value: ast.ArrayExpr{Elements: []ast.Expr{
+			ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+			ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
+			ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 		}}},
 	)
 	if !strings.Contains(result, "[1, 2, 3]") {
@@ -1304,8 +1304,8 @@ func TestFormatArray_MultipleElements(t *testing.T) {
 
 func TestFormatArray_SingleElement(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.ReturnStatement{Value: interpreter.ArrayExpr{Elements: []interpreter.Expr{
-			interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "only"}},
+		ast.ReturnStatement{Value: ast.ArrayExpr{Elements: []ast.Expr{
+			ast.LiteralExpr{Value: ast.StringLiteral{Value: "only"}},
 		}}},
 	)
 	if !strings.Contains(result, `["only"]`) {
@@ -1315,7 +1315,7 @@ func TestFormatArray_SingleElement(t *testing.T) {
 
 func TestFormatLiteral_Float(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.ReturnStatement{Value: interpreter.LiteralExpr{Value: interpreter.FloatLiteral{Value: 3.14}}},
+		ast.ReturnStatement{Value: ast.LiteralExpr{Value: ast.FloatLiteral{Value: 3.14}}},
 	)
 	if !strings.Contains(result, "> 3.14") {
 		t.Errorf("Float literal should format correctly, got: %s", result)
@@ -1324,7 +1324,7 @@ func TestFormatLiteral_Float(t *testing.T) {
 
 func TestFormatLiteral_Null(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.ReturnStatement{Value: interpreter.LiteralExpr{Value: interpreter.NullLiteral{}}},
+		ast.ReturnStatement{Value: ast.LiteralExpr{Value: ast.NullLiteral{}}},
 	)
 	if !strings.Contains(result, "> null") {
 		t.Errorf("Null literal should format as 'null', got: %s", result)
@@ -1333,7 +1333,7 @@ func TestFormatLiteral_Null(t *testing.T) {
 
 func TestFormatLiteral_BoolFalse(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.ReturnStatement{Value: interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: false}}},
+		ast.ReturnStatement{Value: ast.LiteralExpr{Value: ast.BoolLiteral{Value: false}}},
 	)
 	if !strings.Contains(result, "> false") {
 		t.Errorf("Bool false should format correctly, got: %s", result)
@@ -1342,8 +1342,8 @@ func TestFormatLiteral_BoolFalse(t *testing.T) {
 
 func TestFormatWsSend(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.WsSendStatement{
-			Client: interpreter.VariableExpr{Name: "client"}, Message: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "hello"}},
+		ast.WsSendStatement{
+			Client: ast.VariableExpr{Name: "client"}, Message: ast.LiteralExpr{Value: ast.StringLiteral{Value: "hello"}},
 		},
 	)
 	if !strings.Contains(result, `ws.send(client, "hello")`) {
@@ -1353,7 +1353,7 @@ func TestFormatWsSend(t *testing.T) {
 
 func TestFormatWsSend_Pointer(t *testing.T) {
 	result := formatRouteBody(Compact,
-		&interpreter.WsSendStatement{Client: interpreter.VariableExpr{Name: "c"}, Message: interpreter.VariableExpr{Name: "msg"}},
+		&ast.WsSendStatement{Client: ast.VariableExpr{Name: "c"}, Message: ast.VariableExpr{Name: "msg"}},
 	)
 	if !strings.Contains(result, "ws.send(c, msg)") {
 		t.Errorf("Pointer WsSend should format correctly, got: %s", result)
@@ -1362,7 +1362,7 @@ func TestFormatWsSend_Pointer(t *testing.T) {
 
 func TestFormatWsBroadcast(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.WsBroadcastStatement{Message: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "update"}}},
+		ast.WsBroadcastStatement{Message: ast.LiteralExpr{Value: ast.StringLiteral{Value: "update"}}},
 	)
 	if !strings.Contains(result, `ws.broadcast("update")`) {
 		t.Errorf("WsBroadcast should format correctly, got: %s", result)
@@ -1370,10 +1370,10 @@ func TestFormatWsBroadcast(t *testing.T) {
 }
 
 func TestFormatWsBroadcast_WithExcept(t *testing.T) {
-	except := interpreter.Expr(interpreter.VariableExpr{Name: "sender"})
+	except := ast.Expr(ast.VariableExpr{Name: "sender"})
 	result := formatRouteBody(Compact,
-		interpreter.WsBroadcastStatement{
-			Message: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "msg"}}, Except: &except,
+		ast.WsBroadcastStatement{
+			Message: ast.LiteralExpr{Value: ast.StringLiteral{Value: "msg"}}, Except: &except,
 		},
 	)
 	if !strings.Contains(result, `ws.broadcast("msg", except: sender)`) {
@@ -1382,10 +1382,10 @@ func TestFormatWsBroadcast_WithExcept(t *testing.T) {
 }
 
 func TestFormatWsBroadcast_Pointer(t *testing.T) {
-	except := interpreter.Expr(interpreter.VariableExpr{Name: "me"})
+	except := ast.Expr(ast.VariableExpr{Name: "me"})
 	result := formatRouteBody(Compact,
-		&interpreter.WsBroadcastStatement{
-			Message: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "hi"}}, Except: &except,
+		&ast.WsBroadcastStatement{
+			Message: ast.LiteralExpr{Value: ast.StringLiteral{Value: "hi"}}, Except: &except,
 		},
 	)
 	if !strings.Contains(result, `ws.broadcast("hi", except: me)`) {
@@ -1395,9 +1395,9 @@ func TestFormatWsBroadcast_Pointer(t *testing.T) {
 
 func TestFormatWsClose(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.WsCloseStatement{
-			Client: interpreter.VariableExpr{Name: "client"},
-			Reason: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "timeout"}},
+		ast.WsCloseStatement{
+			Client: ast.VariableExpr{Name: "client"},
+			Reason: ast.LiteralExpr{Value: ast.StringLiteral{Value: "timeout"}},
 		},
 	)
 	if !strings.Contains(result, `ws.close(client, "timeout")`) {
@@ -1407,7 +1407,7 @@ func TestFormatWsClose(t *testing.T) {
 
 func TestFormatWsClose_NoReason(t *testing.T) {
 	result := formatRouteBody(Compact,
-		interpreter.WsCloseStatement{Client: interpreter.VariableExpr{Name: "client"}},
+		ast.WsCloseStatement{Client: ast.VariableExpr{Name: "client"}},
 	)
 	if !strings.Contains(result, "ws.close(client)") {
 		t.Errorf("WsClose without reason should format correctly, got: %s", result)
@@ -1416,9 +1416,9 @@ func TestFormatWsClose_NoReason(t *testing.T) {
 
 func TestFormatWsClose_Pointer(t *testing.T) {
 	result := formatRouteBody(Compact,
-		&interpreter.WsCloseStatement{
-			Client: interpreter.VariableExpr{Name: "c"},
-			Reason: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "done"}},
+		&ast.WsCloseStatement{
+			Client: ast.VariableExpr{Name: "c"},
+			Reason: ast.LiteralExpr{Value: ast.StringLiteral{Value: "done"}},
 		},
 	)
 	if !strings.Contains(result, `ws.close(c, "done")`) {
@@ -1429,8 +1429,8 @@ func TestFormatWsClose_Pointer(t *testing.T) {
 func TestFormatStatement_PointerTypes(t *testing.T) {
 	// Test pointer versions of assign, return, if, expression, validation
 	result := formatRouteBody(Compact,
-		&interpreter.AssignStatement{Target: "z", Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}}},
-		&interpreter.ReturnStatement{Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}}},
+		&ast.AssignStatement{Target: "z", Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}}},
+		&ast.ReturnStatement{Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}}},
 	)
 	if !strings.Contains(result, "$ z = 5") {
 		t.Errorf("Pointer assign should format correctly, got: %s", result)
@@ -1442,9 +1442,9 @@ func TestFormatStatement_PointerTypes(t *testing.T) {
 
 func TestFormatStatement_PointerIf(t *testing.T) {
 	result := formatRouteBody(Compact,
-		&interpreter.IfStatement{
-			Condition: interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
-			ThenBlock: []interpreter.Statement{interpreter.ReturnStatement{Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}}}},
+		&ast.IfStatement{
+			Condition: ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
+			ThenBlock: []ast.Statement{ast.ReturnStatement{Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}}}},
 		},
 	)
 	if !strings.Contains(result, "if true {") {
@@ -1454,7 +1454,7 @@ func TestFormatStatement_PointerIf(t *testing.T) {
 
 func TestFormatStatement_PointerExpression(t *testing.T) {
 	result := formatRouteBody(Compact,
-		&interpreter.ExpressionStatement{Expr: interpreter.FunctionCallExpr{Name: "hello", Args: []interpreter.Expr{}}},
+		&ast.ExpressionStatement{Expr: ast.FunctionCallExpr{Name: "hello", Args: []ast.Expr{}}},
 	)
 	if !strings.Contains(result, "hello()") {
 		t.Errorf("Pointer expression stmt should format correctly, got: %s", result)
@@ -1463,8 +1463,8 @@ func TestFormatStatement_PointerExpression(t *testing.T) {
 
 func TestFormatStatement_PointerValidation(t *testing.T) {
 	result := formatRouteBody(Expanded,
-		&interpreter.ValidationStatement{
-			Call: interpreter.FunctionCallExpr{Name: "check", Args: []interpreter.Expr{interpreter.VariableExpr{Name: "x"}}},
+		&ast.ValidationStatement{
+			Call: ast.FunctionCallExpr{Name: "check", Args: []ast.Expr{ast.VariableExpr{Name: "x"}}},
 		},
 	)
 	if !strings.Contains(result, "validate check(x)") {
@@ -1473,14 +1473,14 @@ func TestFormatStatement_PointerValidation(t *testing.T) {
 }
 
 func TestFormatTypeDef_WithConstrainedTypeParams(t *testing.T) {
-	td := &interpreter.TypeDef{
+	td := &ast.TypeDef{
 		Name: "Result",
-		TypeParams: []interpreter.TypeParameter{
+		TypeParams: []ast.TypeParameter{
 			{Name: "T"},
-			{Name: "E", Constraint: interpreter.NamedType{Name: "Error"}},
+			{Name: "E", Constraint: ast.NamedType{Name: "Error"}},
 		},
-		Fields: []interpreter.Field{
-			{Name: "ok", TypeAnnotation: interpreter.TypeParameterType{Name: "T"}},
+		Fields: []ast.Field{
+			{Name: "ok", TypeAnnotation: ast.TypeParameterType{Name: "T"}},
 		},
 	}
 	result := formatViaModule(Compact, td)
@@ -1490,15 +1490,15 @@ func TestFormatTypeDef_WithConstrainedTypeParams(t *testing.T) {
 }
 
 func TestFormatRoute_QueryParamsAndReturnType(t *testing.T) {
-	route := &interpreter.Route{
-		Method: interpreter.Get, Path: "/api/users",
-		QueryParams: []interpreter.QueryParamDecl{
-			{Name: "page", Type: interpreter.IntType{}, Required: true},
-			{Name: "limit", Type: interpreter.IntType{}, Default: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 20}}},
+	route := &ast.Route{
+		Method: ast.Get, Path: "/api/users",
+		QueryParams: []ast.QueryParamDecl{
+			{Name: "page", Type: ast.IntType{}, Required: true},
+			{Name: "limit", Type: ast.IntType{}, Default: ast.LiteralExpr{Value: ast.IntLiteral{Value: 20}}},
 		},
-		ReturnType: interpreter.NamedType{Name: "UserList"},
-		Body: []interpreter.Statement{
-			interpreter.ReturnStatement{Value: interpreter.ObjectExpr{Fields: []interpreter.ObjectField{}}},
+		ReturnType: ast.NamedType{Name: "UserList"},
+		Body: []ast.Statement{
+			ast.ReturnStatement{Value: ast.ObjectExpr{Fields: []ast.ObjectField{}}},
 		},
 	}
 	result := formatViaModule(Expanded, route)
@@ -1514,13 +1514,13 @@ func TestFormatRoute_QueryParamsAndReturnType(t *testing.T) {
 }
 
 func TestFormatCommand_DescriptionAndFlags(t *testing.T) {
-	cmd := &interpreter.Command{
+	cmd := &ast.Command{
 		Name: "deploy", Description: "Deploy the application",
-		Params: []interpreter.CommandParam{
-			{Name: "env", Type: interpreter.StringType{}, Required: true},
-			{Name: "verbose", IsFlag: true, Type: interpreter.BoolType{}, Default: interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: false}}},
+		Params: []ast.CommandParam{
+			{Name: "env", Type: ast.StringType{}, Required: true},
+			{Name: "verbose", IsFlag: true, Type: ast.BoolType{}, Default: ast.LiteralExpr{Value: ast.BoolLiteral{Value: false}}},
 		},
-		Body: []interpreter.Statement{},
+		Body: []ast.Statement{},
 	}
 	result := formatViaModule(Compact, cmd)
 	if !strings.Contains(result, `! deploy "Deploy the application"`) {
@@ -1535,9 +1535,9 @@ func TestFormatCommand_DescriptionAndFlags(t *testing.T) {
 }
 
 func TestFormat_MultipleItemsSeparator(t *testing.T) {
-	module := &interpreter.Module{Items: []interpreter.Item{
-		&interpreter.ModuleDecl{Name: "app"},
-		&interpreter.ImportStatement{Path: "utils"},
+	module := &ast.Module{Items: []ast.Item{
+		&ast.ModuleDecl{Name: "app"},
+		&ast.ImportStatement{Path: "utils"},
 	}}
 	result := New(Compact).Format(module)
 	if !strings.Contains(result, "module \"app\"\n\nimport \"utils\"") {
@@ -1546,11 +1546,11 @@ func TestFormat_MultipleItemsSeparator(t *testing.T) {
 }
 
 func TestFormatCronTask_WithInjections(t *testing.T) {
-	cron := &interpreter.CronTask{
+	cron := &ast.CronTask{
 		Schedule:   "*/5 * * * *",
-		Injections: []interpreter.Injection{{Name: "db", Type: interpreter.DatabaseType{}}},
-		Body: []interpreter.Statement{
-			interpreter.ReturnStatement{Value: interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}}},
+		Injections: []ast.Injection{{Name: "db", Type: ast.DatabaseType{}}},
+		Body: []ast.Statement{
+			ast.ReturnStatement{Value: ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}}},
 		},
 	}
 	compact := formatViaModule(Compact, cron)
@@ -1564,11 +1564,11 @@ func TestFormatCronTask_WithInjections(t *testing.T) {
 }
 
 func TestFormatEventHandler_WithInjections(t *testing.T) {
-	eh := &interpreter.EventHandler{
+	eh := &ast.EventHandler{
 		EventType:  "order.paid",
-		Injections: []interpreter.Injection{{Name: "db", Type: interpreter.DatabaseType{}}},
-		Body: []interpreter.Statement{
-			interpreter.ReturnStatement{Value: interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}}},
+		Injections: []ast.Injection{{Name: "db", Type: ast.DatabaseType{}}},
+		Body: []ast.Statement{
+			ast.ReturnStatement{Value: ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}}},
 		},
 	}
 	compact := formatViaModule(Compact, eh)
@@ -1583,17 +1583,17 @@ func TestFormatEventHandler_WithInjections(t *testing.T) {
 
 func TestFormatAllBinaryOps(t *testing.T) {
 	ops := []struct {
-		op       interpreter.BinOp
+		op       ast.BinOp
 		expected string
 	}{
-		{interpreter.Add, "+"}, {interpreter.Sub, "-"}, {interpreter.Mul, "*"}, {interpreter.Div, "/"},
-		{interpreter.Eq, "=="}, {interpreter.Ne, "!="}, {interpreter.Lt, "<"}, {interpreter.Le, "<="},
-		{interpreter.Gt, ">"}, {interpreter.Ge, ">="}, {interpreter.And, "&&"}, {interpreter.Or, "||"},
+		{ast.Add, "+"}, {ast.Sub, "-"}, {ast.Mul, "*"}, {ast.Div, "/"},
+		{ast.Eq, "=="}, {ast.Ne, "!="}, {ast.Lt, "<"}, {ast.Le, "<="},
+		{ast.Gt, ">"}, {ast.Ge, ">="}, {ast.And, "&&"}, {ast.Or, "||"},
 	}
 	for _, tt := range ops {
 		result := formatRouteBody(Expanded,
-			interpreter.AssignStatement{Target: "r", Value: interpreter.BinaryOpExpr{
-				Op: tt.op, Left: interpreter.VariableExpr{Name: "a"}, Right: interpreter.VariableExpr{Name: "b"},
+			ast.AssignStatement{Target: "r", Value: ast.BinaryOpExpr{
+				Op: tt.op, Left: ast.VariableExpr{Name: "a"}, Right: ast.VariableExpr{Name: "b"},
 			}},
 		)
 		expected := "a " + tt.expected + " b"
@@ -1604,11 +1604,11 @@ func TestFormatAllBinaryOps(t *testing.T) {
 }
 
 func TestFormatQueueWorker_WithInjections(t *testing.T) {
-	qw := &interpreter.QueueWorker{
+	qw := &ast.QueueWorker{
 		QueueName:  "tasks",
-		Injections: []interpreter.Injection{{Name: "cache", Type: interpreter.NamedType{Name: "Redis"}}},
-		Body: []interpreter.Statement{
-			interpreter.ReturnStatement{Value: interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}}},
+		Injections: []ast.Injection{{Name: "cache", Type: ast.NamedType{Name: "Redis"}}},
+		Body: []ast.Statement{
+			ast.ReturnStatement{Value: ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}}},
 		},
 	}
 	compact := formatViaModule(Compact, qw)

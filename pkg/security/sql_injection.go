@@ -163,5 +163,5 @@ func EscapeSQLString(input string) string {
 // Deprecated: This function provides a false sense of security. Use EscapeSQLString
 // for non-security escaping, or preferably use parameterized queries.
 func SanitizeSQL(input string) string {
-	return StripSQLComments(input)
+	return EscapeSQLString(input)
 }

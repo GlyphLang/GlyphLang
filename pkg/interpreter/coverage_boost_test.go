@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/glyphlang/glyph/pkg/ast"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -1898,15 +1899,12 @@ func TestEvaluateNullLiteral(t *testing.T) {
 // Unsupported expression type
 // =============================================================================
 
-type fakeExpr struct{}
-
-func (fakeExpr) isExpr() {}
-
 func TestEvaluateExpression_Unsupported(t *testing.T) {
 	interp := NewInterpreter()
 	env := NewEnvironment()
 
-	_, err := interp.EvaluateExpression(fakeExpr{}, env)
+	// QuoteExpr is a valid AST Expr that EvaluateExpression does not handle
+	_, err := interp.EvaluateExpression(QuoteExpr{}, env)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported expression type")
 }
@@ -1918,8 +1916,8 @@ func TestEvaluateExpression_Unsupported(t *testing.T) {
 func TestExpressionStatement_Evaluation(t *testing.T) {
 	// ExpressionStatement wraps an expression as a statement
 	stmt := ExpressionStatement{Expr: LiteralExpr{Value: IntLiteral{Value: 42}}}
-	// ExpressionStatement has isStatement() marker
-	stmt.isStatement()
+	// Verify ExpressionStatement satisfies the Statement interface
+	var _ Statement = stmt
 	assert.NotNil(t, stmt.Expr)
 }
 
