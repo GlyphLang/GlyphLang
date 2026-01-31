@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -92,7 +92,7 @@ func (m *hotReloadManager) startDevServerInternal() (*http.Server, error) {
 
 	// Register WebSocket routes
 	for _, item := range module.Items {
-		if wsRoute, ok := item.(*interpreter.WebSocketRoute); ok {
+		if wsRoute, ok := item.(*ast.WebSocketRoute); ok {
 			path := wsRoute.Path
 			// Convert :param to {param} for Go's http.ServeMux pattern matching
 			muxPattern := server.ConvertPatternToMuxFormat(path)

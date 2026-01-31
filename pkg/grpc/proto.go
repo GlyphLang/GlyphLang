@@ -2,7 +2,7 @@ package grpc
 
 import (
 	"fmt"
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"strings"
 )
 
@@ -43,7 +43,7 @@ type ProtoField struct {
 }
 
 // GenerateProto generates a .proto file from Glyph service definitions and type definitions.
-func GenerateProto(packageName string, services map[string]interpreter.GRPCService, typeDefs map[string]interpreter.TypeDef) *ProtoFile {
+func GenerateProto(packageName string, services map[string]ast.GRPCService, typeDefs map[string]ast.TypeDef) *ProtoFile {
 	proto := &ProtoFile{
 		Package: packageName,
 	}
@@ -57,9 +57,9 @@ func GenerateProto(packageName string, services map[string]interpreter.GRPCServi
 				Type:   glyphTypeToProto(field.TypeAnnotation),
 				Number: i + 1,
 			}
-			if _, ok := field.TypeAnnotation.(interpreter.ArrayType); ok {
+			if _, ok := field.TypeAnnotation.(ast.ArrayType); ok {
 				pf.Repeated = true
-				pf.Type = glyphTypeToProto(field.TypeAnnotation.(interpreter.ArrayType).ElementType)
+				pf.Type = glyphTypeToProto(field.TypeAnnotation.(ast.ArrayType).ElementType)
 			}
 			msg.Fields = append(msg.Fields, pf)
 		}
@@ -74,8 +74,8 @@ func GenerateProto(packageName string, services map[string]interpreter.GRPCServi
 				Name:            method.Name,
 				InputType:       typeToProtoName(method.InputType),
 				OutputType:      typeToProtoName(method.ReturnType),
-				ClientStreaming: method.StreamType == interpreter.GRPCClientStream || method.StreamType == interpreter.GRPCBidirectional,
-				ServerStreaming: method.StreamType == interpreter.GRPCServerStream || method.StreamType == interpreter.GRPCBidirectional,
+				ClientStreaming: method.StreamType == ast.GRPCClientStream || method.StreamType == ast.GRPCBidirectional,
+				ServerStreaming: method.StreamType == ast.GRPCServerStream || method.StreamType == ast.GRPCBidirectional,
 			}
 			protoSvc.Methods = append(protoSvc.Methods, pm)
 		}
@@ -127,38 +127,38 @@ func (p *ProtoFile) Generate() string {
 	return strings.TrimSpace(b.String())
 }
 
-func glyphTypeToProto(t interpreter.Type) string {
+func glyphTypeToProto(t ast.Type) string {
 	if t == nil {
 		return "string"
 	}
 	switch v := t.(type) {
-	case interpreter.IntType:
+	case ast.IntType:
 		return "int64"
-	case interpreter.StringType:
+	case ast.StringType:
 		return "string"
-	case interpreter.BoolType:
+	case ast.BoolType:
 		return "bool"
-	case interpreter.FloatType:
+	case ast.FloatType:
 		return "double"
-	case interpreter.ArrayType:
+	case ast.ArrayType:
 		return glyphTypeToProto(v.ElementType)
-	case interpreter.OptionalType:
+	case ast.OptionalType:
 		return glyphTypeToProto(v.InnerType)
-	case interpreter.NamedType:
+	case ast.NamedType:
 		return v.Name
 	default:
 		return "string"
 	}
 }
 
-func typeToProtoName(t interpreter.Type) string {
+func typeToProtoName(t ast.Type) string {
 	if t == nil {
 		return "Empty"
 	}
 	switch v := t.(type) {
-	case interpreter.NamedType:
+	case ast.NamedType:
 		return v.Name
-	case interpreter.ArrayType:
+	case ast.ArrayType:
 		return typeToProtoName(v.ElementType)
 	default:
 		return glyphTypeToProto(t)

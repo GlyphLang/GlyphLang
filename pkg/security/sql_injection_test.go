@@ -1,7 +1,7 @@
 package security
 
 import (
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
 )
 
@@ -9,17 +9,17 @@ func TestSQLInjectionDetector_DetectConcatenation(t *testing.T) {
 	detector := NewSQLInjectionDetector()
 
 	// Test SQL query with string concatenation
-	route := &interpreter.Route{
+	route := &ast.Route{
 		Path: "/api/users",
-		Body: []interpreter.Statement{
-			interpreter.AssignStatement{
+		Body: []ast.Statement{
+			ast.AssignStatement{
 				Target: "query",
-				Value: interpreter.BinaryOpExpr{
-					Left: interpreter.LiteralExpr{
-						Value: interpreter.StringLiteral{Value: "SELECT * FROM users WHERE id = "},
+				Value: ast.BinaryOpExpr{
+					Left: ast.LiteralExpr{
+						Value: ast.StringLiteral{Value: "SELECT * FROM users WHERE id = "},
 					},
-					Op:    interpreter.Add,
-					Right: interpreter.VariableExpr{Name: "userId"},
+					Op:    ast.Add,
+					Right: ast.VariableExpr{Name: "userId"},
 				},
 			},
 		},
@@ -44,16 +44,16 @@ func TestSQLInjectionDetector_SafeQuery(t *testing.T) {
 	detector := NewSQLInjectionDetector()
 
 	// Test safe query (no concatenation)
-	route := &interpreter.Route{
+	route := &ast.Route{
 		Path: "/api/users",
-		Body: []interpreter.Statement{
-			interpreter.ReturnStatement{
-				Value: interpreter.ObjectExpr{
-					Fields: []interpreter.ObjectField{
+		Body: []ast.Statement{
+			ast.ReturnStatement{
+				Value: ast.ObjectExpr{
+					Fields: []ast.ObjectField{
 						{
 							Key: "message",
-							Value: interpreter.LiteralExpr{
-								Value: interpreter.StringLiteral{Value: "Hello"},
+							Value: ast.LiteralExpr{
+								Value: ast.StringLiteral{Value: "Hello"},
 							},
 						},
 					},
@@ -71,20 +71,20 @@ func TestSQLInjectionDetector_SafeQuery(t *testing.T) {
 
 func TestIsSafeQuery_OldTests(t *testing.T) {
 	// Safe query - just a literal
-	safeExpr := interpreter.LiteralExpr{
-		Value: interpreter.StringLiteral{Value: "SELECT * FROM users"},
+	safeExpr := ast.LiteralExpr{
+		Value: ast.StringLiteral{Value: "SELECT * FROM users"},
 	}
 	if !IsSafeQuery(safeExpr) {
 		t.Error("Expected literal query to be safe")
 	}
 
 	// Unsafe query - concatenation with SQL
-	unsafeExpr := interpreter.BinaryOpExpr{
-		Left: interpreter.LiteralExpr{
-			Value: interpreter.StringLiteral{Value: "SELECT * FROM users WHERE id = "},
+	unsafeExpr := ast.BinaryOpExpr{
+		Left: ast.LiteralExpr{
+			Value: ast.StringLiteral{Value: "SELECT * FROM users WHERE id = "},
 		},
-		Op:    interpreter.Add,
-		Right: interpreter.VariableExpr{Name: "id"},
+		Op:    ast.Add,
+		Right: ast.VariableExpr{Name: "id"},
 	}
 	if IsSafeQuery(unsafeExpr) {
 		t.Error("Expected concatenated query to be unsafe")
@@ -128,22 +128,22 @@ func TestSQLInjectionDetector_NestedExpressions(t *testing.T) {
 	detector := NewSQLInjectionDetector()
 
 	// Test nested in if statement
-	route := &interpreter.Route{
+	route := &ast.Route{
 		Path: "/api/search",
-		Body: []interpreter.Statement{
-			interpreter.IfStatement{
-				Condition: interpreter.LiteralExpr{
-					Value: interpreter.BoolLiteral{Value: true},
+		Body: []ast.Statement{
+			ast.IfStatement{
+				Condition: ast.LiteralExpr{
+					Value: ast.BoolLiteral{Value: true},
 				},
-				ThenBlock: []interpreter.Statement{
-					interpreter.AssignStatement{
+				ThenBlock: []ast.Statement{
+					ast.AssignStatement{
 						Target: "query",
-						Value: interpreter.BinaryOpExpr{
-							Left: interpreter.LiteralExpr{
-								Value: interpreter.StringLiteral{Value: "DELETE FROM users WHERE name = "},
+						Value: ast.BinaryOpExpr{
+							Left: ast.LiteralExpr{
+								Value: ast.StringLiteral{Value: "DELETE FROM users WHERE name = "},
 							},
-							Op:    interpreter.Add,
-							Right: interpreter.VariableExpr{Name: "name"},
+							Op:    ast.Add,
+							Right: ast.VariableExpr{Name: "name"},
 						},
 					},
 				},

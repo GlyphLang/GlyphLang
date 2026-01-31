@@ -8,7 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"os"
 	"path/filepath"
 	"sort"
@@ -214,22 +214,22 @@ func (g *Generator) processFile(relPath string, ctx *ProjectContext) (*FileConte
 
 	for _, item := range module.Items {
 		switch v := item.(type) {
-		case *interpreter.TypeDef:
+		case *ast.TypeDef:
 			typeInfo := extractTypeInfo(v)
 			ctx.Types[v.Name] = typeInfo
 			typeCount++
 
-		case *interpreter.Route:
+		case *ast.Route:
 			routeInfo := extractRouteInfo(v)
 			ctx.Routes = append(ctx.Routes, routeInfo)
 			routeCount++
 
-		case *interpreter.Function:
+		case *ast.Function:
 			funcInfo := extractFunctionInfo(v)
 			ctx.Functions[v.Name] = funcInfo
 			funcCount++
 
-		case *interpreter.Command:
+		case *ast.Command:
 			cmdInfo := extractCommandInfo(v)
 			ctx.Commands[v.Name] = cmdInfo
 			cmdCount++
@@ -265,7 +265,7 @@ func (g *Generator) processFile(relPath string, ctx *ProjectContext) (*FileConte
 }
 
 // extractTypeInfo extracts compact type information
-func extractTypeInfo(t *interpreter.TypeDef) *TypeInfo {
+func extractTypeInfo(t *ast.TypeDef) *TypeInfo {
 	fields := make([]string, len(t.Fields))
 	for i, f := range t.Fields {
 		fieldStr := f.Name + ": " + typeToString(f.TypeAnnotation)
@@ -292,7 +292,7 @@ func extractTypeInfo(t *interpreter.TypeDef) *TypeInfo {
 }
 
 // extractRouteInfo extracts compact route information
-func extractRouteInfo(r *interpreter.Route) *RouteInfo {
+func extractRouteInfo(r *ast.Route) *RouteInfo {
 	// Extract path parameters (e.g., :id from /users/:id)
 	var params []string
 	parts := strings.Split(r.Path, "/")
@@ -349,7 +349,7 @@ func extractRouteInfo(r *interpreter.Route) *RouteInfo {
 }
 
 // extractFunctionInfo extracts compact function information
-func extractFunctionInfo(f *interpreter.Function) *FunctionInfo {
+func extractFunctionInfo(f *ast.Function) *FunctionInfo {
 	params := make([]string, len(f.Params))
 	for i, p := range f.Params {
 		paramStr := p.Name + ": " + typeToString(p.TypeAnnotation)
@@ -381,7 +381,7 @@ func extractFunctionInfo(f *interpreter.Function) *FunctionInfo {
 }
 
 // extractCommandInfo extracts compact command information
-func extractCommandInfo(c *interpreter.Command) *CommandInfo {
+func extractCommandInfo(c *ast.Command) *CommandInfo {
 	params := make([]string, len(c.Params))
 	for i, p := range c.Params {
 		prefix := ""
@@ -468,45 +468,45 @@ func (g *Generator) detectPatterns(ctx *ProjectContext) []string {
 }
 
 // typeToString converts a Type to a compact string representation
-func typeToString(t interpreter.Type) string {
+func typeToString(t ast.Type) string {
 	if t == nil {
 		return "any"
 	}
 
 	switch v := t.(type) {
-	case interpreter.IntType:
+	case ast.IntType:
 		return "int"
-	case interpreter.StringType:
+	case ast.StringType:
 		return "string"
-	case interpreter.BoolType:
+	case ast.BoolType:
 		return "bool"
-	case interpreter.FloatType:
+	case ast.FloatType:
 		return "float"
-	case interpreter.NamedType:
+	case ast.NamedType:
 		return v.Name
-	case interpreter.ArrayType:
+	case ast.ArrayType:
 		return "[" + typeToString(v.ElementType) + "]"
-	case interpreter.OptionalType:
+	case ast.OptionalType:
 		return typeToString(v.InnerType) + "?"
-	case interpreter.GenericType:
+	case ast.GenericType:
 		args := make([]string, len(v.TypeArgs))
 		for i, arg := range v.TypeArgs {
 			args[i] = typeToString(arg)
 		}
 		return typeToString(v.BaseType) + "<" + strings.Join(args, ", ") + ">"
-	case interpreter.UnionType:
+	case ast.UnionType:
 		types := make([]string, len(v.Types))
 		for i, ut := range v.Types {
 			types[i] = typeToString(ut)
 		}
 		return strings.Join(types, " | ")
-	case interpreter.FunctionType:
+	case ast.FunctionType:
 		params := make([]string, len(v.ParamTypes))
 		for i, pt := range v.ParamTypes {
 			params[i] = typeToString(pt)
 		}
 		return "(" + strings.Join(params, ", ") + ") -> " + typeToString(v.ReturnType)
-	case interpreter.DatabaseType:
+	case ast.DatabaseType:
 		return "Database"
 	default:
 		return "any"

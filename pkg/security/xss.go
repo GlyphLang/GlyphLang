@@ -2,7 +2,7 @@ package security
 
 import (
 	"fmt"
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"html"
 	"regexp"
 	"strings"
@@ -21,28 +21,28 @@ func NewXSSDetector() *XSSDetector {
 }
 
 // DetectXSS analyzes an expression for XSS vulnerabilities
-func DetectXSS(expr interpreter.Expr) []SecurityWarning {
+func DetectXSS(expr ast.Expr) []SecurityWarning {
 	detector := NewXSSDetector()
 	detector.analyzeExpr(expr, false)
 	return detector.warnings
 }
 
 // analyzeExpr recursively analyzes an expression for XSS patterns
-func (d *XSSDetector) analyzeExpr(expr interpreter.Expr, inHTMLContext bool) {
+func (d *XSSDetector) analyzeExpr(expr ast.Expr, inHTMLContext bool) {
 	if expr == nil {
 		return
 	}
 
 	switch e := expr.(type) {
-	case interpreter.LiteralExpr:
+	case ast.LiteralExpr:
 		d.analyzeLiteral(e, inHTMLContext)
 
-	case interpreter.VariableExpr:
+	case ast.VariableExpr:
 		d.analyzeVariable(e, inHTMLContext)
 
-	case interpreter.BinaryOpExpr:
+	case ast.BinaryOpExpr:
 		// String concatenation is particularly risky for XSS
-		if e.Op == interpreter.Add {
+		if e.Op == ast.Add {
 			d.analyzeExpr(e.Left, inHTMLContext)
 			d.analyzeExpr(e.Right, inHTMLContext)
 
@@ -62,18 +62,18 @@ func (d *XSSDetector) analyzeExpr(expr interpreter.Expr, inHTMLContext bool) {
 			d.analyzeExpr(e.Right, inHTMLContext)
 		}
 
-	case interpreter.FunctionCallExpr:
+	case ast.FunctionCallExpr:
 		d.analyzeFunctionCall(e, inHTMLContext)
 		for _, arg := range e.Args {
 			d.analyzeExpr(arg, inHTMLContext)
 		}
 
-	case interpreter.ObjectExpr:
+	case ast.ObjectExpr:
 		d.analyzeObjectExpr(e)
 
-	case interpreter.FieldAccessExpr:
+	case ast.FieldAccessExpr:
 		// Field access from request/input is user data
-		if varExpr, ok := e.Object.(interpreter.VariableExpr); ok {
+		if varExpr, ok := e.Object.(ast.VariableExpr); ok {
 			if isUserInputSource(varExpr.Name) && inHTMLContext {
 				d.addWarning(SecurityWarning{
 					Type:       "XSS",
@@ -87,7 +87,7 @@ func (d *XSSDetector) analyzeExpr(expr interpreter.Expr, inHTMLContext bool) {
 		}
 		d.analyzeExpr(e.Object, inHTMLContext)
 
-	case interpreter.ArrayExpr:
+	case ast.ArrayExpr:
 		for _, elem := range e.Elements {
 			d.analyzeExpr(elem, inHTMLContext)
 		}
@@ -95,8 +95,8 @@ func (d *XSSDetector) analyzeExpr(expr interpreter.Expr, inHTMLContext bool) {
 }
 
 // analyzeLiteral checks string literals for HTML/JavaScript content
-func (d *XSSDetector) analyzeLiteral(lit interpreter.LiteralExpr, inHTMLContext bool) {
-	if strLit, ok := lit.Value.(interpreter.StringLiteral); ok {
+func (d *XSSDetector) analyzeLiteral(lit ast.LiteralExpr, inHTMLContext bool) {
+	if strLit, ok := lit.Value.(ast.StringLiteral); ok {
 		if containsHTMLTags(strLit.Value) {
 			d.addWarning(SecurityWarning{
 				Type:       "XSS",
@@ -133,7 +133,7 @@ func (d *XSSDetector) analyzeLiteral(lit interpreter.LiteralExpr, inHTMLContext 
 }
 
 // analyzeVariable checks if a variable might contain user input
-func (d *XSSDetector) analyzeVariable(varExpr interpreter.VariableExpr, inHTMLContext bool) {
+func (d *XSSDetector) analyzeVariable(varExpr ast.VariableExpr, inHTMLContext bool) {
 	if isUserInputSource(varExpr.Name) && inHTMLContext {
 		d.addWarning(SecurityWarning{
 			Type:       "XSS",
@@ -147,7 +147,7 @@ func (d *XSSDetector) analyzeVariable(varExpr interpreter.VariableExpr, inHTMLCo
 }
 
 // analyzeFunctionCall checks for unsafe function calls
-func (d *XSSDetector) analyzeFunctionCall(call interpreter.FunctionCallExpr, inHTMLContext bool) {
+func (d *XSSDetector) analyzeFunctionCall(call ast.FunctionCallExpr, inHTMLContext bool) {
 	// Check for functions that output HTML
 	htmlOutputFunctions := map[string]bool{
 		"render":     true,
@@ -192,12 +192,12 @@ func (d *XSSDetector) analyzeFunctionCall(call interpreter.FunctionCallExpr, inH
 }
 
 // analyzeObjectExpr checks object expressions for HTML content in response objects
-func (d *XSSDetector) analyzeObjectExpr(obj interpreter.ObjectExpr) {
+func (d *XSSDetector) analyzeObjectExpr(obj ast.ObjectExpr) {
 	for _, field := range obj.Fields {
 		// Check for Content-Type field
 		if strings.EqualFold(field.Key, "content-type") || strings.EqualFold(field.Key, "contentType") {
-			if strLit, ok := field.Value.(interpreter.LiteralExpr); ok {
-				if lit, ok := strLit.Value.(interpreter.StringLiteral); ok {
+			if strLit, ok := field.Value.(ast.LiteralExpr); ok {
+				if lit, ok := strLit.Value.(ast.StringLiteral); ok {
 					if strings.Contains(strings.ToLower(lit.Value), "text/html") {
 						d.addWarning(SecurityWarning{
 							Type:       "XSS",
@@ -232,26 +232,26 @@ func (d *XSSDetector) analyzeObjectExpr(obj interpreter.ObjectExpr) {
 }
 
 // RequiresHTMLEscape checks if an expression requires HTML escaping
-func RequiresHTMLEscape(expr interpreter.Expr) bool {
+func RequiresHTMLEscape(expr ast.Expr) bool {
 	if expr == nil {
 		return false
 	}
 
 	switch e := expr.(type) {
-	case interpreter.VariableExpr:
+	case ast.VariableExpr:
 		return isUserInputSource(e.Name)
 
-	case interpreter.FieldAccessExpr:
-		if varExpr, ok := e.Object.(interpreter.VariableExpr); ok {
+	case ast.FieldAccessExpr:
+		if varExpr, ok := e.Object.(ast.VariableExpr); ok {
 			return isUserInputSource(varExpr.Name)
 		}
 		return RequiresHTMLEscape(e.Object)
 
-	case interpreter.BinaryOpExpr:
+	case ast.BinaryOpExpr:
 		// If any part contains user input, the whole expression needs escaping
 		return RequiresHTMLEscape(e.Left) || RequiresHTMLEscape(e.Right)
 
-	case interpreter.FunctionCallExpr:
+	case ast.FunctionCallExpr:
 		// Check if it's already an escape function
 		safeEscapeFunctions := map[string]bool{
 			"escapeHTML": true,
@@ -270,7 +270,7 @@ func RequiresHTMLEscape(expr interpreter.Expr) bool {
 		}
 		return false
 
-	case interpreter.ArrayExpr:
+	case ast.ArrayExpr:
 		for _, elem := range e.Elements {
 			if RequiresHTMLEscape(elem) {
 				return true
@@ -284,7 +284,7 @@ func RequiresHTMLEscape(expr interpreter.Expr) bool {
 }
 
 // SuggestHTMLEscape generates a suggestion for HTML escaping
-func SuggestHTMLEscape(expr interpreter.Expr) string {
+func SuggestHTMLEscape(expr ast.Expr) string {
 	exprStr := exprToString(expr)
 	return fmt.Sprintf("Use escapeHTML(%s) to prevent XSS attacks", exprStr)
 }
@@ -381,77 +381,77 @@ func containsEventHandlers(s string) bool {
 	return false
 }
 
-func (d *XSSDetector) containsHTMLPatterns(expr interpreter.Expr) bool {
+func (d *XSSDetector) containsHTMLPatterns(expr ast.Expr) bool {
 	switch e := expr.(type) {
-	case interpreter.LiteralExpr:
-		if strLit, ok := e.Value.(interpreter.StringLiteral); ok {
+	case ast.LiteralExpr:
+		if strLit, ok := e.Value.(ast.StringLiteral); ok {
 			return containsHTMLTags(strLit.Value)
 		}
-	case interpreter.BinaryOpExpr:
+	case ast.BinaryOpExpr:
 		return d.containsHTMLPatterns(e.Left) || d.containsHTMLPatterns(e.Right)
 	}
 	return false
 }
 
-func (d *XSSDetector) containsUserInput(expr interpreter.Expr) bool {
+func (d *XSSDetector) containsUserInput(expr ast.Expr) bool {
 	switch e := expr.(type) {
-	case interpreter.VariableExpr:
+	case ast.VariableExpr:
 		return isUserInputSource(e.Name)
-	case interpreter.FieldAccessExpr:
-		if varExpr, ok := e.Object.(interpreter.VariableExpr); ok {
+	case ast.FieldAccessExpr:
+		if varExpr, ok := e.Object.(ast.VariableExpr); ok {
 			return isUserInputSource(varExpr.Name)
 		}
 		return d.containsUserInput(e.Object)
-	case interpreter.BinaryOpExpr:
+	case ast.BinaryOpExpr:
 		return d.containsUserInput(e.Left) || d.containsUserInput(e.Right)
 	}
 	return false
 }
 
-func exprToString(expr interpreter.Expr) string {
+func exprToString(expr ast.Expr) string {
 	if expr == nil {
 		return "nil"
 	}
 
 	switch e := expr.(type) {
-	case interpreter.LiteralExpr:
-		if strLit, ok := e.Value.(interpreter.StringLiteral); ok {
+	case ast.LiteralExpr:
+		if strLit, ok := e.Value.(ast.StringLiteral); ok {
 			return fmt.Sprintf("\"%s\"", strLit.Value)
 		}
-		if intLit, ok := e.Value.(interpreter.IntLiteral); ok {
+		if intLit, ok := e.Value.(ast.IntLiteral); ok {
 			return fmt.Sprintf("%d", intLit.Value)
 		}
-		if boolLit, ok := e.Value.(interpreter.BoolLiteral); ok {
+		if boolLit, ok := e.Value.(ast.BoolLiteral); ok {
 			return fmt.Sprintf("%t", boolLit.Value)
 		}
-		if floatLit, ok := e.Value.(interpreter.FloatLiteral); ok {
+		if floatLit, ok := e.Value.(ast.FloatLiteral); ok {
 			return fmt.Sprintf("%f", floatLit.Value)
 		}
 
-	case interpreter.VariableExpr:
+	case ast.VariableExpr:
 		return e.Name
 
-	case interpreter.FieldAccessExpr:
+	case ast.FieldAccessExpr:
 		return fmt.Sprintf("%s.%s", exprToString(e.Object), e.Field)
 
-	case interpreter.BinaryOpExpr:
+	case ast.BinaryOpExpr:
 		return fmt.Sprintf("(%s %s %s)", exprToString(e.Left), e.Op.String(), exprToString(e.Right))
 
-	case interpreter.FunctionCallExpr:
+	case ast.FunctionCallExpr:
 		args := make([]string, len(e.Args))
 		for i, arg := range e.Args {
 			args[i] = exprToString(arg)
 		}
 		return fmt.Sprintf("%s(%s)", e.Name, strings.Join(args, ", "))
 
-	case interpreter.ArrayExpr:
+	case ast.ArrayExpr:
 		elements := make([]string, len(e.Elements))
 		for i, elem := range e.Elements {
 			elements[i] = exprToString(elem)
 		}
 		return fmt.Sprintf("[%s]", strings.Join(elements, ", "))
 
-	case interpreter.ObjectExpr:
+	case ast.ObjectExpr:
 		return "{...}"
 	}
 

@@ -3,6 +3,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/glyphlang/glyph/pkg/ast"
 	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/parser"
 	"github.com/stretchr/testify/assert"
@@ -34,7 +35,7 @@ func TestFieldDefaultsE2E_StructWithDefaults(t *testing.T) {
 	require.Len(t, module.Items, 2)
 
 	// Check TypeDef
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 	assert.Equal(t, "User", typeDef.Name)
 	require.Len(t, typeDef.Fields, 3)
@@ -71,11 +72,11 @@ func TestFieldDefaultsE2E_ValidationWithDefaults(t *testing.T) {
 	module, err := p.Parse()
 	require.NoError(t, err)
 
-	typeDef := module.Items[0].(*interpreter.TypeDef)
+	typeDef := module.Items[0].(*ast.TypeDef)
 
 	// Create type checker and register type
 	tc := interpreter.NewTypeChecker()
-	tc.SetTypeDefs(map[string]interpreter.TypeDef{
+	tc.SetTypeDefs(map[string]ast.TypeDef{
 		"Config": *typeDef,
 	})
 
@@ -105,7 +106,7 @@ func TestFieldDefaultsE2E_ApplyDefaults(t *testing.T) {
 	module, err := p.Parse()
 	require.NoError(t, err)
 
-	typeDef := module.Items[0].(*interpreter.TypeDef)
+	typeDef := module.Items[0].(*ast.TypeDef)
 
 	// Create interpreter and environment
 	interp := interpreter.NewInterpreter()
@@ -140,7 +141,7 @@ func TestFieldDefaultsE2E_FunctionWithDefaultParams(t *testing.T) {
 	module, err := p.Parse()
 	require.NoError(t, err)
 
-	fn := module.Items[0].(*interpreter.Function)
+	fn := module.Items[0].(*ast.Function)
 
 	// Check function parameters
 	require.Len(t, fn.Params, 3)
@@ -178,19 +179,19 @@ func TestFieldDefaultsE2E_IssueExample(t *testing.T) {
 	module, err := p.Parse()
 	require.NoError(t, err)
 
-	typeDef := module.Items[0].(*interpreter.TypeDef)
+	typeDef := module.Items[0].(*ast.TypeDef)
 	assert.Equal(t, "User", typeDef.Name)
 
 	// Verify default expressions are stored correctly
-	roleDefault, ok := typeDef.Fields[0].Default.(interpreter.LiteralExpr)
+	roleDefault, ok := typeDef.Fields[0].Default.(ast.LiteralExpr)
 	require.True(t, ok)
-	strLit, ok := roleDefault.Value.(interpreter.StringLiteral)
+	strLit, ok := roleDefault.Value.(ast.StringLiteral)
 	require.True(t, ok)
 	assert.Equal(t, "user", strLit.Value)
 
-	activeDefault, ok := typeDef.Fields[1].Default.(interpreter.LiteralExpr)
+	activeDefault, ok := typeDef.Fields[1].Default.(ast.LiteralExpr)
 	require.True(t, ok)
-	boolLit, ok := activeDefault.Value.(interpreter.BoolLiteral)
+	boolLit, ok := activeDefault.Value.(ast.BoolLiteral)
 	require.True(t, ok)
 	assert.Equal(t, true, boolLit.Value)
 }
@@ -226,18 +227,18 @@ func TestFieldDefaultsE2E_RouteInputType(t *testing.T) {
 	require.Len(t, module.Items, 2)
 
 	// Check TypeDef
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 	assert.Equal(t, "CreateUserInput", typeDef.Name)
 
 	// Check Route has InputType
-	route, ok := module.Items[1].(*interpreter.Route)
+	route, ok := module.Items[1].(*ast.Route)
 	require.True(t, ok)
 	assert.Equal(t, "/api/users", route.Path)
 	require.NotNil(t, route.InputType, "Route should have InputType set")
 
 	// Verify InputType is NamedType pointing to CreateUserInput
-	namedType, ok := route.InputType.(interpreter.NamedType)
+	namedType, ok := route.InputType.(ast.NamedType)
 	require.True(t, ok, "InputType should be a NamedType")
 	assert.Equal(t, "CreateUserInput", namedType.Name)
 }
@@ -275,9 +276,9 @@ func TestFieldDefaultsE2E_AutomaticDefaultsInRoute(t *testing.T) {
 	require.NoError(t, err)
 
 	// Get the route from the module
-	var route *interpreter.Route
+	var route *ast.Route
 	for _, item := range module.Items {
-		if r, ok := item.(*interpreter.Route); ok {
+		if r, ok := item.(*ast.Route); ok {
 			route = r
 			break
 		}
@@ -340,9 +341,9 @@ func TestFieldDefaultsE2E_DefaultsNotOverwriteProvided(t *testing.T) {
 	require.NoError(t, err)
 
 	// Get the route from the module
-	var route *interpreter.Route
+	var route *ast.Route
 	for _, item := range module.Items {
-		if r, ok := item.(*interpreter.Route); ok {
+		if r, ok := item.(*ast.Route); ok {
 			route = r
 			break
 		}
@@ -402,9 +403,9 @@ func TestFieldDefaultsE2E_ValidationFailsWithMissingRequired(t *testing.T) {
 	require.NoError(t, err)
 
 	// Get the route from the module
-	var route *interpreter.Route
+	var route *ast.Route
 	for _, item := range module.Items {
-		if r, ok := item.(*interpreter.Route); ok {
+		if r, ok := item.(*ast.Route); ok {
 			route = r
 			break
 		}
@@ -450,9 +451,9 @@ func TestFieldDefaultsE2E_RouteWithoutInputType(t *testing.T) {
 	require.NoError(t, err)
 
 	// Get the route from the module
-	var route *interpreter.Route
+	var route *ast.Route
 	for _, item := range module.Items {
-		if r, ok := item.(*interpreter.Route); ok {
+		if r, ok := item.(*ast.Route); ok {
 			route = r
 			break
 		}

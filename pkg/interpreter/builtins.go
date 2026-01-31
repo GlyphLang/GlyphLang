@@ -1,8 +1,8 @@
 package interpreter
 
 import (
-	. "github.com/glyphlang/glyph/pkg/ast"
 	"fmt"
+	. "github.com/glyphlang/glyph/pkg/ast"
 	"strings"
 	"time"
 )

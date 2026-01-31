@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"github.com/glyphlang/glyph/pkg/compiler"
 	"github.com/glyphlang/glyph/pkg/decompiler"
 	"github.com/glyphlang/glyph/pkg/interpreter"
@@ -59,7 +60,7 @@ func runCompile(cmd *cobra.Command, args []string) error {
 
 	// Find first route and compile it
 	for _, item := range module.Items {
-		if route, ok := item.(*interpreter.Route); ok {
+		if route, ok := item.(*ast.Route); ok {
 			bytecode, err = c.CompileRoute(route)
 			if err != nil {
 				return fmt.Errorf("compilation failed: %w", err)
@@ -463,7 +464,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 }
 
 // parseCommandArgs parses CLI arguments into a map based on command parameters
-func parseCommandArgs(args []string, params []interpreter.CommandParam) map[string]interface{} {
+func parseCommandArgs(args []string, params []ast.CommandParam) map[string]interface{} {
 	result := make(map[string]interface{})
 
 	positionalIdx := 0

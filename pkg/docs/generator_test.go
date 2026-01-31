@@ -1,7 +1,7 @@
 package docs
 
 import (
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"strings"
 	"testing"
 
@@ -9,36 +9,36 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func testModule() *interpreter.Module {
-	return &interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.TypeDef{
+func testModule() *ast.Module {
+	return &ast.Module{
+		Items: []ast.Item{
+			&ast.TypeDef{
 				Name: "User",
-				Fields: []interpreter.Field{
-					{Name: "id", TypeAnnotation: interpreter.NamedType{Name: "int"}, Required: true},
-					{Name: "name", TypeAnnotation: interpreter.NamedType{Name: "str"}, Required: true},
-					{Name: "email", TypeAnnotation: interpreter.NamedType{Name: "str"}, Required: false},
+				Fields: []ast.Field{
+					{Name: "id", TypeAnnotation: ast.NamedType{Name: "int"}, Required: true},
+					{Name: "name", TypeAnnotation: ast.NamedType{Name: "str"}, Required: true},
+					{Name: "email", TypeAnnotation: ast.NamedType{Name: "str"}, Required: false},
 				},
 			},
-			&interpreter.Route{
+			&ast.Route{
 				Path:       "/api/users",
-				Method:     interpreter.Get,
-				ReturnType: interpreter.ArrayType{ElementType: interpreter.NamedType{Name: "User"}},
+				Method:     ast.Get,
+				ReturnType: ast.ArrayType{ElementType: ast.NamedType{Name: "User"}},
 			},
-			&interpreter.Route{
+			&ast.Route{
 				Path:       "/api/users/:id",
-				Method:     interpreter.Get,
-				ReturnType: interpreter.NamedType{Name: "User"},
+				Method:     ast.Get,
+				ReturnType: ast.NamedType{Name: "User"},
 			},
-			&interpreter.Route{
+			&ast.Route{
 				Path:       "/api/users",
-				Method:     interpreter.Post,
-				InputType:  interpreter.NamedType{Name: "CreateUser"},
-				ReturnType: interpreter.NamedType{Name: "User"},
+				Method:     ast.Post,
+				InputType:  ast.NamedType{Name: "CreateUser"},
+				ReturnType: ast.NamedType{Name: "User"},
 			},
-			&interpreter.Route{
+			&ast.Route{
 				Path:   "/api/users/:id",
-				Method: interpreter.Delete,
+				Method: ast.Delete,
 			},
 		},
 	}
@@ -86,15 +86,15 @@ func TestExtractDocs_RouteDetails(t *testing.T) {
 }
 
 func TestExtractDocs_SkipsWebSocket(t *testing.T) {
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.Route{
+	module := &ast.Module{
+		Items: []ast.Item{
+			&ast.Route{
 				Path:   "/ws/chat",
-				Method: interpreter.WebSocket,
+				Method: ast.WebSocket,
 			},
-			&interpreter.Route{
+			&ast.Route{
 				Path:   "/api/health",
-				Method: interpreter.Get,
+				Method: ast.Get,
 			},
 		},
 	}
@@ -105,12 +105,12 @@ func TestExtractDocs_SkipsWebSocket(t *testing.T) {
 }
 
 func TestExtractDocs_Auth(t *testing.T) {
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.Route{
+	module := &ast.Module{
+		Items: []ast.Item{
+			&ast.Route{
 				Path:   "/api/admin",
-				Method: interpreter.Get,
-				Auth:   &interpreter.AuthConfig{AuthType: "jwt"},
+				Method: ast.Get,
+				Auth:   &ast.AuthConfig{AuthType: "jwt"},
 			},
 		},
 	}
@@ -122,12 +122,12 @@ func TestExtractDocs_Auth(t *testing.T) {
 }
 
 func TestExtractDocs_RateLimit(t *testing.T) {
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.Route{
+	module := &ast.Module{
+		Items: []ast.Item{
+			&ast.Route{
 				Path:      "/api/data",
-				Method:    interpreter.Get,
-				RateLimit: &interpreter.RateLimit{Requests: 100, Window: "1m"},
+				Method:    ast.Get,
+				RateLimit: &ast.RateLimit{Requests: 100, Window: "1m"},
 			},
 		},
 	}
@@ -164,7 +164,7 @@ func TestGenerateMarkdown_TableOfContents(t *testing.T) {
 }
 
 func TestGenerateMarkdown_EmptyModule(t *testing.T) {
-	module := &interpreter.Module{Items: []interpreter.Item{}}
+	module := &ast.Module{Items: []ast.Item{}}
 	doc := ExtractDocs(module, "Empty API")
 	md := GenerateMarkdown(doc)
 
@@ -210,12 +210,12 @@ func TestGenerateHTML_Structure(t *testing.T) {
 
 func TestTypeToString(t *testing.T) {
 	tests := []struct {
-		input    interpreter.Type
+		input    ast.Type
 		expected string
 	}{
-		{interpreter.NamedType{Name: "int"}, "int"},
-		{interpreter.ArrayType{ElementType: interpreter.NamedType{Name: "User"}}, "User[]"},
-		{interpreter.OptionalType{InnerType: interpreter.NamedType{Name: "str"}}, "str?"},
+		{ast.NamedType{Name: "int"}, "int"},
+		{ast.ArrayType{ElementType: ast.NamedType{Name: "User"}}, "User[]"},
+		{ast.OptionalType{InnerType: ast.NamedType{Name: "str"}}, "str?"},
 		{nil, "any"},
 	}
 
@@ -226,14 +226,14 @@ func TestTypeToString(t *testing.T) {
 }
 
 func TestExtractDocs_QueryParams(t *testing.T) {
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.Route{
+	module := &ast.Module{
+		Items: []ast.Item{
+			&ast.Route{
 				Path:   "/api/search",
-				Method: interpreter.Get,
-				QueryParams: []interpreter.QueryParamDecl{
-					{Name: "q", Type: interpreter.NamedType{Name: "str"}, Required: true},
-					{Name: "page", Type: interpreter.NamedType{Name: "int"}, Required: false},
+				Method: ast.Get,
+				QueryParams: []ast.QueryParamDecl{
+					{Name: "q", Type: ast.NamedType{Name: "str"}, Required: true},
+					{Name: "page", Type: ast.NamedType{Name: "int"}, Required: false},
 				},
 			},
 		},
@@ -249,13 +249,13 @@ func TestExtractDocs_QueryParams(t *testing.T) {
 }
 
 func TestGenerateMarkdown_QueryParams(t *testing.T) {
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.Route{
+	module := &ast.Module{
+		Items: []ast.Item{
+			&ast.Route{
 				Path:   "/api/search",
-				Method: interpreter.Get,
-				QueryParams: []interpreter.QueryParamDecl{
-					{Name: "q", Type: interpreter.NamedType{Name: "str"}, Required: true},
+				Method: ast.Get,
+				QueryParams: []ast.QueryParamDecl{
+					{Name: "q", Type: ast.NamedType{Name: "str"}, Required: true},
 				},
 			},
 		},

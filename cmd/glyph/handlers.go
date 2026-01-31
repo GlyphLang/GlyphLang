@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"github.com/glyphlang/glyph/pkg/database"
 	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/parser"
@@ -25,7 +26,7 @@ import (
 )
 
 // parseSource parses GLYPH source using the Go parser
-func parseSource(source string) (*interpreter.Module, error) {
+func parseSource(source string) (*ast.Module, error) {
 	// Use Go parser
 	lexer := parser.NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -50,7 +51,7 @@ func newConfiguredInterpreter() *interpreter.Interpreter {
 	interp.SetDatabaseHandler(mockDB)
 
 	// Set up the parse function for module resolution
-	interp.GetModuleResolver().SetParseFunc(func(source string) (*interpreter.Module, error) {
+	interp.GetModuleResolver().SetParseFunc(func(source string) (*ast.Module, error) {
 		lexer := parser.NewLexer(source)
 		tokens, err := lexer.Tokenize()
 		if err != nil {
@@ -64,7 +65,7 @@ func newConfiguredInterpreter() *interpreter.Interpreter {
 }
 
 // registerRoute registers a route with the router
-func registerRoute(router *server.Router, route *interpreter.Route, interp *interpreter.Interpreter) error {
+func registerRoute(router *server.Router, route *ast.Route, interp *interpreter.Interpreter) error {
 	handler := createRouteHandler(route, interp)
 
 	serverRoute := &server.Route{
@@ -77,7 +78,7 @@ func registerRoute(router *server.Router, route *interpreter.Route, interp *inte
 }
 
 // registerCompiledRoute registers a compiled route with the router
-func registerCompiledRoute(router *server.Router, route *interpreter.Route, bytecode []byte, wsHub *websocket.Hub) error {
+func registerCompiledRoute(router *server.Router, route *ast.Route, bytecode []byte, wsHub *websocket.Hub) error {
 	handler := createCompiledRouteHandler(route, bytecode, wsHub)
 
 	serverRoute := &server.Route{
@@ -90,7 +91,7 @@ func registerCompiledRoute(router *server.Router, route *interpreter.Route, byte
 }
 
 // createCompiledRouteHandler creates an HTTP handler that executes compiled bytecode
-func createCompiledRouteHandler(route *interpreter.Route, bytecode []byte, wsHub *websocket.Hub) server.RouteHandler {
+func createCompiledRouteHandler(route *ast.Route, bytecode []byte, wsHub *websocket.Hub) server.RouteHandler {
 	return func(ctx *server.Context) error {
 		// Create VM instance
 		vmInstance := vm.NewVM()
@@ -151,7 +152,7 @@ func createCompiledRouteHandler(route *interpreter.Route, bytecode []byte, wsHub
 }
 
 // createRouteHandler creates an HTTP handler for a route
-func createRouteHandler(route *interpreter.Route, interp *interpreter.Interpreter) server.RouteHandler {
+func createRouteHandler(route *ast.Route, interp *interpreter.Interpreter) server.RouteHandler {
 	return func(ctx *server.Context) error {
 		// Execute route body using the interpreter
 		result, err := executeRoute(route, ctx, interp)
@@ -172,7 +173,7 @@ func createRouteHandler(route *interpreter.Route, interp *interpreter.Interprete
 }
 
 // executeRoute executes a route's body and returns the result
-func executeRoute(route *interpreter.Route, ctx *server.Context, interp *interpreter.Interpreter) (interface{}, error) {
+func executeRoute(route *ast.Route, ctx *server.Context, interp *interpreter.Interpreter) (interface{}, error) {
 	// Parse request body for POST/PUT/PATCH requests
 	var requestBody interface{}
 	if ctx.Request.Method == "POST" || ctx.Request.Method == "PUT" || ctx.Request.Method == "PATCH" {
@@ -308,18 +309,18 @@ func waitForShutdown(srv *http.Server) error {
 	return nil
 }
 
-// convertHTTPMethod converts interpreter.HttpMethod to server.HTTPMethod
-func convertHTTPMethod(method interpreter.HttpMethod) server.HTTPMethod {
+// convertHTTPMethod converts ast.HttpMethod to server.HTTPMethod
+func convertHTTPMethod(method ast.HttpMethod) server.HTTPMethod {
 	switch method {
-	case interpreter.Get:
+	case ast.Get:
 		return server.GET
-	case interpreter.Post:
+	case ast.Post:
 		return server.POST
-	case interpreter.Put:
+	case ast.Put:
 		return server.PUT
-	case interpreter.Delete:
+	case ast.Delete:
 		return server.DELETE
-	case interpreter.Patch:
+	case ast.Patch:
 		return server.PATCH
 	default:
 		return server.GET

@@ -3,7 +3,7 @@ package lsp
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"strings"
 	"testing"
 )
@@ -483,9 +483,9 @@ func TestAnalyzeRouteForOptimizations(t *testing.T) {
 	doc, _ := dm.Open("file:///test.glyph", 1, source)
 
 	if doc.AST != nil && len(doc.AST.Items) > 0 {
-		// analyzeRouteForOptimizations expects []interpreter.Statement
+		// analyzeRouteForOptimizations expects []ast.Statement
 		// We need to type assert to get the Route and its Body
-		if route, ok := doc.AST.Items[0].(*interpreter.Route); ok {
+		if route, ok := doc.AST.Items[0].(*ast.Route); ok {
 			hints := analyzeRouteForOptimizations(route.Body)
 			_ = len(hints)
 		}
@@ -980,19 +980,19 @@ func TestPublishDiagnostics(t *testing.T) {
 func TestFormatTypeComplex(t *testing.T) {
 	tests := []struct {
 		name     string
-		typ      interpreter.Type
+		typ      ast.Type
 		expected string
 	}{
 		{"nil", nil, "unknown"},
-		{"int", interpreter.IntType{}, "int"},
-		{"string", interpreter.StringType{}, "str"},
-		{"bool", interpreter.BoolType{}, "bool"},
-		{"float", interpreter.FloatType{}, "float"},
-		{"array of int", interpreter.ArrayType{ElementType: interpreter.IntType{}}, "[int]"},
-		{"optional string", interpreter.OptionalType{InnerType: interpreter.StringType{}}, "str?"},
-		{"named type", interpreter.NamedType{Name: "User"}, "User"},
+		{"int", ast.IntType{}, "int"},
+		{"string", ast.StringType{}, "str"},
+		{"bool", ast.BoolType{}, "bool"},
+		{"float", ast.FloatType{}, "float"},
+		{"array of int", ast.ArrayType{ElementType: ast.IntType{}}, "[int]"},
+		{"optional string", ast.OptionalType{InnerType: ast.StringType{}}, "str?"},
+		{"named type", ast.NamedType{Name: "User"}, "User"},
 		// DatabaseType is not handled in formatType, returns "unknown"
-		{"database", interpreter.DatabaseType{}, "unknown"},
+		{"database", ast.DatabaseType{}, "unknown"},
 	}
 
 	for _, tt := range tests {
@@ -1101,10 +1101,10 @@ func TestIsRenameableSymbol(t *testing.T) {
 // TestCheckConstantFoldingOpportunity tests constant folding detection
 func TestCheckConstantFoldingOpportunity(t *testing.T) {
 	// Create a binary expression: 1 + 2
-	expr := &interpreter.BinaryOpExpr{
-		Left:  interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-		Op:    interpreter.Add,
-		Right: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+	expr := &ast.BinaryOpExpr{
+		Left:  ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+		Op:    ast.Add,
+		Right: ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 	}
 
 	diag := checkConstantFoldingOpportunity(expr)
@@ -1118,9 +1118,9 @@ func TestCheckConstantFoldingOpportunity(t *testing.T) {
 // TestCheckLoopInvariants tests loop invariant detection
 func TestCheckLoopInvariants(t *testing.T) {
 	// Create a simple while loop
-	stmt := &interpreter.WhileStatement{
-		Condition: interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
-		Body:      []interpreter.Statement{},
+	stmt := &ast.WhileStatement{
+		Condition: ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
+		Body:      []ast.Statement{},
 	}
 
 	diag := checkLoopInvariants(stmt)
@@ -1199,13 +1199,13 @@ func TestFindFunctionCallContext(t *testing.T) {
 // TestAnalyzeRouteForOptimizationsDetailed tests route optimization analysis
 func TestAnalyzeRouteForOptimizationsDetailed(t *testing.T) {
 	// Test with statements that could have constant folding
-	stmts := []interpreter.Statement{
-		interpreter.AssignStatement{
+	stmts := []ast.Statement{
+		ast.AssignStatement{
 			Target: "x",
-			Value: interpreter.BinaryOpExpr{
-				Left:  interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-				Op:    interpreter.Add,
-				Right: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+			Value: ast.BinaryOpExpr{
+				Left:  ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+				Op:    ast.Add,
+				Right: ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 			},
 		},
 	}
@@ -1404,19 +1404,19 @@ func TestNewServerWithLogFile(t *testing.T) {
 func TestFormatCronTaskHoverFull(t *testing.T) {
 	tests := []struct {
 		name     string
-		cron     *interpreter.CronTask
+		cron     *ast.CronTask
 		contains []string
 	}{
 		{
 			name: "basic cron task",
-			cron: &interpreter.CronTask{
+			cron: &ast.CronTask{
 				Schedule: "0 0 * * *",
 			},
 			contains: []string{"Cron Task", "0 0 * * *"},
 		},
 		{
 			name: "named cron task",
-			cron: &interpreter.CronTask{
+			cron: &ast.CronTask{
 				Name:     "cleanup",
 				Schedule: "0 0 * * *",
 			},
@@ -1424,7 +1424,7 @@ func TestFormatCronTaskHoverFull(t *testing.T) {
 		},
 		{
 			name: "cron with timezone and retries",
-			cron: &interpreter.CronTask{
+			cron: &ast.CronTask{
 				Name:     "report",
 				Schedule: "0 9 * * 1",
 				Timezone: "America/New_York",
@@ -1450,12 +1450,12 @@ func TestFormatCronTaskHoverFull(t *testing.T) {
 func TestFormatEventHandlerHover(t *testing.T) {
 	tests := []struct {
 		name     string
-		event    *interpreter.EventHandler
+		event    *ast.EventHandler
 		contains []string
 	}{
 		{
 			name: "sync event handler",
-			event: &interpreter.EventHandler{
+			event: &ast.EventHandler{
 				EventType: "user.created",
 				Async:     false,
 			},
@@ -1463,7 +1463,7 @@ func TestFormatEventHandlerHover(t *testing.T) {
 		},
 		{
 			name: "async event handler",
-			event: &interpreter.EventHandler{
+			event: &ast.EventHandler{
 				EventType: "order.completed",
 				Async:     true,
 			},
@@ -1487,19 +1487,19 @@ func TestFormatEventHandlerHover(t *testing.T) {
 func TestFormatQueueWorkerHover(t *testing.T) {
 	tests := []struct {
 		name     string
-		queue    *interpreter.QueueWorker
+		queue    *ast.QueueWorker
 		contains []string
 	}{
 		{
 			name: "basic queue worker",
-			queue: &interpreter.QueueWorker{
+			queue: &ast.QueueWorker{
 				QueueName: "emails",
 			},
 			contains: []string{"Queue Worker", "emails"},
 		},
 		{
 			name: "queue with concurrency",
-			queue: &interpreter.QueueWorker{
+			queue: &ast.QueueWorker{
 				QueueName:   "notifications",
 				Concurrency: 5,
 			},
@@ -1507,7 +1507,7 @@ func TestFormatQueueWorkerHover(t *testing.T) {
 		},
 		{
 			name: "queue with all options",
-			queue: &interpreter.QueueWorker{
+			queue: &ast.QueueWorker{
 				QueueName:   "tasks",
 				Concurrency: 10,
 				MaxRetries:  3,
@@ -1531,13 +1531,13 @@ func TestFormatQueueWorkerHover(t *testing.T) {
 
 // TestFindReferencesInStatements tests findReferencesInStatements
 func TestFindReferencesInStatements(t *testing.T) {
-	stmts := []interpreter.Statement{
-		interpreter.AssignStatement{
+	stmts := []ast.Statement{
+		ast.AssignStatement{
 			Target: "x",
-			Value:  interpreter.VariableExpr{Name: "y"},
+			Value:  ast.VariableExpr{Name: "y"},
 		},
-		interpreter.ReturnStatement{
-			Value: interpreter.VariableExpr{Name: "x"},
+		ast.ReturnStatement{
+			Value: ast.VariableExpr{Name: "x"},
 		},
 	}
 
@@ -1549,26 +1549,26 @@ func TestFindReferencesInStatements(t *testing.T) {
 // TestFindReferencesInStatement tests findReferencesInStatement
 func TestFindReferencesInStatement(t *testing.T) {
 	t.Run("assign statement", func(t *testing.T) {
-		stmt := interpreter.AssignStatement{
+		stmt := ast.AssignStatement{
 			Target: "x",
-			Value:  interpreter.VariableExpr{Name: "y"},
+			Value:  ast.VariableExpr{Name: "y"},
 		}
 		locs := findReferencesInStatement(stmt, "y", "file:///test.glyph")
 		_ = locs
 	})
 
 	t.Run("return statement", func(t *testing.T) {
-		stmt := interpreter.ReturnStatement{
-			Value: interpreter.VariableExpr{Name: "x"},
+		stmt := ast.ReturnStatement{
+			Value: ast.VariableExpr{Name: "x"},
 		}
 		locs := findReferencesInStatement(stmt, "x", "file:///test.glyph")
 		_ = locs
 	})
 
 	t.Run("if statement", func(t *testing.T) {
-		stmt := interpreter.IfStatement{
-			Condition: interpreter.VariableExpr{Name: "flag"},
-			ThenBlock: []interpreter.Statement{},
+		stmt := ast.IfStatement{
+			Condition: ast.VariableExpr{Name: "flag"},
+			ThenBlock: []ast.Statement{},
 		}
 		locs := findReferencesInStatement(stmt, "flag", "file:///test.glyph")
 		_ = locs
@@ -1578,7 +1578,7 @@ func TestFindReferencesInStatement(t *testing.T) {
 // TestFindReferencesInExpression tests findReferencesInExpression
 func TestFindReferencesInExpression(t *testing.T) {
 	t.Run("variable expression", func(t *testing.T) {
-		expr := interpreter.VariableExpr{Name: "x"}
+		expr := ast.VariableExpr{Name: "x"}
 		locs := findReferencesInExpression(expr, "x", "file:///test.glyph")
 		if len(locs) == 0 {
 			t.Skip("Variable expression references might not be found")
@@ -1586,19 +1586,19 @@ func TestFindReferencesInExpression(t *testing.T) {
 	})
 
 	t.Run("binary expression", func(t *testing.T) {
-		expr := interpreter.BinaryOpExpr{
-			Left:  interpreter.VariableExpr{Name: "a"},
-			Op:    interpreter.Add,
-			Right: interpreter.VariableExpr{Name: "b"},
+		expr := ast.BinaryOpExpr{
+			Left:  ast.VariableExpr{Name: "a"},
+			Op:    ast.Add,
+			Right: ast.VariableExpr{Name: "b"},
 		}
 		locs := findReferencesInExpression(expr, "a", "file:///test.glyph")
 		_ = locs
 	})
 
 	t.Run("call expression", func(t *testing.T) {
-		expr := interpreter.FunctionCallExpr{
+		expr := ast.FunctionCallExpr{
 			Name: "myFunc",
-			Args: []interpreter.Expr{interpreter.VariableExpr{Name: "x"}},
+			Args: []ast.Expr{ast.VariableExpr{Name: "x"}},
 		}
 		locs := findReferencesInExpression(expr, "x", "file:///test.glyph")
 		_ = locs
@@ -1661,10 +1661,10 @@ func TestIsRenameableSymbolEdgeCases(t *testing.T) {
 // TestCheckConstantFoldingOpportunityEdgeCases tests more constant folding cases
 func TestCheckConstantFoldingOpportunityEdgeCases(t *testing.T) {
 	t.Run("non-literal operands", func(t *testing.T) {
-		expr := &interpreter.BinaryOpExpr{
-			Left:  interpreter.VariableExpr{Name: "x"},
-			Op:    interpreter.Add,
-			Right: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+		expr := &ast.BinaryOpExpr{
+			Left:  ast.VariableExpr{Name: "x"},
+			Op:    ast.Add,
+			Right: ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 		}
 		diag := checkConstantFoldingOpportunity(expr)
 		// Should not find constant folding opportunity
@@ -1674,10 +1674,10 @@ func TestCheckConstantFoldingOpportunityEdgeCases(t *testing.T) {
 	})
 
 	t.Run("both literals", func(t *testing.T) {
-		expr := &interpreter.BinaryOpExpr{
-			Left:  interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
-			Op:    interpreter.Mul,
-			Right: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+		expr := &ast.BinaryOpExpr{
+			Left:  ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
+			Op:    ast.Mul,
+			Right: ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
 		}
 		diag := checkConstantFoldingOpportunity(expr)
 		// Should find constant folding opportunity
@@ -1687,17 +1687,17 @@ func TestCheckConstantFoldingOpportunityEdgeCases(t *testing.T) {
 
 // TestAnalyzeRouteForOptimizationsWithForLoop tests optimization analysis with for loops
 func TestAnalyzeRouteForOptimizationsWithForLoop(t *testing.T) {
-	stmts := []interpreter.Statement{
-		interpreter.WhileStatement{
-			Condition: interpreter.BinaryOpExpr{
-				Left:  interpreter.VariableExpr{Name: "i"},
-				Op:    interpreter.Lt,
-				Right: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+	stmts := []ast.Statement{
+		ast.WhileStatement{
+			Condition: ast.BinaryOpExpr{
+				Left:  ast.VariableExpr{Name: "i"},
+				Op:    ast.Lt,
+				Right: ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
 			},
-			Body: []interpreter.Statement{
-				interpreter.AssignStatement{
+			Body: []ast.Statement{
+				ast.AssignStatement{
 					Target: "x",
-					Value:  interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+					Value:  ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 				},
 			},
 		},
@@ -1754,28 +1754,28 @@ func TestGetDocumentSymbolsWithCronAndEvents(t *testing.T) {
 // TestFindReferencesInStatementMoreTypes tests more statement types
 func TestFindReferencesInStatementMoreTypes(t *testing.T) {
 	t.Run("while statement", func(t *testing.T) {
-		stmt := interpreter.WhileStatement{
-			Condition: interpreter.VariableExpr{Name: "running"},
-			Body:      []interpreter.Statement{},
+		stmt := ast.WhileStatement{
+			Condition: ast.VariableExpr{Name: "running"},
+			Body:      []ast.Statement{},
 		}
 		locs := findReferencesInStatement(stmt, "running", "file:///test.glyph")
 		_ = locs
 	})
 
 	t.Run("for statement", func(t *testing.T) {
-		stmt := interpreter.ForStatement{
+		stmt := ast.ForStatement{
 			ValueVar: "item",
-			Iterable: interpreter.VariableExpr{Name: "items"},
-			Body:     []interpreter.Statement{},
+			Iterable: ast.VariableExpr{Name: "items"},
+			Body:     []ast.Statement{},
 		}
 		locs := findReferencesInStatement(stmt, "items", "file:///test.glyph")
 		_ = locs
 	})
 
 	t.Run("switch statement", func(t *testing.T) {
-		stmt := interpreter.SwitchStatement{
-			Value: interpreter.VariableExpr{Name: "choice"},
-			Cases: []interpreter.SwitchCase{},
+		stmt := ast.SwitchStatement{
+			Value: ast.VariableExpr{Name: "choice"},
+			Cases: []ast.SwitchCase{},
 		}
 		locs := findReferencesInStatement(stmt, "choice", "file:///test.glyph")
 		_ = locs
@@ -1785,18 +1785,18 @@ func TestFindReferencesInStatementMoreTypes(t *testing.T) {
 // TestFindReferencesInExpressionMoreTypes tests more expression types
 func TestFindReferencesInExpressionMoreTypes(t *testing.T) {
 	t.Run("unary expression", func(t *testing.T) {
-		expr := interpreter.UnaryOpExpr{
-			Op:    interpreter.Not,
-			Right: interpreter.VariableExpr{Name: "flag"},
+		expr := ast.UnaryOpExpr{
+			Op:    ast.Not,
+			Right: ast.VariableExpr{Name: "flag"},
 		}
 		locs := findReferencesInExpression(expr, "flag", "file:///test.glyph")
 		_ = locs
 	})
 
 	t.Run("object expression", func(t *testing.T) {
-		expr := interpreter.ObjectExpr{
-			Fields: []interpreter.ObjectField{
-				{Key: "name", Value: interpreter.VariableExpr{Name: "userName"}},
+		expr := ast.ObjectExpr{
+			Fields: []ast.ObjectField{
+				{Key: "name", Value: ast.VariableExpr{Name: "userName"}},
 			},
 		}
 		locs := findReferencesInExpression(expr, "userName", "file:///test.glyph")
@@ -1804,10 +1804,10 @@ func TestFindReferencesInExpressionMoreTypes(t *testing.T) {
 	})
 
 	t.Run("array expression", func(t *testing.T) {
-		expr := interpreter.ArrayExpr{
-			Elements: []interpreter.Expr{
-				interpreter.VariableExpr{Name: "x"},
-				interpreter.VariableExpr{Name: "y"},
+		expr := ast.ArrayExpr{
+			Elements: []ast.Expr{
+				ast.VariableExpr{Name: "x"},
+				ast.VariableExpr{Name: "y"},
 			},
 		}
 		locs := findReferencesInExpression(expr, "x", "file:///test.glyph")
@@ -1906,10 +1906,10 @@ func TestGetHoverOnVariousElements(t *testing.T) {
 // TestCheckConstantFoldingOpportunityAlgebraic tests algebraic simplification detection
 func TestCheckConstantFoldingOpportunityAlgebraic(t *testing.T) {
 	t.Run("add zero on left", func(t *testing.T) {
-		expr := &interpreter.BinaryOpExpr{
-			Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
-			Op:    interpreter.Add,
-			Right: interpreter.VariableExpr{Name: "x"},
+		expr := &ast.BinaryOpExpr{
+			Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
+			Op:    ast.Add,
+			Right: ast.VariableExpr{Name: "x"},
 		}
 		diag := checkConstantFoldingOpportunity(expr)
 		if diag == "" {
@@ -1921,10 +1921,10 @@ func TestCheckConstantFoldingOpportunityAlgebraic(t *testing.T) {
 	})
 
 	t.Run("add zero on right", func(t *testing.T) {
-		expr := &interpreter.BinaryOpExpr{
-			Left:  interpreter.VariableExpr{Name: "x"},
-			Op:    interpreter.Add,
-			Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+		expr := &ast.BinaryOpExpr{
+			Left:  ast.VariableExpr{Name: "x"},
+			Op:    ast.Add,
+			Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 		}
 		diag := checkConstantFoldingOpportunity(expr)
 		if diag == "" {
@@ -1936,10 +1936,10 @@ func TestCheckConstantFoldingOpportunityAlgebraic(t *testing.T) {
 	})
 
 	t.Run("multiply by one on left", func(t *testing.T) {
-		expr := &interpreter.BinaryOpExpr{
-			Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-			Op:    interpreter.Mul,
-			Right: interpreter.VariableExpr{Name: "x"},
+		expr := &ast.BinaryOpExpr{
+			Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+			Op:    ast.Mul,
+			Right: ast.VariableExpr{Name: "x"},
 		}
 		diag := checkConstantFoldingOpportunity(expr)
 		if diag == "" {
@@ -1948,10 +1948,10 @@ func TestCheckConstantFoldingOpportunityAlgebraic(t *testing.T) {
 	})
 
 	t.Run("multiply by one on right", func(t *testing.T) {
-		expr := &interpreter.BinaryOpExpr{
-			Left:  interpreter.VariableExpr{Name: "x"},
-			Op:    interpreter.Mul,
-			Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+		expr := &ast.BinaryOpExpr{
+			Left:  ast.VariableExpr{Name: "x"},
+			Op:    ast.Mul,
+			Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 		}
 		diag := checkConstantFoldingOpportunity(expr)
 		if diag == "" {
@@ -1960,10 +1960,10 @@ func TestCheckConstantFoldingOpportunityAlgebraic(t *testing.T) {
 	})
 
 	t.Run("multiply by two on right", func(t *testing.T) {
-		expr := &interpreter.BinaryOpExpr{
-			Left:  interpreter.VariableExpr{Name: "x"},
-			Op:    interpreter.Mul,
-			Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+		expr := &ast.BinaryOpExpr{
+			Left:  ast.VariableExpr{Name: "x"},
+			Op:    ast.Mul,
+			Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 		}
 		diag := checkConstantFoldingOpportunity(expr)
 		if diag == "" {
@@ -1975,7 +1975,7 @@ func TestCheckConstantFoldingOpportunityAlgebraic(t *testing.T) {
 	})
 
 	t.Run("non-binary expression", func(t *testing.T) {
-		expr := interpreter.VariableExpr{Name: "x"}
+		expr := ast.VariableExpr{Name: "x"}
 		diag := checkConstantFoldingOpportunity(expr)
 		if diag != "" {
 			t.Error("Non-binary expression should not have constant folding opportunity")
@@ -1986,13 +1986,13 @@ func TestCheckConstantFoldingOpportunityAlgebraic(t *testing.T) {
 // TestAnalyzeRouteForOptimizationsPointers tests optimization analysis with pointer types
 func TestAnalyzeRouteForOptimizationsPointers(t *testing.T) {
 	t.Run("with pointer AssignStatement", func(t *testing.T) {
-		stmts := []interpreter.Statement{
-			&interpreter.AssignStatement{
+		stmts := []ast.Statement{
+			&ast.AssignStatement{
 				Target: "x",
-				Value: &interpreter.BinaryOpExpr{
-					Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-					Op:    interpreter.Add,
-					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+				Value: &ast.BinaryOpExpr{
+					Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+					Op:    ast.Add,
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 				},
 			},
 		}
@@ -2002,12 +2002,12 @@ func TestAnalyzeRouteForOptimizationsPointers(t *testing.T) {
 	})
 
 	t.Run("with pointer WhileStatement", func(t *testing.T) {
-		stmts := []interpreter.Statement{
-			&interpreter.WhileStatement{
-				Condition: interpreter.VariableExpr{Name: "running"},
-				Body: []interpreter.Statement{
-					&interpreter.AssignStatement{Target: "x", Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}}},
-					&interpreter.AssignStatement{Target: "y", Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}}},
+		stmts := []ast.Statement{
+			&ast.WhileStatement{
+				Condition: ast.VariableExpr{Name: "running"},
+				Body: []ast.Statement{
+					&ast.AssignStatement{Target: "x", Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}}},
+					&ast.AssignStatement{Target: "y", Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}}},
 				},
 			},
 		}
@@ -2020,12 +2020,12 @@ func TestAnalyzeRouteForOptimizationsPointers(t *testing.T) {
 // TestCheckLoopInvariantsMultipleAssigns tests loop invariant detection with multiple assignments
 func TestCheckLoopInvariantsMultipleAssigns(t *testing.T) {
 	t.Run("loop with multiple assignments", func(t *testing.T) {
-		whileStmt := &interpreter.WhileStatement{
-			Condition: interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
-			Body: []interpreter.Statement{
-				&interpreter.AssignStatement{Target: "a", Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}}},
-				&interpreter.AssignStatement{Target: "b", Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}}},
-				&interpreter.AssignStatement{Target: "c", Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}}},
+		whileStmt := &ast.WhileStatement{
+			Condition: ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
+			Body: []ast.Statement{
+				&ast.AssignStatement{Target: "a", Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}}},
+				&ast.AssignStatement{Target: "b", Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}}},
+				&ast.AssignStatement{Target: "c", Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}}},
 			},
 		}
 		diag := checkLoopInvariants(whileStmt)
@@ -2039,10 +2039,10 @@ func TestCheckLoopInvariantsMultipleAssigns(t *testing.T) {
 	})
 
 	t.Run("loop with single assignment", func(t *testing.T) {
-		whileStmt := &interpreter.WhileStatement{
-			Condition: interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
-			Body: []interpreter.Statement{
-				&interpreter.AssignStatement{Target: "a", Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}}},
+		whileStmt := &ast.WhileStatement{
+			Condition: ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
+			Body: []ast.Statement{
+				&ast.AssignStatement{Target: "a", Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}}},
 			},
 		}
 		diag := checkLoopInvariants(whileStmt)
@@ -2053,9 +2053,9 @@ func TestCheckLoopInvariantsMultipleAssigns(t *testing.T) {
 	})
 
 	t.Run("loop with no assignments", func(t *testing.T) {
-		whileStmt := &interpreter.WhileStatement{
-			Condition: interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
-			Body:      []interpreter.Statement{},
+		whileStmt := &ast.WhileStatement{
+			Condition: ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
+			Body:      []ast.Statement{},
 		}
 		diag := checkLoopInvariants(whileStmt)
 		// Should NOT detect loop invariant opportunity

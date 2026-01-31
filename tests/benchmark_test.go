@@ -2,7 +2,7 @@ package tests
 
 import (
 	"fmt"
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
 
 	"github.com/glyphlang/glyph/pkg/compiler"
@@ -11,7 +11,7 @@ import (
 )
 
 // Helper function to parse source code into a Module
-func parseSource(source string) (*interpreter.Module, error) {
+func parseSource(source string) (*ast.Module, error) {
 	lexer := parser.NewLexer(source)
 	tokens, err := lexer.Tokenize()
 	if err != nil {

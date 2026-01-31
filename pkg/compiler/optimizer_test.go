@@ -1,7 +1,7 @@
 package compiler
 
 import (
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
 
 	"github.com/glyphlang/glyph/pkg/vm"
@@ -11,53 +11,53 @@ import (
 func TestOptimizer_ConstantFoldingArithmetic(t *testing.T) {
 	tests := []struct {
 		name     string
-		expr     interpreter.Expr
-		expected interpreter.Expr
+		expr     ast.Expr
+		expected ast.Expr
 	}{
 		{
 			name: "2 + 3 = 5",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Add,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Add,
+				Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 			},
-			expected: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
+			expected: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
 		},
 		{
 			name: "10 - 4 = 6",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Sub,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 4}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Sub,
+				Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 4}},
 			},
-			expected: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 6}},
+			expected: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 6}},
 		},
 		{
 			name: "6 * 7 = 42",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Mul,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 6}},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 7}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Mul,
+				Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 6}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 7}},
 			},
-			expected: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+			expected: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
 		},
 		{
 			name: "20 / 4 = 5",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Div,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 20}},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 4}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Div,
+				Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 20}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 4}},
 			},
-			expected: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
+			expected: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
 		},
 		{
 			name: "3.5 + 2.5 = 6.0",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Add,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.FloatLiteral{Value: 3.5}},
-				Right: &interpreter.LiteralExpr{Value: interpreter.FloatLiteral{Value: 2.5}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Add,
+				Left:  &ast.LiteralExpr{Value: ast.FloatLiteral{Value: 3.5}},
+				Right: &ast.LiteralExpr{Value: ast.FloatLiteral{Value: 2.5}},
 			},
-			expected: &interpreter.LiteralExpr{Value: interpreter.FloatLiteral{Value: 6.0}},
+			expected: &ast.LiteralExpr{Value: ast.FloatLiteral{Value: 6.0}},
 		},
 	}
 
@@ -76,62 +76,62 @@ func TestOptimizer_ConstantFoldingArithmetic(t *testing.T) {
 func TestOptimizer_ConstantFoldingComparison(t *testing.T) {
 	tests := []struct {
 		name     string
-		expr     interpreter.Expr
-		expected interpreter.Expr
+		expr     ast.Expr
+		expected ast.Expr
 	}{
 		{
 			name: "5 > 3 = true",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Gt,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Gt,
+				Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 			},
-			expected: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
+			expected: &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
 		},
 		{
 			name: "2 < 1 = false",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Lt,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Lt,
+				Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 			},
-			expected: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: false}},
+			expected: &ast.LiteralExpr{Value: ast.BoolLiteral{Value: false}},
 		},
 		{
 			name: "42 == 42 = true",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Eq,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Eq,
+				Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
 			},
-			expected: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
+			expected: &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
 		},
 		{
 			name: "5 != 3 = true",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Ne,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Ne,
+				Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 			},
-			expected: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
+			expected: &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
 		},
 		{
 			name: "10 >= 10 = true",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Ge,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Ge,
+				Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
 			},
-			expected: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
+			expected: &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
 		},
 		{
 			name: "5 <= 3 = false",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Le,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Le,
+				Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 			},
-			expected: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: false}},
+			expected: &ast.LiteralExpr{Value: ast.BoolLiteral{Value: false}},
 		},
 	}
 
@@ -150,26 +150,26 @@ func TestOptimizer_ConstantFoldingComparison(t *testing.T) {
 func TestOptimizer_ConstantFoldingBoolean(t *testing.T) {
 	tests := []struct {
 		name     string
-		expr     interpreter.Expr
-		expected interpreter.Expr
+		expr     ast.Expr
+		expected ast.Expr
 	}{
 		{
 			name: "true && false = false",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.And,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
-				Right: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: false}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.And,
+				Left:  &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
+				Right: &ast.LiteralExpr{Value: ast.BoolLiteral{Value: false}},
 			},
-			expected: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: false}},
+			expected: &ast.LiteralExpr{Value: ast.BoolLiteral{Value: false}},
 		},
 		{
 			name: "true || false = true",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Or,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
-				Right: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: false}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Or,
+				Left:  &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
+				Right: &ast.LiteralExpr{Value: ast.BoolLiteral{Value: false}},
 			},
-			expected: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
+			expected: &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
 		},
 	}
 
@@ -186,82 +186,82 @@ func TestOptimizer_ConstantFoldingBoolean(t *testing.T) {
 
 // Test algebraic simplifications
 func TestOptimizer_AlgebraicSimplifications(t *testing.T) {
-	xVar := &interpreter.VariableExpr{Name: "x"}
+	xVar := &ast.VariableExpr{Name: "x"}
 
 	tests := []struct {
 		name     string
-		expr     interpreter.Expr
-		expected interpreter.Expr
+		expr     ast.Expr
+		expected ast.Expr
 	}{
 		{
 			name: "x + 0 = x",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Add,
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Add,
 				Left:  xVar,
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
 			expected: xVar,
 		},
 		{
 			name: "0 + x = x",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Add,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Add,
+				Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 				Right: xVar,
 			},
 			expected: xVar,
 		},
 		{
 			name: "x - 0 = x",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Sub,
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Sub,
 				Left:  xVar,
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
 			expected: xVar,
 		},
 		{
 			name: "x * 1 = x",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Mul,
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Mul,
 				Left:  xVar,
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 			},
 			expected: xVar,
 		},
 		{
 			name: "1 * x = x",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Mul,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Mul,
+				Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 				Right: xVar,
 			},
 			expected: xVar,
 		},
 		{
 			name: "x * 0 = 0",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Mul,
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Mul,
 				Left:  xVar,
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
-			expected: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+			expected: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 		},
 		{
 			name: "0 * x = 0",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Mul,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Mul,
+				Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 				Right: xVar,
 			},
-			expected: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+			expected: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 		},
 		{
 			name: "x / 1 = x",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Div,
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Div,
 				Left:  xVar,
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 			},
 			expected: xVar,
 		},
@@ -281,17 +281,17 @@ func TestOptimizer_AlgebraicSimplifications(t *testing.T) {
 // Test nested constant folding
 func TestOptimizer_NestedConstantFolding(t *testing.T) {
 	// Test: (2 + 3) * 4 = 5 * 4 = 20
-	expr := &interpreter.BinaryOpExpr{
-		Op: interpreter.Mul,
-		Left: &interpreter.BinaryOpExpr{
-			Op:    interpreter.Add,
-			Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
-			Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+	expr := &ast.BinaryOpExpr{
+		Op: ast.Mul,
+		Left: &ast.BinaryOpExpr{
+			Op:    ast.Add,
+			Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
+			Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 		},
-		Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 4}},
+		Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 4}},
 	}
 
-	expected := &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 20}}
+	expected := &ast.LiteralExpr{Value: ast.IntLiteral{Value: 20}}
 
 	opt := NewOptimizer(OptBasic)
 	result := opt.OptimizeExpression(expr)
@@ -303,17 +303,17 @@ func TestOptimizer_NestedConstantFolding(t *testing.T) {
 
 // Test dead code elimination after return
 func TestOptimizer_DeadCodeAfterReturn(t *testing.T) {
-	stmts := []interpreter.Statement{
-		&interpreter.AssignStatement{
+	stmts := []ast.Statement{
+		&ast.AssignStatement{
 			Target: "x",
-			Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+			Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
 		},
-		&interpreter.ReturnStatement{
-			Value: &interpreter.VariableExpr{Name: "x"},
+		&ast.ReturnStatement{
+			Value: &ast.VariableExpr{Name: "x"},
 		},
-		&interpreter.AssignStatement{
+		&ast.AssignStatement{
 			Target: "y",
-			Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 100}},
+			Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 100}},
 		},
 	}
 
@@ -326,12 +326,12 @@ func TestOptimizer_DeadCodeAfterReturn(t *testing.T) {
 	}
 
 	// First should be assignment
-	if _, ok := result[0].(*interpreter.AssignStatement); !ok {
+	if _, ok := result[0].(*ast.AssignStatement); !ok {
 		t.Errorf("Expected first statement to be AssignStatement, got %T", result[0])
 	}
 
 	// Second should be return
-	if _, ok := result[1].(*interpreter.ReturnStatement); !ok {
+	if _, ok := result[1].(*ast.ReturnStatement); !ok {
 		t.Errorf("Expected second statement to be ReturnStatement, got %T", result[1])
 	}
 }
@@ -340,17 +340,17 @@ func TestOptimizer_DeadCodeAfterReturn(t *testing.T) {
 func TestOptimizer_DeadCodeInIfStatement(t *testing.T) {
 	// if true { > 1 } else { > 2 }
 	// Should optimize to just: > 1
-	stmts := []interpreter.Statement{
-		&interpreter.IfStatement{
-			Condition: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
-			ThenBlock: []interpreter.Statement{
-				&interpreter.ReturnStatement{
-					Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+	stmts := []ast.Statement{
+		&ast.IfStatement{
+			Condition: &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
+			ThenBlock: []ast.Statement{
+				&ast.ReturnStatement{
+					Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 				},
 			},
-			ElseBlock: []interpreter.Statement{
-				&interpreter.ReturnStatement{
-					Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+			ElseBlock: []ast.Statement{
+				&ast.ReturnStatement{
+					Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 				},
 			},
 		},
@@ -365,17 +365,17 @@ func TestOptimizer_DeadCodeInIfStatement(t *testing.T) {
 	}
 
 	// Should be a return statement with value 1
-	retStmt, ok := result[0].(*interpreter.ReturnStatement)
+	retStmt, ok := result[0].(*ast.ReturnStatement)
 	if !ok {
 		t.Fatalf("Expected ReturnStatement, got %T", result[0])
 	}
 
-	litExpr, ok := retStmt.Value.(*interpreter.LiteralExpr)
+	litExpr, ok := retStmt.Value.(*ast.LiteralExpr)
 	if !ok {
 		t.Fatalf("Expected LiteralExpr, got %T", retStmt.Value)
 	}
 
-	intLit, ok := litExpr.Value.(interpreter.IntLiteral)
+	intLit, ok := litExpr.Value.(ast.IntLiteral)
 	if !ok || intLit.Value != 1 {
 		t.Errorf("Expected literal value 1, got %v", litExpr.Value)
 	}
@@ -385,17 +385,17 @@ func TestOptimizer_DeadCodeInIfStatement(t *testing.T) {
 func TestOptimizer_DeadCodeInIfStatementFalse(t *testing.T) {
 	// if false { > 1 } else { > 2 }
 	// Should optimize to just: > 2
-	stmts := []interpreter.Statement{
-		&interpreter.IfStatement{
-			Condition: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: false}},
-			ThenBlock: []interpreter.Statement{
-				&interpreter.ReturnStatement{
-					Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+	stmts := []ast.Statement{
+		&ast.IfStatement{
+			Condition: &ast.LiteralExpr{Value: ast.BoolLiteral{Value: false}},
+			ThenBlock: []ast.Statement{
+				&ast.ReturnStatement{
+					Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 				},
 			},
-			ElseBlock: []interpreter.Statement{
-				&interpreter.ReturnStatement{
-					Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+			ElseBlock: []ast.Statement{
+				&ast.ReturnStatement{
+					Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 				},
 			},
 		},
@@ -410,17 +410,17 @@ func TestOptimizer_DeadCodeInIfStatementFalse(t *testing.T) {
 	}
 
 	// Should be a return statement with value 2
-	retStmt, ok := result[0].(*interpreter.ReturnStatement)
+	retStmt, ok := result[0].(*ast.ReturnStatement)
 	if !ok {
 		t.Fatalf("Expected ReturnStatement, got %T", result[0])
 	}
 
-	litExpr, ok := retStmt.Value.(*interpreter.LiteralExpr)
+	litExpr, ok := retStmt.Value.(*ast.LiteralExpr)
 	if !ok {
 		t.Fatalf("Expected LiteralExpr, got %T", retStmt.Value)
 	}
 
-	intLit, ok := litExpr.Value.(interpreter.IntLiteral)
+	intLit, ok := litExpr.Value.(ast.IntLiteral)
 	if !ok || intLit.Value != 2 {
 		t.Errorf("Expected literal value 2, got %v", litExpr.Value)
 	}
@@ -429,18 +429,18 @@ func TestOptimizer_DeadCodeInIfStatementFalse(t *testing.T) {
 // Test that optimization produces same result as non-optimized code
 func TestOptimizer_ExecutionEquivalence(t *testing.T) {
 	// Test: $ result = 2 + 3, > result
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "result",
-				Value: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Add,
-					Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
-					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+				Value: &ast.BinaryOpExpr{
+					Op:    ast.Add,
+					Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "result"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "result"},
 			},
 		},
 	}
@@ -454,7 +454,7 @@ func TestOptimizer_ExecutionEquivalence(t *testing.T) {
 
 	// Compile with optimization
 	opt := NewOptimizer(OptBasic)
-	optimizedRoute := &interpreter.Route{
+	optimizedRoute := &ast.Route{
 		Body: opt.OptimizeStatements(route.Body),
 	}
 
@@ -487,22 +487,22 @@ func TestOptimizer_ExecutionEquivalence(t *testing.T) {
 func TestOptimizer_ConstantConditionExecution(t *testing.T) {
 	// Test: if 5 > 3 { > 1 } else { > 2 }
 	// Should optimize to: > 1
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.IfStatement{
-				Condition: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Gt,
-					Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
-					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.IfStatement{
+				Condition: &ast.BinaryOpExpr{
+					Op:    ast.Gt,
+					Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 				},
-				ThenBlock: []interpreter.Statement{
-					&interpreter.ReturnStatement{
-						Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+				ThenBlock: []ast.Statement{
+					&ast.ReturnStatement{
+						Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 					},
 				},
-				ElseBlock: []interpreter.Statement{
-					&interpreter.ReturnStatement{
-						Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+				ElseBlock: []ast.Statement{
+					&ast.ReturnStatement{
+						Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 					},
 				},
 			},
@@ -511,7 +511,7 @@ func TestOptimizer_ConstantConditionExecution(t *testing.T) {
 
 	// Optimize
 	opt := NewOptimizer(OptBasic)
-	optimizedRoute := &interpreter.Route{
+	optimizedRoute := &ast.Route{
 		Body: opt.OptimizeStatements(route.Body),
 	}
 
@@ -541,21 +541,21 @@ func TestOptimizer_ConstantPropagation(t *testing.T) {
 	// Code: $ x = 5, $ y = x + 3, > y
 	// Should become: $ x = 5, $ y = 5 + 3, > y
 	// Then constant folding: $ x = 5, $ y = 8, > y
-	stmts := []interpreter.Statement{
-		&interpreter.AssignStatement{
+	stmts := []ast.Statement{
+		&ast.AssignStatement{
 			Target: "x",
-			Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
+			Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
 		},
-		&interpreter.AssignStatement{
+		&ast.AssignStatement{
 			Target: "y",
-			Value: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Add,
-				Left:  &interpreter.VariableExpr{Name: "x"},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+			Value: &ast.BinaryOpExpr{
+				Op:    ast.Add,
+				Left:  &ast.VariableExpr{Name: "x"},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 			},
 		},
-		&interpreter.ReturnStatement{
-			Value: &interpreter.VariableExpr{Name: "y"},
+		&ast.ReturnStatement{
+			Value: &ast.VariableExpr{Name: "y"},
 		},
 	}
 
@@ -568,33 +568,33 @@ func TestOptimizer_ConstantPropagation(t *testing.T) {
 	}
 
 	// Check second statement - y should be assigned 8 (constant folded)
-	assignStmt, ok := result[1].(*interpreter.AssignStatement)
+	assignStmt, ok := result[1].(*ast.AssignStatement)
 	if !ok {
 		t.Fatalf("Expected AssignStatement, got %T", result[1])
 	}
 
-	litExpr, ok := assignStmt.Value.(*interpreter.LiteralExpr)
+	litExpr, ok := assignStmt.Value.(*ast.LiteralExpr)
 	if !ok {
 		t.Fatalf("Expected LiteralExpr after constant propagation and folding, got %T", assignStmt.Value)
 	}
 
-	intLit, ok := litExpr.Value.(interpreter.IntLiteral)
+	intLit, ok := litExpr.Value.(ast.IntLiteral)
 	if !ok || intLit.Value != 8 {
 		t.Errorf("Expected y = 8, got %v", litExpr.Value)
 	}
 
 	// Check return statement - y should be propagated to literal 8
-	retStmt, ok := result[2].(*interpreter.ReturnStatement)
+	retStmt, ok := result[2].(*ast.ReturnStatement)
 	if !ok {
 		t.Fatalf("Expected ReturnStatement, got %T", result[2])
 	}
 
-	retLitExpr, ok := retStmt.Value.(*interpreter.LiteralExpr)
+	retLitExpr, ok := retStmt.Value.(*ast.LiteralExpr)
 	if !ok {
 		t.Fatalf("Expected LiteralExpr in return (y should be propagated), got %T", retStmt.Value)
 	}
 
-	retIntLit, ok := retLitExpr.Value.(interpreter.IntLiteral)
+	retIntLit, ok := retLitExpr.Value.(ast.IntLiteral)
 	if !ok || retIntLit.Value != 8 {
 		t.Errorf("Expected return 8, got return %v", retLitExpr.Value)
 	}
@@ -605,25 +605,25 @@ func TestOptimizer_ConstantPropagationMultipleUses(t *testing.T) {
 	// Code: $ x = 10, $ y = x * 2, $ z = x + y
 	// Should become: $ x = 10, $ y = 10 * 2, $ z = 10 + 20
 	// Then: $ x = 10, $ y = 20, $ z = 30
-	stmts := []interpreter.Statement{
-		&interpreter.AssignStatement{
+	stmts := []ast.Statement{
+		&ast.AssignStatement{
 			Target: "x",
-			Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+			Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
 		},
-		&interpreter.AssignStatement{
+		&ast.AssignStatement{
 			Target: "y",
-			Value: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Mul,
-				Left:  &interpreter.VariableExpr{Name: "x"},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+			Value: &ast.BinaryOpExpr{
+				Op:    ast.Mul,
+				Left:  &ast.VariableExpr{Name: "x"},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 			},
 		},
-		&interpreter.AssignStatement{
+		&ast.AssignStatement{
 			Target: "z",
-			Value: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Add,
-				Left:  &interpreter.VariableExpr{Name: "x"},
-				Right: &interpreter.VariableExpr{Name: "y"},
+			Value: &ast.BinaryOpExpr{
+				Op:    ast.Add,
+				Left:  &ast.VariableExpr{Name: "x"},
+				Right: &ast.VariableExpr{Name: "y"},
 			},
 		},
 	}
@@ -632,17 +632,17 @@ func TestOptimizer_ConstantPropagationMultipleUses(t *testing.T) {
 	result := opt.OptimizeStatements(stmts)
 
 	// Check z = 30
-	assignStmt, ok := result[2].(*interpreter.AssignStatement)
+	assignStmt, ok := result[2].(*ast.AssignStatement)
 	if !ok {
 		t.Fatalf("Expected AssignStatement, got %T", result[2])
 	}
 
-	litExpr, ok := assignStmt.Value.(*interpreter.LiteralExpr)
+	litExpr, ok := assignStmt.Value.(*ast.LiteralExpr)
 	if !ok {
 		t.Fatalf("Expected LiteralExpr for z, got %T", assignStmt.Value)
 	}
 
-	intLit, ok := litExpr.Value.(interpreter.IntLiteral)
+	intLit, ok := litExpr.Value.(ast.IntLiteral)
 	if !ok || intLit.Value != 30 {
 		t.Errorf("Expected z = 30, got %v", litExpr.Value)
 	}
@@ -655,29 +655,29 @@ func TestOptimizer_ConstantPropagationInvalidation(t *testing.T) {
 	// After second: y is constant 6
 	// After third: x is non-constant (assigned from y), so invalidated
 	// Fourth: z = x + 1 should NOT be folded (x is not constant anymore)
-	stmts := []interpreter.Statement{
-		&interpreter.AssignStatement{
+	stmts := []ast.Statement{
+		&ast.AssignStatement{
 			Target: "x",
-			Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
+			Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
 		},
-		&interpreter.AssignStatement{
+		&ast.AssignStatement{
 			Target: "y",
-			Value: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Add,
-				Left:  &interpreter.VariableExpr{Name: "x"},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+			Value: &ast.BinaryOpExpr{
+				Op:    ast.Add,
+				Left:  &ast.VariableExpr{Name: "x"},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 			},
 		},
-		&interpreter.AssignStatement{
+		&ast.AssignStatement{
 			Target: "x",
-			Value:  &interpreter.VariableExpr{Name: "y"},
+			Value:  &ast.VariableExpr{Name: "y"},
 		},
-		&interpreter.AssignStatement{
+		&ast.AssignStatement{
 			Target: "z",
-			Value: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Add,
-				Left:  &interpreter.VariableExpr{Name: "x"},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+			Value: &ast.BinaryOpExpr{
+				Op:    ast.Add,
+				Left:  &ast.VariableExpr{Name: "x"},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 			},
 		},
 	}
@@ -686,34 +686,34 @@ func TestOptimizer_ConstantPropagationInvalidation(t *testing.T) {
 	result := opt.OptimizeStatements(stmts)
 
 	// Check third statement - x should be assigned literal 6 (y was propagated)
-	assignStmt3, ok := result[2].(*interpreter.AssignStatement)
+	assignStmt3, ok := result[2].(*ast.AssignStatement)
 	if !ok {
 		t.Fatalf("Expected AssignStatement, got %T", result[2])
 	}
 
-	litExpr, ok := assignStmt3.Value.(*interpreter.LiteralExpr)
+	litExpr, ok := assignStmt3.Value.(*ast.LiteralExpr)
 	if !ok {
 		t.Fatalf("Expected LiteralExpr for x = y (y should be propagated), got %T", assignStmt3.Value)
 	}
 
-	intLit, ok := litExpr.Value.(interpreter.IntLiteral)
+	intLit, ok := litExpr.Value.(ast.IntLiteral)
 	if !ok || intLit.Value != 6 {
 		t.Errorf("Expected x = 6 (propagated from y), got %v", litExpr.Value)
 	}
 
 	// Check fourth statement - z = x + 1
 	// Since x was reassigned with a literal 6, it should be propagated and folded to 7
-	assignStmt4, ok := result[3].(*interpreter.AssignStatement)
+	assignStmt4, ok := result[3].(*ast.AssignStatement)
 	if !ok {
 		t.Fatalf("Expected AssignStatement, got %T", result[3])
 	}
 
-	litExpr2, ok := assignStmt4.Value.(*interpreter.LiteralExpr)
+	litExpr2, ok := assignStmt4.Value.(*ast.LiteralExpr)
 	if !ok {
 		t.Fatalf("Expected LiteralExpr for z, got %T", assignStmt4.Value)
 	}
 
-	intLit2, ok := litExpr2.Value.(interpreter.IntLiteral)
+	intLit2, ok := litExpr2.Value.(ast.IntLiteral)
 	if !ok || intLit2.Value != 7 {
 		t.Errorf("Expected z = 7, got %v", litExpr2.Value)
 	}
@@ -721,29 +721,29 @@ func TestOptimizer_ConstantPropagationInvalidation(t *testing.T) {
 
 // Test strength reduction (x * 2 -> x + x)
 func TestOptimizer_StrengthReduction(t *testing.T) {
-	xVar := &interpreter.VariableExpr{Name: "x"}
+	xVar := &ast.VariableExpr{Name: "x"}
 
 	tests := []struct {
 		name     string
-		expr     interpreter.Expr
+		expr     ast.Expr
 		level    OptimizationLevel
 		expected string // "add" or "mul"
 	}{
 		{
 			name: "x*2 with OptAggressive",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Mul,
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Mul,
 				Left:  xVar,
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 			},
 			level:    OptAggressive,
 			expected: "add",
 		},
 		{
 			name: "2*x with OptAggressive",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Mul,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Mul,
+				Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 				Right: xVar,
 			},
 			level:    OptAggressive,
@@ -751,20 +751,20 @@ func TestOptimizer_StrengthReduction(t *testing.T) {
 		},
 		{
 			name: "x*2 with OptBasic",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Mul,
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Mul,
 				Left:  xVar,
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 			},
 			level:    OptBasic,
 			expected: "mul", // Basic level doesn't do strength reduction
 		},
 		{
 			name: "x*3 with OptAggressive",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Mul,
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Mul,
 				Left:  xVar,
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 			},
 			level:    OptAggressive,
 			expected: "mul", // Only x*2 is reduced
@@ -777,19 +777,19 @@ func TestOptimizer_StrengthReduction(t *testing.T) {
 			result := opt.OptimizeExpression(tt.expr)
 
 			if tt.expected == "add" {
-				binOp, ok := result.(*interpreter.BinaryOpExpr)
+				binOp, ok := result.(*ast.BinaryOpExpr)
 				if !ok {
 					t.Fatalf("Expected BinaryOpExpr, got %T", result)
 				}
-				if binOp.Op != interpreter.Add {
+				if binOp.Op != ast.Add {
 					t.Errorf("Expected Add operation, got %v", binOp.Op)
 				}
 			} else if tt.expected == "mul" {
-				binOp, ok := result.(*interpreter.BinaryOpExpr)
+				binOp, ok := result.(*ast.BinaryOpExpr)
 				if !ok {
 					t.Fatalf("Expected BinaryOpExpr, got %T", result)
 				}
-				if binOp.Op != interpreter.Mul {
+				if binOp.Op != ast.Mul {
 					t.Errorf("Expected Mul operation, got %v", binOp.Op)
 				}
 			}
@@ -801,21 +801,21 @@ func TestOptimizer_StrengthReduction(t *testing.T) {
 func TestOptimizer_CSE(t *testing.T) {
 	// Code: $ a = x + y, $ b = x + y
 	// Should become: $ a = x + y, $ b = a
-	stmts := []interpreter.Statement{
-		&interpreter.AssignStatement{
+	stmts := []ast.Statement{
+		&ast.AssignStatement{
 			Target: "a",
-			Value: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Add,
-				Left:  &interpreter.VariableExpr{Name: "x"},
-				Right: &interpreter.VariableExpr{Name: "y"},
+			Value: &ast.BinaryOpExpr{
+				Op:    ast.Add,
+				Left:  &ast.VariableExpr{Name: "x"},
+				Right: &ast.VariableExpr{Name: "y"},
 			},
 		},
-		&interpreter.AssignStatement{
+		&ast.AssignStatement{
 			Target: "b",
-			Value: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Add,
-				Left:  &interpreter.VariableExpr{Name: "x"},
-				Right: &interpreter.VariableExpr{Name: "y"},
+			Value: &ast.BinaryOpExpr{
+				Op:    ast.Add,
+				Left:  &ast.VariableExpr{Name: "x"},
+				Right: &ast.VariableExpr{Name: "y"},
 			},
 		},
 	}
@@ -829,12 +829,12 @@ func TestOptimizer_CSE(t *testing.T) {
 	}
 
 	// Check second statement - b should be assigned from a
-	assignStmt, ok := result[1].(*interpreter.AssignStatement)
+	assignStmt, ok := result[1].(*ast.AssignStatement)
 	if !ok {
 		t.Fatalf("Expected AssignStatement, got %T", result[1])
 	}
 
-	varExpr, ok := assignStmt.Value.(*interpreter.VariableExpr)
+	varExpr, ok := assignStmt.Value.(*ast.VariableExpr)
 	if !ok {
 		t.Fatalf("Expected VariableExpr (CSE should replace with 'a'), got %T", assignStmt.Value)
 	}
@@ -846,21 +846,21 @@ func TestOptimizer_CSE(t *testing.T) {
 
 // Test CSE only works at OptAggressive level
 func TestOptimizer_CSE_LevelCheck(t *testing.T) {
-	stmts := []interpreter.Statement{
-		&interpreter.AssignStatement{
+	stmts := []ast.Statement{
+		&ast.AssignStatement{
 			Target: "a",
-			Value: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Mul,
-				Left:  &interpreter.VariableExpr{Name: "x"},
-				Right: &interpreter.VariableExpr{Name: "y"},
+			Value: &ast.BinaryOpExpr{
+				Op:    ast.Mul,
+				Left:  &ast.VariableExpr{Name: "x"},
+				Right: &ast.VariableExpr{Name: "y"},
 			},
 		},
-		&interpreter.AssignStatement{
+		&ast.AssignStatement{
 			Target: "b",
-			Value: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Mul,
-				Left:  &interpreter.VariableExpr{Name: "x"},
-				Right: &interpreter.VariableExpr{Name: "y"},
+			Value: &ast.BinaryOpExpr{
+				Op:    ast.Mul,
+				Left:  &ast.VariableExpr{Name: "x"},
+				Right: &ast.VariableExpr{Name: "y"},
 			},
 		},
 	}
@@ -869,13 +869,13 @@ func TestOptimizer_CSE_LevelCheck(t *testing.T) {
 	optBasic := NewOptimizer(OptBasic)
 	resultBasic := optBasic.OptimizeStatements(stmts)
 
-	assignStmt, ok := resultBasic[1].(*interpreter.AssignStatement)
+	assignStmt, ok := resultBasic[1].(*ast.AssignStatement)
 	if !ok {
 		t.Fatalf("Expected AssignStatement, got %T", resultBasic[1])
 	}
 
 	// Should still be a BinaryOpExpr (not CSE'd)
-	if _, ok := assignStmt.Value.(*interpreter.BinaryOpExpr); !ok {
+	if _, ok := assignStmt.Value.(*ast.BinaryOpExpr); !ok {
 		t.Errorf("OptBasic should NOT perform CSE, but got %T", assignStmt.Value)
 	}
 
@@ -883,13 +883,13 @@ func TestOptimizer_CSE_LevelCheck(t *testing.T) {
 	optAgg := NewOptimizer(OptAggressive)
 	resultAgg := optAgg.OptimizeStatements(stmts)
 
-	assignStmt2, ok := resultAgg[1].(*interpreter.AssignStatement)
+	assignStmt2, ok := resultAgg[1].(*ast.AssignStatement)
 	if !ok {
 		t.Fatalf("Expected AssignStatement, got %T", resultAgg[1])
 	}
 
 	// Should be a VariableExpr (CSE'd)
-	varExpr, ok := assignStmt2.Value.(*interpreter.VariableExpr)
+	varExpr, ok := assignStmt2.Value.(*ast.VariableExpr)
 	if !ok {
 		t.Errorf("OptAggressive should perform CSE, got %T", assignStmt2.Value)
 	} else if varExpr.Name != "a" {
@@ -901,29 +901,29 @@ func TestOptimizer_CSE_LevelCheck(t *testing.T) {
 func TestOptimizer_CSE_MultipleUses(t *testing.T) {
 	// Code: $ a = x * y, $ b = x * y, $ c = x * y
 	// Should become: $ a = x * y, $ b = a, $ c = a
-	stmts := []interpreter.Statement{
-		&interpreter.AssignStatement{
+	stmts := []ast.Statement{
+		&ast.AssignStatement{
 			Target: "a",
-			Value: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Mul,
-				Left:  &interpreter.VariableExpr{Name: "x"},
-				Right: &interpreter.VariableExpr{Name: "y"},
+			Value: &ast.BinaryOpExpr{
+				Op:    ast.Mul,
+				Left:  &ast.VariableExpr{Name: "x"},
+				Right: &ast.VariableExpr{Name: "y"},
 			},
 		},
-		&interpreter.AssignStatement{
+		&ast.AssignStatement{
 			Target: "b",
-			Value: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Mul,
-				Left:  &interpreter.VariableExpr{Name: "x"},
-				Right: &interpreter.VariableExpr{Name: "y"},
+			Value: &ast.BinaryOpExpr{
+				Op:    ast.Mul,
+				Left:  &ast.VariableExpr{Name: "x"},
+				Right: &ast.VariableExpr{Name: "y"},
 			},
 		},
-		&interpreter.AssignStatement{
+		&ast.AssignStatement{
 			Target: "c",
-			Value: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Mul,
-				Left:  &interpreter.VariableExpr{Name: "x"},
-				Right: &interpreter.VariableExpr{Name: "y"},
+			Value: &ast.BinaryOpExpr{
+				Op:    ast.Mul,
+				Left:  &ast.VariableExpr{Name: "x"},
+				Right: &ast.VariableExpr{Name: "y"},
 			},
 		},
 	}
@@ -932,23 +932,23 @@ func TestOptimizer_CSE_MultipleUses(t *testing.T) {
 	result := opt.OptimizeStatements(stmts)
 
 	// Check b = a
-	assignB, ok := result[1].(*interpreter.AssignStatement)
+	assignB, ok := result[1].(*ast.AssignStatement)
 	if !ok {
 		t.Fatalf("Expected AssignStatement for b, got %T", result[1])
 	}
 
-	varExprB, ok := assignB.Value.(*interpreter.VariableExpr)
+	varExprB, ok := assignB.Value.(*ast.VariableExpr)
 	if !ok || varExprB.Name != "a" {
 		t.Errorf("Expected b = a, got b = %v", assignB.Value)
 	}
 
 	// Check c = a
-	assignC, ok := result[2].(*interpreter.AssignStatement)
+	assignC, ok := result[2].(*ast.AssignStatement)
 	if !ok {
 		t.Fatalf("Expected AssignStatement for c, got %T", result[2])
 	}
 
-	varExprC, ok := assignC.Value.(*interpreter.VariableExpr)
+	varExprC, ok := assignC.Value.(*ast.VariableExpr)
 	if !ok || varExprC.Name != "a" {
 		t.Errorf("Expected c = a, got c = %v", assignC.Value)
 	}
@@ -958,21 +958,21 @@ func TestOptimizer_CSE_MultipleUses(t *testing.T) {
 func TestOptimizer_CopyPropagation(t *testing.T) {
 	// Code: $ x = 10, $ y = x, $ z = y + 5
 	// Should become: $ x = 10, $ y = x, $ z = x + 5
-	stmts := []interpreter.Statement{
-		&interpreter.AssignStatement{
+	stmts := []ast.Statement{
+		&ast.AssignStatement{
 			Target: "x",
-			Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+			Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
 		},
-		&interpreter.AssignStatement{
+		&ast.AssignStatement{
 			Target: "y",
-			Value:  &interpreter.VariableExpr{Name: "x"},
+			Value:  &ast.VariableExpr{Name: "x"},
 		},
-		&interpreter.AssignStatement{
+		&ast.AssignStatement{
 			Target: "z",
-			Value: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Add,
-				Left:  &interpreter.VariableExpr{Name: "y"},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
+			Value: &ast.BinaryOpExpr{
+				Op:    ast.Add,
+				Left:  &ast.VariableExpr{Name: "y"},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
 			},
 		},
 	}
@@ -981,18 +981,18 @@ func TestOptimizer_CopyPropagation(t *testing.T) {
 	result := opt.OptimizeStatements(stmts)
 
 	// Check third statement - should be constant folded to 15
-	assignStmt, ok := result[2].(*interpreter.AssignStatement)
+	assignStmt, ok := result[2].(*ast.AssignStatement)
 	if !ok {
 		t.Fatalf("Expected AssignStatement, got %T", result[2])
 	}
 
 	// With copy propagation and constant propagation, z = y + 5 becomes z = x + 5 becomes z = 10 + 5 = 15
-	litExpr, ok := assignStmt.Value.(*interpreter.LiteralExpr)
+	litExpr, ok := assignStmt.Value.(*ast.LiteralExpr)
 	if !ok {
 		t.Fatalf("Expected LiteralExpr (constant folded to 15), got %T", assignStmt.Value)
 	}
 
-	intLit, ok := litExpr.Value.(interpreter.IntLiteral)
+	intLit, ok := litExpr.Value.(ast.IntLiteral)
 	if !ok || intLit.Value != 15 {
 		t.Errorf("Expected z = 15, got %v", litExpr.Value)
 	}
@@ -1002,25 +1002,25 @@ func TestOptimizer_CopyPropagation(t *testing.T) {
 func TestOptimizer_CopyPropagationChain(t *testing.T) {
 	// Code: $ a = 5, $ b = a, $ c = b, $ d = c
 	// Should track: b->a, c->a (via b), d->a (via c->b->a)
-	stmts := []interpreter.Statement{
-		&interpreter.AssignStatement{
+	stmts := []ast.Statement{
+		&ast.AssignStatement{
 			Target: "a",
-			Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
+			Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
 		},
-		&interpreter.AssignStatement{
+		&ast.AssignStatement{
 			Target: "b",
-			Value:  &interpreter.VariableExpr{Name: "a"},
+			Value:  &ast.VariableExpr{Name: "a"},
 		},
-		&interpreter.AssignStatement{
+		&ast.AssignStatement{
 			Target: "c",
-			Value:  &interpreter.VariableExpr{Name: "b"},
+			Value:  &ast.VariableExpr{Name: "b"},
 		},
-		&interpreter.AssignStatement{
+		&ast.AssignStatement{
 			Target: "d",
-			Value:  &interpreter.VariableExpr{Name: "c"},
+			Value:  &ast.VariableExpr{Name: "c"},
 		},
-		&interpreter.ReturnStatement{
-			Value: &interpreter.VariableExpr{Name: "d"},
+		&ast.ReturnStatement{
+			Value: &ast.VariableExpr{Name: "d"},
 		},
 	}
 
@@ -1028,20 +1028,20 @@ func TestOptimizer_CopyPropagationChain(t *testing.T) {
 	result := opt.OptimizeStatements(stmts)
 
 	// Check that d is assigned from a (or constant 5)
-	assignD, ok := result[3].(*interpreter.AssignStatement)
+	assignD, ok := result[3].(*ast.AssignStatement)
 	if !ok {
 		t.Fatalf("Expected AssignStatement for d, got %T", result[3])
 	}
 
 	// Should resolve to either variable 'a' or constant 5
 	switch v := assignD.Value.(type) {
-	case *interpreter.VariableExpr:
+	case *ast.VariableExpr:
 		if v.Name != "a" {
 			t.Errorf("Expected d = a (copy propagated), got d = %s", v.Name)
 		}
-	case *interpreter.LiteralExpr:
+	case *ast.LiteralExpr:
 		// Constant propagated
-		intLit, ok := v.Value.(interpreter.IntLiteral)
+		intLit, ok := v.Value.(ast.IntLiteral)
 		if !ok || intLit.Value != 5 {
 			t.Errorf("Expected d = 5 (constant propagated), got d = %v", v.Value)
 		}
@@ -1050,19 +1050,19 @@ func TestOptimizer_CopyPropagationChain(t *testing.T) {
 	}
 
 	// Check return statement - should also be resolved
-	retStmt, ok := result[4].(*interpreter.ReturnStatement)
+	retStmt, ok := result[4].(*ast.ReturnStatement)
 	if !ok {
 		t.Fatalf("Expected ReturnStatement, got %T", result[4])
 	}
 
 	// Return should be constant 5 or variable 'a'
 	switch v := retStmt.Value.(type) {
-	case *interpreter.VariableExpr:
+	case *ast.VariableExpr:
 		if v.Name != "a" {
 			t.Errorf("Expected return a, got return %s", v.Name)
 		}
-	case *interpreter.LiteralExpr:
-		intLit, ok := v.Value.(interpreter.IntLiteral)
+	case *ast.LiteralExpr:
+		intLit, ok := v.Value.(ast.IntLiteral)
 		if !ok || intLit.Value != 5 {
 			t.Errorf("Expected return 5, got return %v", v.Value)
 		}
@@ -1075,28 +1075,28 @@ func TestOptimizer_CopyPropagationChain(t *testing.T) {
 func TestOptimizer_LICM_Basic(t *testing.T) {
 	// Code: while (i < 10) { $ x = a + b, $ i = i + 1 }
 	// Should become: $ x = a + b, while (i < 10) { $ i = i + 1 }
-	stmts := []interpreter.Statement{
-		&interpreter.WhileStatement{
-			Condition: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Lt,
-				Left:  &interpreter.VariableExpr{Name: "i"},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+	stmts := []ast.Statement{
+		&ast.WhileStatement{
+			Condition: &ast.BinaryOpExpr{
+				Op:    ast.Lt,
+				Left:  &ast.VariableExpr{Name: "i"},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
 			},
-			Body: []interpreter.Statement{
-				&interpreter.AssignStatement{
+			Body: []ast.Statement{
+				&ast.AssignStatement{
 					Target: "x",
-					Value: &interpreter.BinaryOpExpr{
-						Op:    interpreter.Add,
-						Left:  &interpreter.VariableExpr{Name: "a"},
-						Right: &interpreter.VariableExpr{Name: "b"},
+					Value: &ast.BinaryOpExpr{
+						Op:    ast.Add,
+						Left:  &ast.VariableExpr{Name: "a"},
+						Right: &ast.VariableExpr{Name: "b"},
 					},
 				},
-				&interpreter.AssignStatement{
+				&ast.AssignStatement{
 					Target: "i",
-					Value: &interpreter.BinaryOpExpr{
-						Op:    interpreter.Add,
-						Left:  &interpreter.VariableExpr{Name: "i"},
-						Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+					Value: &ast.BinaryOpExpr{
+						Op:    ast.Add,
+						Left:  &ast.VariableExpr{Name: "i"},
+						Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 					},
 				},
 			},
@@ -1112,7 +1112,7 @@ func TestOptimizer_LICM_Basic(t *testing.T) {
 	}
 
 	// First statement should be the hoisted x = a + b
-	assignStmt, ok := result[0].(*interpreter.AssignStatement)
+	assignStmt, ok := result[0].(*ast.AssignStatement)
 	if !ok {
 		t.Fatalf("Expected first statement to be hoisted AssignStatement, got %T", result[0])
 	}
@@ -1121,7 +1121,7 @@ func TestOptimizer_LICM_Basic(t *testing.T) {
 	}
 
 	// Second statement should be the while loop
-	whileStmt, ok := result[1].(*interpreter.WhileStatement)
+	whileStmt, ok := result[1].(*ast.WhileStatement)
 	if !ok {
 		t.Fatalf("Expected second statement to be WhileStatement, got %T", result[1])
 	}
@@ -1136,20 +1136,20 @@ func TestOptimizer_LICM_Basic(t *testing.T) {
 func TestOptimizer_LICM_ConditionVariable(t *testing.T) {
 	// Code: while (i < 10) { $ i = a + b }
 	// Should NOT move i assignment out (i is in condition)
-	stmts := []interpreter.Statement{
-		&interpreter.WhileStatement{
-			Condition: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Lt,
-				Left:  &interpreter.VariableExpr{Name: "i"},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+	stmts := []ast.Statement{
+		&ast.WhileStatement{
+			Condition: &ast.BinaryOpExpr{
+				Op:    ast.Lt,
+				Left:  &ast.VariableExpr{Name: "i"},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
 			},
-			Body: []interpreter.Statement{
-				&interpreter.AssignStatement{
+			Body: []ast.Statement{
+				&ast.AssignStatement{
 					Target: "i",
-					Value: &interpreter.BinaryOpExpr{
-						Op:    interpreter.Add,
-						Left:  &interpreter.VariableExpr{Name: "a"},
-						Right: &interpreter.VariableExpr{Name: "b"},
+					Value: &ast.BinaryOpExpr{
+						Op:    ast.Add,
+						Left:  &ast.VariableExpr{Name: "a"},
+						Right: &ast.VariableExpr{Name: "b"},
 					},
 				},
 			},
@@ -1164,7 +1164,7 @@ func TestOptimizer_LICM_ConditionVariable(t *testing.T) {
 		t.Fatalf("Expected 1 statement, got %d", len(result))
 	}
 
-	whileStmt, ok := result[0].(*interpreter.WhileStatement)
+	whileStmt, ok := result[0].(*ast.WhileStatement)
 	if !ok {
 		t.Fatalf("Expected WhileStatement, got %T", result[0])
 	}
@@ -1179,28 +1179,28 @@ func TestOptimizer_LICM_ConditionVariable(t *testing.T) {
 func TestOptimizer_LICM_VariantExpression(t *testing.T) {
 	// Code: while (i < 10) { $ x = i + 1, $ i = i + 1 }
 	// Should NOT move x assignment (depends on i which is modified)
-	stmts := []interpreter.Statement{
-		&interpreter.WhileStatement{
-			Condition: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Lt,
-				Left:  &interpreter.VariableExpr{Name: "i"},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+	stmts := []ast.Statement{
+		&ast.WhileStatement{
+			Condition: &ast.BinaryOpExpr{
+				Op:    ast.Lt,
+				Left:  &ast.VariableExpr{Name: "i"},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
 			},
-			Body: []interpreter.Statement{
-				&interpreter.AssignStatement{
+			Body: []ast.Statement{
+				&ast.AssignStatement{
 					Target: "x",
-					Value: &interpreter.BinaryOpExpr{
-						Op:    interpreter.Add,
-						Left:  &interpreter.VariableExpr{Name: "i"},
-						Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+					Value: &ast.BinaryOpExpr{
+						Op:    ast.Add,
+						Left:  &ast.VariableExpr{Name: "i"},
+						Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 					},
 				},
-				&interpreter.AssignStatement{
+				&ast.AssignStatement{
 					Target: "i",
-					Value: &interpreter.BinaryOpExpr{
-						Op:    interpreter.Add,
-						Left:  &interpreter.VariableExpr{Name: "i"},
-						Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+					Value: &ast.BinaryOpExpr{
+						Op:    ast.Add,
+						Left:  &ast.VariableExpr{Name: "i"},
+						Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 					},
 				},
 			},
@@ -1215,7 +1215,7 @@ func TestOptimizer_LICM_VariantExpression(t *testing.T) {
 		t.Fatalf("Expected 1 statement, got %d", len(result))
 	}
 
-	whileStmt, ok := result[0].(*interpreter.WhileStatement)
+	whileStmt, ok := result[0].(*ast.WhileStatement)
 	if !ok {
 		t.Fatalf("Expected WhileStatement, got %T", result[0])
 	}
@@ -1228,28 +1228,28 @@ func TestOptimizer_LICM_VariantExpression(t *testing.T) {
 
 // Test LICM only works at OptAggressive
 func TestOptimizer_LICM_LevelCheck(t *testing.T) {
-	stmts := []interpreter.Statement{
-		&interpreter.WhileStatement{
-			Condition: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Lt,
-				Left:  &interpreter.VariableExpr{Name: "i"},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+	stmts := []ast.Statement{
+		&ast.WhileStatement{
+			Condition: &ast.BinaryOpExpr{
+				Op:    ast.Lt,
+				Left:  &ast.VariableExpr{Name: "i"},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
 			},
-			Body: []interpreter.Statement{
-				&interpreter.AssignStatement{
+			Body: []ast.Statement{
+				&ast.AssignStatement{
 					Target: "x",
-					Value: &interpreter.BinaryOpExpr{
-						Op:    interpreter.Add,
-						Left:  &interpreter.VariableExpr{Name: "a"},
-						Right: &interpreter.VariableExpr{Name: "b"},
+					Value: &ast.BinaryOpExpr{
+						Op:    ast.Add,
+						Left:  &ast.VariableExpr{Name: "a"},
+						Right: &ast.VariableExpr{Name: "b"},
 					},
 				},
-				&interpreter.AssignStatement{
+				&ast.AssignStatement{
 					Target: "i",
-					Value: &interpreter.BinaryOpExpr{
-						Op:    interpreter.Add,
-						Left:  &interpreter.VariableExpr{Name: "i"},
-						Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+					Value: &ast.BinaryOpExpr{
+						Op:    ast.Add,
+						Left:  &ast.VariableExpr{Name: "i"},
+						Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 					},
 				},
 			},
@@ -1275,44 +1275,44 @@ func TestOptimizer_LICM_LevelCheck(t *testing.T) {
 
 // Test optimization level none
 func TestOptimizer_OptNone(t *testing.T) {
-	expr := &interpreter.BinaryOpExpr{
-		Op:    interpreter.Add,
-		Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
-		Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+	expr := &ast.BinaryOpExpr{
+		Op:    ast.Add,
+		Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
+		Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 	}
 
 	opt := NewOptimizer(OptNone)
 	result := opt.OptimizeExpression(expr)
 
 	// With OptNone, expression should remain unchanged
-	binOp, ok := result.(*interpreter.BinaryOpExpr)
+	binOp, ok := result.(*ast.BinaryOpExpr)
 	if !ok {
 		t.Fatalf("Expected BinaryOpExpr, got %T", result)
 	}
 
-	if binOp.Op != interpreter.Add {
+	if binOp.Op != ast.Add {
 		t.Errorf("Expected Add operation, got %v", binOp.Op)
 	}
 }
 
 // Helper function to compare expressions
-func exprsEqual(a, b interpreter.Expr) bool {
-	aLit, aIsLit := a.(*interpreter.LiteralExpr)
-	bLit, bIsLit := b.(*interpreter.LiteralExpr)
+func exprsEqual(a, b ast.Expr) bool {
+	aLit, aIsLit := a.(*ast.LiteralExpr)
+	bLit, bIsLit := b.(*ast.LiteralExpr)
 
 	if aIsLit && bIsLit {
 		return literalsEqual(aLit.Value, bLit.Value)
 	}
 
-	aVar, aIsVar := a.(*interpreter.VariableExpr)
-	bVar, bIsVar := b.(*interpreter.VariableExpr)
+	aVar, aIsVar := a.(*ast.VariableExpr)
+	bVar, bIsVar := b.(*ast.VariableExpr)
 
 	if aIsVar && bIsVar {
 		return aVar.Name == bVar.Name
 	}
 
-	aBinOp, aIsBinOp := a.(*interpreter.BinaryOpExpr)
-	bBinOp, bIsBinOp := b.(*interpreter.BinaryOpExpr)
+	aBinOp, aIsBinOp := a.(*ast.BinaryOpExpr)
+	bBinOp, bIsBinOp := b.(*ast.BinaryOpExpr)
 
 	if aIsBinOp && bIsBinOp {
 		return aBinOp.Op == bBinOp.Op &&
@@ -1328,33 +1328,33 @@ func exprsEqual(a, b interpreter.Expr) bool {
 func TestOptimizer_NestedForLoopConstantInvalidation(t *testing.T) {
 	// Test: $ sum = 0, for row in matrix { for cell in row { $ sum = sum + cell } }, > sum
 	// The optimizer should NOT replace the return "sum" with constant 0
-	stmts := []interpreter.Statement{
-		&interpreter.AssignStatement{
+	stmts := []ast.Statement{
+		&ast.AssignStatement{
 			Target: "sum",
-			Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+			Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 		},
-		&interpreter.ForStatement{
+		&ast.ForStatement{
 			ValueVar: "row",
-			Iterable: &interpreter.VariableExpr{Name: "matrix"},
-			Body: []interpreter.Statement{
-				&interpreter.ForStatement{
+			Iterable: &ast.VariableExpr{Name: "matrix"},
+			Body: []ast.Statement{
+				&ast.ForStatement{
 					ValueVar: "cell",
-					Iterable: &interpreter.VariableExpr{Name: "row"},
-					Body: []interpreter.Statement{
-						&interpreter.AssignStatement{
+					Iterable: &ast.VariableExpr{Name: "row"},
+					Body: []ast.Statement{
+						&ast.AssignStatement{
 							Target: "sum",
-							Value: &interpreter.BinaryOpExpr{
-								Op:    interpreter.Add,
-								Left:  &interpreter.VariableExpr{Name: "sum"},
-								Right: &interpreter.VariableExpr{Name: "cell"},
+							Value: &ast.BinaryOpExpr{
+								Op:    ast.Add,
+								Left:  &ast.VariableExpr{Name: "sum"},
+								Right: &ast.VariableExpr{Name: "cell"},
 							},
 						},
 					},
 				},
 			},
 		},
-		&interpreter.ReturnStatement{
-			Value: &interpreter.VariableExpr{Name: "sum"},
+		&ast.ReturnStatement{
+			Value: &ast.VariableExpr{Name: "sum"},
 		},
 	}
 
@@ -1367,16 +1367,16 @@ func TestOptimizer_NestedForLoopConstantInvalidation(t *testing.T) {
 	}
 
 	// The return statement should still reference the variable "sum", NOT a constant
-	retStmt, ok := result[2].(*interpreter.ReturnStatement)
+	retStmt, ok := result[2].(*ast.ReturnStatement)
 	if !ok {
 		t.Fatalf("Expected ReturnStatement, got %T", result[2])
 	}
 
 	// The return value should be a VariableExpr, not a LiteralExpr
-	varExpr, ok := retStmt.Value.(*interpreter.VariableExpr)
+	varExpr, ok := retStmt.Value.(*ast.VariableExpr)
 	if !ok {
 		// If it's a literal, the bug is present
-		if litExpr, isLit := retStmt.Value.(*interpreter.LiteralExpr); isLit {
+		if litExpr, isLit := retStmt.Value.(*ast.LiteralExpr); isLit {
 			t.Errorf("Bug: Return value was incorrectly optimized to constant %v instead of variable 'sum'", litExpr.Value)
 		} else {
 			t.Fatalf("Expected VariableExpr for return value, got %T", retStmt.Value)
@@ -1393,27 +1393,27 @@ func TestOptimizer_NestedForLoopConstantInvalidation(t *testing.T) {
 // invalidated when modified inside a single for-loop
 func TestOptimizer_ForLoopConstantInvalidation(t *testing.T) {
 	// Test: $ count = 0, for item in items { $ count = count + 1 }, > count
-	stmts := []interpreter.Statement{
-		&interpreter.AssignStatement{
+	stmts := []ast.Statement{
+		&ast.AssignStatement{
 			Target: "count",
-			Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+			Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 		},
-		&interpreter.ForStatement{
+		&ast.ForStatement{
 			ValueVar: "item",
-			Iterable: &interpreter.VariableExpr{Name: "items"},
-			Body: []interpreter.Statement{
-				&interpreter.AssignStatement{
+			Iterable: &ast.VariableExpr{Name: "items"},
+			Body: []ast.Statement{
+				&ast.AssignStatement{
 					Target: "count",
-					Value: &interpreter.BinaryOpExpr{
-						Op:    interpreter.Add,
-						Left:  &interpreter.VariableExpr{Name: "count"},
-						Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+					Value: &ast.BinaryOpExpr{
+						Op:    ast.Add,
+						Left:  &ast.VariableExpr{Name: "count"},
+						Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 					},
 				},
 			},
 		},
-		&interpreter.ReturnStatement{
-			Value: &interpreter.VariableExpr{Name: "count"},
+		&ast.ReturnStatement{
+			Value: &ast.VariableExpr{Name: "count"},
 		},
 	}
 
@@ -1421,12 +1421,12 @@ func TestOptimizer_ForLoopConstantInvalidation(t *testing.T) {
 	result := opt.OptimizeStatements(stmts)
 
 	// The return statement should still reference the variable "count"
-	retStmt, ok := result[2].(*interpreter.ReturnStatement)
+	retStmt, ok := result[2].(*ast.ReturnStatement)
 	if !ok {
 		t.Fatalf("Expected ReturnStatement, got %T", result[2])
 	}
 
-	varExpr, ok := retStmt.Value.(*interpreter.VariableExpr)
+	varExpr, ok := retStmt.Value.(*ast.VariableExpr)
 	if !ok {
 		t.Fatalf("Expected VariableExpr for return value, got %T", retStmt.Value)
 	}

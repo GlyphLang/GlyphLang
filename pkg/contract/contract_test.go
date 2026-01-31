@@ -1,39 +1,40 @@
 // Tests for pkg/contract/verify.go which implements Verify, Diff, and VerifyConsumer functions.
 // Types used: Violation, VerifyResult, BreakingChange, DiffResult, ConsumerExpectation, ConsumerResult (all in verify.go).
-// interpreter.Route implements interpreter.Item (ast.go:36).
-// interpreter.GetContract and GetContracts (interpreter.go:568-575).
+// ast.Route implements ast.Item (ast.go:36).
+// interpreter.GetContract and GetContracts (ast.go:568-575).
 package contract
 
 import (
 	"testing"
 
+	"github.com/glyphlang/glyph/pkg/ast"
 	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func makeContract(name string, endpoints ...interpreter.ContractEndpoint) interpreter.ContractDef {
-	return interpreter.ContractDef{Name: name, Endpoints: endpoints}
+func makeContract(name string, endpoints ...ast.ContractEndpoint) ast.ContractDef {
+	return ast.ContractDef{Name: name, Endpoints: endpoints}
 }
 
-func makeEndpoint(method interpreter.HttpMethod, path string, returnType interpreter.Type) interpreter.ContractEndpoint {
-	return interpreter.ContractEndpoint{Method: method, Path: path, ReturnType: returnType}
+func makeEndpoint(method ast.HttpMethod, path string, returnType ast.Type) ast.ContractEndpoint {
+	return ast.ContractEndpoint{Method: method, Path: path, ReturnType: returnType}
 }
 
-func makeRoute(method interpreter.HttpMethod, path string, returnType interpreter.Type) *interpreter.Route {
-	return &interpreter.Route{Method: method, Path: path, ReturnType: returnType}
+func makeRoute(method ast.HttpMethod, path string, returnType ast.Type) *ast.Route {
+	return &ast.Route{Method: method, Path: path, ReturnType: returnType}
 }
 
 // TestVerifyPass tests that verification passes when routes match contract
 func TestVerifyPass(t *testing.T) {
 	ct := makeContract("UserService",
-		makeEndpoint(interpreter.Get, "/users/:id", interpreter.NamedType{Name: "User"}),
-		makeEndpoint(interpreter.Post, "/users", interpreter.NamedType{Name: "User"}),
+		makeEndpoint(ast.Get, "/users/:id", ast.NamedType{Name: "User"}),
+		makeEndpoint(ast.Post, "/users", ast.NamedType{Name: "User"}),
 	)
 
-	items := []interpreter.Item{
-		makeRoute(interpreter.Get, "/users/:id", interpreter.NamedType{Name: "User"}),
-		makeRoute(interpreter.Post, "/users", interpreter.NamedType{Name: "User"}),
+	items := []ast.Item{
+		makeRoute(ast.Get, "/users/:id", ast.NamedType{Name: "User"}),
+		makeRoute(ast.Post, "/users", ast.NamedType{Name: "User"}),
 	}
 
 	result := Verify(ct, items)
@@ -45,12 +46,12 @@ func TestVerifyPass(t *testing.T) {
 // TestVerifyMissingEndpoint tests that verification fails when an endpoint is missing
 func TestVerifyMissingEndpoint(t *testing.T) {
 	ct := makeContract("UserService",
-		makeEndpoint(interpreter.Get, "/users/:id", interpreter.NamedType{Name: "User"}),
-		makeEndpoint(interpreter.Delete, "/users/:id", interpreter.NamedType{Name: "Ok"}),
+		makeEndpoint(ast.Get, "/users/:id", ast.NamedType{Name: "User"}),
+		makeEndpoint(ast.Delete, "/users/:id", ast.NamedType{Name: "Ok"}),
 	)
 
-	items := []interpreter.Item{
-		makeRoute(interpreter.Get, "/users/:id", interpreter.NamedType{Name: "User"}),
+	items := []ast.Item{
+		makeRoute(ast.Get, "/users/:id", ast.NamedType{Name: "User"}),
 	}
 
 	result := Verify(ct, items)
@@ -63,11 +64,11 @@ func TestVerifyMissingEndpoint(t *testing.T) {
 // TestVerifyReturnTypeMismatch tests that verification detects return type mismatches
 func TestVerifyReturnTypeMismatch(t *testing.T) {
 	ct := makeContract("UserService",
-		makeEndpoint(interpreter.Get, "/users/:id", interpreter.NamedType{Name: "User"}),
+		makeEndpoint(ast.Get, "/users/:id", ast.NamedType{Name: "User"}),
 	)
 
-	items := []interpreter.Item{
-		makeRoute(interpreter.Get, "/users/:id", interpreter.NamedType{Name: "Admin"}),
+	items := []ast.Item{
+		makeRoute(ast.Get, "/users/:id", ast.NamedType{Name: "Admin"}),
 	}
 
 	result := Verify(ct, items)
@@ -79,18 +80,18 @@ func TestVerifyReturnTypeMismatch(t *testing.T) {
 // TestVerifyUnionTypeCompatibility tests union type matching
 func TestVerifyUnionTypeCompatibility(t *testing.T) {
 	ct := makeContract("UserService",
-		makeEndpoint(interpreter.Get, "/users/:id",
-			interpreter.UnionType{Types: []interpreter.Type{
-				interpreter.NamedType{Name: "User"},
-				interpreter.NamedType{Name: "NotFound"},
+		makeEndpoint(ast.Get, "/users/:id",
+			ast.UnionType{Types: []ast.Type{
+				ast.NamedType{Name: "User"},
+				ast.NamedType{Name: "NotFound"},
 			}}),
 	)
 
-	items := []interpreter.Item{
-		makeRoute(interpreter.Get, "/users/:id",
-			interpreter.UnionType{Types: []interpreter.Type{
-				interpreter.NamedType{Name: "User"},
-				interpreter.NamedType{Name: "NotFound"},
+	items := []ast.Item{
+		makeRoute(ast.Get, "/users/:id",
+			ast.UnionType{Types: []ast.Type{
+				ast.NamedType{Name: "User"},
+				ast.NamedType{Name: "NotFound"},
 			}}),
 	}
 
@@ -101,10 +102,10 @@ func TestVerifyUnionTypeCompatibility(t *testing.T) {
 // TestDiffNoBreakingChanges tests that identical contracts have no breaking changes
 func TestDiffNoBreakingChanges(t *testing.T) {
 	old := makeContract("UserService",
-		makeEndpoint(interpreter.Get, "/users/:id", interpreter.NamedType{Name: "User"}),
+		makeEndpoint(ast.Get, "/users/:id", ast.NamedType{Name: "User"}),
 	)
 	newC := makeContract("UserService",
-		makeEndpoint(interpreter.Get, "/users/:id", interpreter.NamedType{Name: "User"}),
+		makeEndpoint(ast.Get, "/users/:id", ast.NamedType{Name: "User"}),
 	)
 
 	result := Diff(old, newC)
@@ -115,11 +116,11 @@ func TestDiffNoBreakingChanges(t *testing.T) {
 // TestDiffRemovedEndpoint tests that removing an endpoint is a breaking change
 func TestDiffRemovedEndpoint(t *testing.T) {
 	old := makeContract("UserService",
-		makeEndpoint(interpreter.Get, "/users/:id", interpreter.NamedType{Name: "User"}),
-		makeEndpoint(interpreter.Delete, "/users/:id", interpreter.NamedType{Name: "Ok"}),
+		makeEndpoint(ast.Get, "/users/:id", ast.NamedType{Name: "User"}),
+		makeEndpoint(ast.Delete, "/users/:id", ast.NamedType{Name: "Ok"}),
 	)
 	newC := makeContract("UserService",
-		makeEndpoint(interpreter.Get, "/users/:id", interpreter.NamedType{Name: "User"}),
+		makeEndpoint(ast.Get, "/users/:id", ast.NamedType{Name: "User"}),
 	)
 
 	result := Diff(old, newC)
@@ -131,10 +132,10 @@ func TestDiffRemovedEndpoint(t *testing.T) {
 // TestDiffReturnTypeChanged tests that changing return type is a breaking change
 func TestDiffReturnTypeChanged(t *testing.T) {
 	old := makeContract("UserService",
-		makeEndpoint(interpreter.Get, "/users/:id", interpreter.NamedType{Name: "User"}),
+		makeEndpoint(ast.Get, "/users/:id", ast.NamedType{Name: "User"}),
 	)
 	newC := makeContract("UserService",
-		makeEndpoint(interpreter.Get, "/users/:id", interpreter.NamedType{Name: "UserV2"}),
+		makeEndpoint(ast.Get, "/users/:id", ast.NamedType{Name: "UserV2"}),
 	)
 
 	result := Diff(old, newC)
@@ -146,11 +147,11 @@ func TestDiffReturnTypeChanged(t *testing.T) {
 // TestDiffAddedEndpoint tests that adding a new endpoint is non-breaking
 func TestDiffAddedEndpoint(t *testing.T) {
 	old := makeContract("UserService",
-		makeEndpoint(interpreter.Get, "/users/:id", interpreter.NamedType{Name: "User"}),
+		makeEndpoint(ast.Get, "/users/:id", ast.NamedType{Name: "User"}),
 	)
 	newC := makeContract("UserService",
-		makeEndpoint(interpreter.Get, "/users/:id", interpreter.NamedType{Name: "User"}),
-		makeEndpoint(interpreter.Post, "/users", interpreter.NamedType{Name: "User"}),
+		makeEndpoint(ast.Get, "/users/:id", ast.NamedType{Name: "User"}),
+		makeEndpoint(ast.Post, "/users", ast.NamedType{Name: "User"}),
 	)
 
 	result := Diff(old, newC)
@@ -162,7 +163,7 @@ func TestDiffAddedEndpoint(t *testing.T) {
 // TestVerifyConsumerPass tests consumer expectations pass
 func TestVerifyConsumerPass(t *testing.T) {
 	ct := makeContract("UserService",
-		makeEndpoint(interpreter.Get, "/users/:id", interpreter.NamedType{Name: "User"}),
+		makeEndpoint(ast.Get, "/users/:id", ast.NamedType{Name: "User"}),
 	)
 
 	expectations := []ConsumerExpectation{
@@ -179,7 +180,7 @@ func TestVerifyConsumerPass(t *testing.T) {
 // TestVerifyConsumerMissingEndpoint tests consumer fails when expected endpoint is missing
 func TestVerifyConsumerMissingEndpoint(t *testing.T) {
 	ct := makeContract("UserService",
-		makeEndpoint(interpreter.Get, "/users/:id", interpreter.NamedType{Name: "User"}),
+		makeEndpoint(ast.Get, "/users/:id", ast.NamedType{Name: "User"}),
 	)
 
 	expectations := []ConsumerExpectation{
@@ -195,7 +196,7 @@ func TestVerifyConsumerMissingEndpoint(t *testing.T) {
 // TestVerifyConsumerReturnTypeMismatch tests consumer fails on return type mismatch
 func TestVerifyConsumerReturnTypeMismatch(t *testing.T) {
 	ct := makeContract("UserService",
-		makeEndpoint(interpreter.Get, "/users/:id", interpreter.NamedType{Name: "Admin"}),
+		makeEndpoint(ast.Get, "/users/:id", ast.NamedType{Name: "Admin"}),
 	)
 
 	expectations := []ConsumerExpectation{
@@ -222,15 +223,15 @@ func TestBreakingChangeString(t *testing.T) {
 
 // TestTypeStringVariants tests typeString for different type kinds
 func TestTypeStringVariants(t *testing.T) {
-	assert.Equal(t, "int", typeString(interpreter.IntType{}))
-	assert.Equal(t, "string", typeString(interpreter.StringType{}))
-	assert.Equal(t, "bool", typeString(interpreter.BoolType{}))
-	assert.Equal(t, "float", typeString(interpreter.FloatType{}))
-	assert.Equal(t, "User", typeString(interpreter.NamedType{Name: "User"}))
-	assert.Equal(t, "[int]", typeString(interpreter.ArrayType{ElementType: interpreter.IntType{}}))
-	assert.Equal(t, "string?", typeString(interpreter.OptionalType{InnerType: interpreter.StringType{}}))
-	assert.Equal(t, "User | NotFound", typeString(interpreter.UnionType{
-		Types: []interpreter.Type{interpreter.NamedType{Name: "User"}, interpreter.NamedType{Name: "NotFound"}},
+	assert.Equal(t, "int", typeString(ast.IntType{}))
+	assert.Equal(t, "string", typeString(ast.StringType{}))
+	assert.Equal(t, "bool", typeString(ast.BoolType{}))
+	assert.Equal(t, "float", typeString(ast.FloatType{}))
+	assert.Equal(t, "User", typeString(ast.NamedType{Name: "User"}))
+	assert.Equal(t, "[int]", typeString(ast.ArrayType{ElementType: ast.IntType{}}))
+	assert.Equal(t, "string?", typeString(ast.OptionalType{InnerType: ast.StringType{}}))
+	assert.Equal(t, "User | NotFound", typeString(ast.UnionType{
+		Types: []ast.Type{ast.NamedType{Name: "User"}, ast.NamedType{Name: "NotFound"}},
 	}))
 }
 
@@ -238,12 +239,12 @@ func TestTypeStringVariants(t *testing.T) {
 func TestInterpreterContractStorage(t *testing.T) {
 	interp := interpreter.NewInterpreter()
 
-	module := interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.ContractDef{
+	module := ast.Module{
+		Items: []ast.Item{
+			&ast.ContractDef{
 				Name: "UserService",
-				Endpoints: []interpreter.ContractEndpoint{
-					{Method: interpreter.Get, Path: "/users/:id", ReturnType: interpreter.NamedType{Name: "User"}},
+				Endpoints: []ast.ContractEndpoint{
+					{Method: ast.Get, Path: "/users/:id", ReturnType: ast.NamedType{Name: "User"}},
 				},
 			},
 		},

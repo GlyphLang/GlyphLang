@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"os"
 	"path/filepath"
 	"strings"
@@ -113,20 +113,20 @@ func runListCommands(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// typeToString converts an interpreter.Type to a string representation
-func typeToString(t interpreter.Type) string {
+// typeToString converts an ast.Type to a string representation
+func typeToString(t ast.Type) string {
 	switch v := t.(type) {
-	case interpreter.IntType:
+	case ast.IntType:
 		return "int"
-	case interpreter.StringType:
+	case ast.StringType:
 		return "str"
-	case interpreter.BoolType:
+	case ast.BoolType:
 		return "bool"
-	case interpreter.FloatType:
+	case ast.FloatType:
 		return "float"
-	case interpreter.NamedType:
+	case ast.NamedType:
 		return v.Name
-	case interpreter.ArrayType:
+	case ast.ArrayType:
 		return typeToString(v.ElementType) + "[]"
 	default:
 		return "any"

@@ -1,7 +1,7 @@
 package tests
 
 import (
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -38,9 +38,9 @@ func TestWebSocketPathParamsCompilationFlow(t *testing.T) {
 	require.NoError(t, err, "Parser should parse the module")
 
 	// Find the WebSocket route
-	var wsRoute *interpreter.WebSocketRoute
+	var wsRoute *ast.WebSocketRoute
 	for _, item := range module.Items {
-		if r, ok := item.(*interpreter.WebSocketRoute); ok {
+		if r, ok := item.(*ast.WebSocketRoute); ok {
 			wsRoute = r
 			break
 		}
@@ -81,9 +81,9 @@ func TestWebSocketPathParamsVMExecution(t *testing.T) {
 	module, err := p.Parse()
 	require.NoError(t, err)
 
-	var wsRoute *interpreter.WebSocketRoute
+	var wsRoute *ast.WebSocketRoute
 	for _, item := range module.Items {
-		if r, ok := item.(*interpreter.WebSocketRoute); ok {
+		if r, ok := item.(*ast.WebSocketRoute); ok {
 			wsRoute = r
 			break
 		}
@@ -312,9 +312,9 @@ func TestWebSocketPathParamsInBytecodeExecution(t *testing.T) {
 	module, err := p.Parse()
 	require.NoError(t, err)
 
-	var wsRoute *interpreter.WebSocketRoute
+	var wsRoute *ast.WebSocketRoute
 	for _, item := range module.Items {
-		if r, ok := item.(*interpreter.WebSocketRoute); ok {
+		if r, ok := item.(*ast.WebSocketRoute); ok {
 			wsRoute = r
 			break
 		}
@@ -447,9 +447,9 @@ func TestWebSocketPathParamsFullFlow(t *testing.T) {
 	t.Log("  Parser: OK")
 
 	// Step 2: Verify the route was parsed correctly
-	var wsRoute *interpreter.WebSocketRoute
+	var wsRoute *ast.WebSocketRoute
 	for _, item := range module.Items {
-		if r, ok := item.(*interpreter.WebSocketRoute); ok {
+		if r, ok := item.(*ast.WebSocketRoute); ok {
 			wsRoute = r
 			break
 		}
@@ -567,9 +567,9 @@ func TestWebSocketPathParamsIssue64Verification(t *testing.T) {
 	require.NoError(t, err, "Parser failed")
 
 	// Compile
-	var wsRoute *interpreter.WebSocketRoute
+	var wsRoute *ast.WebSocketRoute
 	for _, item := range module.Items {
-		if r, ok := item.(*interpreter.WebSocketRoute); ok {
+		if r, ok := item.(*ast.WebSocketRoute); ok {
 			wsRoute = r
 			break
 		}

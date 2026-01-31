@@ -1,7 +1,7 @@
 package validation
 
 import (
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,11 +9,11 @@ import (
 )
 
 func TestSchemaFromTypeDef_Required(t *testing.T) {
-	td := &interpreter.TypeDef{
+	td := &ast.TypeDef{
 		Name: "User",
-		Fields: []interpreter.Field{
-			{Name: "name", TypeAnnotation: interpreter.NamedType{Name: "str"}, Required: true},
-			{Name: "bio", TypeAnnotation: interpreter.NamedType{Name: "str"}, Required: false},
+		Fields: []ast.Field{
+			{Name: "name", TypeAnnotation: ast.NamedType{Name: "str"}, Required: true},
+			{Name: "bio", TypeAnnotation: ast.NamedType{Name: "str"}, Required: false},
 		},
 	}
 
@@ -27,13 +27,13 @@ func TestSchemaFromTypeDef_Required(t *testing.T) {
 }
 
 func TestSchemaFromTypeDef_MinLen(t *testing.T) {
-	td := &interpreter.TypeDef{
+	td := &ast.TypeDef{
 		Name: "Input",
-		Fields: []interpreter.Field{
+		Fields: []ast.Field{
 			{
 				Name:        "name",
 				Required:    true,
-				Annotations: []interpreter.FieldAnnotation{{Name: "minLen", Params: []interface{}{int64(3)}}},
+				Annotations: []ast.FieldAnnotation{{Name: "minLen", Params: []interface{}{int64(3)}}},
 			},
 		},
 	}
@@ -48,13 +48,13 @@ func TestSchemaFromTypeDef_MinLen(t *testing.T) {
 }
 
 func TestSchemaFromTypeDef_MaxLen(t *testing.T) {
-	td := &interpreter.TypeDef{
+	td := &ast.TypeDef{
 		Name: "Input",
-		Fields: []interpreter.Field{
+		Fields: []ast.Field{
 			{
 				Name:        "code",
 				Required:    true,
-				Annotations: []interpreter.FieldAnnotation{{Name: "maxLen", Params: []interface{}{int64(5)}}},
+				Annotations: []ast.FieldAnnotation{{Name: "maxLen", Params: []interface{}{int64(5)}}},
 			},
 		},
 	}
@@ -69,13 +69,13 @@ func TestSchemaFromTypeDef_MaxLen(t *testing.T) {
 }
 
 func TestSchemaFromTypeDef_Email(t *testing.T) {
-	td := &interpreter.TypeDef{
+	td := &ast.TypeDef{
 		Name: "Input",
-		Fields: []interpreter.Field{
+		Fields: []ast.Field{
 			{
 				Name:        "email",
 				Required:    true,
-				Annotations: []interpreter.FieldAnnotation{{Name: "email"}},
+				Annotations: []ast.FieldAnnotation{{Name: "email"}},
 			},
 		},
 	}
@@ -90,13 +90,13 @@ func TestSchemaFromTypeDef_Email(t *testing.T) {
 }
 
 func TestSchemaFromTypeDef_Pattern(t *testing.T) {
-	td := &interpreter.TypeDef{
+	td := &ast.TypeDef{
 		Name: "Input",
-		Fields: []interpreter.Field{
+		Fields: []ast.Field{
 			{
 				Name:        "code",
 				Required:    true,
-				Annotations: []interpreter.FieldAnnotation{{Name: "pattern", Params: []interface{}{"^[A-Z]{3}$"}}},
+				Annotations: []ast.FieldAnnotation{{Name: "pattern", Params: []interface{}{"^[A-Z]{3}$"}}},
 			},
 		},
 	}
@@ -111,13 +111,13 @@ func TestSchemaFromTypeDef_Pattern(t *testing.T) {
 }
 
 func TestSchemaFromTypeDef_MinMax(t *testing.T) {
-	td := &interpreter.TypeDef{
+	td := &ast.TypeDef{
 		Name: "Input",
-		Fields: []interpreter.Field{
+		Fields: []ast.Field{
 			{
 				Name:     "age",
 				Required: true,
-				Annotations: []interpreter.FieldAnnotation{
+				Annotations: []ast.FieldAnnotation{
 					{Name: "min", Params: []interface{}{int64(0)}},
 					{Name: "max", Params: []interface{}{int64(150)}},
 				},
@@ -138,13 +138,13 @@ func TestSchemaFromTypeDef_MinMax(t *testing.T) {
 }
 
 func TestSchemaFromTypeDef_Range(t *testing.T) {
-	td := &interpreter.TypeDef{
+	td := &ast.TypeDef{
 		Name: "Input",
-		Fields: []interpreter.Field{
+		Fields: []ast.Field{
 			{
 				Name:        "score",
 				Required:    true,
-				Annotations: []interpreter.FieldAnnotation{{Name: "range", Params: []interface{}{int64(1), int64(100)}}},
+				Annotations: []ast.FieldAnnotation{{Name: "range", Params: []interface{}{int64(1), int64(100)}}},
 			},
 		},
 	}
@@ -159,13 +159,13 @@ func TestSchemaFromTypeDef_Range(t *testing.T) {
 }
 
 func TestSchemaFromTypeDef_OneOf(t *testing.T) {
-	td := &interpreter.TypeDef{
+	td := &ast.TypeDef{
 		Name: "Input",
-		Fields: []interpreter.Field{
+		Fields: []ast.Field{
 			{
 				Name:        "role",
 				Required:    true,
-				Annotations: []interpreter.FieldAnnotation{{Name: "oneOf", Params: []interface{}{[]string{"admin", "user", "guest"}}}},
+				Annotations: []ast.FieldAnnotation{{Name: "oneOf", Params: []interface{}{[]string{"admin", "user", "guest"}}}},
 			},
 		},
 	}
@@ -180,13 +180,13 @@ func TestSchemaFromTypeDef_OneOf(t *testing.T) {
 }
 
 func TestSchemaFromTypeDef_UUID(t *testing.T) {
-	td := &interpreter.TypeDef{
+	td := &ast.TypeDef{
 		Name: "Input",
-		Fields: []interpreter.Field{
+		Fields: []ast.Field{
 			{
 				Name:        "id",
 				Required:    true,
-				Annotations: []interpreter.FieldAnnotation{{Name: "uuid"}},
+				Annotations: []ast.FieldAnnotation{{Name: "uuid"}},
 			},
 		},
 	}
@@ -201,12 +201,12 @@ func TestSchemaFromTypeDef_UUID(t *testing.T) {
 }
 
 func TestSchemaFromTypeDef_URL(t *testing.T) {
-	td := &interpreter.TypeDef{
+	td := &ast.TypeDef{
 		Name: "Input",
-		Fields: []interpreter.Field{
+		Fields: []ast.Field{
 			{
 				Name:        "website",
-				Annotations: []interpreter.FieldAnnotation{{Name: "url"}},
+				Annotations: []ast.FieldAnnotation{{Name: "url"}},
 			},
 		},
 	}
@@ -221,13 +221,13 @@ func TestSchemaFromTypeDef_URL(t *testing.T) {
 }
 
 func TestSchemaFromTypeDef_Positive(t *testing.T) {
-	td := &interpreter.TypeDef{
+	td := &ast.TypeDef{
 		Name: "Input",
-		Fields: []interpreter.Field{
+		Fields: []ast.Field{
 			{
 				Name:        "amount",
 				Required:    true,
-				Annotations: []interpreter.FieldAnnotation{{Name: "positive"}},
+				Annotations: []ast.FieldAnnotation{{Name: "positive"}},
 			},
 		},
 	}
@@ -245,13 +245,13 @@ func TestSchemaFromTypeDef_Positive(t *testing.T) {
 }
 
 func TestSchemaFromTypeDef_MinItems(t *testing.T) {
-	td := &interpreter.TypeDef{
+	td := &ast.TypeDef{
 		Name: "Input",
-		Fields: []interpreter.Field{
+		Fields: []ast.Field{
 			{
 				Name:        "tags",
 				Required:    true,
-				Annotations: []interpreter.FieldAnnotation{{Name: "minItems", Params: []interface{}{int64(1)}}},
+				Annotations: []ast.FieldAnnotation{{Name: "minItems", Params: []interface{}{int64(1)}}},
 			},
 		},
 	}
@@ -266,13 +266,13 @@ func TestSchemaFromTypeDef_MinItems(t *testing.T) {
 }
 
 func TestSchemaFromTypeDef_Unique(t *testing.T) {
-	td := &interpreter.TypeDef{
+	td := &ast.TypeDef{
 		Name: "Input",
-		Fields: []interpreter.Field{
+		Fields: []ast.Field{
 			{
 				Name:        "ids",
 				Required:    true,
-				Annotations: []interpreter.FieldAnnotation{{Name: "unique"}},
+				Annotations: []ast.FieldAnnotation{{Name: "unique"}},
 			},
 		},
 	}
@@ -287,13 +287,13 @@ func TestSchemaFromTypeDef_Unique(t *testing.T) {
 }
 
 func TestSchemaFromTypeDef_MultipleAnnotations(t *testing.T) {
-	td := &interpreter.TypeDef{
+	td := &ast.TypeDef{
 		Name: "CreateUser",
-		Fields: []interpreter.Field{
+		Fields: []ast.Field{
 			{
 				Name:     "name",
 				Required: true,
-				Annotations: []interpreter.FieldAnnotation{
+				Annotations: []ast.FieldAnnotation{
 					{Name: "minLen", Params: []interface{}{int64(2)}},
 					{Name: "maxLen", Params: []interface{}{int64(100)}},
 				},
@@ -301,13 +301,13 @@ func TestSchemaFromTypeDef_MultipleAnnotations(t *testing.T) {
 			{
 				Name:     "email",
 				Required: true,
-				Annotations: []interpreter.FieldAnnotation{
+				Annotations: []ast.FieldAnnotation{
 					{Name: "email"},
 				},
 			},
 			{
 				Name: "age",
-				Annotations: []interpreter.FieldAnnotation{
+				Annotations: []ast.FieldAnnotation{
 					{Name: "min", Params: []interface{}{int64(0)}},
 					{Name: "max", Params: []interface{}{int64(150)}},
 				},
@@ -349,9 +349,9 @@ func TestToResult(t *testing.T) {
 }
 
 func TestSchemaFromTypeDef_NoAnnotations(t *testing.T) {
-	td := &interpreter.TypeDef{
+	td := &ast.TypeDef{
 		Name: "Simple",
-		Fields: []interpreter.Field{
+		Fields: []ast.Field{
 			{Name: "name", Required: true},
 		},
 	}
@@ -363,13 +363,13 @@ func TestSchemaFromTypeDef_NoAnnotations(t *testing.T) {
 }
 
 func TestSchemaFromTypeDef_NotEmpty(t *testing.T) {
-	td := &interpreter.TypeDef{
+	td := &ast.TypeDef{
 		Name: "Input",
-		Fields: []interpreter.Field{
+		Fields: []ast.Field{
 			{
 				Name:        "title",
 				Required:    true,
-				Annotations: []interpreter.FieldAnnotation{{Name: "notEmpty"}},
+				Annotations: []ast.FieldAnnotation{{Name: "notEmpty"}},
 			},
 		},
 	}

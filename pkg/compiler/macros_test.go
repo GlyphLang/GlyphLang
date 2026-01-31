@@ -1,17 +1,17 @@
 package compiler
 
 import (
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
 )
 
 func TestMacroExpander_RegisterAndGet(t *testing.T) {
 	expander := NewMacroExpander()
 
-	macro := &interpreter.MacroDef{
+	macro := &ast.MacroDef{
 		Name:   "test_macro",
 		Params: []string{"x", "y"},
-		Body:   []interpreter.Node{},
+		Body:   []ast.Node{},
 	}
 
 	expander.RegisterMacro(macro)
@@ -38,15 +38,15 @@ func TestMacroExpander_SimpleSubstitution(t *testing.T) {
 	expander := NewMacroExpander()
 
 	// Define a simple macro: macro! double(x) { > x + x }
-	macro := &interpreter.MacroDef{
+	macro := &ast.MacroDef{
 		Name:   "double",
 		Params: []string{"x"},
-		Body: []interpreter.Node{
-			interpreter.ReturnStatement{
-				Value: interpreter.BinaryOpExpr{
-					Op:    interpreter.Add,
-					Left:  interpreter.VariableExpr{Name: "x"},
-					Right: interpreter.VariableExpr{Name: "x"},
+		Body: []ast.Node{
+			ast.ReturnStatement{
+				Value: ast.BinaryOpExpr{
+					Op:    ast.Add,
+					Left:  ast.VariableExpr{Name: "x"},
+					Right: ast.VariableExpr{Name: "x"},
 				},
 			},
 		},
@@ -54,10 +54,10 @@ func TestMacroExpander_SimpleSubstitution(t *testing.T) {
 	expander.RegisterMacro(macro)
 
 	// Invoke the macro: double!(5)
-	invocation := &interpreter.MacroInvocation{
+	invocation := &ast.MacroInvocation{
 		Name: "double",
-		Args: []interpreter.Expr{
-			interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
+		Args: []ast.Expr{
+			ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
 		},
 	}
 
@@ -71,31 +71,31 @@ func TestMacroExpander_SimpleSubstitution(t *testing.T) {
 	}
 
 	// Check that the return statement has the value substituted
-	retStmt, ok := expanded[0].(interpreter.ReturnStatement)
+	retStmt, ok := expanded[0].(ast.ReturnStatement)
 	if !ok {
 		t.Fatalf("Expected ReturnStatement, got %T", expanded[0])
 	}
 
-	binOp, ok := retStmt.Value.(interpreter.BinaryOpExpr)
+	binOp, ok := retStmt.Value.(ast.BinaryOpExpr)
 	if !ok {
 		t.Fatalf("Expected BinaryOpExpr, got %T", retStmt.Value)
 	}
 
 	// Both left and right should be the substituted value (5)
-	leftLit, ok := binOp.Left.(interpreter.LiteralExpr)
+	leftLit, ok := binOp.Left.(ast.LiteralExpr)
 	if !ok {
 		t.Fatalf("Expected LiteralExpr on left, got %T", binOp.Left)
 	}
-	if leftLit.Value.(interpreter.IntLiteral).Value != 5 {
-		t.Errorf("Expected left value 5, got %d", leftLit.Value.(interpreter.IntLiteral).Value)
+	if leftLit.Value.(ast.IntLiteral).Value != 5 {
+		t.Errorf("Expected left value 5, got %d", leftLit.Value.(ast.IntLiteral).Value)
 	}
 
-	rightLit, ok := binOp.Right.(interpreter.LiteralExpr)
+	rightLit, ok := binOp.Right.(ast.LiteralExpr)
 	if !ok {
 		t.Fatalf("Expected LiteralExpr on right, got %T", binOp.Right)
 	}
-	if rightLit.Value.(interpreter.IntLiteral).Value != 5 {
-		t.Errorf("Expected right value 5, got %d", rightLit.Value.(interpreter.IntLiteral).Value)
+	if rightLit.Value.(ast.IntLiteral).Value != 5 {
+		t.Errorf("Expected right value 5, got %d", rightLit.Value.(ast.IntLiteral).Value)
 	}
 }
 
@@ -103,15 +103,15 @@ func TestMacroExpander_MultipleParams(t *testing.T) {
 	expander := NewMacroExpander()
 
 	// Define a macro with multiple params: macro! add(a, b) { > a + b }
-	macro := &interpreter.MacroDef{
+	macro := &ast.MacroDef{
 		Name:   "add",
 		Params: []string{"a", "b"},
-		Body: []interpreter.Node{
-			interpreter.ReturnStatement{
-				Value: interpreter.BinaryOpExpr{
-					Op:    interpreter.Add,
-					Left:  interpreter.VariableExpr{Name: "a"},
-					Right: interpreter.VariableExpr{Name: "b"},
+		Body: []ast.Node{
+			ast.ReturnStatement{
+				Value: ast.BinaryOpExpr{
+					Op:    ast.Add,
+					Left:  ast.VariableExpr{Name: "a"},
+					Right: ast.VariableExpr{Name: "b"},
 				},
 			},
 		},
@@ -119,11 +119,11 @@ func TestMacroExpander_MultipleParams(t *testing.T) {
 	expander.RegisterMacro(macro)
 
 	// Invoke: add!(10, 20)
-	invocation := &interpreter.MacroInvocation{
+	invocation := &ast.MacroInvocation{
 		Name: "add",
-		Args: []interpreter.Expr{
-			interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
-			interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 20}},
+		Args: []ast.Expr{
+			ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
+			ast.LiteralExpr{Value: ast.IntLiteral{Value: 20}},
 		},
 	}
 
@@ -132,26 +132,26 @@ func TestMacroExpander_MultipleParams(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	retStmt := expanded[0].(interpreter.ReturnStatement)
-	binOp := retStmt.Value.(interpreter.BinaryOpExpr)
+	retStmt := expanded[0].(ast.ReturnStatement)
+	binOp := retStmt.Value.(ast.BinaryOpExpr)
 
-	leftLit := binOp.Left.(interpreter.LiteralExpr)
-	if leftLit.Value.(interpreter.IntLiteral).Value != 10 {
-		t.Errorf("Expected left value 10, got %d", leftLit.Value.(interpreter.IntLiteral).Value)
+	leftLit := binOp.Left.(ast.LiteralExpr)
+	if leftLit.Value.(ast.IntLiteral).Value != 10 {
+		t.Errorf("Expected left value 10, got %d", leftLit.Value.(ast.IntLiteral).Value)
 	}
 
-	rightLit := binOp.Right.(interpreter.LiteralExpr)
-	if rightLit.Value.(interpreter.IntLiteral).Value != 20 {
-		t.Errorf("Expected right value 20, got %d", rightLit.Value.(interpreter.IntLiteral).Value)
+	rightLit := binOp.Right.(ast.LiteralExpr)
+	if rightLit.Value.(ast.IntLiteral).Value != 20 {
+		t.Errorf("Expected right value 20, got %d", rightLit.Value.(ast.IntLiteral).Value)
 	}
 }
 
 func TestMacroExpander_UndefinedMacro(t *testing.T) {
 	expander := NewMacroExpander()
 
-	invocation := &interpreter.MacroInvocation{
+	invocation := &ast.MacroInvocation{
 		Name: "undefined_macro",
-		Args: []interpreter.Expr{},
+		Args: []ast.Expr{},
 	}
 
 	_, err := expander.ExpandMacroInvocation(invocation)
@@ -163,18 +163,18 @@ func TestMacroExpander_UndefinedMacro(t *testing.T) {
 func TestMacroExpander_WrongArgCount(t *testing.T) {
 	expander := NewMacroExpander()
 
-	macro := &interpreter.MacroDef{
+	macro := &ast.MacroDef{
 		Name:   "two_args",
 		Params: []string{"a", "b"},
-		Body:   []interpreter.Node{},
+		Body:   []ast.Node{},
 	}
 	expander.RegisterMacro(macro)
 
 	// Try to invoke with wrong number of args
-	invocation := &interpreter.MacroInvocation{
+	invocation := &ast.MacroInvocation{
 		Name: "two_args",
-		Args: []interpreter.Expr{
-			interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+		Args: []ast.Expr{
+			ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 		},
 	}
 
@@ -188,13 +188,13 @@ func TestMacroExpander_StringInterpolation(t *testing.T) {
 	expander := NewMacroExpander()
 
 	// Define a macro with string interpolation: macro! greet(name) { > "Hello, ${name}!" }
-	macro := &interpreter.MacroDef{
+	macro := &ast.MacroDef{
 		Name:   "greet",
 		Params: []string{"name"},
-		Body: []interpreter.Node{
-			interpreter.ReturnStatement{
-				Value: interpreter.LiteralExpr{
-					Value: interpreter.StringLiteral{Value: "Hello, ${name}!"},
+		Body: []ast.Node{
+			ast.ReturnStatement{
+				Value: ast.LiteralExpr{
+					Value: ast.StringLiteral{Value: "Hello, ${name}!"},
 				},
 			},
 		},
@@ -202,10 +202,10 @@ func TestMacroExpander_StringInterpolation(t *testing.T) {
 	expander.RegisterMacro(macro)
 
 	// Invoke: greet!("World")
-	invocation := &interpreter.MacroInvocation{
+	invocation := &ast.MacroInvocation{
 		Name: "greet",
-		Args: []interpreter.Expr{
-			interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "World"}},
+		Args: []ast.Expr{
+			ast.LiteralExpr{Value: ast.StringLiteral{Value: "World"}},
 		},
 	}
 
@@ -214,9 +214,9 @@ func TestMacroExpander_StringInterpolation(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	retStmt := expanded[0].(interpreter.ReturnStatement)
-	litExpr := retStmt.Value.(interpreter.LiteralExpr)
-	strLit := litExpr.Value.(interpreter.StringLiteral)
+	retStmt := expanded[0].(ast.ReturnStatement)
+	litExpr := retStmt.Value.(ast.LiteralExpr)
+	strLit := litExpr.Value.(ast.StringLiteral)
 
 	if strLit.Value != "Hello, World!" {
 		t.Errorf("Expected 'Hello, World!', got '%s'", strLit.Value)
@@ -227,20 +227,20 @@ func TestMacroExpander_ExpandModule(t *testing.T) {
 	expander := NewMacroExpander()
 
 	// Create a module with a macro definition and invocation
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
+	module := &ast.Module{
+		Items: []ast.Item{
 			// Define macro
-			&interpreter.MacroDef{
+			&ast.MacroDef{
 				Name:   "make_route",
 				Params: []string{"path"},
-				Body: []interpreter.Node{
-					&interpreter.Route{
+				Body: []ast.Node{
+					&ast.Route{
 						Path:   "/${path}",
-						Method: interpreter.Get,
-						Body: []interpreter.Statement{
-							interpreter.ReturnStatement{
-								Value: interpreter.LiteralExpr{
-									Value: interpreter.StringLiteral{Value: "ok"},
+						Method: ast.Get,
+						Body: []ast.Statement{
+							ast.ReturnStatement{
+								Value: ast.LiteralExpr{
+									Value: ast.StringLiteral{Value: "ok"},
 								},
 							},
 						},
@@ -248,10 +248,10 @@ func TestMacroExpander_ExpandModule(t *testing.T) {
 				},
 			},
 			// Invoke macro
-			&interpreter.MacroInvocation{
+			&ast.MacroInvocation{
 				Name: "make_route",
-				Args: []interpreter.Expr{
-					interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "users"}},
+				Args: []ast.Expr{
+					ast.LiteralExpr{Value: ast.StringLiteral{Value: "users"}},
 				},
 			},
 		},
@@ -267,7 +267,7 @@ func TestMacroExpander_ExpandModule(t *testing.T) {
 		t.Fatalf("Expected 1 item, got %d", len(expanded.Items))
 	}
 
-	route, ok := expanded.Items[0].(*interpreter.Route)
+	route, ok := expanded.Items[0].(*ast.Route)
 	if !ok {
 		t.Fatalf("Expected Route, got %T", expanded.Items[0])
 	}
@@ -281,15 +281,15 @@ func TestMacroExpander_NestedMacros(t *testing.T) {
 	expander := NewMacroExpander()
 
 	// Define inner macro: macro! inner(x) { > x * 2 }
-	innerMacro := &interpreter.MacroDef{
+	innerMacro := &ast.MacroDef{
 		Name:   "inner",
 		Params: []string{"x"},
-		Body: []interpreter.Node{
-			interpreter.ReturnStatement{
-				Value: interpreter.BinaryOpExpr{
-					Op:    interpreter.Mul,
-					Left:  interpreter.VariableExpr{Name: "x"},
-					Right: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+		Body: []ast.Node{
+			ast.ReturnStatement{
+				Value: ast.BinaryOpExpr{
+					Op:    ast.Mul,
+					Left:  ast.VariableExpr{Name: "x"},
+					Right: ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 				},
 			},
 		},
@@ -297,14 +297,14 @@ func TestMacroExpander_NestedMacros(t *testing.T) {
 	expander.RegisterMacro(innerMacro)
 
 	// Define outer macro that uses inner: macro! outer(y) { inner!(y) }
-	outerMacro := &interpreter.MacroDef{
+	outerMacro := &ast.MacroDef{
 		Name:   "outer",
 		Params: []string{"y"},
-		Body: []interpreter.Node{
-			&interpreter.MacroInvocation{
+		Body: []ast.Node{
+			&ast.MacroInvocation{
 				Name: "inner",
-				Args: []interpreter.Expr{
-					interpreter.VariableExpr{Name: "y"},
+				Args: []ast.Expr{
+					ast.VariableExpr{Name: "y"},
 				},
 			},
 		},
@@ -312,10 +312,10 @@ func TestMacroExpander_NestedMacros(t *testing.T) {
 	expander.RegisterMacro(outerMacro)
 
 	// Invoke outer!(5) should expand to inner!(5) which expands to > 5 * 2
-	invocation := &interpreter.MacroInvocation{
+	invocation := &ast.MacroInvocation{
 		Name: "outer",
-		Args: []interpreter.Expr{
-			interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
+		Args: []ast.Expr{
+			ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
 		},
 	}
 
@@ -328,15 +328,15 @@ func TestMacroExpander_NestedMacros(t *testing.T) {
 		t.Fatalf("Expected 1 expanded node, got %d", len(expanded))
 	}
 
-	retStmt, ok := expanded[0].(interpreter.ReturnStatement)
+	retStmt, ok := expanded[0].(ast.ReturnStatement)
 	if !ok {
 		t.Fatalf("Expected ReturnStatement, got %T", expanded[0])
 	}
 
-	binOp := retStmt.Value.(interpreter.BinaryOpExpr)
-	leftLit := binOp.Left.(interpreter.LiteralExpr)
-	if leftLit.Value.(interpreter.IntLiteral).Value != 5 {
-		t.Errorf("Expected left value 5, got %d", leftLit.Value.(interpreter.IntLiteral).Value)
+	binOp := retStmt.Value.(ast.BinaryOpExpr)
+	leftLit := binOp.Left.(ast.LiteralExpr)
+	if leftLit.Value.(ast.IntLiteral).Value != 5 {
+		t.Errorf("Expected left value 5, got %d", leftLit.Value.(ast.IntLiteral).Value)
 	}
 }
 
@@ -344,15 +344,15 @@ func TestMacroExpander_FunctionCallSubstitution(t *testing.T) {
 	expander := NewMacroExpander()
 
 	// Define a macro that calls a function: macro! log(msg) { print(msg) }
-	macro := &interpreter.MacroDef{
+	macro := &ast.MacroDef{
 		Name:   "log",
 		Params: []string{"msg"},
-		Body: []interpreter.Node{
-			interpreter.ExpressionStatement{
-				Expr: interpreter.FunctionCallExpr{
+		Body: []ast.Node{
+			ast.ExpressionStatement{
+				Expr: ast.FunctionCallExpr{
 					Name: "print",
-					Args: []interpreter.Expr{
-						interpreter.VariableExpr{Name: "msg"},
+					Args: []ast.Expr{
+						ast.VariableExpr{Name: "msg"},
 					},
 				},
 			},
@@ -361,10 +361,10 @@ func TestMacroExpander_FunctionCallSubstitution(t *testing.T) {
 	expander.RegisterMacro(macro)
 
 	// Invoke: log!("Hello")
-	invocation := &interpreter.MacroInvocation{
+	invocation := &ast.MacroInvocation{
 		Name: "log",
-		Args: []interpreter.Expr{
-			interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "Hello"}},
+		Args: []ast.Expr{
+			ast.LiteralExpr{Value: ast.StringLiteral{Value: "Hello"}},
 		},
 	}
 
@@ -373,16 +373,16 @@ func TestMacroExpander_FunctionCallSubstitution(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	exprStmt := expanded[0].(interpreter.ExpressionStatement)
-	funcCall := exprStmt.Expr.(interpreter.FunctionCallExpr)
+	exprStmt := expanded[0].(ast.ExpressionStatement)
+	funcCall := exprStmt.Expr.(ast.FunctionCallExpr)
 
 	if funcCall.Name != "print" {
 		t.Errorf("Expected function name 'print', got '%s'", funcCall.Name)
 	}
 
-	argLit := funcCall.Args[0].(interpreter.LiteralExpr)
-	if argLit.Value.(interpreter.StringLiteral).Value != "Hello" {
-		t.Errorf("Expected arg 'Hello', got '%s'", argLit.Value.(interpreter.StringLiteral).Value)
+	argLit := funcCall.Args[0].(ast.LiteralExpr)
+	if argLit.Value.(ast.StringLiteral).Value != "Hello" {
+		t.Errorf("Expected arg 'Hello', got '%s'", argLit.Value.(ast.StringLiteral).Value)
 	}
 }
 
@@ -390,15 +390,15 @@ func TestMacroExpander_IfStatementSubstitution(t *testing.T) {
 	expander := NewMacroExpander()
 
 	// Define a macro with if statement: macro! check(cond, val) { if cond { > val } }
-	macro := &interpreter.MacroDef{
+	macro := &ast.MacroDef{
 		Name:   "check",
 		Params: []string{"cond", "val"},
-		Body: []interpreter.Node{
-			interpreter.IfStatement{
-				Condition: interpreter.VariableExpr{Name: "cond"},
-				ThenBlock: []interpreter.Statement{
-					interpreter.ReturnStatement{
-						Value: interpreter.VariableExpr{Name: "val"},
+		Body: []ast.Node{
+			ast.IfStatement{
+				Condition: ast.VariableExpr{Name: "cond"},
+				ThenBlock: []ast.Statement{
+					ast.ReturnStatement{
+						Value: ast.VariableExpr{Name: "val"},
 					},
 				},
 			},
@@ -407,11 +407,11 @@ func TestMacroExpander_IfStatementSubstitution(t *testing.T) {
 	expander.RegisterMacro(macro)
 
 	// Invoke: check!(true, 42)
-	invocation := &interpreter.MacroInvocation{
+	invocation := &ast.MacroInvocation{
 		Name: "check",
-		Args: []interpreter.Expr{
-			interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
-			interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+		Args: []ast.Expr{
+			ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
+			ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
 		},
 	}
 
@@ -420,16 +420,16 @@ func TestMacroExpander_IfStatementSubstitution(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	ifStmt := expanded[0].(interpreter.IfStatement)
-	condLit := ifStmt.Condition.(interpreter.LiteralExpr)
-	if !condLit.Value.(interpreter.BoolLiteral).Value {
+	ifStmt := expanded[0].(ast.IfStatement)
+	condLit := ifStmt.Condition.(ast.LiteralExpr)
+	if !condLit.Value.(ast.BoolLiteral).Value {
 		t.Error("Expected condition to be true")
 	}
 
-	retStmt := ifStmt.ThenBlock[0].(interpreter.ReturnStatement)
-	valLit := retStmt.Value.(interpreter.LiteralExpr)
-	if valLit.Value.(interpreter.IntLiteral).Value != 42 {
-		t.Errorf("Expected value 42, got %d", valLit.Value.(interpreter.IntLiteral).Value)
+	retStmt := ifStmt.ThenBlock[0].(ast.ReturnStatement)
+	valLit := retStmt.Value.(ast.LiteralExpr)
+	if valLit.Value.(ast.IntLiteral).Value != 42 {
+		t.Errorf("Expected value 42, got %d", valLit.Value.(ast.IntLiteral).Value)
 	}
 }
 

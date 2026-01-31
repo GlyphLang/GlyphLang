@@ -2,7 +2,7 @@ package docs
 
 import (
 	"fmt"
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"strings"
 )
 
@@ -47,22 +47,22 @@ type APIDoc struct {
 }
 
 // ExtractDocs extracts documentation data from a parsed module.
-func ExtractDocs(module *interpreter.Module, title string) *APIDoc {
+func ExtractDocs(module *ast.Module, title string) *APIDoc {
 	doc := &APIDoc{Title: title}
 
 	for _, item := range module.Items {
 		switch v := item.(type) {
-		case *interpreter.TypeDef:
+		case *ast.TypeDef:
 			doc.Types = append(doc.Types, extractTypeDef(v))
-		case interpreter.TypeDef:
+		case ast.TypeDef:
 			doc.Types = append(doc.Types, extractTypeDef(&v))
-		case *interpreter.Route:
+		case *ast.Route:
 			// Skip WebSocket routes - they use a different protocol model
-			if v.Method != interpreter.WebSocket {
+			if v.Method != ast.WebSocket {
 				doc.Routes = append(doc.Routes, extractRoute(v))
 			}
-		case interpreter.Route:
-			if v.Method != interpreter.WebSocket {
+		case ast.Route:
+			if v.Method != ast.WebSocket {
 				doc.Routes = append(doc.Routes, extractRoute(&v))
 			}
 		}
@@ -71,7 +71,7 @@ func ExtractDocs(module *interpreter.Module, title string) *APIDoc {
 	return doc
 }
 
-func extractTypeDef(td *interpreter.TypeDef) TypeDoc {
+func extractTypeDef(td *ast.TypeDef) TypeDoc {
 	tdoc := TypeDoc{Name: td.Name}
 	for _, f := range td.Fields {
 		fdoc := FieldDoc{
@@ -84,7 +84,7 @@ func extractTypeDef(td *interpreter.TypeDef) TypeDoc {
 	return tdoc
 }
 
-func extractRoute(r *interpreter.Route) RouteDoc {
+func extractRoute(r *ast.Route) RouteDoc {
 	rd := RouteDoc{
 		Method:     strings.ToUpper(r.Method.String()),
 		Path:       r.Path,
@@ -128,18 +128,18 @@ func extractPathParams(path string) []string {
 	return params
 }
 
-func typeToString(t interpreter.Type) string {
+func typeToString(t ast.Type) string {
 	if t == nil {
 		return "any"
 	}
 	switch v := t.(type) {
-	case interpreter.NamedType:
+	case ast.NamedType:
 		return v.Name
-	case interpreter.ArrayType:
+	case ast.ArrayType:
 		return typeToString(v.ElementType) + "[]"
-	case interpreter.OptionalType:
+	case ast.OptionalType:
 		return typeToString(v.InnerType) + "?"
-	case interpreter.UnionType:
+	case ast.UnionType:
 		var parts []string
 		for _, m := range v.Types {
 			parts = append(parts, typeToString(m))

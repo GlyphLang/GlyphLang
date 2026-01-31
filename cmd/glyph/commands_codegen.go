@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -503,7 +503,7 @@ func runWatchMode(path, outputDir string, isDir bool, mode string) error {
 }
 
 // parseExpandedSource parses .glyphx source using the expanded lexer
-func parseExpandedSource(source string) (*interpreter.Module, error) {
+func parseExpandedSource(source string) (*ast.Module, error) {
 	lexer := parser.NewExpandedLexer(source)
 	tokens, err := lexer.Tokenize()
 	if err != nil {

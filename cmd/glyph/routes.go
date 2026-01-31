@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,7 +16,7 @@ import (
 // setupRoutes handles the common logic of determining execution mode, compiling routes,
 // and setting up the router. Used by both startServer and startDevServerInternal.
 // filePath is the path to the source file, used for resolving relative module imports.
-func setupRoutes(module *interpreter.Module, filePath string, forceInterpreter ...bool) (useCompiler bool, compiledRoutes map[string][]byte, wsServer *websocket.Server, router *server.Router, err error) {
+func setupRoutes(module *ast.Module, filePath string, forceInterpreter ...bool) (useCompiler bool, compiledRoutes map[string][]byte, wsServer *websocket.Server, router *server.Router, err error) {
 	useCompiler = true
 	if len(forceInterpreter) > 0 && forceInterpreter[0] {
 		useCompiler = false
@@ -25,14 +25,14 @@ func setupRoutes(module *interpreter.Module, filePath string, forceInterpreter .
 
 	// Check if any route has database injection - VM doesn't support db method calls
 	for _, item := range module.Items {
-		if route, ok := item.(*interpreter.Route); ok {
+		if route, ok := item.(*ast.Route); ok {
 			for _, injection := range route.Injections {
-				if _, isDB := injection.Type.(interpreter.DatabaseType); isDB {
+				if _, isDB := injection.Type.(ast.DatabaseType); isDB {
 					printInfo("Routes use database injection, using interpreter mode")
 					useCompiler = false
 					break
 				}
-				if named, ok := injection.Type.(interpreter.NamedType); ok && named.Name == "Database" {
+				if named, ok := injection.Type.(ast.NamedType); ok && named.Name == "Database" {
 					printInfo("Routes use database injection, using interpreter mode")
 					useCompiler = false
 					break
@@ -48,7 +48,7 @@ func setupRoutes(module *interpreter.Module, filePath string, forceInterpreter .
 	if useCompiler {
 		c := compiler.NewCompilerWithOptLevel(compiler.OptBasic)
 		for _, item := range module.Items {
-			if route, ok := item.(*interpreter.Route); ok {
+			if route, ok := item.(*ast.Route); ok {
 				bytecode, compileErr := c.CompileRoute(route)
 				if compileErr != nil {
 					// Semantic errors (like redeclaration) should fail completely, not fall back
@@ -74,7 +74,7 @@ func setupRoutes(module *interpreter.Module, filePath string, forceInterpreter .
 
 	if useCompiler {
 		for _, item := range module.Items {
-			if route, ok := item.(*interpreter.Route); ok {
+			if route, ok := item.(*ast.Route); ok {
 				bytecode := compiledRoutes[route.Path]
 				regErr := registerCompiledRoute(router, route, bytecode, wsServer.GetHub())
 				if regErr != nil {
@@ -88,7 +88,7 @@ func setupRoutes(module *interpreter.Module, filePath string, forceInterpreter .
 		// Compile and register WebSocket routes
 		c := compiler.NewCompilerWithOptLevel(compiler.OptBasic)
 		for _, item := range module.Items {
-			if wsRoute, ok := item.(*interpreter.WebSocketRoute); ok {
+			if wsRoute, ok := item.(*ast.WebSocketRoute); ok {
 				compiledWs, compileErr := c.CompileWebSocketRoute(wsRoute)
 				if compileErr != nil {
 					printWarning(fmt.Sprintf("Failed to compile WebSocket route %s: %v", wsRoute.Path, compileErr))
@@ -107,7 +107,7 @@ func setupRoutes(module *interpreter.Module, filePath string, forceInterpreter .
 			return
 		}
 		for _, item := range module.Items {
-			if route, ok := item.(*interpreter.Route); ok {
+			if route, ok := item.(*ast.Route); ok {
 				regErr := registerRoute(router, route, interp)
 				if regErr != nil {
 					printWarning(fmt.Sprintf("Failed to register route %s: %v", route.Path, regErr))
@@ -146,7 +146,7 @@ func startServer(filePath string, port int, forceInterpreter bool) (*http.Server
 
 	// Register WebSocket routes with HTTP mux
 	for _, item := range module.Items {
-		if wsRoute, ok := item.(*interpreter.WebSocketRoute); ok {
+		if wsRoute, ok := item.(*ast.WebSocketRoute); ok {
 			path := wsRoute.Path
 			// Convert :param to {param} for Go's http.ServeMux pattern matching
 			muxPattern := server.ConvertPatternToMuxFormat(path)

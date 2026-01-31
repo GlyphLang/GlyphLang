@@ -3,7 +3,7 @@ package tests
 import (
 	"context"
 	"fmt"
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -53,7 +53,7 @@ func createTestServer(interpreter server.Interpreter) *server.Server {
 }
 
 // Helper function to parse source code into a Module (E2E version)
-func parseSourceE2E(source string) (*interpreter.Module, error) {
+func parseSourceE2E(source string) (*ast.Module, error) {
 	return parseSource(source)
 }
 
@@ -1325,8 +1325,9 @@ func TestSecurityFeaturesE2E(t *testing.T) {
 		// Create a server with rate limiting middleware
 		// Use a very small burst size to ensure we can exhaust it quickly
 		rateLimitConfig := server.RateLimiterConfig{
-			RequestsPerMinute: 1, // Very slow refill rate
-			BurstSize:         3, // Small burst size
+			RequestsPerMinute: 1,    // Very slow refill rate
+			BurstSize:         3,    // Small burst size
+			TrustProxy:        true, // Trust X-Forwarded-For for consistent client IP in test
 		}
 
 		srv := server.NewServer(

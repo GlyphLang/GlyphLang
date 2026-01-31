@@ -2,7 +2,7 @@ package jit
 
 import (
 	"fmt"
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"sync"
 	"time"
 
@@ -110,7 +110,7 @@ func NewJITCompilerWithConfig(hotPathThreshold int, recompileWindow time.Duratio
 }
 
 // CompileRoute compiles or recompiles a route based on profiling data
-func (jit *JITCompiler) CompileRoute(name string, route *interpreter.Route) ([]byte, error) {
+func (jit *JITCompiler) CompileRoute(name string, route *ast.Route) ([]byte, error) {
 	startTime := time.Now()
 
 	// Check if we have a cached compiled unit
@@ -229,7 +229,7 @@ func (jit *JITCompiler) shouldRecompile(unit *CompilationUnit) bool {
 }
 
 // recompileRoute recompiles a route to a higher optimization tier
-func (jit *JITCompiler) recompileRoute(name string, route *interpreter.Route, currentUnit *CompilationUnit) ([]byte, error) {
+func (jit *JITCompiler) recompileRoute(name string, route *ast.Route, currentUnit *CompilationUnit) ([]byte, error) {
 	startTime := time.Now()
 
 	// Determine next tier
@@ -260,7 +260,7 @@ func (jit *JITCompiler) recompileRoute(name string, route *interpreter.Route, cu
 }
 
 // compileWithTier compiles a route with a specific optimization tier
-func (jit *JITCompiler) compileWithTier(route *interpreter.Route, tier OptimizationTier) ([]byte, error) {
+func (jit *JITCompiler) compileWithTier(route *ast.Route, tier OptimizationTier) ([]byte, error) {
 	var comp *compiler.Compiler
 
 	// Create a new compiler instance for each compilation to avoid race conditions
@@ -400,7 +400,7 @@ func (jit *JITCompiler) SetRecompileWindow(window time.Duration) {
 }
 
 // CompileRouteWithTypes compiles a route with type specialization
-func (jit *JITCompiler) CompileRouteWithTypes(name string, route *interpreter.Route, types map[string]string) ([]byte, error) {
+func (jit *JITCompiler) CompileRouteWithTypes(name string, route *ast.Route, types map[string]string) ([]byte, error) {
 	// Check for existing specialization
 	if spec := jit.specializationCache.GetSpecialization(name, types); spec != nil {
 		jit.statsMux.Lock()
@@ -426,7 +426,7 @@ func (jit *JITCompiler) CompileRouteWithTypes(name string, route *interpreter.Ro
 }
 
 // CheckAdaptiveRecompilation checks if a route should be recompiled based on profiling
-func (jit *JITCompiler) CheckAdaptiveRecompilation(name string, route *interpreter.Route) (bool, error) {
+func (jit *JITCompiler) CheckAdaptiveRecompilation(name string, route *ast.Route) (bool, error) {
 	jit.unitsMux.RLock()
 	unit, exists := jit.units[name]
 	jit.unitsMux.RUnlock()

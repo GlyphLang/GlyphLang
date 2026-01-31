@@ -2,7 +2,7 @@ package lsp
 
 import (
 	"fmt"
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"strings"
 	"sync"
 
@@ -15,7 +15,7 @@ type Document struct {
 	Version int
 	Content string
 	Lines   []string
-	AST     *interpreter.Module
+	AST     *ast.Module
 	Errors  []parser.ParseError
 }
 

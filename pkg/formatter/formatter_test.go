@@ -1,28 +1,28 @@
 package formatter
 
 import (
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"strings"
 	"testing"
 )
 
 func TestFormatRoute(t *testing.T) {
-	route := &interpreter.Route{
-		Method: interpreter.Get,
+	route := &ast.Route{
+		Method: ast.Get,
 		Path:   "/api/users",
-		Body: []interpreter.Statement{
-			interpreter.AssignStatement{
+		Body: []ast.Statement{
+			ast.AssignStatement{
 				Target: "users",
-				Value:  interpreter.ArrayExpr{Elements: []interpreter.Expr{}},
+				Value:  ast.ArrayExpr{Elements: []ast.Expr{}},
 			},
-			interpreter.ReturnStatement{
-				Value: interpreter.VariableExpr{Name: "users"},
+			ast.ReturnStatement{
+				Value: ast.VariableExpr{Name: "users"},
 			},
 		},
 	}
 
-	module := &interpreter.Module{
-		Items: []interpreter.Item{route},
+	module := &ast.Module{
+		Items: []ast.Item{route},
 	}
 
 	// Test compact mode
@@ -55,17 +55,17 @@ func TestFormatRoute(t *testing.T) {
 }
 
 func TestFormatTypeDef(t *testing.T) {
-	typeDef := &interpreter.TypeDef{
+	typeDef := &ast.TypeDef{
 		Name: "User",
-		Fields: []interpreter.Field{
-			{Name: "id", TypeAnnotation: interpreter.IntType{}, Required: true},
-			{Name: "name", TypeAnnotation: interpreter.StringType{}, Required: true},
-			{Name: "email", TypeAnnotation: interpreter.StringType{}, Required: false},
+		Fields: []ast.Field{
+			{Name: "id", TypeAnnotation: ast.IntType{}, Required: true},
+			{Name: "name", TypeAnnotation: ast.StringType{}, Required: true},
+			{Name: "email", TypeAnnotation: ast.StringType{}, Required: false},
 		},
 	}
 
-	module := &interpreter.Module{
-		Items: []interpreter.Item{typeDef},
+	module := &ast.Module{
+		Items: []ast.Item{typeDef},
 	}
 
 	// Test compact mode
@@ -89,24 +89,24 @@ func TestFormatTypeDef(t *testing.T) {
 }
 
 func TestFormatCommand(t *testing.T) {
-	cmd := &interpreter.Command{
+	cmd := &ast.Command{
 		Name: "hello",
-		Params: []interpreter.CommandParam{
-			{Name: "name", Type: interpreter.StringType{}, Required: true},
+		Params: []ast.CommandParam{
+			{Name: "name", Type: ast.StringType{}, Required: true},
 		},
-		Body: []interpreter.Statement{
-			interpreter.ReturnStatement{
-				Value: interpreter.ObjectExpr{
-					Fields: []interpreter.ObjectField{
-						{Key: "message", Value: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "Hello"}}},
+		Body: []ast.Statement{
+			ast.ReturnStatement{
+				Value: ast.ObjectExpr{
+					Fields: []ast.ObjectField{
+						{Key: "message", Value: ast.LiteralExpr{Value: ast.StringLiteral{Value: "Hello"}}},
 					},
 				},
 			},
 		},
 	}
 
-	module := &interpreter.Module{
-		Items: []interpreter.Item{cmd},
+	module := &ast.Module{
+		Items: []ast.Item{cmd},
 	}
 
 	// Test compact mode
@@ -127,22 +127,22 @@ func TestFormatCommand(t *testing.T) {
 }
 
 func TestFormatCronTask(t *testing.T) {
-	cron := &interpreter.CronTask{
+	cron := &ast.CronTask{
 		Schedule: "0 0 * * *",
 		Name:     "daily_task",
-		Body: []interpreter.Statement{
-			interpreter.ReturnStatement{
-				Value: interpreter.ObjectExpr{
-					Fields: []interpreter.ObjectField{
-						{Key: "done", Value: interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}}},
+		Body: []ast.Statement{
+			ast.ReturnStatement{
+				Value: ast.ObjectExpr{
+					Fields: []ast.ObjectField{
+						{Key: "done", Value: ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}}},
 					},
 				},
 			},
 		},
 	}
 
-	module := &interpreter.Module{
-		Items: []interpreter.Item{cron},
+	module := &ast.Module{
+		Items: []ast.Item{cron},
 	}
 
 	// Test compact mode
@@ -163,22 +163,22 @@ func TestFormatCronTask(t *testing.T) {
 }
 
 func TestFormatEventHandler(t *testing.T) {
-	event := &interpreter.EventHandler{
+	event := &ast.EventHandler{
 		EventType: "user.created",
 		Async:     true,
-		Body: []interpreter.Statement{
-			interpreter.ReturnStatement{
-				Value: interpreter.ObjectExpr{
-					Fields: []interpreter.ObjectField{
-						{Key: "handled", Value: interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}}},
+		Body: []ast.Statement{
+			ast.ReturnStatement{
+				Value: ast.ObjectExpr{
+					Fields: []ast.ObjectField{
+						{Key: "handled", Value: ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}}},
 					},
 				},
 			},
 		},
 	}
 
-	module := &interpreter.Module{
-		Items: []interpreter.Item{event},
+	module := &ast.Module{
+		Items: []ast.Item{event},
 	}
 
 	// Test compact mode
@@ -199,24 +199,24 @@ func TestFormatEventHandler(t *testing.T) {
 }
 
 func TestFormatQueueWorker(t *testing.T) {
-	queue := &interpreter.QueueWorker{
+	queue := &ast.QueueWorker{
 		QueueName:   "email.send",
 		Concurrency: 5,
 		MaxRetries:  3,
 		Timeout:     30,
-		Body: []interpreter.Statement{
-			interpreter.ReturnStatement{
-				Value: interpreter.ObjectExpr{
-					Fields: []interpreter.ObjectField{
-						{Key: "sent", Value: interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}}},
+		Body: []ast.Statement{
+			ast.ReturnStatement{
+				Value: ast.ObjectExpr{
+					Fields: []ast.ObjectField{
+						{Key: "sent", Value: ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}}},
 					},
 				},
 			},
 		},
 	}
 
-	module := &interpreter.Module{
-		Items: []interpreter.Item{queue},
+	module := &ast.Module{
+		Items: []ast.Item{queue},
 	}
 
 	// Test compact mode
@@ -243,32 +243,32 @@ func TestFormatQueueWorker(t *testing.T) {
 }
 
 func TestFormatIfStatement(t *testing.T) {
-	route := &interpreter.Route{
-		Method: interpreter.Get,
+	route := &ast.Route{
+		Method: ast.Get,
 		Path:   "/test",
-		Body: []interpreter.Statement{
-			interpreter.IfStatement{
-				Condition: interpreter.BinaryOpExpr{
-					Op:    interpreter.Gt,
-					Left:  interpreter.VariableExpr{Name: "x"},
-					Right: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+		Body: []ast.Statement{
+			ast.IfStatement{
+				Condition: ast.BinaryOpExpr{
+					Op:    ast.Gt,
+					Left:  ast.VariableExpr{Name: "x"},
+					Right: ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 				},
-				ThenBlock: []interpreter.Statement{
-					interpreter.ReturnStatement{
-						Value: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "positive"}},
+				ThenBlock: []ast.Statement{
+					ast.ReturnStatement{
+						Value: ast.LiteralExpr{Value: ast.StringLiteral{Value: "positive"}},
 					},
 				},
-				ElseBlock: []interpreter.Statement{
-					interpreter.ReturnStatement{
-						Value: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "non-positive"}},
+				ElseBlock: []ast.Statement{
+					ast.ReturnStatement{
+						Value: ast.LiteralExpr{Value: ast.StringLiteral{Value: "non-positive"}},
 					},
 				},
 			},
 		},
 	}
 
-	module := &interpreter.Module{
-		Items: []interpreter.Item{route},
+	module := &ast.Module{
+		Items: []ast.Item{route},
 	}
 
 	formatter := New(Expanded)
@@ -283,23 +283,23 @@ func TestFormatIfStatement(t *testing.T) {
 }
 
 func TestFormatValidationStatement(t *testing.T) {
-	route := &interpreter.Route{
-		Method: interpreter.Post,
+	route := &ast.Route{
+		Method: ast.Post,
 		Path:   "/api/users",
-		Body: []interpreter.Statement{
-			interpreter.ValidationStatement{
-				Call: interpreter.FunctionCallExpr{
+		Body: []ast.Statement{
+			ast.ValidationStatement{
+				Call: ast.FunctionCallExpr{
 					Name: "validateEmail",
-					Args: []interpreter.Expr{
-						interpreter.VariableExpr{Name: "email"},
+					Args: []ast.Expr{
+						ast.VariableExpr{Name: "email"},
 					},
 				},
 			},
 		},
 	}
 
-	module := &interpreter.Module{
-		Items: []interpreter.Item{route},
+	module := &ast.Module{
+		Items: []ast.Item{route},
 	}
 
 	// Test compact mode
@@ -320,29 +320,29 @@ func TestFormatValidationStatement(t *testing.T) {
 }
 
 func TestFormatMiddlewareAndInjection(t *testing.T) {
-	route := &interpreter.Route{
-		Method: interpreter.Get,
+	route := &ast.Route{
+		Method: ast.Get,
 		Path:   "/api/admin",
-		Auth: &interpreter.AuthConfig{
+		Auth: &ast.AuthConfig{
 			AuthType: "jwt",
 			Required: true,
 		},
-		RateLimit: &interpreter.RateLimit{
+		RateLimit: &ast.RateLimit{
 			Requests: 100,
 			Window:   "min",
 		},
-		Injections: []interpreter.Injection{
-			{Name: "db", Type: interpreter.DatabaseType{}},
+		Injections: []ast.Injection{
+			{Name: "db", Type: ast.DatabaseType{}},
 		},
-		Body: []interpreter.Statement{
-			interpreter.ReturnStatement{
-				Value: interpreter.ObjectExpr{Fields: []interpreter.ObjectField{}},
+		Body: []ast.Statement{
+			ast.ReturnStatement{
+				Value: ast.ObjectExpr{Fields: []ast.ObjectField{}},
 			},
 		},
 	}
 
-	module := &interpreter.Module{
-		Items: []interpreter.Item{route},
+	module := &ast.Module{
+		Items: []ast.Item{route},
 	}
 
 	// Test compact mode

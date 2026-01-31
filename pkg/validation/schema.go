@@ -2,7 +2,7 @@ package validation
 
 import (
 	"fmt"
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"math"
 	"net/url"
 	"regexp"
@@ -15,7 +15,7 @@ var uuidRegex = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4
 // SchemaFromTypeDef builds a Validator from a TypeDef's field annotations.
 // Each field's @-annotations (e.g., @minLen(2), @email) are converted into
 // the corresponding validation rules on the returned Validator.
-func SchemaFromTypeDef(td *interpreter.TypeDef) *Validator {
+func SchemaFromTypeDef(td *ast.TypeDef) *Validator {
 	v := NewValidator()
 
 	for _, field := range td.Fields {
@@ -31,7 +31,7 @@ func SchemaFromTypeDef(td *interpreter.TypeDef) *Validator {
 	return v
 }
 
-func addAnnotationRule(v *Validator, field string, ann interpreter.FieldAnnotation) {
+func addAnnotationRule(v *Validator, field string, ann ast.FieldAnnotation) {
 	switch ann.Name {
 	case "minLen":
 		if n, ok := paramInt(ann.Params, 0); ok {

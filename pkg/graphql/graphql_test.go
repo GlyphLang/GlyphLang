@@ -3,6 +3,7 @@ package graphql
 import (
 	"testing"
 
+	"github.com/glyphlang/glyph/pkg/ast"
 	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -172,35 +173,35 @@ func TestParseEmptyBraces(t *testing.T) {
 
 // TestBuildSchema verifies schema construction from type defs and resolvers
 func TestBuildSchema(t *testing.T) {
-	typeDefs := map[string]interpreter.TypeDef{
+	typeDefs := map[string]ast.TypeDef{
 		"User": {
 			Name: "User",
-			Fields: []interpreter.Field{
-				{Name: "id", TypeAnnotation: interpreter.IntType{}, Required: true},
-				{Name: "name", TypeAnnotation: interpreter.StringType{}, Required: true},
-				{Name: "email", TypeAnnotation: interpreter.StringType{}},
+			Fields: []ast.Field{
+				{Name: "id", TypeAnnotation: ast.IntType{}, Required: true},
+				{Name: "name", TypeAnnotation: ast.StringType{}, Required: true},
+				{Name: "email", TypeAnnotation: ast.StringType{}},
 			},
 		},
 	}
 
-	resolvers := map[string]interpreter.GraphQLResolver{
+	resolvers := map[string]ast.GraphQLResolver{
 		"query.user": {
-			Operation:  interpreter.GraphQLQuery,
+			Operation:  ast.GraphQLQuery,
 			FieldName:  "user",
-			Params:     []interpreter.Field{{Name: "id", TypeAnnotation: interpreter.IntType{}, Required: true}},
-			ReturnType: interpreter.NamedType{Name: "User"},
+			Params:     []ast.Field{{Name: "id", TypeAnnotation: ast.IntType{}, Required: true}},
+			ReturnType: ast.NamedType{Name: "User"},
 		},
 		"query.users": {
-			Operation:  interpreter.GraphQLQuery,
+			Operation:  ast.GraphQLQuery,
 			FieldName:  "users",
-			Params:     []interpreter.Field{{Name: "limit", TypeAnnotation: interpreter.IntType{}}},
-			ReturnType: interpreter.ArrayType{ElementType: interpreter.NamedType{Name: "User"}},
+			Params:     []ast.Field{{Name: "limit", TypeAnnotation: ast.IntType{}}},
+			ReturnType: ast.ArrayType{ElementType: ast.NamedType{Name: "User"}},
 		},
 		"mutation.createUser": {
-			Operation:  interpreter.GraphQLMutation,
+			Operation:  ast.GraphQLMutation,
 			FieldName:  "createUser",
-			Params:     []interpreter.Field{{Name: "name", TypeAnnotation: interpreter.StringType{}, Required: true}},
-			ReturnType: interpreter.NamedType{Name: "User"},
+			Params:     []ast.Field{{Name: "name", TypeAnnotation: ast.StringType{}, Required: true}},
+			ReturnType: ast.NamedType{Name: "User"},
 		},
 	}
 
@@ -232,21 +233,21 @@ func TestBuildSchema(t *testing.T) {
 
 // TestGenerateSDL verifies SDL generation from schema
 func TestGenerateSDL(t *testing.T) {
-	typeDefs := map[string]interpreter.TypeDef{
+	typeDefs := map[string]ast.TypeDef{
 		"User": {
 			Name: "User",
-			Fields: []interpreter.Field{
-				{Name: "id", TypeAnnotation: interpreter.IntType{}, Required: true},
-				{Name: "name", TypeAnnotation: interpreter.StringType{}},
+			Fields: []ast.Field{
+				{Name: "id", TypeAnnotation: ast.IntType{}, Required: true},
+				{Name: "name", TypeAnnotation: ast.StringType{}},
 			},
 		},
 	}
-	resolvers := map[string]interpreter.GraphQLResolver{
+	resolvers := map[string]ast.GraphQLResolver{
 		"query.user": {
-			Operation:  interpreter.GraphQLQuery,
+			Operation:  ast.GraphQLQuery,
 			FieldName:  "user",
-			Params:     []interpreter.Field{{Name: "id", TypeAnnotation: interpreter.IntType{}, Required: true}},
-			ReturnType: interpreter.NamedType{Name: "User"},
+			Params:     []ast.Field{{Name: "id", TypeAnnotation: ast.IntType{}, Required: true}},
+			ReturnType: ast.NamedType{Name: "User"},
 		},
 	}
 
@@ -263,16 +264,16 @@ func TestGenerateSDL(t *testing.T) {
 // TestTypeToGraphQL verifies Glyph type to GraphQL type conversion
 func TestTypeToGraphQL(t *testing.T) {
 	tests := []struct {
-		input    interpreter.Type
+		input    ast.Type
 		expected string
 	}{
-		{interpreter.IntType{}, "Int"},
-		{interpreter.StringType{}, "String"},
-		{interpreter.BoolType{}, "Boolean"},
-		{interpreter.FloatType{}, "Float"},
-		{interpreter.NamedType{Name: "User"}, "User"},
-		{interpreter.ArrayType{ElementType: interpreter.StringType{}}, "[String]"},
-		{interpreter.OptionalType{InnerType: interpreter.IntType{}}, "Int"},
+		{ast.IntType{}, "Int"},
+		{ast.StringType{}, "String"},
+		{ast.BoolType{}, "Boolean"},
+		{ast.FloatType{}, "Float"},
+		{ast.NamedType{Name: "User"}, "User"},
+		{ast.ArrayType{ElementType: ast.StringType{}}, "[String]"},
+		{ast.OptionalType{InnerType: ast.IntType{}}, "Int"},
 		{nil, "String"},
 	}
 
@@ -286,16 +287,16 @@ func TestExecutorSimpleQuery(t *testing.T) {
 	interp := interpreter.NewInterpreter()
 
 	// Load a module with a query resolver that returns a literal
-	module := interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.GraphQLResolver{
-				Operation:  interpreter.GraphQLQuery,
+	module := ast.Module{
+		Items: []ast.Item{
+			&ast.GraphQLResolver{
+				Operation:  ast.GraphQLQuery,
 				FieldName:  "hello",
-				ReturnType: interpreter.StringType{},
-				Body: []interpreter.Statement{
-					interpreter.ReturnStatement{
-						Value: interpreter.LiteralExpr{
-							Value: interpreter.StringLiteral{Value: "Hello, GraphQL!"},
+				ReturnType: ast.StringType{},
+				Body: []ast.Statement{
+					ast.ReturnStatement{
+						Value: ast.LiteralExpr{
+							Value: ast.StringLiteral{Value: "Hello, GraphQL!"},
 						},
 					},
 				},
@@ -324,19 +325,19 @@ func TestExecutorSimpleQuery(t *testing.T) {
 func TestExecutorQueryWithArgs(t *testing.T) {
 	interp := interpreter.NewInterpreter()
 
-	module := interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.GraphQLResolver{
-				Operation:  interpreter.GraphQLQuery,
+	module := ast.Module{
+		Items: []ast.Item{
+			&ast.GraphQLResolver{
+				Operation:  ast.GraphQLQuery,
 				FieldName:  "greet",
-				Params:     []interpreter.Field{{Name: "name", TypeAnnotation: interpreter.StringType{}, Required: true}},
-				ReturnType: interpreter.StringType{},
-				Body: []interpreter.Statement{
-					interpreter.ReturnStatement{
-						Value: interpreter.BinaryOpExpr{
-							Op:    interpreter.Add,
-							Left:  interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "Hello, "}},
-							Right: interpreter.VariableExpr{Name: "name"},
+				Params:     []ast.Field{{Name: "name", TypeAnnotation: ast.StringType{}, Required: true}},
+				ReturnType: ast.StringType{},
+				Body: []ast.Statement{
+					ast.ReturnStatement{
+						Value: ast.BinaryOpExpr{
+							Op:    ast.Add,
+							Left:  ast.LiteralExpr{Value: ast.StringLiteral{Value: "Hello, "}},
+							Right: ast.VariableExpr{Name: "name"},
 						},
 					},
 				},
@@ -365,19 +366,19 @@ func TestExecutorQueryWithArgs(t *testing.T) {
 func TestExecutorMutation(t *testing.T) {
 	interp := interpreter.NewInterpreter()
 
-	module := interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.GraphQLResolver{
-				Operation:  interpreter.GraphQLMutation,
+	module := ast.Module{
+		Items: []ast.Item{
+			&ast.GraphQLResolver{
+				Operation:  ast.GraphQLMutation,
 				FieldName:  "createItem",
-				Params:     []interpreter.Field{{Name: "name", TypeAnnotation: interpreter.StringType{}, Required: true}},
-				ReturnType: interpreter.NamedType{Name: "Item"},
-				Body: []interpreter.Statement{
-					interpreter.ReturnStatement{
-						Value: interpreter.ObjectExpr{
-							Fields: []interpreter.ObjectField{
-								{Key: "id", Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}}},
-								{Key: "name", Value: interpreter.VariableExpr{Name: "name"}},
+				Params:     []ast.Field{{Name: "name", TypeAnnotation: ast.StringType{}, Required: true}},
+				ReturnType: ast.NamedType{Name: "Item"},
+				Body: []ast.Statement{
+					ast.ReturnStatement{
+						Value: ast.ObjectExpr{
+							Fields: []ast.ObjectField{
+								{Key: "id", Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}}},
+								{Key: "name", Value: ast.VariableExpr{Name: "name"}},
 							},
 						},
 					},
@@ -413,7 +414,7 @@ func TestExecutorMissingResolver(t *testing.T) {
 	// Empty schema with no resolvers but with a Query type
 	schema := &Schema{
 		Types:     make(map[string]*ObjectType),
-		Resolvers: make(map[string]interpreter.GraphQLResolver),
+		Resolvers: make(map[string]ast.GraphQLResolver),
 		Query:     &ObjectType{Name: "Query", Fields: map[string]*FieldDef{}},
 	}
 
@@ -432,7 +433,7 @@ func TestExecutorUnsupportedOperation(t *testing.T) {
 	interp := interpreter.NewInterpreter()
 	schema := &Schema{
 		Types:     make(map[string]*ObjectType),
-		Resolvers: make(map[string]interpreter.GraphQLResolver),
+		Resolvers: make(map[string]ast.GraphQLResolver),
 		Query:     &ObjectType{Name: "Query", Fields: map[string]*FieldDef{}},
 	}
 	executor := NewExecutor(schema, interp)
@@ -449,20 +450,20 @@ func TestExecutorUnsupportedOperation(t *testing.T) {
 func TestExecutorFieldSelection(t *testing.T) {
 	interp := interpreter.NewInterpreter()
 
-	module := interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.GraphQLResolver{
-				Operation:  interpreter.GraphQLQuery,
+	module := ast.Module{
+		Items: []ast.Item{
+			&ast.GraphQLResolver{
+				Operation:  ast.GraphQLQuery,
 				FieldName:  "user",
-				ReturnType: interpreter.NamedType{Name: "User"},
-				Body: []interpreter.Statement{
-					interpreter.ReturnStatement{
-						Value: interpreter.ObjectExpr{
-							Fields: []interpreter.ObjectField{
-								{Key: "id", Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}}},
-								{Key: "name", Value: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "Alice"}}},
-								{Key: "email", Value: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "alice@example.com"}}},
-								{Key: "secret", Value: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "hidden"}}},
+				ReturnType: ast.NamedType{Name: "User"},
+				Body: []ast.Statement{
+					ast.ReturnStatement{
+						Value: ast.ObjectExpr{
+							Fields: []ast.ObjectField{
+								{Key: "id", Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}}},
+								{Key: "name", Value: ast.LiteralExpr{Value: ast.StringLiteral{Value: "Alice"}}},
+								{Key: "email", Value: ast.LiteralExpr{Value: ast.StringLiteral{Value: "alice@example.com"}}},
+								{Key: "secret", Value: ast.LiteralExpr{Value: ast.StringLiteral{Value: "hidden"}}},
 							},
 						},
 					},
@@ -501,15 +502,15 @@ func TestExecutorFieldSelection(t *testing.T) {
 func TestExecutorAlias(t *testing.T) {
 	interp := interpreter.NewInterpreter()
 
-	module := interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.GraphQLResolver{
-				Operation:  interpreter.GraphQLQuery,
+	module := ast.Module{
+		Items: []ast.Item{
+			&ast.GraphQLResolver{
+				Operation:  ast.GraphQLQuery,
 				FieldName:  "hello",
-				ReturnType: interpreter.StringType{},
-				Body: []interpreter.Statement{
-					interpreter.ReturnStatement{
-						Value: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "world"}},
+				ReturnType: ast.StringType{},
+				Body: []ast.Statement{
+					ast.ReturnStatement{
+						Value: ast.LiteralExpr{Value: ast.StringLiteral{Value: "world"}},
 					},
 				},
 			},
@@ -540,7 +541,7 @@ func TestExecutorNoQueryType(t *testing.T) {
 	interp := interpreter.NewInterpreter()
 	schema := &Schema{
 		Types:     make(map[string]*ObjectType),
-		Resolvers: make(map[string]interpreter.GraphQLResolver),
+		Resolvers: make(map[string]ast.GraphQLResolver),
 	}
 	executor := NewExecutor(schema, interp)
 
@@ -554,19 +555,19 @@ func TestExecutorNoQueryType(t *testing.T) {
 
 // TestIntrospect verifies schema introspection returns type information
 func TestIntrospect(t *testing.T) {
-	typeDefs := map[string]interpreter.TypeDef{
+	typeDefs := map[string]ast.TypeDef{
 		"User": {
 			Name: "User",
-			Fields: []interpreter.Field{
-				{Name: "id", TypeAnnotation: interpreter.IntType{}},
+			Fields: []ast.Field{
+				{Name: "id", TypeAnnotation: ast.IntType{}},
 			},
 		},
 	}
-	resolvers := map[string]interpreter.GraphQLResolver{
+	resolvers := map[string]ast.GraphQLResolver{
 		"query.user": {
-			Operation:  interpreter.GraphQLQuery,
+			Operation:  ast.GraphQLQuery,
 			FieldName:  "user",
-			ReturnType: interpreter.NamedType{Name: "User"},
+			ReturnType: ast.NamedType{Name: "User"},
 		},
 	}
 
@@ -594,9 +595,9 @@ func TestSelectionEffectiveName(t *testing.T) {
 
 // TestGraphQLOperationTypeString verifies string representation of operation types
 func TestGraphQLOperationTypeString(t *testing.T) {
-	assert.Equal(t, "query", interpreter.GraphQLQuery.String())
-	assert.Equal(t, "mutation", interpreter.GraphQLMutation.String())
-	assert.Equal(t, "subscription", interpreter.GraphQLSubscription.String())
+	assert.Equal(t, "query", ast.GraphQLQuery.String())
+	assert.Equal(t, "mutation", ast.GraphQLMutation.String())
+	assert.Equal(t, "subscription", ast.GraphQLSubscription.String())
 }
 
 // TestApplySelectionsArray verifies field selection on array results
