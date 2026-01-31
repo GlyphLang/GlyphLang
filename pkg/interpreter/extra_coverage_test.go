@@ -1,15 +1,14 @@
 package interpreter
 
 import (
+	. "github.com/glyphlang/glyph/pkg/ast"
+
 	"fmt"
 	"testing"
 )
 
-// TestExpressionStatementMarker tests expression statement isStatement marker
-func TestExpressionStatementMarker(t *testing.T) {
-	stmt := ExpressionStatement{Expr: LiteralExpr{Value: IntLiteral{Value: 42}}}
-	stmt.isStatement()
-}
+// Compile-time check: ExpressionStatement satisfies Statement interface
+var _ Statement = ExpressionStatement{}
 
 // TestCallMethod tests the CallMethod reflection function
 func TestCallMethod(t *testing.T) {

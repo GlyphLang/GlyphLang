@@ -1,7 +1,11 @@
 package interpreter
 
 import (
+	. "github.com/glyphlang/glyph/pkg/ast"
+
+	"math"
 	"testing"
+	"time"
 )
 
 // TestValuesEqual tests the valuesEqual method
@@ -448,6 +452,7 @@ func TestMoreBuiltinFunctions(t *testing.T) {
 	env := NewEnvironment()
 
 	// Test time.now function
+	before := time.Now().Unix()
 	result, err := interp.EvaluateExpression(FunctionCallExpr{
 		Name: "time.now",
 		Args: []Expr{},
@@ -455,11 +460,12 @@ func TestMoreBuiltinFunctions(t *testing.T) {
 	if err != nil {
 		t.Errorf("time.now failed: %v", err)
 	}
-	if result != int64(1234567890) {
-		t.Errorf("time.now = %v, want 1234567890", result)
+	if ts, ok := result.(int64); !ok || math.Abs(float64(ts-before)) > 2 {
+		t.Errorf("time.now = %v, want value within 2s of %d", result, before)
 	}
 
 	// Test now function
+	before = time.Now().Unix()
 	result, err = interp.EvaluateExpression(FunctionCallExpr{
 		Name: "now",
 		Args: []Expr{},
@@ -467,8 +473,8 @@ func TestMoreBuiltinFunctions(t *testing.T) {
 	if err != nil {
 		t.Errorf("now failed: %v", err)
 	}
-	if result != int64(1234567890) {
-		t.Errorf("now = %v, want 1234567890", result)
+	if ts, ok := result.(int64); !ok || math.Abs(float64(ts-before)) > 2 {
+		t.Errorf("now = %v, want value within 2s of %d", result, before)
 	}
 
 	// Test split function

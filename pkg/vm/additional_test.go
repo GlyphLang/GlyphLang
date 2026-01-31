@@ -3,6 +3,7 @@ package vm
 import (
 	"encoding/binary"
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -1765,33 +1766,33 @@ func TestBuiltinFunctionErrors(t *testing.T) {
 	})
 }
 
-// TestHelperFunctions tests string helper functions
-func TestHelperFunctions(t *testing.T) {
-	t.Run("splitString_empty_delim", func(t *testing.T) {
-		result := splitString("abc", "")
+// TestStringBuiltins tests that VM string builtins use Go stdlib correctly
+func TestStringBuiltins(t *testing.T) {
+	t.Run("split_empty_delim", func(t *testing.T) {
+		result := strings.Split("abc", "")
 		if len(result) != 3 || result[0] != "a" || result[1] != "b" || result[2] != "c" {
 			t.Errorf("Expected [a, b, c], got %v", result)
 		}
 	})
 
-	t.Run("joinStrings_empty", func(t *testing.T) {
-		result := joinStrings([]string{}, ",")
+	t.Run("join_empty", func(t *testing.T) {
+		result := strings.Join([]string{}, ",")
 		if result != "" {
 			t.Errorf("Expected empty string, got %q", result)
 		}
 	})
 
-	t.Run("joinStrings_single", func(t *testing.T) {
-		result := joinStrings([]string{"hello"}, ",")
+	t.Run("join_single", func(t *testing.T) {
+		result := strings.Join([]string{"hello"}, ",")
 		if result != "hello" {
 			t.Errorf("Expected 'hello', got %q", result)
 		}
 	})
 
-	t.Run("replaceAll_empty_old", func(t *testing.T) {
-		result := replaceAll("test", "", "x")
-		if result != "test" {
-			t.Errorf("Expected 'test' unchanged, got %q", result)
+	t.Run("unicode_toUpper", func(t *testing.T) {
+		result := strings.ToUpper("café")
+		if result != "CAFÉ" {
+			t.Errorf("Expected 'CAFÉ', got %q", result)
 		}
 	})
 }

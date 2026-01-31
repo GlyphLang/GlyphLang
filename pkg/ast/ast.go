@@ -1,4 +1,4 @@
-package interpreter
+package ast
 
 // Module represents the top-level AST node
 type Module struct {

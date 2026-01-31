@@ -1,9 +1,9 @@
 package parser
 
 import (
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -111,32 +111,32 @@ func TestParser_PipeExpression(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		checkAST func(t *testing.T, module *interpreter.Module)
+		checkAST func(t *testing.T, module *ast.Module)
 	}{
 		{
 			name: "simple pipe to function",
 			input: `@ GET /test {
 				> x |> f
 			}`,
-			checkAST: func(t *testing.T, module *interpreter.Module) {
+			checkAST: func(t *testing.T, module *ast.Module) {
 				require.Len(t, module.Items, 1)
-				route, ok := module.Items[0].(*interpreter.Route)
+				route, ok := module.Items[0].(*ast.Route)
 				require.True(t, ok)
 				require.Len(t, route.Body, 1)
 
-				ret, ok := route.Body[0].(interpreter.ReturnStatement)
+				ret, ok := route.Body[0].(ast.ReturnStatement)
 				require.True(t, ok)
 
-				pipe, ok := ret.Value.(interpreter.PipeExpr)
+				pipe, ok := ret.Value.(ast.PipeExpr)
 				require.True(t, ok, "expected PipeExpr, got %T", ret.Value)
 
 				// Left should be variable x
-				left, ok := pipe.Left.(interpreter.VariableExpr)
+				left, ok := pipe.Left.(ast.VariableExpr)
 				require.True(t, ok)
 				assert.Equal(t, "x", left.Name)
 
 				// Right should be variable f
-				right, ok := pipe.Right.(interpreter.VariableExpr)
+				right, ok := pipe.Right.(ast.VariableExpr)
 				require.True(t, ok)
 				assert.Equal(t, "f", right.Name)
 			},
@@ -146,25 +146,25 @@ func TestParser_PipeExpression(t *testing.T) {
 			input: `@ GET /test {
 				> x |> f(a, b)
 			}`,
-			checkAST: func(t *testing.T, module *interpreter.Module) {
+			checkAST: func(t *testing.T, module *ast.Module) {
 				require.Len(t, module.Items, 1)
-				route, ok := module.Items[0].(*interpreter.Route)
+				route, ok := module.Items[0].(*ast.Route)
 				require.True(t, ok)
 				require.Len(t, route.Body, 1)
 
-				ret, ok := route.Body[0].(interpreter.ReturnStatement)
+				ret, ok := route.Body[0].(ast.ReturnStatement)
 				require.True(t, ok)
 
-				pipe, ok := ret.Value.(interpreter.PipeExpr)
+				pipe, ok := ret.Value.(ast.PipeExpr)
 				require.True(t, ok, "expected PipeExpr, got %T", ret.Value)
 
 				// Left should be variable x
-				left, ok := pipe.Left.(interpreter.VariableExpr)
+				left, ok := pipe.Left.(ast.VariableExpr)
 				require.True(t, ok)
 				assert.Equal(t, "x", left.Name)
 
 				// Right should be function call f(a, b)
-				right, ok := pipe.Right.(interpreter.FunctionCallExpr)
+				right, ok := pipe.Right.(ast.FunctionCallExpr)
 				require.True(t, ok, "expected FunctionCallExpr, got %T", pipe.Right)
 				assert.Equal(t, "f", right.Name)
 				assert.Len(t, right.Args, 2)
@@ -175,41 +175,41 @@ func TestParser_PipeExpression(t *testing.T) {
 			input: `@ GET /test {
 				> x |> f |> g |> h
 			}`,
-			checkAST: func(t *testing.T, module *interpreter.Module) {
+			checkAST: func(t *testing.T, module *ast.Module) {
 				require.Len(t, module.Items, 1)
-				route, ok := module.Items[0].(*interpreter.Route)
+				route, ok := module.Items[0].(*ast.Route)
 				require.True(t, ok)
 				require.Len(t, route.Body, 1)
 
-				ret, ok := route.Body[0].(interpreter.ReturnStatement)
+				ret, ok := route.Body[0].(ast.ReturnStatement)
 				require.True(t, ok)
 
 				// Should be: ((x |> f) |> g) |> h (left associative)
-				pipe1, ok := ret.Value.(interpreter.PipeExpr)
+				pipe1, ok := ret.Value.(ast.PipeExpr)
 				require.True(t, ok, "expected PipeExpr, got %T", ret.Value)
 
 				// Right should be h
-				rightH, ok := pipe1.Right.(interpreter.VariableExpr)
+				rightH, ok := pipe1.Right.(ast.VariableExpr)
 				require.True(t, ok)
 				assert.Equal(t, "h", rightH.Name)
 
 				// Left should be (x |> f) |> g
-				pipe2, ok := pipe1.Left.(interpreter.PipeExpr)
+				pipe2, ok := pipe1.Left.(ast.PipeExpr)
 				require.True(t, ok)
 
-				rightG, ok := pipe2.Right.(interpreter.VariableExpr)
+				rightG, ok := pipe2.Right.(ast.VariableExpr)
 				require.True(t, ok)
 				assert.Equal(t, "g", rightG.Name)
 
 				// Left should be x |> f
-				pipe3, ok := pipe2.Left.(interpreter.PipeExpr)
+				pipe3, ok := pipe2.Left.(ast.PipeExpr)
 				require.True(t, ok)
 
-				leftX, ok := pipe3.Left.(interpreter.VariableExpr)
+				leftX, ok := pipe3.Left.(ast.VariableExpr)
 				require.True(t, ok)
 				assert.Equal(t, "x", leftX.Name)
 
-				rightF, ok := pipe3.Right.(interpreter.VariableExpr)
+				rightF, ok := pipe3.Right.(ast.VariableExpr)
 				require.True(t, ok)
 				assert.Equal(t, "f", rightF.Name)
 			},
@@ -219,25 +219,25 @@ func TestParser_PipeExpression(t *testing.T) {
 			input: `@ GET /test {
 				> x + 1 |> f
 			}`,
-			checkAST: func(t *testing.T, module *interpreter.Module) {
+			checkAST: func(t *testing.T, module *ast.Module) {
 				require.Len(t, module.Items, 1)
-				route, ok := module.Items[0].(*interpreter.Route)
+				route, ok := module.Items[0].(*ast.Route)
 				require.True(t, ok)
 				require.Len(t, route.Body, 1)
 
-				ret, ok := route.Body[0].(interpreter.ReturnStatement)
+				ret, ok := route.Body[0].(ast.ReturnStatement)
 				require.True(t, ok)
 
-				pipe, ok := ret.Value.(interpreter.PipeExpr)
+				pipe, ok := ret.Value.(ast.PipeExpr)
 				require.True(t, ok, "expected PipeExpr, got %T", ret.Value)
 
 				// Left should be binary expression (x + 1)
-				binOp, ok := pipe.Left.(interpreter.BinaryOpExpr)
+				binOp, ok := pipe.Left.(ast.BinaryOpExpr)
 				require.True(t, ok, "expected BinaryOpExpr on left, got %T", pipe.Left)
-				assert.Equal(t, interpreter.Add, binOp.Op)
+				assert.Equal(t, ast.Add, binOp.Op)
 
 				// Right should be f
-				right, ok := pipe.Right.(interpreter.VariableExpr)
+				right, ok := pipe.Right.(ast.VariableExpr)
 				require.True(t, ok)
 				assert.Equal(t, "f", right.Name)
 			},
@@ -278,24 +278,24 @@ func TestParser_PipePrecedence(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 	require.Len(t, route.Body, 1)
 
-	ret, ok := route.Body[0].(interpreter.ReturnStatement)
+	ret, ok := route.Body[0].(ast.ReturnStatement)
 	require.True(t, ok)
 
 	// Should be (a || b) |> f
-	pipe, ok := ret.Value.(interpreter.PipeExpr)
+	pipe, ok := ret.Value.(ast.PipeExpr)
 	require.True(t, ok, "expected PipeExpr, got %T", ret.Value)
 
 	// Left should be a || b
-	binOp, ok := pipe.Left.(interpreter.BinaryOpExpr)
+	binOp, ok := pipe.Left.(ast.BinaryOpExpr)
 	require.True(t, ok, "expected BinaryOpExpr, got %T", pipe.Left)
-	assert.Equal(t, interpreter.Or, binOp.Op)
+	assert.Equal(t, ast.Or, binOp.Op)
 
 	// Right should be f
-	right, ok := pipe.Right.(interpreter.VariableExpr)
+	right, ok := pipe.Right.(ast.VariableExpr)
 	require.True(t, ok)
 	assert.Equal(t, "f", right.Name)
 }

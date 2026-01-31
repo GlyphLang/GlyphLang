@@ -1,9 +1,9 @@
 package parser
 
 import (
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,14 +32,14 @@ func TestTraitDefinition(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, module.Items, 1)
 
-	trait, ok := module.Items[0].(*interpreter.TraitDef)
+	trait, ok := module.Items[0].(*ast.TraitDef)
 	require.True(t, ok, "expected TraitDef")
 	assert.Equal(t, "Serializable", trait.Name)
 	require.Len(t, trait.Methods, 2)
 
 	assert.Equal(t, "toJson", trait.Methods[0].Name)
 	assert.Len(t, trait.Methods[0].Params, 0)
-	assert.IsType(t, interpreter.StringType{}, trait.Methods[0].ReturnType)
+	assert.IsType(t, ast.StringType{}, trait.Methods[0].ReturnType)
 
 	assert.Equal(t, "fromJson", trait.Methods[1].Name)
 	require.Len(t, trait.Methods[1].Params, 1)
@@ -57,7 +57,7 @@ func TestTraitDefinitionExpandedSyntax(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, module.Items, 1)
 
-	trait, ok := module.Items[0].(*interpreter.TraitDef)
+	trait, ok := module.Items[0].(*ast.TraitDef)
 	require.True(t, ok)
 	assert.Equal(t, "Comparable", trait.Name)
 	require.Len(t, trait.Methods, 1)
@@ -76,7 +76,7 @@ func TestTraitWithGenericParams(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, module.Items, 1)
 
-	trait, ok := module.Items[0].(*interpreter.TraitDef)
+	trait, ok := module.Items[0].(*ast.TraitDef)
 	require.True(t, ok)
 	assert.Equal(t, "Container", trait.Name)
 	require.Len(t, trait.TypeParams, 1)
@@ -99,7 +99,7 @@ func TestTypeDefImplTrait(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, module.Items, 1)
 
-	td, ok := module.Items[0].(*interpreter.TypeDef)
+	td, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok, "expected TypeDef")
 	assert.Equal(t, "User", td.Name)
 	require.Len(t, td.Traits, 1)
@@ -128,7 +128,7 @@ func TestTypeDefImplMultipleTraits(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, module.Items, 1)
 
-	td, ok := module.Items[0].(*interpreter.TypeDef)
+	td, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 	assert.Equal(t, "User", td.Name)
 	require.Len(t, td.Traits, 2)
@@ -149,7 +149,7 @@ func TestTypeDefWithoutImpl(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, module.Items, 1)
 
-	td, ok := module.Items[0].(*interpreter.TypeDef)
+	td, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 	assert.Equal(t, "User", td.Name)
 	assert.Empty(t, td.Traits)
@@ -171,7 +171,7 @@ func TestExpandedTypeDefImpl(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, module.Items, 1)
 
-	td, ok := module.Items[0].(*interpreter.TypeDef)
+	td, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 	assert.Equal(t, "User", td.Name)
 	require.Len(t, td.Traits, 1)
@@ -198,11 +198,11 @@ func TestTraitAndTypeDefTogether(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, module.Items, 2)
 
-	trait, ok := module.Items[0].(*interpreter.TraitDef)
+	trait, ok := module.Items[0].(*ast.TraitDef)
 	require.True(t, ok)
 	assert.Equal(t, "Printable", trait.Name)
 
-	td, ok := module.Items[1].(*interpreter.TypeDef)
+	td, ok := module.Items[1].(*ast.TypeDef)
 	require.True(t, ok)
 	assert.Equal(t, "Message", td.Name)
 	require.Len(t, td.Traits, 1)
@@ -220,7 +220,7 @@ func TestTraitMethodWithMultipleParams(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, module.Items, 1)
 
-	trait, ok := module.Items[0].(*interpreter.TraitDef)
+	trait, ok := module.Items[0].(*ast.TraitDef)
 	require.True(t, ok)
 	require.Len(t, trait.Methods, 1)
 	assert.Equal(t, "map", trait.Methods[0].Name)
@@ -240,7 +240,7 @@ func TestTraitMethodNoReturnType(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, module.Items, 1)
 
-	trait, ok := module.Items[0].(*interpreter.TraitDef)
+	trait, ok := module.Items[0].(*ast.TraitDef)
 	require.True(t, ok)
 	require.Len(t, trait.Methods, 1)
 	assert.Equal(t, "log", trait.Methods[0].Name)

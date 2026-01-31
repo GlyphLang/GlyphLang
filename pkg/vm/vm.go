@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"strings"
+	"time"
 )
 
 // Opcode represents a bytecode operation
@@ -1301,9 +1303,7 @@ func (vm *VM) registerBuiltins() {
 		if len(args) != 0 {
 			return nil, fmt.Errorf("time.now() takes no arguments, got %d", len(args))
 		}
-		// For now, return a mock timestamp
-		// TODO: Return actual time.Now().Unix() when time package is integrated
-		return IntValue{Val: 1234567890}, nil
+		return IntValue{Val: time.Now().Unix()}, nil
 	}
 
 	// now() - alias for time.now()
@@ -1311,7 +1311,7 @@ func (vm *VM) registerBuiltins() {
 		if len(args) != 0 {
 			return nil, fmt.Errorf("now() takes no arguments, got %d", len(args))
 		}
-		return IntValue{Val: 1234567890}, nil
+		return IntValue{Val: time.Now().Unix()}, nil
 	}
 
 	// length() - returns length of array or string
@@ -1339,7 +1339,7 @@ func (vm *VM) registerBuiltins() {
 		if !ok {
 			return nil, fmt.Errorf("upper() requires a string, got %T", args[0])
 		}
-		return StringValue{Val: toUpper(str.Val)}, nil
+		return StringValue{Val: strings.ToUpper(str.Val)}, nil
 	}
 
 	// lower() - convert string to lowercase
@@ -1351,7 +1351,7 @@ func (vm *VM) registerBuiltins() {
 		if !ok {
 			return nil, fmt.Errorf("lower() requires a string, got %T", args[0])
 		}
-		return StringValue{Val: toLower(str.Val)}, nil
+		return StringValue{Val: strings.ToLower(str.Val)}, nil
 	}
 
 	// trim() - remove leading/trailing whitespace
@@ -1363,7 +1363,7 @@ func (vm *VM) registerBuiltins() {
 		if !ok {
 			return nil, fmt.Errorf("trim() requires a string, got %T", args[0])
 		}
-		return StringValue{Val: trimSpace(str.Val)}, nil
+		return StringValue{Val: strings.TrimSpace(str.Val)}, nil
 	}
 
 	// split() - split string into array
@@ -1379,7 +1379,7 @@ func (vm *VM) registerBuiltins() {
 		if !ok {
 			return nil, fmt.Errorf("split() second argument must be a string, got %T", args[1])
 		}
-		parts := splitString(str.Val, delim.Val)
+		parts := strings.Split(str.Val, delim.Val)
 		result := make([]Value, len(parts))
 		for i, part := range parts {
 			result[i] = StringValue{Val: part}
@@ -1404,7 +1404,7 @@ func (vm *VM) registerBuiltins() {
 		for i, elem := range arr.Val {
 			strParts[i] = valueToString(elem)
 		}
-		return StringValue{Val: joinStrings(strParts, delim.Val)}, nil
+		return StringValue{Val: strings.Join(strParts, delim.Val)}, nil
 	}
 
 	// contains() - check if string contains substring
@@ -1420,7 +1420,7 @@ func (vm *VM) registerBuiltins() {
 		if !ok {
 			return nil, fmt.Errorf("contains() second argument must be a string, got %T", args[1])
 		}
-		return BoolValue{Val: stringContains(str.Val, substr.Val)}, nil
+		return BoolValue{Val: strings.Contains(str.Val, substr.Val)}, nil
 	}
 
 	// replace() - replace occurrences in string
@@ -1440,7 +1440,7 @@ func (vm *VM) registerBuiltins() {
 		if !ok {
 			return nil, fmt.Errorf("replace() third argument must be a string, got %T", args[2])
 		}
-		return StringValue{Val: replaceAll(str.Val, old.Val, new.Val)}, nil
+		return StringValue{Val: strings.ReplaceAll(str.Val, old.Val, new.Val)}, nil
 	}
 
 	// substring() - get substring
@@ -1475,157 +1475,6 @@ func (vm *VM) registerBuiltins() {
 		}
 		return StringValue{Val: str.Val[start.Val:end.Val]}, nil
 	}
-}
-
-// Helper functions for string manipulation
-
-// toUpper converts a string to uppercase
-func toUpper(s string) string {
-	result := make([]rune, len(s))
-	for i, r := range s {
-		if r >= 'a' && r <= 'z' {
-			result[i] = r - 32
-		} else {
-			result[i] = r
-		}
-	}
-	return string(result)
-}
-
-// toLower converts a string to lowercase
-func toLower(s string) string {
-	result := make([]rune, len(s))
-	for i, r := range s {
-		if r >= 'A' && r <= 'Z' {
-			result[i] = r + 32
-		} else {
-			result[i] = r
-		}
-	}
-	return string(result)
-}
-
-// trimSpace removes leading and trailing whitespace
-func trimSpace(s string) string {
-	start := 0
-	end := len(s)
-
-	// Trim leading whitespace
-	for start < end && isWhitespace(rune(s[start])) {
-		start++
-	}
-
-	// Trim trailing whitespace
-	for end > start && isWhitespace(rune(s[end-1])) {
-		end--
-	}
-
-	return s[start:end]
-}
-
-// isWhitespace checks if a rune is whitespace
-func isWhitespace(r rune) bool {
-	return r == ' ' || r == '\t' || r == '\n' || r == '\r'
-}
-
-// splitString splits a string by a delimiter
-func splitString(s, delim string) []string {
-	if delim == "" {
-		// Split into individual characters
-		result := make([]string, len(s))
-		for i := range s {
-			result[i] = string(s[i])
-		}
-		return result
-	}
-
-	var result []string
-	start := 0
-
-	for i := 0; i <= len(s)-len(delim); i++ {
-		if s[i:i+len(delim)] == delim {
-			result = append(result, s[start:i])
-			start = i + len(delim)
-			i += len(delim) - 1
-		}
-	}
-
-	// Add the last part
-	result = append(result, s[start:])
-
-	return result
-}
-
-// joinStrings joins strings with a delimiter
-func joinStrings(parts []string, delim string) string {
-	if len(parts) == 0 {
-		return ""
-	}
-	if len(parts) == 1 {
-		return parts[0]
-	}
-
-	// Calculate total length
-	totalLen := 0
-	for _, part := range parts {
-		totalLen += len(part)
-	}
-	totalLen += (len(parts) - 1) * len(delim)
-
-	// Build result
-	result := make([]byte, totalLen)
-	pos := 0
-
-	for i, part := range parts {
-		copy(result[pos:], part)
-		pos += len(part)
-
-		if i < len(parts)-1 {
-			copy(result[pos:], delim)
-			pos += len(delim)
-		}
-	}
-
-	return string(result)
-}
-
-// stringContains checks if a string contains a substring
-func stringContains(s, substr string) bool {
-	if len(substr) == 0 {
-		return true
-	}
-	if len(substr) > len(s) {
-		return false
-	}
-
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-
-	return false
-}
-
-// replaceAll replaces all occurrences of old with new in s
-func replaceAll(s, old, new string) string {
-	if old == "" {
-		return s
-	}
-
-	var result string
-	start := 0
-
-	for i := 0; i <= len(s)-len(old); i++ {
-		if s[i:i+len(old)] == old {
-			result += s[start:i] + new
-			start = i + len(old)
-			i += len(old) - 1
-		}
-	}
-
-	result += s[start:]
-	return result
 }
 
 // valueToString converts a Value to a string representation
@@ -1959,24 +1808,34 @@ func (vm *VM) execAsync() error {
 		Done: make(chan struct{}),
 	}
 
-	// Copy locals, globals, constants, and builtins BEFORE launching the goroutine
-	// to avoid data races on concurrent map access
-	asyncVM := NewVM()
-	asyncConstants := make([]Value, len(vm.constants))
-	copy(asyncConstants, vm.constants)
-	asyncVM.constants = asyncConstants
+	// Copy constants to avoid sharing mutable slice reference
+	constantsCopy := make([]Value, len(vm.constants))
+	copy(constantsCopy, vm.constants)
+
+	// Snapshot maps before launching goroutine to avoid concurrent reads
+	localsCopy := make(map[string]Value, len(vm.locals))
 	for k, v := range vm.locals {
-		asyncVM.locals[k] = v
+		localsCopy[k] = v
 	}
+	globalsCopy := make(map[string]Value, len(vm.globals))
 	for k, v := range vm.globals {
-		asyncVM.globals[k] = v
+		globalsCopy[k] = v
 	}
+	builtinsCopy := make(map[string]BuiltinFunc, len(vm.builtins))
 	for k, v := range vm.builtins {
-		asyncVM.builtins[k] = v
+		builtinsCopy[k] = v
 	}
 
 	go func() {
 		defer close(future.Done)
+
+		// Create a new VM for the async execution
+		asyncVM := NewVM()
+		asyncVM.constants = constantsCopy
+		asyncVM.locals = localsCopy
+		asyncVM.globals = globalsCopy
+		asyncVM.builtins = builtinsCopy
+
 
 		// Execute the async body
 		result, execErr := asyncVM.Execute(asyncBody)
@@ -1985,7 +1844,6 @@ func (vm *VM) execAsync() error {
 		} else {
 			future.Result = result
 		}
-		future.Resolved = true
 	}()
 
 	// Push the future onto the stack

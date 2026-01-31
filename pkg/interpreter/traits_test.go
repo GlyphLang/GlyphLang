@@ -1,6 +1,8 @@
 package interpreter
 
 import (
+	. "github.com/glyphlang/glyph/pkg/ast"
+
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,8 +24,8 @@ func TestTraitDefIsItem(t *testing.T) {
 // TestTraitDefIsNode verifies TraitDef implements the Node interface
 func TestTraitDefIsNode(t *testing.T) {
 	trait := &TraitDef{Name: "TestTrait"}
-	var _ Node = trait // compile-time check
-	trait.isNode()     // should not panic
+	// compile-time check - isNode() is unexported and in pkg/ast, verified via interface
+	var _ Node = trait
 }
 
 // TestTypeDefTraitsField verifies the TypeDef Traits field

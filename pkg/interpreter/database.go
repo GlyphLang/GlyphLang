@@ -13,7 +13,6 @@ var allowedMethods = map[string]bool{
 	"Create":     true,
 	"Update":     true,
 	"Delete":     true,
-	"Query":      true,
 	"First":      true,
 	"All":        true,
 	"Where":      true,

@@ -1,6 +1,8 @@
 package interpreter
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // ResultValue represents a Result[T, E] value with Ok and Err variants.
 // It is the runtime representation of the Result type in GlyphLang.

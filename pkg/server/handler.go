@@ -82,8 +82,8 @@ func parseQueryParams(r *http.Request) map[string][]string {
 	return r.URL.Query()
 }
 
-// maxRequestBodySize is the maximum allowed request body size (10 MB)
-const maxRequestBodySize = 10 * 1024 * 1024
+// maxRequestBodySize is the maximum allowed request body size (10 MB).
+const maxRequestBodySize = 10 << 20
 
 // parseJSONBody parses JSON request body into the context
 func parseJSONBody(r *http.Request, ctx *Context) error {
@@ -98,13 +98,13 @@ func parseJSONBody(r *http.Request, ctx *Context) error {
 		return fmt.Errorf("expected application/json content type, got %s", contentType)
 	}
 
-	// Read body with size limit to prevent DoS
-	body, err := io.ReadAll(io.LimitReader(r.Body, maxRequestBodySize+1))
+	// Limit request body size to prevent denial-of-service
+	r.Body = http.MaxBytesReader(ctx.ResponseWriter, r.Body, maxRequestBodySize)
+
+	// Read body
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read body: %w", err)
-	}
-	if int64(len(body)) > maxRequestBodySize {
-		return fmt.Errorf("request body too large (max %d bytes)", maxRequestBodySize)
 	}
 
 	// Skip empty bodies
@@ -151,12 +151,13 @@ func SendError(ctx *Context, statusCode int, message string) error {
 	})
 }
 
-// handleError logs and sends an error response
+// handleError logs and sends an error response.
+// Full error details are logged server-side but never exposed to clients.
 func (h *Handler) handleError(w http.ResponseWriter, r *http.Request, statusCode int, message string, err error) {
-	// Log the error
+	// Log the full error detail server-side
 	log.Printf("[ERROR] %s %s: %s - %v", r.Method, r.URL.Path, message, err)
 
-	// Send JSON error response
+	// Send JSON error response without internal details
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 

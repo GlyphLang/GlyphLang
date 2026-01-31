@@ -1,6 +1,8 @@
 package interpreter
 
 import (
+	. "github.com/glyphlang/glyph/pkg/ast"
+
 	"fmt"
 	"strings"
 	"time"
@@ -474,7 +476,7 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 			return &Response{
 				StatusCode: 500,
 				Body: map[string]interface{}{
-					"error": err.Error(),
+					"error": "Internal server error",
 				},
 			}, err
 		}

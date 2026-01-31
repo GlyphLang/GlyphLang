@@ -1,7 +1,10 @@
 package interpreter
 
 import (
+	. "github.com/glyphlang/glyph/pkg/ast"
+
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -304,10 +307,14 @@ func TestEvaluateFunctionCall_TimeNow(t *testing.T) {
 		Name: "time.now",
 		Args: []Expr{},
 	}
+	before := time.Now().Unix()
 	result, err := interp.EvaluateExpression(expr, env)
 
 	require.NoError(t, err)
-	assert.Equal(t, int64(1234567890), result)
+	ts, ok := result.(int64)
+	require.True(t, ok, "expected int64 timestamp")
+	// Allow a 2-second window to account for clock granularity
+	assert.InDelta(t, before, ts, 2, "timestamp should be within 2 seconds of current time")
 }
 
 func TestEvaluateObject_Empty(t *testing.T) {
@@ -996,7 +1003,9 @@ func TestExecuteRoute_GreetWithObjectAndParams(t *testing.T) {
 	obj, ok := result.(map[string]interface{})
 	assert.True(t, ok)
 	assert.Equal(t, "Hello, World!", obj["text"])
-	assert.Equal(t, int64(1234567890), obj["timestamp"])
+	ts, ok2 := obj["timestamp"].(int64)
+	require.True(t, ok2, "timestamp should be int64")
+	assert.InDelta(t, time.Now().Unix(), ts, 2, "timestamp should be within 2 seconds of current time")
 }
 
 func TestExecuteRoute_ObjectFieldAccess(t *testing.T) {

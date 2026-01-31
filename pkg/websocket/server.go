@@ -14,37 +14,12 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// newUpgrader creates a WebSocket upgrader with configurable origin checking.
-// If allowedOrigins is nil or empty, no origins are allowed (secure by default).
-// Pass []string{"*"} to allow all origins (not recommended for production).
-func newUpgrader(allowedOrigins []string) websocket.Upgrader {
+// newUpgrader creates a WebSocket upgrader with origin checking based on config.
+func newUpgrader(cfg *Config) websocket.Upgrader {
 	return websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
-		CheckOrigin: func(r *http.Request) bool {
-			if len(allowedOrigins) == 0 {
-				// Secure default: only allow same-origin requests
-				origin := r.Header.Get("Origin")
-				if origin == "" {
-					return true // No Origin header (non-browser client)
-				}
-				u, err := url.Parse(origin)
-				if err != nil {
-					return false
-				}
-				return u.Host == r.Host
-			}
-			for _, allowed := range allowedOrigins {
-				if allowed == "*" {
-					return true
-				}
-				origin := r.Header.Get("Origin")
-				if origin == allowed {
-					return true
-				}
-			}
-			return false
-		},
+		CheckOrigin:     cfg.CheckOrigin,
 	}
 }
 
@@ -453,21 +428,28 @@ type Server struct {
 	upgrader websocket.Upgrader
 }
 
-// NewServer creates a new WebSocket server with same-origin checking by default
-func NewServer() *Server {
-	return NewServerWithOrigins(nil)
-}
+// NewServer creates a new WebSocket server.
+// An optional Config can be passed to configure origin checking and other settings.
+// If nil, DefaultConfig() is used (same-origin only).
+func NewServer(cfgs ...*Config) *Server {
+	var cfg *Config
+	if len(cfgs) > 0 && cfgs[0] != nil {
+		cfg = cfgs[0]
+	} else {
+		cfg = DefaultConfig()
+	}
+	// Validate corrects zero-value fields in-place; current implementation
+	// always returns nil, but we log defensively in case that changes.
+	if err := cfg.Validate(); err != nil {
+		log.Printf("[WS] Config validation warning: %v", err)
+	}
 
-// NewServerWithOrigins creates a new WebSocket server with configurable allowed origins.
-// Pass nil or empty slice for same-origin only (secure default).
-// Pass []string{"*"} to allow all origins (not recommended for production).
-func NewServerWithOrigins(allowedOrigins []string) *Server {
 	hub := NewHub()
 	go hub.Run()
 
 	return &Server{
 		hub:      hub,
-		upgrader: newUpgrader(allowedOrigins),
+		upgrader: newUpgrader(cfg),
 	}
 }
 

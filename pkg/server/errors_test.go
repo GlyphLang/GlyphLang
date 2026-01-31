@@ -138,8 +138,9 @@ func TestInternalError(t *testing.T) {
 			}
 
 			resp := tt.err.ToResponse()
-			if tt.expectCause && resp.Details == "" {
-				t.Error("Expected details to contain cause error")
+			// Internal error details (Cause) must not be exposed in client responses
+			if tt.expectCause && resp.Details != "" {
+				t.Error("Expected details to be empty (internal cause should not leak to client)")
 			}
 		})
 	}
@@ -186,8 +187,9 @@ func TestBadRequestError(t *testing.T) {
 			}
 
 			resp := tt.err.ToResponse()
-			if tt.expectCause && resp.Details == "" {
-				t.Error("Expected details to contain cause error")
+			// Internal error details (Cause) must not be exposed in client responses
+			if tt.expectCause && resp.Details != "" {
+				t.Error("Expected details to be empty (internal cause should not leak to client)")
 			}
 		})
 	}
