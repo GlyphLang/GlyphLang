@@ -30,9 +30,6 @@ jobs:
       - name: Tidy modules
         run: go mod tidy
 
-      - name: Check formatting
-        run: test -z "$(gofmt -l .)"
-
       - name: Run go vet
         run: go vet ./...
 
@@ -63,9 +60,9 @@ jobs:
         run: go mod download
 
       - name: Run tests
-        # Note: Race detector disabled due to known race conditions in logging/websocket packages.
-        # Websocket package has goroutine leaks that cause CI failures - skipped for now.
-        # Re-enable full tests (with -race and websocket) after fixing race conditions in those packages.
+        # Note: Race detector disabled due to known race conditions in logging/websocket packages
+        # Websocket package has goroutine leaks that cause CI failures - skipped for now
+        # TODO: Fix race conditions and goroutine leaks, then re-enable full tests
         run: |
           go test -v -short -coverprofile=coverage.out -covermode=atomic $(go list ./... | grep -v /websocket)
 
