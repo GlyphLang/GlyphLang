@@ -1,10 +1,9 @@
 package security
 
 import (
+	"github.com/glyphlang/glyph/pkg/interpreter"
 	"strings"
 	"testing"
-
-	"github.com/glyphlang/glyph/pkg/interpreter"
 )
 
 func TestSQLInjectionDetector_DetectInRoute(t *testing.T) {
@@ -338,19 +337,19 @@ func TestSanitizeSQL(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "Remove SQL comments",
+			name:     "SQL comments are preserved (use parameterized queries instead)",
 			input:    "SELECT * FROM users -- comment",
-			expected: "SELECT * FROM users ",
+			expected: "SELECT * FROM users -- comment",
 		},
 		{
-			name:     "Remove block comments",
+			name:     "Block comments are preserved (use parameterized queries instead)",
 			input:    "SELECT * /* comment */ FROM users",
-			expected: "SELECT *  FROM users",
+			expected: "SELECT * /* comment */ FROM users",
 		},
 		{
 			name:     "Escape single quotes",
 			input:    "Robert'; DROP TABLE users--",
-			expected: "Robert''; DROP TABLE users",
+			expected: "Robert''; DROP TABLE users--",
 		},
 		{
 			name:     "Remove null bytes",

@@ -2,10 +2,10 @@ package security
 
 import (
 	"fmt"
+	"github.com/glyphlang/glyph/pkg/interpreter"
+	"html"
 	"regexp"
 	"strings"
-
-	"github.com/glyphlang/glyph/pkg/interpreter"
 )
 
 // XSSDetector detects Cross-Site Scripting vulnerabilities
@@ -289,30 +289,33 @@ func SuggestHTMLEscape(expr interpreter.Expr) string {
 	return fmt.Sprintf("Use escapeHTML(%s) to prevent XSS attacks", exprStr)
 }
 
-// EscapeHTML escapes HTML special characters.
-// Ampersand must be replaced first to avoid double-escaping.
+// EscapeHTML escapes HTML special characters using the standard library.
 func EscapeHTML(s string) string {
-	s = strings.ReplaceAll(s, "&", "&amp;")
-	s = strings.ReplaceAll(s, "<", "&lt;")
-	s = strings.ReplaceAll(s, ">", "&gt;")
-	s = strings.ReplaceAll(s, "\"", "&quot;")
-	s = strings.ReplaceAll(s, "'", "&#39;")
-	return s
+	return html.EscapeString(s)
 }
 
 // EscapeJS escapes characters for JavaScript context.
-// Backslash must be replaced first to avoid double-escaping.
+// Replacements are applied in a fixed order: backslash first to avoid
+// double-escaping, then all other characters.
 func EscapeJS(s string) string {
-	s = strings.ReplaceAll(s, "\\", "\\\\")
-	s = strings.ReplaceAll(s, "\"", "\\\"")
-	s = strings.ReplaceAll(s, "'", "\\'")
-	s = strings.ReplaceAll(s, "\n", "\\n")
-	s = strings.ReplaceAll(s, "\r", "\\r")
-	s = strings.ReplaceAll(s, "\t", "\\t")
-	s = strings.ReplaceAll(s, "<", "\\u003C")
-	s = strings.ReplaceAll(s, ">", "\\u003E")
-	s = strings.ReplaceAll(s, "&", "\\u0026")
-	return s
+	// Order matters: backslash must be replaced first to prevent double-escaping.
+	replacements := []struct{ old, new string }{
+		{"\\", "\\\\"},
+		{"\"", "\\\""},
+		{"'", "\\'"},
+		{"\n", "\\n"},
+		{"\r", "\\r"},
+		{"\t", "\\t"},
+		{"<", "\\u003C"},
+		{">", "\\u003E"},
+		{"&", "\\u0026"},
+	}
+
+	result := s
+	for _, r := range replacements {
+		result = strings.ReplaceAll(result, r.old, r.new)
+	}
+	return result
 }
 
 // Helper functions

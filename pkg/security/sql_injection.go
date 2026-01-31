@@ -15,7 +15,7 @@ type SecurityWarning struct {
 	Message    string
 	Location   string
 	Suggestion string
-	UnsafeCode string           // For SQL injection context
+	UnsafeCode string // For SQL injection context
 	Expr       interpreter.Expr // For XSS context (can be nil)
 }
 
@@ -148,9 +148,20 @@ func StripSQLComments(input string) string {
 	return input
 }
 
-// SanitizeSQL is an alias for StripSQLComments for backward compatibility.
-// WARNING: This is NOT a security measure against SQL injection.
-// Always use parameterized queries for user-supplied values.
+// EscapeSQLString performs basic escaping of a string value for SQL contexts.
+// WARNING: This is NOT a security measure. Always use parameterized queries
+// ($1, $2 placeholders) for user-provided values. This function only escapes
+// single quotes for contexts where parameterized queries are not available
+// (e.g., identifiers). It does NOT protect against SQL injection.
+func EscapeSQLString(input string) string {
+	input = strings.ReplaceAll(input, "'", "''")
+	input = strings.ReplaceAll(input, "\x00", "")
+	return input
+}
+
+// SanitizeSQL is deprecated. Use parameterized queries instead.
+// Deprecated: This function provides a false sense of security. Use EscapeSQLString
+// for non-security escaping, or preferably use parameterized queries.
 func SanitizeSQL(input string) string {
 	return StripSQLComments(input)
 }

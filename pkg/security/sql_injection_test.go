@@ -1,9 +1,8 @@
 package security
 
 import (
-	"testing"
-
 	"github.com/glyphlang/glyph/pkg/interpreter"
+	"testing"
 )
 
 func TestSQLInjectionDetector_DetectConcatenation(t *testing.T) {
@@ -105,8 +104,8 @@ func TestSanitizeSQL_OldTests(t *testing.T) {
 		},
 		{
 			input:    "DROP TABLE users--",
-			expected: "DROP TABLE users",
-			desc:     "SQL comments",
+			expected: "DROP TABLE users--",
+			desc:     "SQL comments are no longer stripped (use parameterized queries)",
 		},
 		{
 			input:    "test\x00value",

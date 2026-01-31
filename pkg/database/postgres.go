@@ -354,25 +354,24 @@ func (p *PostgresDB) TableExists(ctx context.Context, table string) (bool, error
 
 // GetLastInsertID retrieves the last inserted ID (PostgreSQL specific)
 func (p *PostgresDB) GetLastInsertID(ctx context.Context, table string, idColumn string) (int64, error) {
-	// Validate identifiers to prevent SQL injection
-	sanitizedTable, err := SanitizeIdentifier(table)
-	if err != nil {
+	// Validate identifiers to prevent SQL injection.
+	// SanitizeIdentifier confirms these are alphanumeric-only identifiers.
+	// pg_get_serial_sequence takes unquoted text arguments, so we use
+	// the validated original names rather than the double-quoted sanitized forms.
+	if _, err := SanitizeIdentifier(table); err != nil {
 		return 0, fmt.Errorf("invalid table name: %w", err)
 	}
-	sanitizedColumn, err := SanitizeIdentifier(idColumn)
-	if err != nil {
+	if _, err := SanitizeIdentifier(idColumn); err != nil {
 		return 0, fmt.Errorf("invalid column name: %w", err)
 	}
 
 	// Identifiers have been validated above by SanitizeIdentifier.
 	// pg_get_serial_sequence takes text arguments (not SQL identifiers),
 	// so we use the validated original names in a parameterized query.
-	_ = sanitizedTable
-	_ = sanitizedColumn
 	query := "SELECT CURRVAL(pg_get_serial_sequence($1, $2))"
 
 	var id int64
-	err = p.QueryRow(ctx, query, table, idColumn).Scan(&id)
+	err := p.QueryRow(ctx, query, table, idColumn).Scan(&id)
 	return id, err
 }
 
