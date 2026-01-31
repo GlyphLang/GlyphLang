@@ -82,3 +82,4 @@ coverage/
 *.db
 *.sqlite
 *.sqlite3
+glyph
