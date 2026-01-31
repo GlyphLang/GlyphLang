@@ -293,9 +293,7 @@ func TestCompilationSpeed(t *testing.T) {
 
 // TestRoundTrip tests compile -> decompile round trip
 func TestRoundTrip(t *testing.T) {
-	t.Skip("Skipping until DeserializeFromBinary and FormatAST are implemented in pure Go")
-
-	// TODO: Implement these in pure Go
+	t.Skip("Skipping: DeserializeFromBinary and FormatAST are not yet implemented in pure Go")
 	// source := `@ GET /hello
 	//   > {message: "Hello, World!"}`
 	//

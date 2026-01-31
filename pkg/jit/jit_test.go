@@ -1,10 +1,9 @@
 package jit
 
 import (
+	"github.com/glyphlang/glyph/pkg/interpreter"
 	"testing"
 	"time"
-
-	"github.com/glyphlang/glyph/pkg/interpreter"
 )
 
 // TestNewJITCompiler tests JIT compiler creation

@@ -140,6 +140,20 @@ func (c *Config) ConnectionString() string {
 	}
 }
 
+// SafeConnectionString returns a connection string with the password masked for safe logging
+func (c *Config) SafeConnectionString() string {
+	switch c.Driver {
+	case "postgres", "postgresql":
+		return fmt.Sprintf("host=%s port=%d user=%s password=**** dbname=%s sslmode=%s",
+			c.Host, c.Port, c.Username, c.Database, c.SSLMode)
+	case "mysql":
+		return fmt.Sprintf("%s:****@tcp(%s:%d)/%s",
+			c.Username, c.Host, c.Port, c.Database)
+	default:
+		return ""
+	}
+}
+
 // NewDatabase creates a new database instance based on the driver
 func NewDatabase(config *Config) (Database, error) {
 	switch config.Driver {

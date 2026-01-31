@@ -2,10 +2,10 @@ package lsp
 
 import (
 	"fmt"
+	"github.com/glyphlang/glyph/pkg/interpreter"
 	"strings"
 	"sync"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/parser"
 )
 

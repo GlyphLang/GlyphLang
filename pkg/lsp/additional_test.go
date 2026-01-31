@@ -3,10 +3,9 @@ package lsp
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/glyphlang/glyph/pkg/interpreter"
 	"strings"
 	"testing"
-
-	"github.com/glyphlang/glyph/pkg/interpreter"
 )
 
 // TestGetWordRangeAtPosition tests GetWordRangeAtPosition function

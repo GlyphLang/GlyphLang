@@ -2,13 +2,12 @@ package context
 
 import (
 	"encoding/json"
+	"github.com/glyphlang/glyph/pkg/interpreter"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/glyphlang/glyph/pkg/interpreter"
 )
 
 func TestNewGenerator(t *testing.T) {

@@ -3,10 +3,10 @@ package openapi
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/glyphlang/glyph/pkg/interpreter"
 	"sort"
 	"strings"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"gopkg.in/yaml.v3"
 )
 

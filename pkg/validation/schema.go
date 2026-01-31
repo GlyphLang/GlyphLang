@@ -2,12 +2,11 @@ package validation
 
 import (
 	"fmt"
+	"github.com/glyphlang/glyph/pkg/interpreter"
 	"math"
 	"net/url"
 	"regexp"
 	"strings"
-
-	"github.com/glyphlang/glyph/pkg/interpreter"
 )
 
 // Pre-compiled regex patterns used for validation.

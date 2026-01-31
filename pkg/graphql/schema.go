@@ -2,9 +2,8 @@ package graphql
 
 import (
 	"fmt"
-	"strings"
-
 	"github.com/glyphlang/glyph/pkg/interpreter"
+	"strings"
 )
 
 // Schema represents a GraphQL schema built from Glyph type definitions and resolvers.

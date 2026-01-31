@@ -1,10 +1,10 @@
 package docs
 
 import (
+	"github.com/glyphlang/glyph/pkg/interpreter"
 	"strings"
 	"testing"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

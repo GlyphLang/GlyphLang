@@ -2,9 +2,8 @@ package contract
 
 import (
 	"fmt"
-	"strings"
-
 	"github.com/glyphlang/glyph/pkg/interpreter"
+	"strings"
 )
 
 // Violation represents a contract violation found during verification

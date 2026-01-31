@@ -2,11 +2,11 @@ package jit
 
 import (
 	"fmt"
+	"github.com/glyphlang/glyph/pkg/interpreter"
 	"sync"
 	"sync/atomic"
 
 	"github.com/glyphlang/glyph/pkg/compiler"
-	"github.com/glyphlang/glyph/pkg/interpreter"
 )
 
 // TypeSpecialization represents specialized code for specific type combinations

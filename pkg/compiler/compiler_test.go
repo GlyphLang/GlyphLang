@@ -1,9 +1,11 @@
 package compiler
 
 import (
-	"testing"
-
 	"github.com/glyphlang/glyph/pkg/interpreter"
+	"math"
+	"testing"
+	"time"
+
 	"github.com/glyphlang/glyph/pkg/vm"
 )
 
@@ -2149,10 +2151,13 @@ func TestCompileFunctionCallNoArgs(t *testing.T) {
 		t.Fatalf("Execute() error: %v", err)
 	}
 
-	// now() returns a mock timestamp
-	expected := vm.IntValue{Val: 1234567890}
-	if !valuesEqual(result, expected) {
-		t.Errorf("Expected %v, got %v", expected, result)
+	// now() returns the current Unix timestamp
+	intVal, ok := result.(vm.IntValue)
+	if !ok {
+		t.Fatalf("Expected IntValue, got %T", result)
+	}
+	if math.Abs(float64(intVal.Val-time.Now().Unix())) > 2 {
+		t.Errorf("Expected timestamp within 2s of now, got %v", intVal.Val)
 	}
 }
 
@@ -2342,10 +2347,13 @@ func TestCompileFunctionCallTimeNow(t *testing.T) {
 		t.Fatalf("Execute() error: %v", err)
 	}
 
-	// time.now() returns a mock timestamp
-	expected := vm.IntValue{Val: 1234567890}
-	if !valuesEqual(result, expected) {
-		t.Errorf("Expected %v, got %v", expected, result)
+	// time.now() returns the current Unix timestamp
+	intVal, ok := result.(vm.IntValue)
+	if !ok {
+		t.Fatalf("Expected IntValue, got %T", result)
+	}
+	if math.Abs(float64(intVal.Val-time.Now().Unix())) > 2 {
+		t.Errorf("Expected timestamp within 2s of now, got %v", intVal.Val)
 	}
 }
 
@@ -2400,8 +2408,8 @@ func TestCompileFunctionCallInObject(t *testing.T) {
 		t.Fatalf("Expected ObjectValue, got %T", result)
 	}
 
-	if tsVal, ok := objVal.Val["timestamp"].(vm.IntValue); !ok || tsVal.Val != 1234567890 {
-		t.Errorf("Expected timestamp=1234567890, got %v", objVal.Val["timestamp"])
+	if tsVal, ok := objVal.Val["timestamp"].(vm.IntValue); !ok || math.Abs(float64(tsVal.Val-time.Now().Unix())) > 2 {
+		t.Errorf("Expected timestamp within 2s of now, got %v", objVal.Val["timestamp"])
 	}
 
 	if itemsVal, ok := objVal.Val["items"].(vm.IntValue); !ok || itemsVal.Val != 2 {

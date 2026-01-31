@@ -2,9 +2,8 @@ package codegen
 
 import (
 	"fmt"
-	"strings"
-
 	"github.com/glyphlang/glyph/pkg/interpreter"
+	"strings"
 )
 
 // TypeScriptGenerator generates TypeScript API client code from a GlyphLang Module.

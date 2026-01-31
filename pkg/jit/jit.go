@@ -2,11 +2,11 @@ package jit
 
 import (
 	"fmt"
+	"github.com/glyphlang/glyph/pkg/interpreter"
 	"sync"
 	"time"
 
 	"github.com/glyphlang/glyph/pkg/compiler"
-	"github.com/glyphlang/glyph/pkg/interpreter"
 )
 
 // HotPathThreshold is the number of executions before code becomes "hot"

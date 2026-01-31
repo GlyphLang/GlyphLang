@@ -2,9 +2,8 @@ package docs
 
 import (
 	"fmt"
-	"strings"
-
 	"github.com/glyphlang/glyph/pkg/interpreter"
+	"strings"
 )
 
 // RouteDoc holds documentation data for a single route.

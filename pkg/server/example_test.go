@@ -9,11 +9,42 @@ import (
 	"github.com/glyphlang/glyph/pkg/server"
 )
 
+// exampleMockInterpreter implements server.Interpreter for examples
+type exampleMockInterpreter struct {
+	Response interface{}
+}
+
+func (m *exampleMockInterpreter) Execute(route *server.Route, ctx *server.Context) (interface{}, error) {
+	if m.Response != nil {
+		return m.Response, nil
+	}
+	// Default mock response includes path params and query params
+	query := make(map[string]interface{})
+	for k, v := range ctx.QueryParams {
+		if len(v) == 1 {
+			query[k] = v[0]
+		} else {
+			query[k] = v
+		}
+	}
+	response := map[string]interface{}{
+		"message":    "Mock response",
+		"path":       ctx.Request.URL.Path,
+		"method":     ctx.Request.Method,
+		"pathParams": ctx.PathParams,
+		"query":      query,
+	}
+	if ctx.Body != nil && len(ctx.Body) > 0 {
+		response["body"] = ctx.Body
+	}
+	return response, nil
+}
+
 // ExampleServer demonstrates basic server usage
 func ExampleServer() {
 	// Create a new server with mock interpreter
 	srv := server.NewServer(
-		server.WithInterpreter(&server.MockInterpreter{
+		server.WithInterpreter(&exampleMockInterpreter{
 			Response: map[string]interface{}{
 				"message": "Hello, World!",
 			},
@@ -39,7 +70,7 @@ func ExampleServer() {
 // ExampleServer_pathParams demonstrates path parameter extraction
 func ExampleServer_pathParams() {
 	srv := server.NewServer(
-		server.WithInterpreter(&server.MockInterpreter{}),
+		server.WithInterpreter(&exampleMockInterpreter{}),
 	)
 
 	// Register route with path parameters

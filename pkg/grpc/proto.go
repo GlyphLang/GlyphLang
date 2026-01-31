@@ -2,9 +2,8 @@ package grpc
 
 import (
 	"fmt"
-	"strings"
-
 	"github.com/glyphlang/glyph/pkg/interpreter"
+	"strings"
 )
 
 // ProtoFile represents a generated .proto file.

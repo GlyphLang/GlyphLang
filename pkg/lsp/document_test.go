@@ -1,9 +1,8 @@
 package lsp
 
 import (
-	"testing"
-
 	"github.com/glyphlang/glyph/pkg/interpreter"
+	"testing"
 )
 
 func TestDocumentManager(t *testing.T) {

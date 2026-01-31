@@ -3,10 +3,10 @@ package compiler
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/glyphlang/glyph/pkg/interpreter"
 	"math"
 	"strings"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/server"
 	"github.com/glyphlang/glyph/pkg/vm"
 )
@@ -294,43 +294,55 @@ func (c *Compiler) CompileQueueWorker(worker *interpreter.QueueWorker) ([]byte, 
 	return c.buildBytecode(), nil
 }
 
-// compileStatement compiles a statement
-func (c *Compiler) compileStatement(stmt interpreter.Statement) error {
+// normalizeStatement converts pointer-typed statements to their value form.
+// The parser produces value types, but other call sites (JIT, LSP, tests)
+// construct pointer types. This normalizer lets compileStatement use a single
+// case per type. Tracked for AST-wide cleanup in P2-4.
+func normalizeStatement(stmt interpreter.Statement) interpreter.Statement {
 	switch s := stmt.(type) {
 	case *interpreter.AssignStatement:
-		return c.compileAssignStatement(s)
+		return *s
+	case *interpreter.ReturnStatement:
+		return *s
+	case *interpreter.IfStatement:
+		return *s
+	case *interpreter.WhileStatement:
+		return *s
+	case *interpreter.ValidationStatement:
+		return *s
+	case *interpreter.ForStatement:
+		return *s
+	case *interpreter.SwitchStatement:
+		return *s
+	case *interpreter.ExpressionStatement:
+		return *s
+	case *interpreter.ReassignStatement:
+		return *s
+	default:
+		return stmt
+	}
+}
+
+// compileStatement compiles a statement node into bytecode.
+func (c *Compiler) compileStatement(stmt interpreter.Statement) error {
+	stmt = normalizeStatement(stmt)
+	switch s := stmt.(type) {
 	case interpreter.AssignStatement:
 		return c.compileAssignStatement(&s)
-	case *interpreter.ReturnStatement:
-		return c.compileReturnStatement(s)
 	case interpreter.ReturnStatement:
 		return c.compileReturnStatement(&s)
-	case *interpreter.IfStatement:
-		return c.compileIfStatement(s)
 	case interpreter.IfStatement:
 		return c.compileIfStatement(&s)
-	case *interpreter.WhileStatement:
-		return c.compileWhileStatement(s)
 	case interpreter.WhileStatement:
 		return c.compileWhileStatement(&s)
-	case *interpreter.ValidationStatement:
-		return c.compileValidationStatement(s)
 	case interpreter.ValidationStatement:
 		return c.compileValidationStatement(&s)
-	case *interpreter.ForStatement:
-		return c.compileForStatement(s)
 	case interpreter.ForStatement:
 		return c.compileForStatement(&s)
-	case *interpreter.SwitchStatement:
-		return c.compileSwitchStatement(s)
 	case interpreter.SwitchStatement:
 		return c.compileSwitchStatement(&s)
-	case *interpreter.ExpressionStatement:
-		return c.compileExpressionStatement(s)
 	case interpreter.ExpressionStatement:
 		return c.compileExpressionStatement(&s)
-	case *interpreter.ReassignStatement:
-		return c.compileReassignStatement(s)
 	case interpreter.ReassignStatement:
 		return c.compileReassignStatement(&s)
 	default:

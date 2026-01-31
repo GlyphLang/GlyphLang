@@ -2,10 +2,10 @@ package tests
 
 import (
 	"fmt"
+	"github.com/glyphlang/glyph/pkg/interpreter"
 	"testing"
 
 	"github.com/glyphlang/glyph/pkg/compiler"
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/parser"
 	"github.com/glyphlang/glyph/pkg/vm"
 )

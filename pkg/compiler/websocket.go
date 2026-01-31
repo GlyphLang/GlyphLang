@@ -2,8 +2,8 @@ package compiler
 
 import (
 	"fmt"
-
 	"github.com/glyphlang/glyph/pkg/interpreter"
+
 	"github.com/glyphlang/glyph/pkg/server"
 	"github.com/glyphlang/glyph/pkg/vm"
 )

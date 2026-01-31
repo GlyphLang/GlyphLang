@@ -2,9 +2,8 @@ package openapi
 
 import (
 	"encoding/json"
-	"testing"
-
 	"github.com/glyphlang/glyph/pkg/interpreter"
+	"testing"
 )
 
 func TestGenerator_EmptyModule(t *testing.T) {

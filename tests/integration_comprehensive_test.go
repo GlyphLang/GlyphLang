@@ -11,6 +11,18 @@ import (
 	"github.com/glyphlang/glyph/pkg/vm"
 )
 
+// testMockInterpreter implements server.Interpreter for integration tests
+type testMockInterpreter struct {
+	Response interface{}
+}
+
+func (m *testMockInterpreter) Execute(route *server.Route, ctx *server.Context) (interface{}, error) {
+	if m.Response != nil {
+		return m.Response, nil
+	}
+	return map[string]interface{}{"message": "Mock response"}, nil
+}
+
 // TestHelloWorldIntegration tests the hello-world example end-to-end
 func TestHelloWorldIntegration(t *testing.T) {
 	t.Skip("Skipping until AST construction helpers are fixed for pure Go implementation")
@@ -267,7 +279,7 @@ func TestServerIntegration(t *testing.T) {
 	helper := NewTestHelper(t)
 
 	// Create mock interpreter
-	mockInterp := &server.MockInterpreter{
+	mockInterp := &testMockInterpreter{
 		Response: map[string]interface{}{
 			"status": "ok",
 			"test":   true,

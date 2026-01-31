@@ -1,10 +1,10 @@
 package compiler
 
 import (
+	"github.com/glyphlang/glyph/pkg/interpreter"
 	"strings"
 	"testing"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/vm"
 )
 

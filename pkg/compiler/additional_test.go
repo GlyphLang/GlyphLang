@@ -1,9 +1,8 @@
 package compiler
 
 import (
-	"testing"
-
 	"github.com/glyphlang/glyph/pkg/interpreter"
+	"testing"
 )
 
 // TestExprHasSideEffects tests the exprHasSideEffects helper function

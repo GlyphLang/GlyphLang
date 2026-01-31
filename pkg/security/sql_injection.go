@@ -15,7 +15,7 @@ type SecurityWarning struct {
 	Message    string
 	Location   string
 	Suggestion string
-	UnsafeCode string // For SQL injection context
+	UnsafeCode string           // For SQL injection context
 	Expr       interpreter.Expr // For XSS context (can be nil)
 }
 

@@ -21,9 +21,8 @@ package formatter
 
 import (
 	"fmt"
-	"strings"
-
 	"github.com/glyphlang/glyph/pkg/interpreter"
+	"strings"
 )
 
 // Mode determines the output format
