@@ -83,6 +83,9 @@ func (i *Interpreter) ExecuteStatement(stmt Statement, env *Environment) (interf
 	case AssertStatement:
 		return i.executeAssert(s, env)
 
+	case IndexAssignStatement:
+		return i.executeIndexAssign(s, env)
+
 	default:
 		return nil, fmt.Errorf("unsupported statement type: %T", stmt)
 	}
@@ -548,4 +551,72 @@ func (i *Interpreter) executeAssert(stmt AssertStatement, env *Environment) (int
 	}
 
 	return true, nil
+}
+
+// executeIndexAssign handles assignment to indexed targets: arr[0] = value, obj.field[0] = value
+func (i *Interpreter) executeIndexAssign(stmt IndexAssignStatement, env *Environment) (interface{}, error) {
+	value, err := i.EvaluateExpression(stmt.Value, env)
+	if err != nil {
+		return nil, err
+	}
+	return i.assignToTarget(stmt.Target, value, env)
+}
+
+// assignToTarget recursively resolves the l-value target and performs the mutation
+func (i *Interpreter) assignToTarget(target Expr, value interface{}, env *Environment) (interface{}, error) {
+	switch t := target.(type) {
+	case ArrayIndexExpr:
+		container, err := i.EvaluateExpression(t.Array, env)
+		if err != nil {
+			return nil, err
+		}
+		indexVal, err := i.EvaluateExpression(t.Index, env)
+		if err != nil {
+			return nil, err
+		}
+
+		switch c := container.(type) {
+		case []interface{}:
+			var index int64
+			switch idx := indexVal.(type) {
+			case int64:
+				index = idx
+			case int:
+				index = int64(idx)
+			default:
+				return nil, fmt.Errorf("array index must be an integer, got %T", indexVal)
+			}
+			if index < 0 || int(index) >= len(c) {
+				return nil, fmt.Errorf("array index out of bounds: %d (length: %d)", index, len(c))
+			}
+			c[index] = value
+			return value, nil
+
+		case map[string]interface{}:
+			keyStr, ok := indexVal.(string)
+			if !ok {
+				return nil, fmt.Errorf("map key must be a string, got %T", indexVal)
+			}
+			c[keyStr] = value
+			return value, nil
+
+		default:
+			return nil, fmt.Errorf("cannot index-assign to %T", container)
+		}
+
+	case FieldAccessExpr:
+		obj, err := i.EvaluateExpression(t.Object, env)
+		if err != nil {
+			return nil, err
+		}
+		objMap, ok := obj.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("cannot assign field '%s' on %T", t.Field, obj)
+		}
+		objMap[t.Field] = value
+		return value, nil
+
+	default:
+		return nil, fmt.Errorf("invalid assignment target: %T", target)
+	}
 }

@@ -3,10 +3,12 @@ package interpreter
 import (
 	"fmt"
 	"math"
+	"math/rand"
 	"strings"
 	"time"
 
 	. "github.com/glyphlang/glyph/pkg/ast"
+	"github.com/google/uuid"
 )
 
 // builtinFunc is the signature for all builtin function implementations.
@@ -41,6 +43,8 @@ func init() {
 		"abs":        builtinAbs,
 		"min":        builtinMin,
 		"max":        builtinMax,
+		"randomInt":  builtinRandomInt,
+		"generateId": builtinGenerateId,
 	}
 }
 
@@ -568,4 +572,37 @@ func builtinMax(i *Interpreter, args []Expr, env *Environment) (interface{}, err
 	default:
 		return nil, fmt.Errorf("max() expects numeric arguments, got %T", leftArg)
 	}
+}
+
+func builtinRandomInt(i *Interpreter, args []Expr, env *Environment) (interface{}, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("randomInt() expects 2 arguments (min, max), got %d", len(args))
+	}
+	minArg, err := i.EvaluateExpression(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	maxArg, err := i.EvaluateExpression(args[1], env)
+	if err != nil {
+		return nil, err
+	}
+	minVal, ok := minArg.(int64)
+	if !ok {
+		return nil, fmt.Errorf("randomInt() expects integer arguments, got %T for min", minArg)
+	}
+	maxVal, ok := maxArg.(int64)
+	if !ok {
+		return nil, fmt.Errorf("randomInt() expects integer arguments, got %T for max", maxArg)
+	}
+	if minVal > maxVal {
+		return nil, fmt.Errorf("randomInt() requires min <= max, got min=%d, max=%d", minVal, maxVal)
+	}
+	return minVal + rand.Int63n(maxVal-minVal+1), nil
+}
+
+func builtinGenerateId(_ *Interpreter, args []Expr, _ *Environment) (interface{}, error) {
+	if len(args) != 0 {
+		return nil, fmt.Errorf("generateId() expects 0 arguments, got %d", len(args))
+	}
+	return uuid.New().String(), nil
 }
