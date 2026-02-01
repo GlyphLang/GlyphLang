@@ -369,3 +369,211 @@ func TestIndexAssignMapWithStringKey(t *testing.T) {
 		assert.Equal(t, "val2", result["key2"])
 	})
 }
+
+// --- append() Tests ---
+
+func TestBuiltinAppend(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	t.Run("append to array", func(t *testing.T) {
+		args := []Expr{
+			ArrayExpr{Elements: []Expr{
+				LiteralExpr{Value: IntLiteral{Value: 1}},
+				LiteralExpr{Value: IntLiteral{Value: 2}},
+			}},
+			LiteralExpr{Value: IntLiteral{Value: 3}},
+		}
+		result, err := builtinAppend(interp, args, env)
+		require.NoError(t, err)
+		expected := []interface{}{int64(1), int64(2), int64(3)}
+		assert.Equal(t, expected, result)
+	})
+
+	t.Run("append to empty array", func(t *testing.T) {
+		args := []Expr{
+			ArrayExpr{Elements: []Expr{}},
+			LiteralExpr{Value: StringLiteral{Value: "hello"}},
+		}
+		result, err := builtinAppend(interp, args, env)
+		require.NoError(t, err)
+		expected := []interface{}{"hello"}
+		assert.Equal(t, expected, result)
+	})
+
+	t.Run("append non-array errors", func(t *testing.T) {
+		args := []Expr{
+			LiteralExpr{Value: IntLiteral{Value: 5}},
+			LiteralExpr{Value: IntLiteral{Value: 3}},
+		}
+		_, err := builtinAppend(interp, args, env)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "array")
+	})
+
+	t.Run("wrong arg count", func(t *testing.T) {
+		args := []Expr{
+			ArrayExpr{Elements: []Expr{}},
+		}
+		_, err := builtinAppend(interp, args, env)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "expects 2 arguments")
+	})
+}
+
+// --- set() Tests ---
+
+func TestBuiltinSet(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	t.Run("set key on object", func(t *testing.T) {
+		env.Define("obj", map[string]interface{}{"a": int64(1)})
+		args := []Expr{
+			VariableExpr{Name: "obj"},
+			LiteralExpr{Value: StringLiteral{Value: "b"}},
+			LiteralExpr{Value: IntLiteral{Value: 2}},
+		}
+		result, err := builtinSet(interp, args, env)
+		require.NoError(t, err)
+		obj := result.(map[string]interface{})
+		assert.Equal(t, int64(1), obj["a"])
+		assert.Equal(t, int64(2), obj["b"])
+	})
+
+	t.Run("overwrite existing key", func(t *testing.T) {
+		env.Define("obj2", map[string]interface{}{"x": "old"})
+		args := []Expr{
+			VariableExpr{Name: "obj2"},
+			LiteralExpr{Value: StringLiteral{Value: "x"}},
+			LiteralExpr{Value: StringLiteral{Value: "new"}},
+		}
+		result, err := builtinSet(interp, args, env)
+		require.NoError(t, err)
+		obj := result.(map[string]interface{})
+		assert.Equal(t, "new", obj["x"])
+	})
+
+	t.Run("non-object errors", func(t *testing.T) {
+		args := []Expr{
+			LiteralExpr{Value: IntLiteral{Value: 5}},
+			LiteralExpr{Value: StringLiteral{Value: "k"}},
+			LiteralExpr{Value: IntLiteral{Value: 1}},
+		}
+		_, err := builtinSet(interp, args, env)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "object")
+	})
+
+	t.Run("non-string key errors", func(t *testing.T) {
+		env.Define("obj3", map[string]interface{}{})
+		args := []Expr{
+			VariableExpr{Name: "obj3"},
+			LiteralExpr{Value: IntLiteral{Value: 1}},
+			LiteralExpr{Value: IntLiteral{Value: 2}},
+		}
+		_, err := builtinSet(interp, args, env)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "string key")
+	})
+}
+
+// --- remove() Tests ---
+
+func TestBuiltinRemove(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	t.Run("remove key from object", func(t *testing.T) {
+		env.Define("obj", map[string]interface{}{"a": int64(1), "b": int64(2)})
+		args := []Expr{
+			VariableExpr{Name: "obj"},
+			LiteralExpr{Value: StringLiteral{Value: "a"}},
+		}
+		result, err := builtinRemove(interp, args, env)
+		require.NoError(t, err)
+		obj := result.(map[string]interface{})
+		_, exists := obj["a"]
+		assert.False(t, exists)
+		assert.Equal(t, int64(2), obj["b"])
+	})
+
+	t.Run("remove nonexistent key is no-op", func(t *testing.T) {
+		env.Define("obj2", map[string]interface{}{"x": int64(1)})
+		args := []Expr{
+			VariableExpr{Name: "obj2"},
+			LiteralExpr{Value: StringLiteral{Value: "missing"}},
+		}
+		result, err := builtinRemove(interp, args, env)
+		require.NoError(t, err)
+		obj := result.(map[string]interface{})
+		assert.Equal(t, int64(1), obj["x"])
+	})
+
+	t.Run("non-object errors", func(t *testing.T) {
+		args := []Expr{
+			LiteralExpr{Value: StringLiteral{Value: "notobj"}},
+			LiteralExpr{Value: StringLiteral{Value: "k"}},
+		}
+		_, err := builtinRemove(interp, args, env)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "object")
+	})
+}
+
+// --- keys() Tests ---
+
+func TestBuiltinKeys(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	t.Run("returns keys of object", func(t *testing.T) {
+		env.Define("obj", map[string]interface{}{"a": int64(1), "b": int64(2)})
+		args := []Expr{VariableExpr{Name: "obj"}}
+		result, err := builtinKeys(interp, args, env)
+		require.NoError(t, err)
+		keys := result.([]interface{})
+		assert.Len(t, keys, 2)
+		assert.Contains(t, keys, "a")
+		assert.Contains(t, keys, "b")
+	})
+
+	t.Run("empty object returns empty array", func(t *testing.T) {
+		env.Define("empty", map[string]interface{}{})
+		args := []Expr{VariableExpr{Name: "empty"}}
+		result, err := builtinKeys(interp, args, env)
+		require.NoError(t, err)
+		keys := result.([]interface{})
+		assert.Empty(t, keys)
+	})
+
+	t.Run("non-object errors", func(t *testing.T) {
+		args := []Expr{LiteralExpr{Value: IntLiteral{Value: 5}}}
+		_, err := builtinKeys(interp, args, env)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "object")
+	})
+}
+
+// --- length() on objects Tests ---
+
+func TestLengthOnObjects(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	t.Run("length of object", func(t *testing.T) {
+		env.Define("obj", map[string]interface{}{"a": int64(1), "b": int64(2), "c": int64(3)})
+		args := []Expr{VariableExpr{Name: "obj"}}
+		result, err := builtinLength(interp, args, env)
+		require.NoError(t, err)
+		assert.Equal(t, int64(3), result)
+	})
+
+	t.Run("length of empty object", func(t *testing.T) {
+		env.Define("empty", map[string]interface{}{})
+		args := []Expr{VariableExpr{Name: "empty"}}
+		result, err := builtinLength(interp, args, env)
+		require.NoError(t, err)
+		assert.Equal(t, int64(0), result)
+	})
+}

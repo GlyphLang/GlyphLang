@@ -45,6 +45,10 @@ func init() {
 		"max":        builtinMax,
 		"randomInt":  builtinRandomInt,
 		"generateId": builtinGenerateId,
+		"append":     builtinAppend,
+		"set":        builtinSet,
+		"remove":     builtinRemove,
+		"keys":       builtinKeys,
 	}
 }
 
@@ -308,8 +312,10 @@ func builtinLength(i *Interpreter, args []Expr, env *Environment) (interface{}, 
 		return int64(len([]rune(v))), nil
 	case []interface{}:
 		return int64(len(v)), nil
+	case map[string]interface{}:
+		return int64(len(v)), nil
 	default:
-		return nil, fmt.Errorf("length() expects a string or array argument, got %T", arg)
+		return nil, fmt.Errorf("length() expects a string, array, or object argument, got %T", arg)
 	}
 }
 
@@ -605,4 +611,94 @@ func builtinGenerateId(_ *Interpreter, args []Expr, _ *Environment) (interface{}
 		return nil, fmt.Errorf("generateId() expects 0 arguments, got %d", len(args))
 	}
 	return uuid.New().String(), nil
+}
+
+func builtinAppend(i *Interpreter, args []Expr, env *Environment) (interface{}, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("append() expects 2 arguments (array, item), got %d", len(args))
+	}
+	arrArg, err := i.EvaluateExpression(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	arr, ok := arrArg.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("append() expects first argument to be an array, got %T", arrArg)
+	}
+	item, err := i.EvaluateExpression(args[1], env)
+	if err != nil {
+		return nil, err
+	}
+	return append(arr, item), nil
+}
+
+func builtinSet(i *Interpreter, args []Expr, env *Environment) (interface{}, error) {
+	if len(args) != 3 {
+		return nil, fmt.Errorf("set() expects 3 arguments (object, key, value), got %d", len(args))
+	}
+	objArg, err := i.EvaluateExpression(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	obj, ok := objArg.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("set() expects first argument to be an object, got %T", objArg)
+	}
+	keyArg, err := i.EvaluateExpression(args[1], env)
+	if err != nil {
+		return nil, err
+	}
+	key, ok := keyArg.(string)
+	if !ok {
+		return nil, fmt.Errorf("set() expects second argument to be a string key, got %T", keyArg)
+	}
+	value, err := i.EvaluateExpression(args[2], env)
+	if err != nil {
+		return nil, err
+	}
+	obj[key] = value
+	return obj, nil
+}
+
+func builtinRemove(i *Interpreter, args []Expr, env *Environment) (interface{}, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("remove() expects 2 arguments (object, key), got %d", len(args))
+	}
+	objArg, err := i.EvaluateExpression(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	obj, ok := objArg.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("remove() expects first argument to be an object, got %T", objArg)
+	}
+	keyArg, err := i.EvaluateExpression(args[1], env)
+	if err != nil {
+		return nil, err
+	}
+	key, ok := keyArg.(string)
+	if !ok {
+		return nil, fmt.Errorf("remove() expects second argument to be a string key, got %T", keyArg)
+	}
+	delete(obj, key)
+	return obj, nil
+}
+
+func builtinKeys(i *Interpreter, args []Expr, env *Environment) (interface{}, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("keys() expects 1 argument (object), got %d", len(args))
+	}
+	objArg, err := i.EvaluateExpression(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	obj, ok := objArg.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("keys() expects an object argument, got %T", objArg)
+	}
+	keys := make([]interface{}, 0, len(obj))
+	for k := range obj {
+		keys = append(keys, k)
+	}
+	return keys, nil
 }
