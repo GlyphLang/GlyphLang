@@ -7,11 +7,15 @@ import (
 	"strings"
 )
 
+// maxParseDepth is the maximum nesting depth for recursive parsing to prevent stack overflow.
+const maxParseDepth = 500
+
 // Parser converts tokens to AST
 type Parser struct {
 	tokens   []Token
 	position int
 	source   string // Original source code for error messages
+	depth    int    // Current recursion depth
 }
 
 // NewParser creates a new Parser
@@ -2374,6 +2378,11 @@ func (p *Parser) parseSwitchStatement() (ast.Statement, error) {
 
 // parseExpr parses an expression with operator precedence
 func (p *Parser) parseExpr() (ast.Expr, error) {
+	p.depth++
+	if p.depth > maxParseDepth {
+		return nil, fmt.Errorf("maximum nesting depth exceeded (%d levels)", maxParseDepth)
+	}
+	defer func() { p.depth-- }()
 	return p.parsePipeExpr()
 }
 

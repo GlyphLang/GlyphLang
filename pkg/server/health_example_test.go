@@ -66,7 +66,11 @@ func ExampleHealthManager_httpChecker() {
 	hm := server.NewHealthManager()
 
 	// Register an HTTP service health checker
-	apiChecker := server.NewHTTPHealthChecker("external-api", "https://api.example.com/health")
+	apiChecker, err := server.NewHTTPHealthChecker("external-api", "https://api.example.com/health")
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
 	hm.RegisterChecker(apiChecker)
 
 	fmt.Println("External API health checker registered")

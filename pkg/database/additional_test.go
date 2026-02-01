@@ -1924,7 +1924,7 @@ func TestConfig_DefaultValues(t *testing.T) {
 	config, err := ParseConnectionString("postgres://user:pass@localhost/testdb")
 	assert.NoError(t, err)
 	assert.Equal(t, 5432, config.Port)
-	assert.Equal(t, "disable", config.SSLMode)
+	assert.Equal(t, "prefer", config.SSLMode)
 	assert.Equal(t, 25, config.MaxOpenConns)
 	assert.Equal(t, 5, config.MaxIdleConns)
 }

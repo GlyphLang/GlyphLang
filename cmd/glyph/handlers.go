@@ -136,11 +136,12 @@ func createCompiledRouteHandler(route *ast.Route, bytecode []byte, wsHub *websoc
 		// Execute compiled bytecode
 		result, err := vmInstance.Execute(bytecode)
 		if err != nil {
-			// Return error response
+			// Log full error server-side, return generic message to client
+			printError(fmt.Errorf("bytecode execution failed: %w", err))
 			ctx.StatusCode = http.StatusInternalServerError
 			ctx.ResponseWriter.Header().Set("Content-Type", "application/json")
 			return json.NewEncoder(ctx.ResponseWriter).Encode(map[string]interface{}{
-				"error": fmt.Sprintf("bytecode execution failed: %v", err),
+				"error": "Internal server error",
 			})
 		}
 
@@ -157,11 +158,12 @@ func createRouteHandler(route *ast.Route, interp *interpreter.Interpreter) serve
 		// Execute route body using the interpreter
 		result, err := executeRoute(route, ctx, interp)
 		if err != nil {
-			// Return error response
+			// Log full error server-side, return generic message to client
+			printError(fmt.Errorf("route execution error: %w", err))
 			ctx.StatusCode = http.StatusInternalServerError
 			ctx.ResponseWriter.Header().Set("Content-Type", "application/json")
 			return json.NewEncoder(ctx.ResponseWriter).Encode(map[string]interface{}{
-				"error": err.Error(),
+				"error": "Internal server error",
 			})
 		}
 
@@ -253,10 +255,11 @@ func createHandler(router *server.Router) http.HandlerFunc {
 
 		// Execute handler
 		if err := route.Handler(ctx); err != nil {
+			printError(fmt.Errorf("handler error for %s %s: %w", r.Method, r.URL.Path, err))
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{
-				"error": err.Error(),
+				"error": "Internal server error",
 			})
 		}
 	}

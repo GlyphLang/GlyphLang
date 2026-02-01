@@ -2,10 +2,11 @@ package jit
 
 import (
 	"fmt"
-	"github.com/glyphlang/glyph/pkg/ast"
+	"sort"
 	"sync"
 	"sync/atomic"
 
+	"github.com/glyphlang/glyph/pkg/ast"
 	"github.com/glyphlang/glyph/pkg/compiler"
 )
 
@@ -172,12 +173,18 @@ func typesMatch(a, b map[string]string) bool {
 	return true
 }
 
-// typeSignature creates a string signature for a type map
+// typeSignature creates a deterministic string signature for a type map.
+// Keys are sorted to ensure consistent signatures regardless of map iteration order.
 func typeSignature(types map[string]string) string {
-	// Create a deterministic signature
+	keys := make([]string, 0, len(types))
+	for k := range types {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
 	sig := ""
-	for k, v := range types {
-		sig += k + ":" + v + ","
+	for _, k := range keys {
+		sig += k + ":" + types[k] + ","
 	}
 	return sig
 }

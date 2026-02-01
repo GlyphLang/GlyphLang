@@ -42,7 +42,7 @@ func TestParseConnectionString(t *testing.T) {
 			connStr: "postgres://user:pass@localhost:5432/testdb",
 			wantErr: false,
 			validate: func(t *testing.T, cfg *Config) {
-				assert.Equal(t, "disable", cfg.SSLMode) // Default SSL mode
+				assert.Equal(t, "prefer", cfg.SSLMode) // Default SSL mode
 			},
 		},
 		{

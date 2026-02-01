@@ -28,7 +28,8 @@ func TestNewHandler(t *testing.T) {
 
 // TestNewHandlerWithBaseURL verifies custom base URL override
 func TestNewHandlerWithBaseURL(t *testing.T) {
-	h := NewHandlerWithBaseURL("openai", "key", "http://localhost:8080")
+	h, err := NewHandlerWithBaseURL("openai", "key", "http://localhost:8080")
+	assert.NoError(t, err)
 	assert.Equal(t, "http://localhost:8080", h.baseURL)
 }
 
@@ -316,7 +317,8 @@ func TestHandlerOpenAIComplete(t *testing.T) {
 	}))
 	defer server.Close()
 
-	h := NewHandlerWithBaseURL("openai", "test-key", server.URL)
+	h, err := NewHandlerWithBaseURL("openai", "test-key", server.URL)
+	assert.NoError(t, err)
 
 	result, err := h.Complete(map[string]interface{}{
 		"model": "gpt-4",
@@ -354,7 +356,8 @@ func TestHandlerAnthropicComplete(t *testing.T) {
 	}))
 	defer server.Close()
 
-	h := NewHandlerWithBaseURL("anthropic", "test-key", server.URL)
+	h, err := NewHandlerWithBaseURL("anthropic", "test-key", server.URL)
+	assert.NoError(t, err)
 
 	result, err := h.Complete(map[string]interface{}{
 		"model": "claude-3-opus",

@@ -2,9 +2,11 @@ package interpreter
 
 import (
 	"fmt"
-	. "github.com/glyphlang/glyph/pkg/ast"
+	"math"
 	"strings"
 	"time"
+
+	. "github.com/glyphlang/glyph/pkg/ast"
 )
 
 // builtinFunc is the signature for all builtin function implementations.
@@ -278,13 +280,14 @@ func builtinSubstring(i *Interpreter, args []Expr, env *Environment) (interface{
 	if start > end {
 		return nil, fmt.Errorf("substring() start index must be less than or equal to end index")
 	}
-	if int(end) > len(str) {
-		end = int64(len(str))
+	runes := []rune(str)
+	if int(end) > len(runes) {
+		end = int64(len(runes))
 	}
-	if int(start) > len(str) {
-		start = int64(len(str))
+	if int(start) > len(runes) {
+		start = int64(len(runes))
 	}
-	return str[start:end], nil
+	return string(runes[start:end]), nil
 }
 
 func builtinLength(i *Interpreter, args []Expr, env *Environment) (interface{}, error) {
@@ -298,7 +301,7 @@ func builtinLength(i *Interpreter, args []Expr, env *Environment) (interface{}, 
 	}
 	switch v := arg.(type) {
 	case string:
-		return int64(len(v)), nil
+		return int64(len([]rune(v))), nil
 	case []interface{}:
 		return int64(len(v)), nil
 	default:
@@ -399,10 +402,11 @@ func builtinCharAt(i *Interpreter, args []Expr, env *Environment) (interface{}, 
 	if !ok {
 		return nil, fmt.Errorf("charAt() expects second argument to be an integer, got %T", indexArg)
 	}
-	if index < 0 || int(index) >= len(str) {
+	runes := []rune(str)
+	if index < 0 || int(index) >= len(runes) {
 		return nil, fmt.Errorf("charAt() index out of bounds: %d", index)
 	}
-	return string(str[index]), nil
+	return string(runes[index]), nil
 }
 
 func builtinParseInt(i *Interpreter, args []Expr, env *Environment) (interface{}, error) {
@@ -472,15 +476,15 @@ func builtinAbs(i *Interpreter, args []Expr, env *Environment) (interface{}, err
 	}
 	switch v := arg.(type) {
 	case int64:
+		if v == math.MinInt64 {
+			return nil, fmt.Errorf("abs() overflow: cannot negate minimum int64 value")
+		}
 		if v < 0 {
 			return -v, nil
 		}
 		return v, nil
 	case float64:
-		if v < 0 {
-			return -v, nil
-		}
-		return v, nil
+		return math.Abs(v), nil
 	default:
 		return nil, fmt.Errorf("abs() expects a numeric argument, got %T", arg)
 	}

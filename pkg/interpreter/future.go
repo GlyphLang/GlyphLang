@@ -130,18 +130,18 @@ func (f *Future) Value() interface{} {
 	defer f.mu.RUnlock()
 
 	if f.state != FutureResolved {
-		panic("Future.Value() called on non-resolved future")
+		return nil
 	}
 	return f.value
 }
 
-// Error returns the rejection error. Panics if the Future is not rejected.
+// Error returns the rejection error. Returns nil if the Future is not rejected.
 func (f *Future) Error() error {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
 	if f.state != FutureRejected {
-		panic("Future.Error() called on non-rejected future")
+		return nil
 	}
 	return f.err
 }

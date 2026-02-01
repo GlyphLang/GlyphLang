@@ -92,7 +92,7 @@ func (c *Compiler) compileWebSocketEvent(event ast.WebSocketEvent, routePath str
 	// Add halt at end
 	eventCompiler.emit(vm.OpHalt)
 
-	return eventCompiler.buildBytecode(), nil
+	return eventCompiler.buildBytecode()
 }
 
 // compileWebSocketStatement compiles a statement in WebSocket context

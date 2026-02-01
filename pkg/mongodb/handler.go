@@ -3,6 +3,7 @@ package mongodb
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -71,6 +72,9 @@ func (h *Handler) Collection(name string) *CollectionHandler {
 
 // FindOne returns the first document matching the filter.
 func (c *CollectionHandler) FindOne(filter map[string]interface{}) (map[string]interface{}, error) {
+	if err := validateFilter(filter); err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithTimeout(c.ctx, 10*time.Second)
 	defer cancel()
 
@@ -87,6 +91,9 @@ func (c *CollectionHandler) FindOne(filter map[string]interface{}) (map[string]i
 
 // Find returns all documents matching the filter.
 func (c *CollectionHandler) Find(filter map[string]interface{}) ([]map[string]interface{}, error) {
+	if err := validateFilter(filter); err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithTimeout(c.ctx, 30*time.Second)
 	defer cancel()
 
@@ -137,6 +144,9 @@ func (c *CollectionHandler) InsertMany(docs []map[string]interface{}) ([]interfa
 
 // UpdateOne updates the first document matching the filter.
 func (c *CollectionHandler) UpdateOne(filter map[string]interface{}, update map[string]interface{}) (int64, error) {
+	if err := validateFilter(filter); err != nil {
+		return 0, err
+	}
 	ctx, cancel := context.WithTimeout(c.ctx, 10*time.Second)
 	defer cancel()
 
@@ -161,6 +171,9 @@ func (c *CollectionHandler) UpdateMany(filter map[string]interface{}, update map
 
 // DeleteOne deletes the first document matching the filter.
 func (c *CollectionHandler) DeleteOne(filter map[string]interface{}) (int64, error) {
+	if err := validateFilter(filter); err != nil {
+		return 0, err
+	}
 	ctx, cancel := context.WithTimeout(c.ctx, 10*time.Second)
 	defer cancel()
 
@@ -173,6 +186,9 @@ func (c *CollectionHandler) DeleteOne(filter map[string]interface{}) (int64, err
 
 // DeleteMany deletes all documents matching the filter.
 func (c *CollectionHandler) DeleteMany(filter map[string]interface{}) (int64, error) {
+	if err := validateFilter(filter); err != nil {
+		return 0, err
+	}
 	ctx, cancel := context.WithTimeout(c.ctx, 30*time.Second)
 	defer cancel()
 
@@ -246,6 +262,24 @@ func (c *CollectionHandler) DropIndex(name string) error {
 	err := c.coll.Indexes().DropOne(ctx, name)
 	if err != nil {
 		return fmt.Errorf("dropIndex failed: %w", err)
+	}
+	return nil
+}
+
+// validateFilter checks that filter values do not contain MongoDB operator
+// injection. Filter values that are maps (which could contain operators like
+// $gt, $ne, $where, etc.) are rejected unless the key itself is a known
+// MongoDB operator (i.e., starts with "$").
+func validateFilter(filter map[string]interface{}) error {
+	for key, val := range filter {
+		// Allow explicit operator usage at the top level (e.g., $or, $and)
+		if strings.HasPrefix(key, "$") {
+			continue
+		}
+		// Reject map values for non-operator keys (prevents operator injection)
+		if _, isMap := val.(map[string]interface{}); isMap {
+			return fmt.Errorf("filter injection rejected: field %q contains a nested object (potential operator injection)", key)
+		}
 	}
 	return nil
 }

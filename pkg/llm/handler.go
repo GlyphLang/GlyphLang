@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -64,11 +65,19 @@ func NewHandler(provider string, apiKey string) *Handler {
 	return h
 }
 
-// NewHandlerWithBaseURL creates a handler with a custom base URL (e.g. for Ollama or proxies)
-func NewHandlerWithBaseURL(provider string, apiKey string, baseURL string) *Handler {
+// NewHandlerWithBaseURL creates a handler with a custom base URL (e.g. for Ollama or proxies).
+// The base URL must use http or https scheme.
+func NewHandlerWithBaseURL(provider string, apiKey string, baseURL string) (*Handler, error) {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid base URL: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return nil, fmt.Errorf("only http and https schemes are allowed, got %q", u.Scheme)
+	}
 	h := NewHandler(provider, apiKey)
 	h.baseURL = baseURL
-	return h
+	return h, nil
 }
 
 // Complete sends a non-streaming completion request and returns the response.

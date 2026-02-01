@@ -156,8 +156,12 @@ func startServer(filePath string, port int, forceInterpreter bool) (*http.Server
 	}
 
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
-		Handler: loggingMiddleware(mux),
+		Addr:           fmt.Sprintf(":%d", port),
+		Handler:        loggingMiddleware(mux),
+		ReadTimeout:    15 * time.Second,
+		WriteTimeout:   15 * time.Second,
+		IdleTimeout:    60 * time.Second,
+		MaxHeaderBytes: 1 << 20, // 1 MB
 	}
 
 	// Start server in background

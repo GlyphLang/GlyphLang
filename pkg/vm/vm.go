@@ -147,6 +147,21 @@ func (vm *VM) Execute(bytecode []byte) (Value, error) {
 	vm.pc = offset
 	vm.halted = false
 
+	return vm.runLoop()
+}
+
+// executeRaw runs raw instruction bytes without a bytecode header.
+// Constants, locals, globals, and builtins must already be set on the VM.
+func (vm *VM) executeRaw(instructions []byte) (Value, error) {
+	vm.code = instructions
+	vm.pc = 0
+	vm.halted = false
+
+	return vm.runLoop()
+}
+
+// runLoop is the core execution loop shared by Execute and executeRaw.
+func (vm *VM) runLoop() (Value, error) {
 	// Execute instructions with step limit to prevent infinite loops
 	steps := 0
 	for !vm.halted && vm.pc < len(vm.code) {
@@ -741,6 +756,11 @@ func (vm *VM) execIterHasNext() error {
 		return fmt.Errorf("cannot iterate over %s", coll.Type())
 	}
 
+	// Clean up exhausted iterators to prevent memory leaks
+	if !hasNext {
+		delete(vm.iterators, int(iterID.Val))
+	}
+
 	vm.Push(BoolValue{Val: hasNext})
 	return nil
 }
@@ -1248,8 +1268,16 @@ func (vm *VM) valuesEqual(a, b Value) bool {
 	return false
 }
 
+// maxStackSize is the maximum stack depth to prevent unbounded memory usage.
+const maxStackSize = 10000
+
 // Push adds a value to the stack
 func (vm *VM) Push(val Value) {
+	if len(vm.stack) >= maxStackSize {
+		// Silently drop to avoid panicking in hot paths; the step limit
+		// will catch runaway programs. In future versions this could return an error.
+		return
+	}
 	vm.stack = append(vm.stack, val)
 }
 
@@ -1324,7 +1352,7 @@ func (vm *VM) registerBuiltins() {
 		case ArrayValue:
 			return IntValue{Val: int64(len(val.Val))}, nil
 		case StringValue:
-			return IntValue{Val: int64(len(val.Val))}, nil
+			return IntValue{Val: int64(len([]rune(val.Val)))}, nil
 		default:
 			return nil, fmt.Errorf("length() requires array or string, got %T", val)
 		}
@@ -1466,14 +1494,15 @@ func (vm *VM) registerBuiltins() {
 		if start.Val > end.Val {
 			return nil, fmt.Errorf("substring() start index must be less than or equal to end index")
 		}
-		strLen := int64(len(str.Val))
+		runes := []rune(str.Val)
+		strLen := int64(len(runes))
 		if end.Val > strLen {
 			end.Val = strLen
 		}
 		if start.Val > strLen {
 			start.Val = strLen
 		}
-		return StringValue{Val: str.Val[start.Val:end.Val]}, nil
+		return StringValue{Val: string(runes[start.Val:end.Val])}, nil
 	}
 }
 
@@ -1828,6 +1857,11 @@ func (vm *VM) execAsync() error {
 
 	go func() {
 		defer close(future.Done)
+		defer func() {
+			if r := recover(); r != nil {
+				future.Error = fmt.Errorf("async panic: %v", r)
+			}
+		}()
 
 		// Create a new VM for the async execution
 		asyncVM := NewVM()
@@ -1836,8 +1870,8 @@ func (vm *VM) execAsync() error {
 		asyncVM.globals = globalsCopy
 		asyncVM.builtins = builtinsCopy
 
-		// Execute the async body
-		result, execErr := asyncVM.Execute(asyncBody)
+		// Execute the async body using raw instructions (no GLYP header)
+		result, execErr := asyncVM.executeRaw(asyncBody)
 		if execErr != nil {
 			future.Error = execErr
 		} else {
