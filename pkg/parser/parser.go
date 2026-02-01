@@ -1852,6 +1852,23 @@ func (p *Parser) parseStatement() (ast.Statement, error) {
 			}
 		}
 
+		// Check for index assignment: $ arr[0] = value or $ obj.field[0] = value
+		if p.check(LBRACKET) {
+			base := ast.VariableExpr{Name: varName}
+			lvalue, err := p.parseLValueExpr(base)
+			if err != nil {
+				return nil, err
+			}
+			if err := p.expect(EQUALS); err != nil {
+				return nil, err
+			}
+			value, err := p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+			return ast.IndexAssignStatement{Target: lvalue, Value: value}, nil
+		}
+
 		// Check for field access: obj.field or obj.field.subfield
 		target := varName
 		for p.check(DOT) {
@@ -1860,6 +1877,27 @@ func (p *Parser) parseStatement() (ast.Statement, error) {
 			if err != nil {
 				return nil, err
 			}
+
+			// Check for index assignment after field: $ obj.field[0] = value
+			if p.check(LBRACKET) {
+				base := ast.FieldAccessExpr{
+					Object: ast.VariableExpr{Name: target},
+					Field:  fieldName,
+				}
+				lvalue, err := p.parseLValueExpr(base)
+				if err != nil {
+					return nil, err
+				}
+				if err := p.expect(EQUALS); err != nil {
+					return nil, err
+				}
+				value, err := p.parseExpr()
+				if err != nil {
+					return nil, err
+				}
+				return ast.IndexAssignStatement{Target: lvalue, Value: value}, nil
+			}
+
 			target = target + "." + fieldName
 		}
 
@@ -1953,6 +1991,30 @@ func (p *Parser) parseStatement() (ast.Statement, error) {
 				return nil, err
 			}
 			return ast.YieldStatement{Value: value}, nil
+		}
+
+		// Speculative parse for index assignment: identifier[index] = expr
+		// If the next token is LBRACKET, try to parse an l-value chain followed by "=".
+		// On failure (parse error or no "=" after l-value), restore position and fall
+		// through to other statement paths (bare assignment, expression statement).
+		if p.peek(1).Type == LBRACKET {
+			savedPos := p.position
+			name := p.current().Literal
+			p.advance() // consume identifier
+			base := ast.VariableExpr{Name: name}
+			lvalue, err := p.parseLValueExpr(base)
+			if err != nil {
+				p.position = savedPos
+			} else if p.check(EQUALS) {
+				p.advance() // consume =
+				value, valErr := p.parseExpr()
+				if valErr != nil {
+					return nil, valErr
+				}
+				return ast.IndexAssignStatement{Target: lvalue, Value: value}, nil
+			} else {
+				p.position = savedPos
+			}
 		}
 
 		// Check for bare assignment (reassignment): identifier = expr
@@ -2912,6 +2974,34 @@ func (p *Parser) parseFieldAccess(base string) (ast.Expr, error) {
 	}
 
 	return object, nil
+}
+
+// parseLValueExpr parses a chain of [index] and .field postfix operations on a base expression
+// for use in index assignment l-values. Returns the full l-value expression chain.
+func (p *Parser) parseLValueExpr(base ast.Expr) (ast.Expr, error) {
+	expr := base
+	for {
+		if p.match(LBRACKET) {
+			index, err := p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+			if err := p.expect(RBRACKET); err != nil {
+				return nil, err
+			}
+			expr = ast.ArrayIndexExpr{Array: expr, Index: index}
+		} else if p.check(DOT) {
+			p.advance()
+			field, err := p.expectIdent()
+			if err != nil {
+				return nil, err
+			}
+			expr = ast.FieldAccessExpr{Object: expr, Field: field}
+		} else {
+			break
+		}
+	}
+	return expr, nil
 }
 
 // parseArrayIndex parses array indexing: array[index] or array[index][index2]

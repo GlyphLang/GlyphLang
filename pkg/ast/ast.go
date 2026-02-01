@@ -251,6 +251,17 @@ type ReassignStatement struct {
 func (ReassignStatement) isStatement() {}
 func (ReassignStatement) isNode()      {}
 
+// IndexAssignStatement represents assignment to an indexed or field target.
+// Target must be ArrayIndexExpr or FieldAccessExpr (enforced by the parser).
+// Example: arr[0] = 99, obj.list[0] = "updated", arr[0].name = "new"
+type IndexAssignStatement struct {
+	Target Expr
+	Value  Expr
+}
+
+func (IndexAssignStatement) isStatement() {}
+func (IndexAssignStatement) isNode()      {}
+
 // DbQueryStatement represents a database query
 type DbQueryStatement struct {
 	Var    string

@@ -316,6 +316,17 @@ func (i *Interpreter) evaluateAdd(left, right interface{}) (interface{}, error) 
 		return leftStr + rightStr, nil
 	}
 
+	// Array concatenation
+	if leftArr, ok := left.([]interface{}); ok {
+		if rightArr, ok := right.([]interface{}); ok {
+			result := make([]interface{}, len(leftArr)+len(rightArr))
+			copy(result, leftArr)
+			copy(result[len(leftArr):], rightArr)
+			return result, nil
+		}
+		return nil, fmt.Errorf("cannot add array and %T", right)
+	}
+
 	// Numeric addition with automatic coercion
 	coercedLeft, coercedRight, _ := CoerceNumeric(left, right)
 
