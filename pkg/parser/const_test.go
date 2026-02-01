@@ -1,9 +1,9 @@
 package parser
 
 import (
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -84,22 +84,22 @@ func TestParser_ConstDecl(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		checkAST func(t *testing.T, module *interpreter.Module)
+		checkAST func(t *testing.T, module *ast.Module)
 	}{
 		{
 			name:  "simple const declaration",
 			input: "const MAX_SIZE = 100",
-			checkAST: func(t *testing.T, module *interpreter.Module) {
+			checkAST: func(t *testing.T, module *ast.Module) {
 				require.Len(t, module.Items, 1)
-				constDecl, ok := module.Items[0].(*interpreter.ConstDecl)
+				constDecl, ok := module.Items[0].(*ast.ConstDecl)
 				require.True(t, ok, "expected ConstDecl, got %T", module.Items[0])
 				assert.Equal(t, "MAX_SIZE", constDecl.Name)
 				assert.Nil(t, constDecl.Type)
 
 				// Check value is integer literal
-				lit, ok := constDecl.Value.(interpreter.LiteralExpr)
+				lit, ok := constDecl.Value.(ast.LiteralExpr)
 				require.True(t, ok)
-				intLit, ok := lit.Value.(interpreter.IntLiteral)
+				intLit, ok := lit.Value.(ast.IntLiteral)
 				require.True(t, ok)
 				assert.Equal(t, int64(100), intLit.Value)
 			},
@@ -107,15 +107,15 @@ func TestParser_ConstDecl(t *testing.T) {
 		{
 			name:  "const with string value",
 			input: `const API_URL = "https://api.example.com"`,
-			checkAST: func(t *testing.T, module *interpreter.Module) {
+			checkAST: func(t *testing.T, module *ast.Module) {
 				require.Len(t, module.Items, 1)
-				constDecl, ok := module.Items[0].(*interpreter.ConstDecl)
+				constDecl, ok := module.Items[0].(*ast.ConstDecl)
 				require.True(t, ok)
 				assert.Equal(t, "API_URL", constDecl.Name)
 
-				lit, ok := constDecl.Value.(interpreter.LiteralExpr)
+				lit, ok := constDecl.Value.(ast.LiteralExpr)
 				require.True(t, ok)
-				strLit, ok := lit.Value.(interpreter.StringLiteral)
+				strLit, ok := lit.Value.(ast.StringLiteral)
 				require.True(t, ok)
 				assert.Equal(t, "https://api.example.com", strLit.Value)
 			},
@@ -123,16 +123,16 @@ func TestParser_ConstDecl(t *testing.T) {
 		{
 			name:  "const with type annotation",
 			input: "const PI: float = 3.14159",
-			checkAST: func(t *testing.T, module *interpreter.Module) {
+			checkAST: func(t *testing.T, module *ast.Module) {
 				require.Len(t, module.Items, 1)
-				constDecl, ok := module.Items[0].(*interpreter.ConstDecl)
+				constDecl, ok := module.Items[0].(*ast.ConstDecl)
 				require.True(t, ok)
 				assert.Equal(t, "PI", constDecl.Name)
 				assert.NotNil(t, constDecl.Type)
 
-				lit, ok := constDecl.Value.(interpreter.LiteralExpr)
+				lit, ok := constDecl.Value.(ast.LiteralExpr)
 				require.True(t, ok)
-				floatLit, ok := lit.Value.(interpreter.FloatLiteral)
+				floatLit, ok := lit.Value.(ast.FloatLiteral)
 				require.True(t, ok)
 				assert.InDelta(t, 3.14159, floatLit.Value, 0.00001)
 			},
@@ -140,15 +140,15 @@ func TestParser_ConstDecl(t *testing.T) {
 		{
 			name:  "const with expression value",
 			input: "const DOUBLED = 50 * 2",
-			checkAST: func(t *testing.T, module *interpreter.Module) {
+			checkAST: func(t *testing.T, module *ast.Module) {
 				require.Len(t, module.Items, 1)
-				constDecl, ok := module.Items[0].(*interpreter.ConstDecl)
+				constDecl, ok := module.Items[0].(*ast.ConstDecl)
 				require.True(t, ok)
 				assert.Equal(t, "DOUBLED", constDecl.Name)
 
-				binOp, ok := constDecl.Value.(interpreter.BinaryOpExpr)
+				binOp, ok := constDecl.Value.(ast.BinaryOpExpr)
 				require.True(t, ok, "expected BinaryOpExpr, got %T", constDecl.Value)
-				assert.Equal(t, interpreter.Mul, binOp.Op)
+				assert.Equal(t, ast.Mul, binOp.Op)
 			},
 		},
 		{
@@ -156,10 +156,10 @@ func TestParser_ConstDecl(t *testing.T) {
 			input: `const A = 1
 const B = 2
 const C = 3`,
-			checkAST: func(t *testing.T, module *interpreter.Module) {
+			checkAST: func(t *testing.T, module *ast.Module) {
 				require.Len(t, module.Items, 3)
 				for i, item := range module.Items {
-					constDecl, ok := item.(*interpreter.ConstDecl)
+					constDecl, ok := item.(*ast.ConstDecl)
 					require.True(t, ok, "item %d: expected ConstDecl, got %T", i, item)
 					expected := string('A' + rune(i))
 					assert.Equal(t, expected, constDecl.Name)
@@ -205,17 +205,17 @@ const DEFAULT_TIMEOUT = 30`
 	require.Len(t, module.Items, 3)
 
 	// First item: const
-	constDecl1, ok := module.Items[0].(*interpreter.ConstDecl)
+	constDecl1, ok := module.Items[0].(*ast.ConstDecl)
 	require.True(t, ok)
 	assert.Equal(t, "MAX_RETRIES", constDecl1.Name)
 
 	// Second item: type
-	typeDef, ok := module.Items[1].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[1].(*ast.TypeDef)
 	require.True(t, ok)
 	assert.Equal(t, "User", typeDef.Name)
 
 	// Third item: const
-	constDecl2, ok := module.Items[2].(*interpreter.ConstDecl)
+	constDecl2, ok := module.Items[2].(*ast.ConstDecl)
 	require.True(t, ok)
 	assert.Equal(t, "DEFAULT_TIMEOUT", constDecl2.Name)
 }

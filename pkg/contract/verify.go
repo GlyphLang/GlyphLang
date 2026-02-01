@@ -2,9 +2,8 @@ package contract
 
 import (
 	"fmt"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"strings"
-
-	"github.com/glyphlang/glyph/pkg/interpreter"
 )
 
 // Violation represents a contract violation found during verification
@@ -62,7 +61,7 @@ type ConsumerResult struct {
 
 // Verify checks if the routes in a module satisfy a contract definition.
 // It compares each contract endpoint against the routes found in the module's items.
-func Verify(contract interpreter.ContractDef, moduleItems []interpreter.Item) VerifyResult {
+func Verify(contract ast.ContractDef, moduleItems []ast.Item) VerifyResult {
 	result := VerifyResult{
 		ContractName: contract.Name,
 	}
@@ -100,19 +99,19 @@ func Verify(contract interpreter.ContractDef, moduleItems []interpreter.Item) Ve
 // Diff compares two contracts and identifies breaking changes.
 // A breaking change is a removal or return type change of an existing endpoint.
 // An addition is a new endpoint not in the old contract.
-func Diff(oldContract, newContract interpreter.ContractDef) DiffResult {
+func Diff(oldContract, newContract ast.ContractDef) DiffResult {
 	result := DiffResult{
 		OldName: oldContract.Name,
 		NewName: newContract.Name,
 	}
 
-	oldEndpoints := make(map[string]interpreter.ContractEndpoint)
+	oldEndpoints := make(map[string]ast.ContractEndpoint)
 	for _, ep := range oldContract.Endpoints {
 		key := endpointKey(ep.Method.String(), ep.Path)
 		oldEndpoints[key] = ep
 	}
 
-	newEndpoints := make(map[string]interpreter.ContractEndpoint)
+	newEndpoints := make(map[string]ast.ContractEndpoint)
 	for _, ep := range newContract.Endpoints {
 		key := endpointKey(ep.Method.String(), ep.Path)
 		newEndpoints[key] = ep
@@ -159,13 +158,13 @@ func Diff(oldContract, newContract interpreter.ContractDef) DiffResult {
 }
 
 // VerifyConsumer checks if a provider contract satisfies consumer expectations.
-func VerifyConsumer(consumer string, contract interpreter.ContractDef, expectations []ConsumerExpectation) ConsumerResult {
+func VerifyConsumer(consumer string, contract ast.ContractDef, expectations []ConsumerExpectation) ConsumerResult {
 	result := ConsumerResult{
 		Consumer: consumer,
 		Provider: contract.Name,
 	}
 
-	endpointMap := make(map[string]interpreter.ContractEndpoint)
+	endpointMap := make(map[string]ast.ContractEndpoint)
 	for _, ep := range contract.Endpoints {
 		key := endpointKey(ep.Method.String(), ep.Path)
 		endpointMap[key] = ep
@@ -195,10 +194,10 @@ func VerifyConsumer(consumer string, contract interpreter.ContractDef, expectati
 }
 
 // buildRouteMap extracts routes from module items into a lookup map
-func buildRouteMap(items []interpreter.Item) map[string]*interpreter.Route {
-	routes := make(map[string]*interpreter.Route)
+func buildRouteMap(items []ast.Item) map[string]*ast.Route {
+	routes := make(map[string]*ast.Route)
 	for _, item := range items {
-		if route, ok := item.(*interpreter.Route); ok {
+		if route, ok := item.(*ast.Route); ok {
 			key := endpointKey(route.Method.String(), route.Path)
 			routes[key] = route
 		}
@@ -212,23 +211,23 @@ func endpointKey(method, path string) string {
 }
 
 // typeString returns a human-readable string for a type
-func typeString(t interpreter.Type) string {
+func typeString(t ast.Type) string {
 	switch tt := t.(type) {
-	case interpreter.IntType:
+	case ast.IntType:
 		return "int"
-	case interpreter.StringType:
+	case ast.StringType:
 		return "string"
-	case interpreter.BoolType:
+	case ast.BoolType:
 		return "bool"
-	case interpreter.FloatType:
+	case ast.FloatType:
 		return "float"
-	case interpreter.NamedType:
+	case ast.NamedType:
 		return tt.Name
-	case interpreter.ArrayType:
+	case ast.ArrayType:
 		return "[" + typeString(tt.ElementType) + "]"
-	case interpreter.OptionalType:
+	case ast.OptionalType:
 		return typeString(tt.InnerType) + "?"
-	case interpreter.UnionType:
+	case ast.UnionType:
 		parts := make([]string, len(tt.Types))
 		for i, ut := range tt.Types {
 			parts[i] = typeString(ut)
@@ -244,15 +243,15 @@ func typeString(t interpreter.Type) string {
 // - They are the same type
 // - The implementation type is a union containing the contract type
 // - Both are union types with matching members
-func typesCompatible(contractType, implType interpreter.Type) bool {
+func typesCompatible(contractType, implType ast.Type) bool {
 	// Same concrete type
 	if typeString(contractType) == typeString(implType) {
 		return true
 	}
 
 	// Union type compatibility: contract union must be subset of impl union
-	contractUnion, contractIsUnion := contractType.(interpreter.UnionType)
-	implUnion, implIsUnion := implType.(interpreter.UnionType)
+	contractUnion, contractIsUnion := contractType.(ast.UnionType)
+	implUnion, implIsUnion := implType.(ast.UnionType)
 
 	if contractIsUnion && implIsUnion {
 		// All contract union members must be in impl union

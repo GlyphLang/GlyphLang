@@ -440,9 +440,9 @@ func TestParserStatements(t *testing.T) {
 				t.Fatalf("Parse failed: %v", err)
 			}
 			bytecode, err := comp.Compile(module)
-			// TODO: Some statement types may not be fully implemented yet
+			// Some statement types may not be fully implemented yet in the compiler.
 			if err != nil {
-				t.Logf("Statement parsing not fully implemented: %v", err)
+				t.Skipf("Skipping: statement compilation not fully implemented: %v", err)
 			} else {
 				helper.AssertNotNil(bytecode, "Bytecode should not be nil")
 			}

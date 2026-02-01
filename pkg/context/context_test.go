@@ -2,13 +2,12 @@ package context
 
 import (
 	"encoding/json"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/glyphlang/glyph/pkg/interpreter"
 )
 
 func TestNewGenerator(t *testing.T) {
@@ -77,39 +76,39 @@ func TestContains(t *testing.T) {
 func TestTypeToString(t *testing.T) {
 	tests := []struct {
 		name string
-		typ  interpreter.Type
+		typ  ast.Type
 		want string
 	}{
 		{"nil type", nil, "any"},
-		{"int type", interpreter.IntType{}, "int"},
-		{"string type", interpreter.StringType{}, "string"},
-		{"bool type", interpreter.BoolType{}, "bool"},
-		{"float type", interpreter.FloatType{}, "float"},
-		{"named type", interpreter.NamedType{Name: "User"}, "User"},
-		{"array type", interpreter.ArrayType{ElementType: interpreter.StringType{}}, "[string]"},
-		{"optional type", interpreter.OptionalType{InnerType: interpreter.IntType{}}, "int?"},
-		{"database type", interpreter.DatabaseType{}, "Database"},
+		{"int type", ast.IntType{}, "int"},
+		{"string type", ast.StringType{}, "string"},
+		{"bool type", ast.BoolType{}, "bool"},
+		{"float type", ast.FloatType{}, "float"},
+		{"named type", ast.NamedType{Name: "User"}, "User"},
+		{"array type", ast.ArrayType{ElementType: ast.StringType{}}, "[string]"},
+		{"optional type", ast.OptionalType{InnerType: ast.IntType{}}, "int?"},
+		{"database type", ast.DatabaseType{}, "Database"},
 		{
 			"union type",
-			interpreter.UnionType{Types: []interpreter.Type{interpreter.StringType{}, interpreter.IntType{}}},
+			ast.UnionType{Types: []ast.Type{ast.StringType{}, ast.IntType{}}},
 			"string | int",
 		},
 		{
 			"function type",
-			interpreter.FunctionType{
-				ParamTypes: []interpreter.Type{interpreter.StringType{}, interpreter.IntType{}},
-				ReturnType: interpreter.BoolType{},
+			ast.FunctionType{
+				ParamTypes: []ast.Type{ast.StringType{}, ast.IntType{}},
+				ReturnType: ast.BoolType{},
 			},
 			"(string, int) -> bool",
 		},
 		{
 			"nested array",
-			interpreter.ArrayType{ElementType: interpreter.ArrayType{ElementType: interpreter.IntType{}}},
+			ast.ArrayType{ElementType: ast.ArrayType{ElementType: ast.IntType{}}},
 			"[[int]]",
 		},
 		{
 			"optional array",
-			interpreter.OptionalType{InnerType: interpreter.ArrayType{ElementType: interpreter.StringType{}}},
+			ast.OptionalType{InnerType: ast.ArrayType{ElementType: ast.StringType{}}},
 			"[string]?",
 		},
 	}
@@ -125,9 +124,9 @@ func TestTypeToString(t *testing.T) {
 }
 
 func TestTypeToStringGeneric(t *testing.T) {
-	genericType := interpreter.GenericType{
-		BaseType: interpreter.NamedType{Name: "List"},
-		TypeArgs: []interpreter.Type{interpreter.StringType{}},
+	genericType := ast.GenericType{
+		BaseType: ast.NamedType{Name: "List"},
+		TypeArgs: []ast.Type{ast.StringType{}},
 	}
 	got := typeToString(genericType)
 	want := "List<string>"
@@ -137,14 +136,14 @@ func TestTypeToStringGeneric(t *testing.T) {
 }
 
 func TestExtractTypeInfo(t *testing.T) {
-	typeDef := &interpreter.TypeDef{
+	typeDef := &ast.TypeDef{
 		Name: "User",
-		Fields: []interpreter.Field{
-			{Name: "id", TypeAnnotation: interpreter.IntType{}, Required: true},
-			{Name: "name", TypeAnnotation: interpreter.StringType{}, Required: true},
-			{Name: "email", TypeAnnotation: interpreter.StringType{}, Required: false},
+		Fields: []ast.Field{
+			{Name: "id", TypeAnnotation: ast.IntType{}, Required: true},
+			{Name: "name", TypeAnnotation: ast.StringType{}, Required: true},
+			{Name: "email", TypeAnnotation: ast.StringType{}, Required: false},
 		},
-		TypeParams: []interpreter.TypeParameter{},
+		TypeParams: []ast.TypeParameter{},
 	}
 
 	info := extractTypeInfo(typeDef)
@@ -173,13 +172,13 @@ func TestExtractTypeInfo(t *testing.T) {
 }
 
 func TestExtractTypeInfoWithTypeParams(t *testing.T) {
-	typeDef := &interpreter.TypeDef{
+	typeDef := &ast.TypeDef{
 		Name: "Result",
-		Fields: []interpreter.Field{
-			{Name: "value", TypeAnnotation: interpreter.NamedType{Name: "T"}, Required: false},
-			{Name: "error", TypeAnnotation: interpreter.StringType{}, Required: false},
+		Fields: []ast.Field{
+			{Name: "value", TypeAnnotation: ast.NamedType{Name: "T"}, Required: false},
+			{Name: "error", TypeAnnotation: ast.StringType{}, Required: false},
 		},
-		TypeParams: []interpreter.TypeParameter{
+		TypeParams: []ast.TypeParameter{
 			{Name: "T"},
 			{Name: "E"},
 		},
@@ -196,19 +195,19 @@ func TestExtractTypeInfoWithTypeParams(t *testing.T) {
 }
 
 func TestExtractRouteInfo(t *testing.T) {
-	route := &interpreter.Route{
-		Method:     interpreter.Get,
+	route := &ast.Route{
+		Method:     ast.Get,
 		Path:       "/users/:id",
-		ReturnType: interpreter.NamedType{Name: "User"},
-		Auth: &interpreter.AuthConfig{
+		ReturnType: ast.NamedType{Name: "User"},
+		Auth: &ast.AuthConfig{
 			AuthType: "jwt",
 			Required: true,
 		},
-		Injections: []interpreter.Injection{
+		Injections: []ast.Injection{
 			{Name: "db"},
 		},
-		QueryParams: []interpreter.QueryParamDecl{
-			{Name: "include", Type: interpreter.StringType{}, Required: false},
+		QueryParams: []ast.QueryParamDecl{
+			{Name: "include", Type: ast.StringType{}, Required: false},
 		},
 	}
 
@@ -241,14 +240,14 @@ func TestExtractRouteInfo(t *testing.T) {
 }
 
 func TestExtractFunctionInfo(t *testing.T) {
-	fn := &interpreter.Function{
+	fn := &ast.Function{
 		Name: "formatUser",
-		Params: []interpreter.Field{
-			{Name: "user", TypeAnnotation: interpreter.NamedType{Name: "User"}, Required: true},
-			{Name: "format", TypeAnnotation: interpreter.StringType{}, Required: false},
+		Params: []ast.Field{
+			{Name: "user", TypeAnnotation: ast.NamedType{Name: "User"}, Required: true},
+			{Name: "format", TypeAnnotation: ast.StringType{}, Required: false},
 		},
-		ReturnType: interpreter.StringType{},
-		TypeParams: []interpreter.TypeParameter{},
+		ReturnType: ast.StringType{},
+		TypeParams: []ast.TypeParameter{},
 	}
 
 	info := extractFunctionInfo(fn)
@@ -271,12 +270,12 @@ func TestExtractFunctionInfo(t *testing.T) {
 }
 
 func TestExtractCommandInfo(t *testing.T) {
-	cmd := &interpreter.Command{
+	cmd := &ast.Command{
 		Name:        "deploy",
 		Description: "Deploy the application",
-		Params: []interpreter.CommandParam{
-			{Name: "env", Type: interpreter.StringType{}, Required: true, IsFlag: false},
-			{Name: "force", Type: interpreter.BoolType{}, Required: false, IsFlag: true},
+		Params: []ast.CommandParam{
+			{Name: "env", Type: ast.StringType{}, Required: true, IsFlag: false},
+			{Name: "force", Type: ast.BoolType{}, Required: false, IsFlag: true},
 		},
 	}
 
@@ -940,8 +939,8 @@ func TestDiffRoutesNilContext(t *testing.T) {
 }
 
 func TestExtractRouteInfoNoAuth(t *testing.T) {
-	route := &interpreter.Route{
-		Method: interpreter.Post,
+	route := &ast.Route{
+		Method: ast.Post,
 		Path:   "/api/data",
 		Auth:   nil,
 	}
@@ -954,9 +953,9 @@ func TestExtractRouteInfoNoAuth(t *testing.T) {
 }
 
 func TestExtractFunctionInfoNoReturn(t *testing.T) {
-	fn := &interpreter.Function{
+	fn := &ast.Function{
 		Name:       "doSomething",
-		Params:     []interpreter.Field{},
+		Params:     []ast.Field{},
 		ReturnType: nil,
 	}
 
@@ -1311,12 +1310,12 @@ func TestDiffRoutesRemoved(t *testing.T) {
 }
 
 func TestExtractRouteInfoRequiredQueryParam(t *testing.T) {
-	route := &interpreter.Route{
-		Method: interpreter.Get,
+	route := &ast.Route{
+		Method: ast.Get,
 		Path:   "/search",
-		QueryParams: []interpreter.QueryParamDecl{
-			{Name: "q", Type: interpreter.StringType{}, Required: true},
-			{Name: "limit", Type: interpreter.IntType{}, Required: false},
+		QueryParams: []ast.QueryParamDecl{
+			{Name: "q", Type: ast.StringType{}, Required: true},
+			{Name: "limit", Type: ast.IntType{}, Required: false},
 		},
 	}
 
@@ -1334,13 +1333,13 @@ func TestExtractRouteInfoRequiredQueryParam(t *testing.T) {
 }
 
 func TestExtractFunctionInfoWithTypeParams(t *testing.T) {
-	fn := &interpreter.Function{
+	fn := &ast.Function{
 		Name: "map",
-		Params: []interpreter.Field{
-			{Name: "arr", TypeAnnotation: interpreter.ArrayType{ElementType: interpreter.NamedType{Name: "T"}}, Required: true},
+		Params: []ast.Field{
+			{Name: "arr", TypeAnnotation: ast.ArrayType{ElementType: ast.NamedType{Name: "T"}}, Required: true},
 		},
-		ReturnType: interpreter.ArrayType{ElementType: interpreter.NamedType{Name: "U"}},
-		TypeParams: []interpreter.TypeParameter{
+		ReturnType: ast.ArrayType{ElementType: ast.NamedType{Name: "U"}},
+		TypeParams: []ast.TypeParameter{
 			{Name: "T"},
 			{Name: "U"},
 		},
@@ -1358,7 +1357,7 @@ func TestExtractFunctionInfoWithTypeParams(t *testing.T) {
 
 func TestTypeToStringTypeParameterType(t *testing.T) {
 	// Test TypeParameterType (used inside generic definitions)
-	typ := interpreter.TypeParameterType{Name: "T"}
+	typ := ast.TypeParameterType{Name: "T"}
 	// TypeParameterType should fall through to default case
 	got := typeToString(typ)
 	if got != "any" {

@@ -2,9 +2,8 @@ package graphql
 
 import (
 	"fmt"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"strings"
-
-	"github.com/glyphlang/glyph/pkg/interpreter"
 )
 
 // Schema represents a GraphQL schema built from Glyph type definitions and resolvers.
@@ -12,7 +11,7 @@ type Schema struct {
 	Types     map[string]*ObjectType
 	Query     *ObjectType
 	Mutation  *ObjectType
-	Resolvers map[string]interpreter.GraphQLResolver // key: "operation.fieldName"
+	Resolvers map[string]ast.GraphQLResolver // key: "operation.fieldName"
 }
 
 // ObjectType represents a GraphQL object type with fields.
@@ -39,7 +38,7 @@ type ArgDef struct {
 }
 
 // BuildSchema constructs a GraphQL schema from interpreter type definitions and resolvers.
-func BuildSchema(typeDefs map[string]interpreter.TypeDef, resolvers map[string]interpreter.GraphQLResolver) *Schema {
+func BuildSchema(typeDefs map[string]ast.TypeDef, resolvers map[string]ast.GraphQLResolver) *Schema {
 	schema := &Schema{
 		Types:     make(map[string]*ObjectType),
 		Resolvers: resolvers,
@@ -148,38 +147,38 @@ func writeObjectType(b *strings.Builder, objType *ObjectType) {
 	b.WriteString("}\n")
 }
 
-func convertField(field interpreter.Field) *FieldDef {
+func convertField(field ast.Field) *FieldDef {
 	fd := &FieldDef{
 		Name:       field.Name,
 		Type:       typeToGraphQL(field.TypeAnnotation),
 		IsNullable: !field.Required,
 	}
-	if _, ok := field.TypeAnnotation.(interpreter.ArrayType); ok {
+	if _, ok := field.TypeAnnotation.(ast.ArrayType); ok {
 		fd.IsList = true
 	}
 	return fd
 }
 
-func typeToGraphQL(t interpreter.Type) string {
+func typeToGraphQL(t ast.Type) string {
 	if t == nil {
 		return "String"
 	}
 	switch v := t.(type) {
-	case interpreter.IntType:
+	case ast.IntType:
 		return "Int"
-	case interpreter.StringType:
+	case ast.StringType:
 		return "String"
-	case interpreter.BoolType:
+	case ast.BoolType:
 		return "Boolean"
-	case interpreter.FloatType:
+	case ast.FloatType:
 		return "Float"
-	case interpreter.ArrayType:
+	case ast.ArrayType:
 		return "[" + typeToGraphQL(v.ElementType) + "]"
-	case interpreter.OptionalType:
+	case ast.OptionalType:
 		return typeToGraphQL(v.InnerType)
-	case interpreter.NamedType:
+	case ast.NamedType:
 		return v.Name
-	case interpreter.UnionType:
+	case ast.UnionType:
 		// GraphQL unions are more complex; use the first type as primary
 		if len(v.Types) > 0 {
 			return typeToGraphQL(v.Types[0])

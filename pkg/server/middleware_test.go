@@ -814,29 +814,34 @@ func TestGetClientIP(t *testing.T) {
 		remoteAddr    string
 		xForwardedFor string
 		xRealIP       string
+		trustProxy    bool
 		expectedIP    string
 	}{
 		{
 			name:       "use RemoteAddr when no proxy headers",
 			remoteAddr: "192.168.1.100:12345",
+			trustProxy: true,
 			expectedIP: "192.168.1.100:12345",
 		},
 		{
 			name:          "prefer X-Forwarded-For over RemoteAddr from trusted proxy",
 			remoteAddr:    "10.0.0.1:12345",
 			xForwardedFor: "203.0.113.195",
+			trustProxy:    true,
 			expectedIP:    "203.0.113.195",
 		},
 		{
 			name:          "X-Forwarded-For with multiple IPs uses first from trusted proxy",
 			remoteAddr:    "10.0.0.1:12345",
 			xForwardedFor: "203.0.113.195, 70.41.3.18, 150.172.238.178",
+			trustProxy:    true,
 			expectedIP:    "203.0.113.195",
 		},
 		{
 			name:       "prefer X-Real-IP over RemoteAddr from trusted proxy",
 			remoteAddr: "10.0.0.1:12345",
 			xRealIP:    "203.0.113.100",
+			trustProxy: true,
 			expectedIP: "203.0.113.100",
 		},
 		{
@@ -844,14 +849,30 @@ func TestGetClientIP(t *testing.T) {
 			remoteAddr:    "10.0.0.1:12345",
 			xForwardedFor: "203.0.113.195",
 			xRealIP:       "203.0.113.100",
+			trustProxy:    true,
 			expectedIP:    "203.0.113.195",
 		},
 		{
-			name:          "ignore proxy headers from untrusted proxy",
+			name:          "ignore proxy headers from untrusted proxy IP",
 			remoteAddr:    "192.168.1.50:12345",
 			xForwardedFor: "203.0.113.195",
 			xRealIP:       "203.0.113.100",
+			trustProxy:    true,
 			expectedIP:    "192.168.1.50:12345",
+		},
+		{
+			name:          "ignore X-Forwarded-For when trustProxy is false",
+			remoteAddr:    "10.0.0.1:12345",
+			xForwardedFor: "203.0.113.195",
+			trustProxy:    false,
+			expectedIP:    "10.0.0.1:12345",
+		},
+		{
+			name:       "ignore X-Real-IP when trustProxy is false",
+			remoteAddr: "10.0.0.1:12345",
+			xRealIP:    "203.0.113.100",
+			trustProxy: false,
+			expectedIP: "10.0.0.1:12345",
 		},
 	}
 
@@ -866,7 +887,7 @@ func TestGetClientIP(t *testing.T) {
 				req.Header.Set("X-Real-IP", tt.xRealIP)
 			}
 
-			ip := getClientIP(req)
+			ip := getClientIP(req, tt.trustProxy)
 			if ip != tt.expectedIP {
 				t.Errorf("getClientIP() = %q, want %q", ip, tt.expectedIP)
 			}

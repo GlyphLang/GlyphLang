@@ -4,11 +4,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 )
 
 // Helper function: lex and parse source code, returning module or error
-func parseSource(t *testing.T, source string) *interpreter.Module {
+func parseSource(t *testing.T, source string) *ast.Module {
 	t.Helper()
 	lexer := NewLexer(source)
 	tokens, err := lexer.Tokenize()
@@ -299,7 +299,7 @@ func TestParseQuoteExprDirect(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	quoteExpr, ok := expr.(interpreter.QuoteExpr)
+	quoteExpr, ok := expr.(ast.QuoteExpr)
 	if !ok {
 		t.Fatalf("expected QuoteExpr, got %T", expr)
 	}
@@ -315,7 +315,7 @@ func TestParseQuoteExprWithReturn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	quoteExpr, ok := expr.(interpreter.QuoteExpr)
+	quoteExpr, ok := expr.(ast.QuoteExpr)
 	if !ok {
 		t.Fatalf("expected QuoteExpr, got %T", expr)
 	}
@@ -331,7 +331,7 @@ func TestParseQuoteExprWithIfStatement(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	quoteExpr, ok := expr.(interpreter.QuoteExpr)
+	quoteExpr, ok := expr.(ast.QuoteExpr)
 	if !ok {
 		t.Fatalf("expected QuoteExpr, got %T", expr)
 	}
@@ -347,7 +347,7 @@ func TestParseQuoteExprWithMultipleStatements(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	quoteExpr, ok := expr.(interpreter.QuoteExpr)
+	quoteExpr, ok := expr.(ast.QuoteExpr)
 	if !ok {
 		t.Fatalf("expected QuoteExpr, got %T", expr)
 	}
@@ -363,7 +363,7 @@ func TestParseQuoteExprEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	quoteExpr, ok := expr.(interpreter.QuoteExpr)
+	quoteExpr, ok := expr.(ast.QuoteExpr)
 	if !ok {
 		t.Fatalf("expected QuoteExpr, got %T", expr)
 	}
@@ -383,11 +383,11 @@ func TestParseExpressionPublic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	lit, ok := expr.(interpreter.LiteralExpr)
+	lit, ok := expr.(ast.LiteralExpr)
 	if !ok {
 		t.Fatalf("expected LiteralExpr, got %T", expr)
 	}
-	intLit, ok := lit.Value.(interpreter.IntLiteral)
+	intLit, ok := lit.Value.(ast.IntLiteral)
 	if !ok {
 		t.Fatalf("expected IntLiteral, got %T", lit.Value)
 	}
@@ -403,11 +403,11 @@ func TestParseExpressionPublicString(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	lit, ok := expr.(interpreter.LiteralExpr)
+	lit, ok := expr.(ast.LiteralExpr)
 	if !ok {
 		t.Fatalf("expected LiteralExpr, got %T", expr)
 	}
-	strLit, ok := lit.Value.(interpreter.StringLiteral)
+	strLit, ok := lit.Value.(ast.StringLiteral)
 	if !ok {
 		t.Fatalf("expected StringLiteral, got %T", lit.Value)
 	}
@@ -423,11 +423,11 @@ func TestParseExpressionPublicBinaryOp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	binExpr, ok := expr.(interpreter.BinaryOpExpr)
+	binExpr, ok := expr.(ast.BinaryOpExpr)
 	if !ok {
 		t.Fatalf("expected BinaryOpExpr, got %T", expr)
 	}
-	if binExpr.Op != interpreter.Add {
+	if binExpr.Op != ast.Add {
 		t.Errorf("expected Add op, got %v", binExpr.Op)
 	}
 }
@@ -448,7 +448,7 @@ func TestParseExpressionPublicWithNewlines(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	_, ok := expr.(interpreter.LiteralExpr)
+	_, ok := expr.(ast.LiteralExpr)
 	if !ok {
 		t.Fatalf("expected LiteralExpr, got %T", expr)
 	}
@@ -461,11 +461,11 @@ func TestParseExpressionPublicBool(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	lit, ok := expr.(interpreter.LiteralExpr)
+	lit, ok := expr.(ast.LiteralExpr)
 	if !ok {
 		t.Fatalf("expected LiteralExpr, got %T", expr)
 	}
-	_, ok = lit.Value.(interpreter.BoolLiteral)
+	_, ok = lit.Value.(ast.BoolLiteral)
 	if !ok {
 		t.Fatalf("expected BoolLiteral, got %T", lit.Value)
 	}
@@ -478,7 +478,7 @@ func TestParseExpressionPublicFunctionCall(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	callExpr, ok := expr.(interpreter.FunctionCallExpr)
+	callExpr, ok := expr.(ast.FunctionCallExpr)
 	if !ok {
 		t.Fatalf("expected FunctionCallExpr, got %T", expr)
 	}
@@ -498,7 +498,7 @@ func TestParseStatementPublicAssign(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	assign, ok := stmt.(interpreter.AssignStatement)
+	assign, ok := stmt.(ast.AssignStatement)
 	if !ok {
 		t.Fatalf("expected AssignStatement, got %T", stmt)
 	}
@@ -514,7 +514,7 @@ func TestParseStatementPublicReturn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	ret, ok := stmt.(interpreter.ReturnStatement)
+	ret, ok := stmt.(ast.ReturnStatement)
 	if !ok {
 		t.Fatalf("expected ReturnStatement, got %T", stmt)
 	}
@@ -539,7 +539,7 @@ func TestParseStatementPublicWithNewlines(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	assign, ok := stmt.(interpreter.AssignStatement)
+	assign, ok := stmt.(ast.AssignStatement)
 	if !ok {
 		t.Fatalf("expected AssignStatement, got %T", stmt)
 	}
@@ -559,8 +559,8 @@ func TestParseStatementLetKeyword(t *testing.T) {
   > x
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	assign, ok := route.Body[0].(interpreter.AssignStatement)
+	route := module.Items[0].(*ast.Route)
+	assign, ok := route.Body[0].(ast.AssignStatement)
 	if !ok {
 		t.Fatalf("expected AssignStatement, got %T", route.Body[0])
 	}
@@ -575,8 +575,8 @@ func TestParseStatementLetWithTypeAnnotation(t *testing.T) {
   > x
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	assign, ok := route.Body[0].(interpreter.AssignStatement)
+	route := module.Items[0].(*ast.Route)
+	assign, ok := route.Body[0].(ast.AssignStatement)
 	if !ok {
 		t.Fatalf("expected AssignStatement, got %T", route.Body[0])
 	}
@@ -592,8 +592,8 @@ func TestParseStatementLetDeclarationOnly(t *testing.T) {
   > x
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	assign, ok := route.Body[0].(interpreter.AssignStatement)
+	route := module.Items[0].(*ast.Route)
+	assign, ok := route.Body[0].(ast.AssignStatement)
 	if !ok {
 		t.Fatalf("expected AssignStatement, got %T", route.Body[0])
 	}
@@ -607,8 +607,8 @@ func TestParseStatementReturnKeyword(t *testing.T) {
   return 42
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	ret, ok := route.Body[0].(interpreter.ReturnStatement)
+	route := module.Items[0].(*ast.Route)
+	ret, ok := route.Body[0].(ast.ReturnStatement)
 	if !ok {
 		t.Fatalf("expected ReturnStatement, got %T", route.Body[0])
 	}
@@ -622,8 +622,8 @@ func TestParseStatementYield(t *testing.T) {
   yield "hello"
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	yieldStmt, ok := route.Body[0].(interpreter.YieldStatement)
+	route := module.Items[0].(*ast.Route)
+	yieldStmt, ok := route.Body[0].(ast.YieldStatement)
 	if !ok {
 		t.Fatalf("expected YieldStatement, got %T", route.Body[0])
 	}
@@ -639,8 +639,8 @@ func TestParseStatementReassignment(t *testing.T) {
   > x
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	reassign, ok := route.Body[1].(interpreter.ReassignStatement)
+	route := module.Items[0].(*ast.Route)
+	reassign, ok := route.Body[1].(ast.ReassignStatement)
 	if !ok {
 		t.Fatalf("expected ReassignStatement, got %T", route.Body[1])
 	}
@@ -655,7 +655,7 @@ func TestParseStatementValidation(t *testing.T) {
   > { ok: true }
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
+	route := module.Items[0].(*ast.Route)
 
 	// The route should parse with query params or validation
 	if len(route.Body) == 0 && len(route.QueryParams) == 0 {
@@ -669,8 +669,8 @@ func TestParseStatementExpressionStatement(t *testing.T) {
   > "done"
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	exprStmt, ok := route.Body[0].(interpreter.ExpressionStatement)
+	route := module.Items[0].(*ast.Route)
+	exprStmt, ok := route.Body[0].(ast.ExpressionStatement)
 	if !ok {
 		t.Fatalf("expected ExpressionStatement, got %T", route.Body[0])
 	}
@@ -685,8 +685,8 @@ func TestParseStatementDollarFieldAccess(t *testing.T) {
   > obj
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	assign, ok := route.Body[0].(interpreter.AssignStatement)
+	route := module.Items[0].(*ast.Route)
+	assign, ok := route.Body[0].(ast.AssignStatement)
 	if !ok {
 		t.Fatalf("expected AssignStatement, got %T", route.Body[0])
 	}
@@ -701,8 +701,8 @@ func TestParseStatementDollarTypeAnnotationNoAssign(t *testing.T) {
   > x
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	assign, ok := route.Body[0].(interpreter.AssignStatement)
+	route := module.Items[0].(*ast.Route)
+	assign, ok := route.Body[0].(ast.AssignStatement)
 	if !ok {
 		t.Fatalf("expected AssignStatement, got %T", route.Body[0])
 	}
@@ -717,8 +717,8 @@ func TestParseStatementAssertStatement(t *testing.T) {
   > "ok"
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	_, ok := route.Body[0].(interpreter.AssertStatement)
+	route := module.Items[0].(*ast.Route)
+	_, ok := route.Body[0].(ast.AssertStatement)
 	if !ok {
 		t.Fatalf("expected AssertStatement, got %T", route.Body[0])
 	}
@@ -739,7 +739,7 @@ func TestParseTypeDefWithoutColon(t *testing.T) {
   age: int!
 }`
 	module := parseSource(t, source)
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	if !ok {
 		t.Fatalf("expected TypeDef, got %T", module.Items[0])
 	}
@@ -756,7 +756,7 @@ func TestParseTypeDefWithoutColonGeneric(t *testing.T) {
   value: T!
 }`
 	module := parseSource(t, source)
-	typeDef := module.Items[0].(*interpreter.TypeDef)
+	typeDef := module.Items[0].(*ast.TypeDef)
 	if typeDef.Name != "Container" {
 		t.Errorf("expected name 'Container', got %q", typeDef.Name)
 	}
@@ -773,7 +773,7 @@ func TestParseTypeDefWithoutColonImpl(t *testing.T) {
   name: str!
 }`
 	module := parseSource(t, source)
-	typeDef := module.Items[0].(*interpreter.TypeDef)
+	typeDef := module.Items[0].(*ast.TypeDef)
 	if typeDef.Name != "MyType" {
 		t.Errorf("expected name 'MyType', got %q", typeDef.Name)
 	}
@@ -790,7 +790,7 @@ func TestParseTypeDefWithoutColonImplMultiple(t *testing.T) {
   name: str!
 }`
 	module := parseSource(t, source)
-	typeDef := module.Items[0].(*interpreter.TypeDef)
+	typeDef := module.Items[0].(*ast.TypeDef)
 	if len(typeDef.Traits) != 2 {
 		t.Fatalf("expected 2 traits, got %d", len(typeDef.Traits))
 	}
@@ -807,7 +807,7 @@ func TestParseTypeDefWithoutColonGenericAndImpl(t *testing.T) {
   value: T!
 }`
 	module := parseSource(t, source)
-	typeDef := module.Items[0].(*interpreter.TypeDef)
+	typeDef := module.Items[0].(*ast.TypeDef)
 	if len(typeDef.TypeParams) != 1 {
 		t.Fatalf("expected 1 type param, got %d", len(typeDef.TypeParams))
 	}
@@ -827,7 +827,7 @@ func TestParseMacroBodyWithRoute(t *testing.T) {
   }
 }`
 	module := parseSource(t, source)
-	macroDef := module.Items[0].(*interpreter.MacroDef)
+	macroDef := module.Items[0].(*ast.MacroDef)
 	if len(macroDef.Body) == 0 {
 		t.Error("expected non-empty macro body")
 	}
@@ -840,7 +840,7 @@ func TestParseMacroBodyWithTypeDef(t *testing.T) {
   }
 }`
 	module := parseSource(t, source)
-	macroDef := module.Items[0].(*interpreter.MacroDef)
+	macroDef := module.Items[0].(*ast.MacroDef)
 	if len(macroDef.Body) == 0 {
 		t.Error("expected non-empty macro body")
 	}
@@ -851,7 +851,7 @@ func TestParseMacroBodyWithAssignment(t *testing.T) {
   $ x = 1
 }`
 	module := parseSource(t, source)
-	macroDef := module.Items[0].(*interpreter.MacroDef)
+	macroDef := module.Items[0].(*ast.MacroDef)
 	if len(macroDef.Body) == 0 {
 		t.Error("expected non-empty macro body")
 	}
@@ -862,7 +862,7 @@ func TestParseMacroBodyWithReturn(t *testing.T) {
   > 42
 }`
 	module := parseSource(t, source)
-	macroDef := module.Items[0].(*interpreter.MacroDef)
+	macroDef := module.Items[0].(*ast.MacroDef)
 	if len(macroDef.Body) == 0 {
 		t.Error("expected non-empty macro body")
 	}
@@ -875,7 +875,7 @@ func TestParseMacroBodyWithIfStatement(t *testing.T) {
   }
 }`
 	module := parseSource(t, source)
-	macroDef := module.Items[0].(*interpreter.MacroDef)
+	macroDef := module.Items[0].(*ast.MacroDef)
 	if len(macroDef.Body) == 0 {
 		t.Error("expected non-empty macro body")
 	}
@@ -888,7 +888,7 @@ func TestParseMacroBodyWithForLoop(t *testing.T) {
   }
 }`
 	module := parseSource(t, source)
-	macroDef := module.Items[0].(*interpreter.MacroDef)
+	macroDef := module.Items[0].(*ast.MacroDef)
 	if len(macroDef.Body) == 0 {
 		t.Error("expected non-empty macro body")
 	}
@@ -901,7 +901,7 @@ func TestParseMacroBodyWithWhileLoop(t *testing.T) {
   }
 }`
 	module := parseSource(t, source)
-	macroDef := module.Items[0].(*interpreter.MacroDef)
+	macroDef := module.Items[0].(*ast.MacroDef)
 	if len(macroDef.Body) == 0 {
 		t.Error("expected non-empty macro body")
 	}
@@ -919,7 +919,7 @@ func TestParseMacroBodyWithSwitchStatement(t *testing.T) {
   }
 }`
 	module := parseSource(t, source)
-	macroDef := module.Items[0].(*interpreter.MacroDef)
+	macroDef := module.Items[0].(*ast.MacroDef)
 	if len(macroDef.Body) == 0 {
 		t.Error("expected non-empty macro body")
 	}
@@ -931,7 +931,7 @@ func TestParseMacroBodyWithLetReturn(t *testing.T) {
   return x
 }`
 	module := parseSource(t, source)
-	macroDef := module.Items[0].(*interpreter.MacroDef)
+	macroDef := module.Items[0].(*ast.MacroDef)
 	if len(macroDef.Body) < 2 {
 		t.Errorf("expected at least 2 body nodes, got %d", len(macroDef.Body))
 	}
@@ -942,7 +942,7 @@ func TestParseMacroBodyWithFuncCall(t *testing.T) {
   doWork(1, 2)
 }`
 	module := parseSource(t, source)
-	macroDef := module.Items[0].(*interpreter.MacroDef)
+	macroDef := module.Items[0].(*ast.MacroDef)
 	if len(macroDef.Body) == 0 {
 		t.Error("expected non-empty macro body")
 	}
@@ -953,7 +953,7 @@ func TestParseMacroBodyWithMacroInvocation(t *testing.T) {
   inner!(1, 2)
 }`
 	module := parseSource(t, source)
-	macroDef := module.Items[0].(*interpreter.MacroDef)
+	macroDef := module.Items[0].(*ast.MacroDef)
 	if len(macroDef.Body) == 0 {
 		t.Error("expected non-empty macro body")
 	}
@@ -964,7 +964,7 @@ func TestParseMacroBodyWithValidation(t *testing.T) {
   ? check(input)
 }`
 	module := parseSource(t, source)
-	macroDef := module.Items[0].(*interpreter.MacroDef)
+	macroDef := module.Items[0].(*ast.MacroDef)
 	if len(macroDef.Body) == 0 {
 		t.Error("expected non-empty macro body")
 	}
@@ -983,15 +983,15 @@ func TestParsePatternFloat(t *testing.T) {
   > result
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	assign := route.Body[0].(interpreter.AssignStatement)
-	matchExpr := assign.Value.(interpreter.MatchExpr)
+	route := module.Items[0].(*ast.Route)
+	assign := route.Body[0].(ast.AssignStatement)
+	matchExpr := assign.Value.(ast.MatchExpr)
 
-	litPat, ok := matchExpr.Cases[0].Pattern.(interpreter.LiteralPattern)
+	litPat, ok := matchExpr.Cases[0].Pattern.(ast.LiteralPattern)
 	if !ok {
 		t.Fatalf("expected LiteralPattern, got %T", matchExpr.Cases[0].Pattern)
 	}
-	_, ok = litPat.Value.(interpreter.FloatLiteral)
+	_, ok = litPat.Value.(ast.FloatLiteral)
 	if !ok {
 		t.Fatalf("expected FloatLiteral, got %T", litPat.Value)
 	}
@@ -1007,15 +1007,15 @@ func TestParsePatternBoolTrue(t *testing.T) {
   > result
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	assign := route.Body[0].(interpreter.AssignStatement)
-	matchExpr := assign.Value.(interpreter.MatchExpr)
+	route := module.Items[0].(*ast.Route)
+	assign := route.Body[0].(ast.AssignStatement)
+	matchExpr := assign.Value.(ast.MatchExpr)
 
-	litPat, ok := matchExpr.Cases[0].Pattern.(interpreter.LiteralPattern)
+	litPat, ok := matchExpr.Cases[0].Pattern.(ast.LiteralPattern)
 	if !ok {
 		t.Fatalf("expected LiteralPattern for true, got %T", matchExpr.Cases[0].Pattern)
 	}
-	boolLit, ok := litPat.Value.(interpreter.BoolLiteral)
+	boolLit, ok := litPat.Value.(ast.BoolLiteral)
 	if !ok {
 		t.Fatalf("expected BoolLiteral, got %T", litPat.Value)
 	}
@@ -1024,11 +1024,11 @@ func TestParsePatternBoolTrue(t *testing.T) {
 	}
 
 	// Check false case
-	litPat2, ok := matchExpr.Cases[1].Pattern.(interpreter.LiteralPattern)
+	litPat2, ok := matchExpr.Cases[1].Pattern.(ast.LiteralPattern)
 	if !ok {
 		t.Fatalf("expected LiteralPattern for false, got %T", matchExpr.Cases[1].Pattern)
 	}
-	boolLit2, ok := litPat2.Value.(interpreter.BoolLiteral)
+	boolLit2, ok := litPat2.Value.(ast.BoolLiteral)
 	if !ok {
 		t.Fatalf("expected BoolLiteral, got %T", litPat2.Value)
 	}
@@ -1046,15 +1046,15 @@ func TestParsePatternNull(t *testing.T) {
   > result
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	assign := route.Body[0].(interpreter.AssignStatement)
-	matchExpr := assign.Value.(interpreter.MatchExpr)
+	route := module.Items[0].(*ast.Route)
+	assign := route.Body[0].(ast.AssignStatement)
+	matchExpr := assign.Value.(ast.MatchExpr)
 
-	litPat, ok := matchExpr.Cases[0].Pattern.(interpreter.LiteralPattern)
+	litPat, ok := matchExpr.Cases[0].Pattern.(ast.LiteralPattern)
 	if !ok {
 		t.Fatalf("expected LiteralPattern, got %T", matchExpr.Cases[0].Pattern)
 	}
-	_, ok = litPat.Value.(interpreter.NullLiteral)
+	_, ok = litPat.Value.(ast.NullLiteral)
 	if !ok {
 		t.Fatalf("expected NullLiteral, got %T", litPat.Value)
 	}
@@ -1068,11 +1068,11 @@ func TestParsePatternVariable(t *testing.T) {
   > result
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	assign := route.Body[0].(interpreter.AssignStatement)
-	matchExpr := assign.Value.(interpreter.MatchExpr)
+	route := module.Items[0].(*ast.Route)
+	assign := route.Body[0].(ast.AssignStatement)
+	matchExpr := assign.Value.(ast.MatchExpr)
 
-	varPat, ok := matchExpr.Cases[0].Pattern.(interpreter.VariablePattern)
+	varPat, ok := matchExpr.Cases[0].Pattern.(ast.VariablePattern)
 	if !ok {
 		t.Fatalf("expected VariablePattern, got %T", matchExpr.Cases[0].Pattern)
 	}
@@ -1093,7 +1093,7 @@ func TestParseMethodDefInType(t *testing.T) {
   }
 }`
 	module := parseSource(t, source)
-	typeDef := module.Items[0].(*interpreter.TypeDef)
+	typeDef := module.Items[0].(*ast.TypeDef)
 	if len(typeDef.Methods) != 1 {
 		t.Fatalf("expected 1 method, got %d", len(typeDef.Methods))
 	}
@@ -1117,7 +1117,7 @@ func TestParseMethodDefNoReturn(t *testing.T) {
   }
 }`
 	module := parseSource(t, source)
-	typeDef := module.Items[0].(*interpreter.TypeDef)
+	typeDef := module.Items[0].(*ast.TypeDef)
 	if len(typeDef.Methods) != 1 {
 		t.Fatalf("expected 1 method, got %d", len(typeDef.Methods))
 	}
@@ -1137,7 +1137,7 @@ func TestParseMethodDefMultipleParams(t *testing.T) {
   }
 }`
 	module := parseSource(t, source)
-	typeDef := module.Items[0].(*interpreter.TypeDef)
+	typeDef := module.Items[0].(*ast.TypeDef)
 	if len(typeDef.Methods) != 1 {
 		t.Fatalf("expected 1 method, got %d", len(typeDef.Methods))
 	}
@@ -1158,7 +1158,7 @@ func TestParseMethodDefMultipleMethods(t *testing.T) {
   }
 }`
 	module := parseSource(t, source)
-	typeDef := module.Items[0].(*interpreter.TypeDef)
+	typeDef := module.Items[0].(*ast.TypeDef)
 	if len(typeDef.Methods) != 2 {
 		t.Fatalf("expected 2 methods, got %d", len(typeDef.Methods))
 	}
@@ -1172,7 +1172,7 @@ func TestParseMethodDefWithGenericTypeParams(t *testing.T) {
   }
 }`
 	module := parseSource(t, source)
-	typeDef := module.Items[0].(*interpreter.TypeDef)
+	typeDef := module.Items[0].(*ast.TypeDef)
 	if len(typeDef.Methods) != 1 {
 		t.Fatalf("expected 1 method, got %d", len(typeDef.Methods))
 	}
@@ -1185,7 +1185,7 @@ func TestParseMethodDefWithGenericTypeParams(t *testing.T) {
 func TestParseConstDeclSimple(t *testing.T) {
 	source := `const MAX_SIZE = 100`
 	module := parseSource(t, source)
-	constDecl, ok := module.Items[0].(*interpreter.ConstDecl)
+	constDecl, ok := module.Items[0].(*ast.ConstDecl)
 	if !ok {
 		t.Fatalf("expected ConstDecl, got %T", module.Items[0])
 	}
@@ -1197,7 +1197,7 @@ func TestParseConstDeclSimple(t *testing.T) {
 func TestParseConstDeclWithType(t *testing.T) {
 	source := `const PI: float = 3.14159`
 	module := parseSource(t, source)
-	constDecl := module.Items[0].(*interpreter.ConstDecl)
+	constDecl := module.Items[0].(*ast.ConstDecl)
 	if constDecl.Name != "PI" {
 		t.Errorf("expected name 'PI', got %q", constDecl.Name)
 	}
@@ -1209,7 +1209,7 @@ func TestParseConstDeclWithType(t *testing.T) {
 func TestParseConstDeclString(t *testing.T) {
 	source := `const APP_NAME = "MyApp"`
 	module := parseSource(t, source)
-	constDecl := module.Items[0].(*interpreter.ConstDecl)
+	constDecl := module.Items[0].(*ast.ConstDecl)
 	if constDecl.Name != "APP_NAME" {
 		t.Errorf("expected name 'APP_NAME', got %q", constDecl.Name)
 	}
@@ -1218,7 +1218,7 @@ func TestParseConstDeclString(t *testing.T) {
 func TestParseConstDeclWithIntType(t *testing.T) {
 	source := `const TIMEOUT: int = 30`
 	module := parseSource(t, source)
-	constDecl := module.Items[0].(*interpreter.ConstDecl)
+	constDecl := module.Items[0].(*ast.ConstDecl)
 	if constDecl.Type == nil {
 		t.Error("expected non-nil type")
 	}
@@ -1243,8 +1243,8 @@ func TestParseSingleTypeFunctionType(t *testing.T) {
   handler: (int, str) -> bool!
 }`
 	module := parseSource(t, source)
-	typeDef := module.Items[0].(*interpreter.TypeDef)
-	_, ok := typeDef.Fields[0].TypeAnnotation.(interpreter.FunctionType)
+	typeDef := module.Items[0].(*ast.TypeDef)
+	_, ok := typeDef.Fields[0].TypeAnnotation.(ast.FunctionType)
 	if !ok {
 		t.Fatalf("expected FunctionType, got %T", typeDef.Fields[0].TypeAnnotation)
 	}
@@ -1255,8 +1255,8 @@ func TestParseSingleTypeArrayBrackets(t *testing.T) {
   items: [str]!
 }`
 	module := parseSource(t, source)
-	typeDef := module.Items[0].(*interpreter.TypeDef)
-	_, ok := typeDef.Fields[0].TypeAnnotation.(interpreter.ArrayType)
+	typeDef := module.Items[0].(*ast.TypeDef)
+	_, ok := typeDef.Fields[0].TypeAnnotation.(ast.ArrayType)
 	if !ok {
 		t.Fatalf("expected ArrayType, got %T", typeDef.Fields[0].TypeAnnotation)
 	}
@@ -1267,8 +1267,8 @@ func TestParseSingleTypeOptional(t *testing.T) {
   nickname: str?
 }`
 	module := parseSource(t, source)
-	typeDef := module.Items[0].(*interpreter.TypeDef)
-	_, ok := typeDef.Fields[0].TypeAnnotation.(interpreter.OptionalType)
+	typeDef := module.Items[0].(*ast.TypeDef)
+	_, ok := typeDef.Fields[0].TypeAnnotation.(ast.OptionalType)
 	if !ok {
 		t.Fatalf("expected OptionalType, got %T", typeDef.Fields[0].TypeAnnotation)
 	}
@@ -1279,8 +1279,8 @@ func TestParseSingleTypeGenericAngleBrackets(t *testing.T) {
   data: List<int>!
 }`
 	module := parseSource(t, source)
-	typeDef := module.Items[0].(*interpreter.TypeDef)
-	genType, ok := typeDef.Fields[0].TypeAnnotation.(interpreter.GenericType)
+	typeDef := module.Items[0].(*ast.TypeDef)
+	genType, ok := typeDef.Fields[0].TypeAnnotation.(ast.GenericType)
 	if !ok {
 		t.Fatalf("expected GenericType, got %T", typeDef.Fields[0].TypeAnnotation)
 	}
@@ -1294,8 +1294,8 @@ func TestParseSingleTypeGenericSquareBrackets(t *testing.T) {
   data: Map[str, int]!
 }`
 	module := parseSource(t, source)
-	typeDef := module.Items[0].(*interpreter.TypeDef)
-	genType, ok := typeDef.Fields[0].TypeAnnotation.(interpreter.GenericType)
+	typeDef := module.Items[0].(*ast.TypeDef)
+	genType, ok := typeDef.Fields[0].TypeAnnotation.(ast.GenericType)
 	if !ok {
 		t.Fatalf("expected GenericType, got %T", typeDef.Fields[0].TypeAnnotation)
 	}
@@ -1310,12 +1310,12 @@ func TestParseSingleTypeEmptyBrackets(t *testing.T) {
   items: int[]!
 }`
 	module := parseSource(t, source)
-	typeDef := module.Items[0].(*interpreter.TypeDef)
-	arrType, ok := typeDef.Fields[0].TypeAnnotation.(interpreter.ArrayType)
+	typeDef := module.Items[0].(*ast.TypeDef)
+	arrType, ok := typeDef.Fields[0].TypeAnnotation.(ast.ArrayType)
 	if !ok {
 		t.Fatalf("expected ArrayType, got %T", typeDef.Fields[0].TypeAnnotation)
 	}
-	_, ok = arrType.ElementType.(interpreter.IntType)
+	_, ok = arrType.ElementType.(ast.IntType)
 	if !ok {
 		t.Fatalf("expected IntType element, got %T", arrType.ElementType)
 	}
@@ -1326,8 +1326,8 @@ func TestParseSingleTypeTypeParamRef(t *testing.T) {
   value: T!
 }`
 	module := parseSource(t, source)
-	typeDef := module.Items[0].(*interpreter.TypeDef)
-	_, ok := typeDef.Fields[0].TypeAnnotation.(interpreter.TypeParameterType)
+	typeDef := module.Items[0].(*ast.TypeDef)
+	_, ok := typeDef.Fields[0].TypeAnnotation.(ast.TypeParameterType)
 	if !ok {
 		t.Fatalf("expected TypeParameterType, got %T", typeDef.Fields[0].TypeAnnotation)
 	}
@@ -1338,8 +1338,8 @@ func TestParseSingleTypeStringAlias(t *testing.T) {
   text: string!
 }`
 	module := parseSource(t, source)
-	typeDef := module.Items[0].(*interpreter.TypeDef)
-	_, ok := typeDef.Fields[0].TypeAnnotation.(interpreter.StringType)
+	typeDef := module.Items[0].(*ast.TypeDef)
+	_, ok := typeDef.Fields[0].TypeAnnotation.(ast.StringType)
 	if !ok {
 		t.Fatalf("expected StringType, got %T", typeDef.Fields[0].TypeAnnotation)
 	}
@@ -1350,58 +1350,58 @@ func TestParseSingleTypeStringAlias(t *testing.T) {
 // ============================================================
 
 func TestTypeToStringInt(t *testing.T) {
-	result := typeToString(interpreter.IntType{})
+	result := typeToString(ast.IntType{})
 	if result != "int" {
 		t.Errorf("expected 'int', got %q", result)
 	}
 }
 
 func TestTypeToStringStr(t *testing.T) {
-	result := typeToString(interpreter.StringType{})
+	result := typeToString(ast.StringType{})
 	if result != "str" {
 		t.Errorf("expected 'str', got %q", result)
 	}
 }
 
 func TestTypeToStringBool(t *testing.T) {
-	result := typeToString(interpreter.BoolType{})
+	result := typeToString(ast.BoolType{})
 	if result != "bool" {
 		t.Errorf("expected 'bool', got %q", result)
 	}
 }
 
 func TestTypeToStringFloat(t *testing.T) {
-	result := typeToString(interpreter.FloatType{})
+	result := typeToString(ast.FloatType{})
 	if result != "float" {
 		t.Errorf("expected 'float', got %q", result)
 	}
 }
 
 func TestTypeToStringArray(t *testing.T) {
-	result := typeToString(interpreter.ArrayType{ElementType: interpreter.IntType{}})
+	result := typeToString(ast.ArrayType{ElementType: ast.IntType{}})
 	if result != "[int]" {
 		t.Errorf("expected '[int]', got %q", result)
 	}
 }
 
 func TestTypeToStringOptional(t *testing.T) {
-	result := typeToString(interpreter.OptionalType{InnerType: interpreter.StringType{}})
+	result := typeToString(ast.OptionalType{InnerType: ast.StringType{}})
 	if result != "str?" {
 		t.Errorf("expected 'str?', got %q", result)
 	}
 }
 
 func TestTypeToStringNamed(t *testing.T) {
-	result := typeToString(interpreter.NamedType{Name: "User"})
+	result := typeToString(ast.NamedType{Name: "User"})
 	if result != "User" {
 		t.Errorf("expected 'User', got %q", result)
 	}
 }
 
 func TestTypeToStringGeneric(t *testing.T) {
-	result := typeToString(interpreter.GenericType{
-		BaseType: interpreter.NamedType{Name: "List"},
-		TypeArgs: []interpreter.Type{interpreter.IntType{}},
+	result := typeToString(ast.GenericType{
+		BaseType: ast.NamedType{Name: "List"},
+		TypeArgs: []ast.Type{ast.IntType{}},
 	})
 	if result != "List<int>" {
 		t.Errorf("expected 'List<int>', got %q", result)
@@ -1409,9 +1409,9 @@ func TestTypeToStringGeneric(t *testing.T) {
 }
 
 func TestTypeToStringGenericMultipleArgs(t *testing.T) {
-	result := typeToString(interpreter.GenericType{
-		BaseType: interpreter.NamedType{Name: "Map"},
-		TypeArgs: []interpreter.Type{interpreter.StringType{}, interpreter.IntType{}},
+	result := typeToString(ast.GenericType{
+		BaseType: ast.NamedType{Name: "Map"},
+		TypeArgs: []ast.Type{ast.StringType{}, ast.IntType{}},
 	})
 	if result != "Map<str, int>" {
 		t.Errorf("expected 'Map<str, int>', got %q", result)
@@ -1419,8 +1419,8 @@ func TestTypeToStringGenericMultipleArgs(t *testing.T) {
 }
 
 func TestTypeToStringGenericNoArgs(t *testing.T) {
-	result := typeToString(interpreter.GenericType{
-		BaseType: interpreter.NamedType{Name: "List"},
+	result := typeToString(ast.GenericType{
+		BaseType: ast.NamedType{Name: "List"},
 	})
 	if result != "List" {
 		t.Errorf("expected 'List', got %q", result)
@@ -1428,16 +1428,16 @@ func TestTypeToStringGenericNoArgs(t *testing.T) {
 }
 
 func TestTypeToStringTypeParameter(t *testing.T) {
-	result := typeToString(interpreter.TypeParameterType{Name: "T"})
+	result := typeToString(ast.TypeParameterType{Name: "T"})
 	if result != "T" {
 		t.Errorf("expected 'T', got %q", result)
 	}
 }
 
 func TestTypeToStringFunctionType(t *testing.T) {
-	result := typeToString(interpreter.FunctionType{
-		ParamTypes: []interpreter.Type{interpreter.IntType{}, interpreter.StringType{}},
-		ReturnType: interpreter.BoolType{},
+	result := typeToString(ast.FunctionType{
+		ParamTypes: []ast.Type{ast.IntType{}, ast.StringType{}},
+		ReturnType: ast.BoolType{},
 	})
 	if result != "(int, str) -> bool" {
 		t.Errorf("expected '(int, str) -> bool', got %q", result)
@@ -1446,7 +1446,7 @@ func TestTypeToStringFunctionType(t *testing.T) {
 
 func TestTypeToStringUnknown(t *testing.T) {
 	// Test the default case with an unknown type
-	result := typeToString(interpreter.UnionType{})
+	result := typeToString(ast.UnionType{})
 	if result != "unknown" {
 		t.Errorf("expected 'unknown', got %q", result)
 	}
@@ -1461,7 +1461,7 @@ func TestParseTypeParametersWithConstraint(t *testing.T) {
   items: [T]!
 }`
 	module := parseSource(t, source)
-	typeDef := module.Items[0].(*interpreter.TypeDef)
+	typeDef := module.Items[0].(*ast.TypeDef)
 	if len(typeDef.TypeParams) != 1 {
 		t.Fatalf("expected 1 type param, got %d", len(typeDef.TypeParams))
 	}
@@ -1478,7 +1478,7 @@ func TestParseTypeParametersWithExtends(t *testing.T) {
   items: [T]!
 }`
 	module := parseSource(t, source)
-	typeDef := module.Items[0].(*interpreter.TypeDef)
+	typeDef := module.Items[0].(*ast.TypeDef)
 	if len(typeDef.TypeParams) != 1 {
 		t.Fatalf("expected 1 type param, got %d", len(typeDef.TypeParams))
 	}
@@ -1493,7 +1493,7 @@ func TestParseTypeParametersMultipleWithConstraints(t *testing.T) {
   value: V!
 }`
 	module := parseSource(t, source)
-	typeDef := module.Items[0].(*interpreter.TypeDef)
+	typeDef := module.Items[0].(*ast.TypeDef)
 	if len(typeDef.TypeParams) != 2 {
 		t.Fatalf("expected 2 type params, got %d", len(typeDef.TypeParams))
 	}
@@ -1515,9 +1515,9 @@ func TestParseAwaitExprWithFuncCall(t *testing.T) {
   > result
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	assign := route.Body[0].(interpreter.AssignStatement)
-	awaitExpr, ok := assign.Value.(interpreter.AwaitExpr)
+	route := module.Items[0].(*ast.Route)
+	assign := route.Body[0].(ast.AssignStatement)
+	awaitExpr, ok := assign.Value.(ast.AwaitExpr)
 	if !ok {
 		t.Fatalf("expected AwaitExpr, got %T", assign.Value)
 	}
@@ -1533,9 +1533,9 @@ func TestParseAwaitExprWithVariable(t *testing.T) {
   > val
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	assign := route.Body[1].(interpreter.AssignStatement)
-	_, ok := assign.Value.(interpreter.AwaitExpr)
+	route := module.Items[0].(*ast.Route)
+	assign := route.Body[1].(ast.AssignStatement)
+	_, ok := assign.Value.(ast.AwaitExpr)
 	if !ok {
 		t.Fatalf("expected AwaitExpr, got %T", assign.Value)
 	}
@@ -1552,8 +1552,8 @@ func TestParseReassignmentSimple(t *testing.T) {
   > count
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	reassign, ok := route.Body[1].(interpreter.ReassignStatement)
+	route := module.Items[0].(*ast.Route)
+	reassign, ok := route.Body[1].(ast.ReassignStatement)
 	if !ok {
 		t.Fatalf("expected ReassignStatement, got %T", route.Body[1])
 	}
@@ -1569,8 +1569,8 @@ func TestParseReassignmentWithExpression(t *testing.T) {
   > x
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	reassign, ok := route.Body[1].(interpreter.ReassignStatement)
+	route := module.Items[0].(*ast.Route)
+	reassign, ok := route.Body[1].(ast.ReassignStatement)
 	if !ok {
 		t.Fatalf("expected ReassignStatement, got %T", route.Body[1])
 	}
@@ -1589,7 +1589,7 @@ func TestParseCommandWithDefaultBinaryExpressions(t *testing.T) {
   > x + y
 }`
 	module := parseSource(t, source)
-	fn, ok := module.Items[0].(*interpreter.Function)
+	fn, ok := module.Items[0].(*ast.Function)
 	if !ok {
 		t.Fatalf("expected Function, got %T", module.Items[0])
 	}
@@ -1665,7 +1665,7 @@ func TestParseCommandDefaultBinaryExprComplex(t *testing.T) {
   > x * scale
 }`
 	module := parseSource(t, source)
-	cmd, ok := module.Items[0].(*interpreter.Command)
+	cmd, ok := module.Items[0].(*ast.Command)
 	if !ok {
 		t.Fatalf("expected Command, got %T", module.Items[0])
 	}
@@ -1744,7 +1744,7 @@ func TestParseUnexpectedTopLevelToken(t *testing.T) {
 func TestParseTopLevelMacroInvocation(t *testing.T) {
 	source := `myMacro!(1, 2, 3)`
 	module := parseSource(t, source)
-	_, ok := module.Items[0].(*interpreter.MacroInvocation)
+	_, ok := module.Items[0].(*ast.MacroInvocation)
 	if !ok {
 		t.Fatalf("expected MacroInvocation, got %T", module.Items[0])
 	}
@@ -1772,8 +1772,8 @@ func TestParseSwitchStatementFull(t *testing.T) {
   }
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	switchStmt, ok := route.Body[0].(interpreter.SwitchStatement)
+	route := module.Items[0].(*ast.Route)
+	switchStmt, ok := route.Body[0].(ast.SwitchStatement)
 	if !ok {
 		t.Fatalf("expected SwitchStatement, got %T", route.Body[0])
 	}
@@ -1795,7 +1795,7 @@ func TestParseTestBlockWithAssert(t *testing.T) {
   assert(2 * 3 == 6, "multiplication failed")
 }`
 	module := parseSource(t, source)
-	testBlock, ok := module.Items[0].(*interpreter.TestBlock)
+	testBlock, ok := module.Items[0].(*ast.TestBlock)
 	if !ok {
 		t.Fatalf("expected TestBlock, got %T", module.Items[0])
 	}
@@ -1814,8 +1814,8 @@ func TestParseTestBlockWithAssert(t *testing.T) {
 func TestParseUnionTypeThreeTypes(t *testing.T) {
 	source := `: Result { value: str | int | bool! }`
 	module := parseSource(t, source)
-	typeDef := module.Items[0].(*interpreter.TypeDef)
-	unionType, ok := typeDef.Fields[0].TypeAnnotation.(interpreter.UnionType)
+	typeDef := module.Items[0].(*ast.TypeDef)
+	unionType, ok := typeDef.Fields[0].TypeAnnotation.(ast.UnionType)
 	if !ok {
 		t.Fatalf("expected UnionType, got %T", typeDef.Fields[0].TypeAnnotation)
 	}
@@ -1834,12 +1834,12 @@ func TestParseMethodCallAsStatement(t *testing.T) {
   > "ok"
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	exprStmt, ok := route.Body[0].(interpreter.ExpressionStatement)
+	route := module.Items[0].(*ast.Route)
+	exprStmt, ok := route.Body[0].(ast.ExpressionStatement)
 	if !ok {
 		t.Fatalf("expected ExpressionStatement, got %T", route.Body[0])
 	}
-	callExpr, ok := exprStmt.Expr.(interpreter.FunctionCallExpr)
+	callExpr, ok := exprStmt.Expr.(ast.FunctionCallExpr)
 	if !ok {
 		t.Fatalf("expected FunctionCallExpr, got %T", exprStmt.Expr)
 	}
@@ -1855,7 +1855,7 @@ func TestParseMethodCallAsStatement(t *testing.T) {
 func TestParseImportWithAlias(t *testing.T) {
 	source := `import "./utils" as u`
 	module := parseSource(t, source)
-	imp, ok := module.Items[0].(*interpreter.ImportStatement)
+	imp, ok := module.Items[0].(*ast.ImportStatement)
 	if !ok {
 		t.Fatalf("expected ImportStatement, got %T", module.Items[0])
 	}
@@ -1874,13 +1874,13 @@ func TestParseNullLiteralExpr(t *testing.T) {
   > x
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	assign := route.Body[0].(interpreter.AssignStatement)
-	lit, ok := assign.Value.(interpreter.LiteralExpr)
+	route := module.Items[0].(*ast.Route)
+	assign := route.Body[0].(ast.AssignStatement)
+	lit, ok := assign.Value.(ast.LiteralExpr)
 	if !ok {
 		t.Fatalf("expected LiteralExpr, got %T", assign.Value)
 	}
-	_, ok = lit.Value.(interpreter.NullLiteral)
+	_, ok = lit.Value.(ast.NullLiteral)
 	if !ok {
 		t.Fatalf("expected NullLiteral, got %T", lit.Value)
 	}
@@ -1896,13 +1896,13 @@ func TestParseFloatLiteralExpr(t *testing.T) {
   > x
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	assign := route.Body[0].(interpreter.AssignStatement)
-	lit, ok := assign.Value.(interpreter.LiteralExpr)
+	route := module.Items[0].(*ast.Route)
+	assign := route.Body[0].(ast.AssignStatement)
+	lit, ok := assign.Value.(ast.LiteralExpr)
 	if !ok {
 		t.Fatalf("expected LiteralExpr, got %T", assign.Value)
 	}
-	floatLit, ok := lit.Value.(interpreter.FloatLiteral)
+	floatLit, ok := lit.Value.(ast.FloatLiteral)
 	if !ok {
 		t.Fatalf("expected FloatLiteral, got %T", lit.Value)
 	}
@@ -1921,7 +1921,7 @@ func TestParseDependencyInjection(t *testing.T) {
   > "ok"
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
+	route := module.Items[0].(*ast.Route)
 	if len(route.Injections) != 1 {
 		t.Fatalf("expected 1 injection, got %d", len(route.Injections))
 	}
@@ -1940,7 +1940,7 @@ func TestParsePipeExpression(t *testing.T) {
   > result
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
+	route := module.Items[0].(*ast.Route)
 	if len(route.Body) < 2 {
 		t.Fatal("expected at least 2 statements")
 	}
@@ -1956,8 +1956,8 @@ func TestParseStatementDollarDeepFieldAccess(t *testing.T) {
   > a
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	assign, ok := route.Body[0].(interpreter.AssignStatement)
+	route := module.Items[0].(*ast.Route)
+	assign, ok := route.Body[0].(ast.AssignStatement)
 	if !ok {
 		t.Fatalf("expected AssignStatement, got %T", route.Body[0])
 	}
@@ -1975,7 +1975,7 @@ func TestParseMacroDefWithMultipleParams(t *testing.T) {
   > msg
 }`
 	module := parseSource(t, source)
-	macroDef := module.Items[0].(*interpreter.MacroDef)
+	macroDef := module.Items[0].(*ast.MacroDef)
 	if macroDef.Name != "log" {
 		t.Errorf("expected name 'log', got %q", macroDef.Name)
 	}
@@ -1996,8 +1996,8 @@ func TestParseIfWithComplexCondition(t *testing.T) {
   > "out"
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	ifStmt, ok := route.Body[0].(interpreter.IfStatement)
+	route := module.Items[0].(*ast.Route)
+	ifStmt, ok := route.Body[0].(ast.IfStatement)
 	if !ok {
 		t.Fatalf("expected IfStatement, got %T", route.Body[0])
 	}
@@ -2019,7 +2019,7 @@ func TestParseContractBasic(t *testing.T) {
 	if len(module.Items) != 1 {
 		t.Fatalf("expected 1 item, got %d", len(module.Items))
 	}
-	contract, ok := module.Items[0].(*interpreter.ContractDef)
+	contract, ok := module.Items[0].(*ast.ContractDef)
 	if !ok {
 		t.Fatalf("expected ContractDef, got %T", module.Items[0])
 	}
@@ -2044,14 +2044,14 @@ func TestParsePatternBoolFalse(t *testing.T) {
   > result
 }`
 	module := parseSource(t, source)
-	route := module.Items[0].(*interpreter.Route)
-	assign := route.Body[0].(interpreter.AssignStatement)
-	matchExpr := assign.Value.(interpreter.MatchExpr)
-	litPat, ok := matchExpr.Cases[0].Pattern.(interpreter.LiteralPattern)
+	route := module.Items[0].(*ast.Route)
+	assign := route.Body[0].(ast.AssignStatement)
+	matchExpr := assign.Value.(ast.MatchExpr)
+	litPat, ok := matchExpr.Cases[0].Pattern.(ast.LiteralPattern)
 	if !ok {
 		t.Fatalf("expected LiteralPattern, got %T", matchExpr.Cases[0].Pattern)
 	}
-	boolLit, ok := litPat.Value.(interpreter.BoolLiteral)
+	boolLit, ok := litPat.Value.(ast.BoolLiteral)
 	if !ok {
 		t.Fatalf("expected BoolLiteral, got %T", litPat.Value)
 	}

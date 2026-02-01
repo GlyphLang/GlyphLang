@@ -1,12 +1,12 @@
 package parser
 
 import (
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
 
 	// GRPCService, GRPCHandler, and GRPCMethod types are defined in
 	// pkg/interpreter/ast.go (lines 638-660). GRPCStreamType constants
 	// are at lines 603-610. These were added as part of issue #38.
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,13 +31,13 @@ func TestParseGRPCServiceDefinition(t *testing.T) {
 	require.NoError(t, err, "Parse should not return an error")
 	require.Len(t, module.Items, 1)
 
-	svc, ok := module.Items[0].(*interpreter.GRPCService)
+	svc, ok := module.Items[0].(*ast.GRPCService)
 	require.True(t, ok, "item should be a GRPCService")
 	assert.Equal(t, "UserService", svc.Name)
 	require.Len(t, svc.Methods, 2)
 
 	assert.Equal(t, "GetUser", svc.Methods[0].Name)
-	inputType, ok := svc.Methods[0].InputType.(interpreter.NamedType)
+	inputType, ok := svc.Methods[0].InputType.(ast.NamedType)
 	require.True(t, ok)
 	assert.Equal(t, "GetUserRequest", inputType.Name)
 
@@ -55,10 +55,10 @@ func TestParseGRPCServerStreaming(t *testing.T) {
 	require.NoError(t, err, "Parse should not return an error")
 	require.Len(t, module.Items, 1)
 
-	svc, ok := module.Items[0].(*interpreter.GRPCService)
+	svc, ok := module.Items[0].(*ast.GRPCService)
 	require.True(t, ok)
 	require.Len(t, svc.Methods, 1)
-	assert.Equal(t, interpreter.GRPCServerStream, svc.Methods[0].StreamType)
+	assert.Equal(t, ast.GRPCServerStream, svc.Methods[0].StreamType)
 }
 
 // TestParseGRPCClientStreaming verifies parsing client streaming methods
@@ -72,10 +72,10 @@ func TestParseGRPCClientStreaming(t *testing.T) {
 	require.NoError(t, err, "Parse should not return an error")
 	require.Len(t, module.Items, 1)
 
-	svc, ok := module.Items[0].(*interpreter.GRPCService)
+	svc, ok := module.Items[0].(*ast.GRPCService)
 	require.True(t, ok)
 	require.Len(t, svc.Methods, 1)
-	assert.Equal(t, interpreter.GRPCClientStream, svc.Methods[0].StreamType)
+	assert.Equal(t, ast.GRPCClientStream, svc.Methods[0].StreamType)
 }
 
 // TestParseGRPCBidirectionalStreaming verifies parsing bidirectional streaming
@@ -89,10 +89,10 @@ func TestParseGRPCBidirectionalStreaming(t *testing.T) {
 	require.NoError(t, err, "Parse should not return an error")
 	require.Len(t, module.Items, 1)
 
-	svc, ok := module.Items[0].(*interpreter.GRPCService)
+	svc, ok := module.Items[0].(*ast.GRPCService)
 	require.True(t, ok)
 	require.Len(t, svc.Methods, 1)
-	assert.Equal(t, interpreter.GRPCBidirectional, svc.Methods[0].StreamType)
+	assert.Equal(t, ast.GRPCBidirectional, svc.Methods[0].StreamType)
 }
 
 // TestParseGRPCHandler verifies parsing a gRPC handler implementation
@@ -106,12 +106,12 @@ func TestParseGRPCHandler(t *testing.T) {
 	require.NoError(t, err, "Parse should not return an error")
 	require.Len(t, module.Items, 1)
 
-	handler, ok := module.Items[0].(*interpreter.GRPCHandler)
+	handler, ok := module.Items[0].(*ast.GRPCHandler)
 	require.True(t, ok, "item should be a GRPCHandler")
 	assert.Equal(t, "GetUser", handler.MethodName)
 	require.Len(t, handler.Params, 1)
 	assert.Equal(t, "req", handler.Params[0].Name)
-	assert.Equal(t, interpreter.GRPCUnary, handler.StreamType)
+	assert.Equal(t, ast.GRPCUnary, handler.StreamType)
 }
 
 // TestParseGRPCHandlerWithStreamReturn verifies handler with stream return type
@@ -125,9 +125,9 @@ func TestParseGRPCHandlerWithStreamReturn(t *testing.T) {
 	require.NoError(t, err, "Parse should not return an error")
 	require.Len(t, module.Items, 1)
 
-	handler, ok := module.Items[0].(*interpreter.GRPCHandler)
+	handler, ok := module.Items[0].(*ast.GRPCHandler)
 	require.True(t, ok)
-	assert.Equal(t, interpreter.GRPCServerStream, handler.StreamType)
+	assert.Equal(t, ast.GRPCServerStream, handler.StreamType)
 }
 
 // TestParseGRPCHandlerWithInjection verifies dependency injection in handlers
@@ -142,7 +142,7 @@ func TestParseGRPCHandlerWithInjection(t *testing.T) {
 	require.NoError(t, err, "Parse should not return an error")
 	require.Len(t, module.Items, 1)
 
-	handler, ok := module.Items[0].(*interpreter.GRPCHandler)
+	handler, ok := module.Items[0].(*ast.GRPCHandler)
 	require.True(t, ok)
 	require.Len(t, handler.Injections, 1)
 	assert.Equal(t, "db", handler.Injections[0].Name)
@@ -160,7 +160,7 @@ func TestParseGRPCHandlerWithAuth(t *testing.T) {
 	require.NoError(t, err, "Parse should not return an error")
 	require.Len(t, module.Items, 1)
 
-	handler, ok := module.Items[0].(*interpreter.GRPCHandler)
+	handler, ok := module.Items[0].(*ast.GRPCHandler)
 	require.True(t, ok)
 	require.NotNil(t, handler.Auth)
 	assert.Equal(t, "jwt", handler.Auth.AuthType)
@@ -181,10 +181,10 @@ func TestParseGRPCServiceAndHandler(t *testing.T) {
 	require.NoError(t, err, "Parse should not return an error")
 	require.Len(t, module.Items, 2)
 
-	_, ok := module.Items[0].(*interpreter.GRPCService)
+	_, ok := module.Items[0].(*ast.GRPCService)
 	require.True(t, ok, "first item should be a GRPCService")
 
-	_, ok = module.Items[1].(*interpreter.GRPCHandler)
+	_, ok = module.Items[1].(*ast.GRPCHandler)
 	require.True(t, ok, "second item should be a GRPCHandler")
 }
 

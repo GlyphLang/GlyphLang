@@ -5,11 +5,24 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/glyphlang/glyph/pkg/ast"
 	"github.com/glyphlang/glyph/pkg/compiler"
 	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/server"
 	"github.com/glyphlang/glyph/pkg/vm"
 )
+
+// testMockInterpreter implements server.Interpreter for integration tests
+type testMockInterpreter struct {
+	Response interface{}
+}
+
+func (m *testMockInterpreter) Execute(route *server.Route, ctx *server.Context) (interface{}, error) {
+	if m.Response != nil {
+		return m.Response, nil
+	}
+	return map[string]interface{}{"message": "Mock response"}, nil
+}
 
 // TestHelloWorldIntegration tests the hello-world example end-to-end
 func TestHelloWorldIntegration(t *testing.T) {
@@ -145,30 +158,30 @@ func TestPathParametersIntegration(t *testing.T) {
 		helper := NewTestHelper(t)
 
 		// Create test module with path parameters
-		module := &interpreter.Module{
-			Items: []interpreter.Item{
-				&interpreter.Route{
+		module := &ast.Module{
+			Items: []ast.Item{
+				&ast.Route{
 					Path:   "/users/:id",
-					Method: interpreter.Get,
-					Body: []interpreter.Statement{
-						interpreter.ReturnStatement{
-							Value: interpreter.LiteralExpr{
+					Method: ast.Get,
+					Body: []ast.Statement{
+						ast.ReturnStatement{
+							Value: ast.LiteralExpr{
 								Value: createMapLiteral(map[string]interface{}{
-									"id": interpreter.VariableExpr{Name: "id"},
+									"id": ast.VariableExpr{Name: "id"},
 								}),
 							},
 						},
 					},
 				},
-				&interpreter.Route{
+				&ast.Route{
 					Path:   "/users/:userId/posts/:postId",
-					Method: interpreter.Get,
-					Body: []interpreter.Statement{
-						interpreter.ReturnStatement{
-							Value: interpreter.LiteralExpr{
+					Method: ast.Get,
+					Body: []ast.Statement{
+						ast.ReturnStatement{
+							Value: ast.LiteralExpr{
 								Value: createMapLiteral(map[string]interface{}{
-									"userId": interpreter.VariableExpr{Name: "userId"},
-									"postId": interpreter.VariableExpr{Name: "postId"},
+									"userId": ast.VariableExpr{Name: "userId"},
+									"postId": ast.VariableExpr{Name: "postId"},
 								}),
 							},
 						},
@@ -207,40 +220,40 @@ func TestHTTPMethodsIntegration(t *testing.T) {
 		helper := NewTestHelper(t)
 
 		// Create module with different HTTP methods
-		module := &interpreter.Module{
-			Items: []interpreter.Item{
-				&interpreter.Route{
+		module := &ast.Module{
+			Items: []ast.Item{
+				&ast.Route{
 					Path:   "/api/users",
-					Method: interpreter.Get,
-					Body: []interpreter.Statement{
-						interpreter.ReturnStatement{
+					Method: ast.Get,
+					Body: []ast.Statement{
+						ast.ReturnStatement{
 							Value: createArrayLiteral(),
 						},
 					},
 				},
-				&interpreter.Route{
+				&ast.Route{
 					Path:   "/api/users",
-					Method: interpreter.Post,
-					Body: []interpreter.Statement{
-						interpreter.ReturnStatement{
+					Method: ast.Post,
+					Body: []ast.Statement{
+						ast.ReturnStatement{
 							Value: createMapLiteralSimple("created", true),
 						},
 					},
 				},
-				&interpreter.Route{
+				&ast.Route{
 					Path:   "/api/users/:id",
-					Method: interpreter.Put,
-					Body: []interpreter.Statement{
-						interpreter.ReturnStatement{
+					Method: ast.Put,
+					Body: []ast.Statement{
+						ast.ReturnStatement{
 							Value: createMapLiteralSimple("updated", true),
 						},
 					},
 				},
-				&interpreter.Route{
+				&ast.Route{
 					Path:   "/api/users/:id",
-					Method: interpreter.Delete,
-					Body: []interpreter.Statement{
-						interpreter.ReturnStatement{
+					Method: ast.Delete,
+					Body: []ast.Statement{
+						ast.ReturnStatement{
 							Value: createMapLiteralSimple("deleted", true),
 						},
 					},
@@ -267,7 +280,7 @@ func TestServerIntegration(t *testing.T) {
 	helper := NewTestHelper(t)
 
 	// Create mock interpreter
-	mockInterp := &server.MockInterpreter{
+	mockInterp := &testMockInterpreter{
 		Response: map[string]interface{}{
 			"status": "ok",
 			"test":   true,
@@ -391,10 +404,10 @@ func TestExpressionEvaluationIntegration(t *testing.T) {
 	env := interpreter.NewEnvironment()
 
 	// Test string concatenation
-	expr := interpreter.BinaryOpExpr{
-		Op:    interpreter.Add,
-		Left:  interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "Hello, "}},
-		Right: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "World!"}},
+	expr := ast.BinaryOpExpr{
+		Op:    ast.Add,
+		Left:  ast.LiteralExpr{Value: ast.StringLiteral{Value: "Hello, "}},
+		Right: ast.LiteralExpr{Value: ast.StringLiteral{Value: "World!"}},
 	}
 
 	result, err := interp.EvaluateExpression(expr, env)
@@ -402,10 +415,10 @@ func TestExpressionEvaluationIntegration(t *testing.T) {
 	helper.AssertEqual(result, "Hello, World!", "String concatenation")
 
 	// Test integer addition
-	expr2 := interpreter.BinaryOpExpr{
-		Op:    interpreter.Add,
-		Left:  interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
-		Right: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 20}},
+	expr2 := ast.BinaryOpExpr{
+		Op:    ast.Add,
+		Left:  ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
+		Right: ast.LiteralExpr{Value: ast.IntLiteral{Value: 20}},
 	}
 
 	result2, err := interp.EvaluateExpression(expr2, env)
@@ -414,7 +427,7 @@ func TestExpressionEvaluationIntegration(t *testing.T) {
 
 	// Test variable reference
 	env.Define("name", "Alice")
-	expr3 := interpreter.VariableExpr{Name: "name"}
+	expr3 := ast.VariableExpr{Name: "name"}
 	result3, err := interp.EvaluateExpression(expr3, env)
 	helper.AssertNoError(err, "Failed to evaluate variable")
 	helper.AssertEqual(result3, "Alice", "Variable reference")
@@ -513,53 +526,53 @@ func TestFixturesIntegration(t *testing.T) {
 // They will be reimplemented when proper AST construction is available
 
 /*
-func createHelloWorldModule() *interpreter.Module {
-	return &interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.TypeDef{
+func createHelloWorldModule() *ast.Module {
+	return &ast.Module{
+		Items: []ast.Item{
+			&ast.TypeDef{
 				Name: "Message",
-				Fields: []interpreter.Field{
-					{Name: "text", TypeAnnotation: interpreter.StringType{}, Required: true},
-					{Name: "timestamp", TypeAnnotation: interpreter.IntType{}, Required: true},
+				Fields: []ast.Field{
+					{Name: "text", TypeAnnotation: ast.StringType{}, Required: true},
+					{Name: "timestamp", TypeAnnotation: ast.IntType{}, Required: true},
 				},
 			},
-			&interpreter.Route{
+			&ast.Route{
 				Path:   "/hello",
-				Method: interpreter.Get,
-				Body: []interpreter.Statement{
-					interpreter.ReturnStatement{
-						Value: interpreter.LiteralExpr{
+				Method: ast.Get,
+				Body: []ast.Statement{
+					ast.ReturnStatement{
+						Value: ast.LiteralExpr{
 							Value: createMapLiteral(map[string]interface{}{
-								"text":      interpreter.StringLiteral{Value: "Hello, World!"},
-								"timestamp": interpreter.IntLiteral{Value: 1234567890},
+								"text":      ast.StringLiteral{Value: "Hello, World!"},
+								"timestamp": ast.IntLiteral{Value: 1234567890},
 							}),
 						},
 					},
 				},
 			},
-			&interpreter.Route{
+			&ast.Route{
 				Path:   "/greet/:name",
-				Method: interpreter.Get,
-				Body: []interpreter.Statement{
-					interpreter.AssignStatement{
+				Method: ast.Get,
+				Body: []ast.Statement{
+					ast.AssignStatement{
 						Target: "message",
-						Value: interpreter.LiteralExpr{
+						Value: ast.LiteralExpr{
 							Value: createMapLiteral(map[string]interface{}{
-								"text": interpreter.BinaryOpExpr{
-									Op:    interpreter.Add,
-									Left:  interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "Hello, "}},
-									Right: interpreter.BinaryOpExpr{
-										Op:    interpreter.Add,
-										Left:  interpreter.VariableExpr{Name: "name"},
-										Right: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "!"}},
+								"text": ast.BinaryOpExpr{
+									Op:    ast.Add,
+									Left:  ast.LiteralExpr{Value: ast.StringLiteral{Value: "Hello, "}},
+									Right: ast.BinaryOpExpr{
+										Op:    ast.Add,
+										Left:  ast.VariableExpr{Name: "name"},
+										Right: ast.LiteralExpr{Value: ast.StringLiteral{Value: "!"}},
 									},
 								},
-								"timestamp": interpreter.FunctionCallExpr{Name: "time.now", Args: []interpreter.Expr{}},
+								"timestamp": ast.FunctionCallExpr{Name: "time.now", Args: []ast.Expr{}},
 							}),
 						},
 					},
-					interpreter.ReturnStatement{
-						Value: interpreter.VariableExpr{Name: "message"},
+					ast.ReturnStatement{
+						Value: ast.VariableExpr{Name: "message"},
 					},
 				},
 			},
@@ -567,26 +580,26 @@ func createHelloWorldModule() *interpreter.Module {
 	}
 }
 
-func createRestAPIModule() *interpreter.Module {
-	return &interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.TypeDef{
+func createRestAPIModule() *ast.Module {
+	return &ast.Module{
+		Items: []ast.Item{
+			&ast.TypeDef{
 				Name: "User",
-				Fields: []interpreter.Field{
-					{Name: "id", TypeAnnotation: interpreter.IntType{}, Required: true},
-					{Name: "name", TypeAnnotation: interpreter.StringType{}, Required: true},
-					{Name: "email", TypeAnnotation: interpreter.StringType{}, Required: true},
+				Fields: []ast.Field{
+					{Name: "id", TypeAnnotation: ast.IntType{}, Required: true},
+					{Name: "name", TypeAnnotation: ast.StringType{}, Required: true},
+					{Name: "email", TypeAnnotation: ast.StringType{}, Required: true},
 				},
 			},
-			&interpreter.Route{
+			&ast.Route{
 				Path:   "/health",
-				Method: interpreter.Get,
-				Body: []interpreter.Statement{
-					interpreter.ReturnStatement{
-						Value: interpreter.LiteralExpr{
+				Method: ast.Get,
+				Body: []ast.Statement{
+					ast.ReturnStatement{
+						Value: ast.LiteralExpr{
 							Value: createMapLiteral(map[string]interface{}{
-								"status":    interpreter.StringLiteral{Value: "ok"},
-								"timestamp": interpreter.FunctionCallExpr{Name: "now", Args: []interpreter.Expr{}},
+								"status":    ast.StringLiteral{Value: "ok"},
+								"timestamp": ast.FunctionCallExpr{Name: "now", Args: []ast.Expr{}},
 							}),
 						},
 					},
@@ -596,9 +609,9 @@ func createRestAPIModule() *interpreter.Module {
 	}
 }
 
-func findRoute(module *interpreter.Module, path string) *interpreter.Route {
+func findRoute(module *ast.Module, path string) *ast.Route {
 	for _, item := range module.Items {
-		if route, ok := item.(**interpreter.Route); ok {
+		if route, ok := item.(**ast.Route); ok {
 			if route.Path == path {
 				return route
 			}
@@ -608,7 +621,7 @@ func findRoute(module *interpreter.Module, path string) *interpreter.Route {
 }
 
 /*
-// These helper types are commented out - they don't properly implement interpreter.Literal
+// These helper types are commented out - they don't properly implement ast.Literal
 // in the pure Go implementation and need to be redesigned
 type mapLiteral struct {
 	fields map[string]interface{}
@@ -620,14 +633,14 @@ func createMapLiteral(fields map[string]interface{}) mapLiteral {
 	return mapLiteral{fields: fields}
 }
 
-func createMapLiteralSimple(key string, value interface{}) interpreter.LiteralExpr {
-	return interpreter.LiteralExpr{
+func createMapLiteralSimple(key string, value interface{}) ast.LiteralExpr {
+	return ast.LiteralExpr{
 		Value: mapLiteral{fields: map[string]interface{}{key: value}},
 	}
 }
 
-func createArrayLiteral() interpreter.LiteralExpr {
-	return interpreter.LiteralExpr{
+func createArrayLiteral() ast.LiteralExpr {
+	return ast.LiteralExpr{
 		Value: arrayLiteral{},
 	}
 }

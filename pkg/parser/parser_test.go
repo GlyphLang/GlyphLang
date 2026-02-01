@@ -2,9 +2,9 @@ package parser
 
 import (
 	"fmt"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -143,7 +143,7 @@ func TestParser_SimpleRoute(t *testing.T) {
 		t.Fatalf("expected 1 item, got %d", len(module.Items))
 	}
 
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	if !ok {
 		t.Fatalf("expected Route, got %T", module.Items[0])
 	}
@@ -152,7 +152,7 @@ func TestParser_SimpleRoute(t *testing.T) {
 		t.Errorf("expected path '/hello', got '%s'", route.Path)
 	}
 
-	if route.Method != interpreter.Get {
+	if route.Method != ast.Get {
 		t.Errorf("expected GET method, got %s", route.Method)
 	}
 
@@ -182,7 +182,7 @@ func TestParser_RouteWithPathParam(t *testing.T) {
 		t.Fatalf("expected 1 item, got %d", len(module.Items))
 	}
 
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	if !ok {
 		t.Fatalf("expected Route, got %T", module.Items[0])
 	}
@@ -191,7 +191,7 @@ func TestParser_RouteWithPathParam(t *testing.T) {
 		t.Errorf("expected path '/users/:id', got '%s'", route.Path)
 	}
 
-	if route.Method != interpreter.Get {
+	if route.Method != ast.Get {
 		t.Errorf("expected GET method, got %s", route.Method)
 	}
 }
@@ -219,7 +219,7 @@ func TestParser_TypeDef(t *testing.T) {
 		t.Fatalf("expected 1 item, got %d", len(module.Items))
 	}
 
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	if !ok {
 		t.Fatalf("expected TypeDef, got %T", module.Items[0])
 	}
@@ -265,7 +265,7 @@ func TestParser_RouteWithMiddleware(t *testing.T) {
 		t.Fatalf("expected 1 item, got %d", len(module.Items))
 	}
 
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	if !ok {
 		t.Fatalf("expected Route, got %T", module.Items[0])
 	}
@@ -316,7 +316,7 @@ func TestParser_RouteWithQueryParams(t *testing.T) {
 		t.Fatalf("expected 1 item, got %d", len(module.Items))
 	}
 
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	if !ok {
 		t.Fatalf("expected Route, got %T", module.Items[0])
 	}
@@ -330,7 +330,7 @@ func TestParser_RouteWithQueryParams(t *testing.T) {
 	if q.Name != "q" {
 		t.Errorf("expected param name 'q', got '%s'", q.Name)
 	}
-	if _, ok := q.Type.(interpreter.StringType); !ok {
+	if _, ok := q.Type.(ast.StringType); !ok {
 		t.Errorf("expected StringType, got %T", q.Type)
 	}
 	if !q.Required {
@@ -345,7 +345,7 @@ func TestParser_RouteWithQueryParams(t *testing.T) {
 	if page.Name != "page" {
 		t.Errorf("expected param name 'page', got '%s'", page.Name)
 	}
-	if _, ok := page.Type.(interpreter.IntType); !ok {
+	if _, ok := page.Type.(ast.IntType); !ok {
 		t.Errorf("expected IntType, got %T", page.Type)
 	}
 	if page.Required {
@@ -369,10 +369,10 @@ func TestParser_RouteWithQueryParams(t *testing.T) {
 	if !tags.IsArray {
 		t.Error("expected tags to be an array type")
 	}
-	arrayType, ok := tags.Type.(interpreter.ArrayType)
+	arrayType, ok := tags.Type.(ast.ArrayType)
 	if !ok {
 		t.Errorf("expected ArrayType, got %T", tags.Type)
-	} else if _, ok := arrayType.ElementType.(interpreter.StringType); !ok {
+	} else if _, ok := arrayType.ElementType.(ast.StringType); !ok {
 		t.Errorf("expected array element type StringType, got %T", arrayType.ElementType)
 	}
 }
@@ -395,7 +395,7 @@ func TestParser_Assignment(t *testing.T) {
 		t.Fatalf("parser error: %v", err)
 	}
 
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	if !ok {
 		t.Fatalf("expected Route, got %T", module.Items[0])
 	}
@@ -404,7 +404,7 @@ func TestParser_Assignment(t *testing.T) {
 		t.Fatalf("expected 2 statements, got %d", len(route.Body))
 	}
 
-	assign, ok := route.Body[0].(interpreter.AssignStatement)
+	assign, ok := route.Body[0].(ast.AssignStatement)
 	if !ok {
 		t.Fatalf("expected AssignStatement, got %T", route.Body[0])
 	}
@@ -433,7 +433,7 @@ func TestParser_Reassignment(t *testing.T) {
 		t.Fatalf("parser error: %v", err)
 	}
 
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	if !ok {
 		t.Fatalf("expected Route, got %T", module.Items[0])
 	}
@@ -443,7 +443,7 @@ func TestParser_Reassignment(t *testing.T) {
 	}
 
 	// First statement should be an AssignStatement (declaration)
-	assign, ok := route.Body[0].(interpreter.AssignStatement)
+	assign, ok := route.Body[0].(ast.AssignStatement)
 	if !ok {
 		t.Fatalf("expected AssignStatement for first statement, got %T", route.Body[0])
 	}
@@ -452,7 +452,7 @@ func TestParser_Reassignment(t *testing.T) {
 	}
 
 	// Second statement should be a ReassignStatement (reassignment without $)
-	reassign, ok := route.Body[1].(interpreter.ReassignStatement)
+	reassign, ok := route.Body[1].(ast.ReassignStatement)
 	if !ok {
 		t.Fatalf("expected ReassignStatement for second statement, got %T", route.Body[1])
 	}
@@ -461,11 +461,11 @@ func TestParser_Reassignment(t *testing.T) {
 	}
 
 	// Check the value is a literal 42
-	lit, ok := reassign.Value.(interpreter.LiteralExpr)
+	lit, ok := reassign.Value.(ast.LiteralExpr)
 	if !ok {
 		t.Fatalf("expected LiteralExpr for reassign value, got %T", reassign.Value)
 	}
-	intLit, ok := lit.Value.(interpreter.IntLiteral)
+	intLit, ok := lit.Value.(ast.IntLiteral)
 	if !ok {
 		t.Fatalf("expected IntLiteral, got %T", lit.Value)
 	}
@@ -493,23 +493,23 @@ func TestParser_ReassignmentWithExpression(t *testing.T) {
 		t.Fatalf("parser error: %v", err)
 	}
 
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	if !ok {
 		t.Fatalf("expected Route, got %T", module.Items[0])
 	}
 
 	// Second statement should be a ReassignStatement with binary expression
-	reassign, ok := route.Body[1].(interpreter.ReassignStatement)
+	reassign, ok := route.Body[1].(ast.ReassignStatement)
 	if !ok {
 		t.Fatalf("expected ReassignStatement, got %T", route.Body[1])
 	}
 
 	// Check the value is a binary expression (x + 1)
-	binExpr, ok := reassign.Value.(interpreter.BinaryOpExpr)
+	binExpr, ok := reassign.Value.(ast.BinaryOpExpr)
 	if !ok {
 		t.Fatalf("expected BinaryOpExpr for reassign value, got %T", reassign.Value)
 	}
-	if binExpr.Op != interpreter.Add {
+	if binExpr.Op != ast.Add {
 		t.Errorf("expected Add operator, got %v", binExpr.Op)
 	}
 }
@@ -532,23 +532,23 @@ func TestParser_BinaryOp(t *testing.T) {
 		t.Fatalf("parser error: %v", err)
 	}
 
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	if !ok {
 		t.Fatalf("expected Route, got %T", module.Items[0])
 	}
 
-	assign, ok := route.Body[0].(interpreter.AssignStatement)
+	assign, ok := route.Body[0].(ast.AssignStatement)
 	if !ok {
 		t.Fatalf("expected AssignStatement, got %T", route.Body[0])
 	}
 
 	// Should be: 10 + (20 * 2) due to precedence
-	binOp, ok := assign.Value.(interpreter.BinaryOpExpr)
+	binOp, ok := assign.Value.(ast.BinaryOpExpr)
 	if !ok {
 		t.Fatalf("expected BinaryOpExpr, got %T", assign.Value)
 	}
 
-	if binOp.Op != interpreter.Add {
+	if binOp.Op != ast.Add {
 		t.Errorf("expected Add operator, got %s", binOp.Op)
 	}
 }
@@ -558,14 +558,14 @@ func TestParser_AllHTTPMethods(t *testing.T) {
 	tests := []struct {
 		name           string
 		methodStr      string
-		expectedMethod interpreter.HttpMethod
+		expectedMethod ast.HttpMethod
 	}{
-		{"GET", "[GET]", interpreter.Get},
-		{"POST", "[POST]", interpreter.Post},
-		{"PUT", "[PUT]", interpreter.Put},
-		{"DELETE", "[DELETE]", interpreter.Delete},
-		{"PATCH", "[PATCH]", interpreter.Patch},
-		{"default GET", "", interpreter.Get}, // No method specified defaults to GET
+		{"GET", "[GET]", ast.Get},
+		{"POST", "[POST]", ast.Post},
+		{"PUT", "[PUT]", ast.Put},
+		{"DELETE", "[DELETE]", ast.Delete},
+		{"PATCH", "[PATCH]", ast.Patch},
+		{"default GET", "", ast.Get}, // No method specified defaults to GET
 	}
 
 	for _, tt := range tests {
@@ -579,7 +579,7 @@ func TestParser_AllHTTPMethods(t *testing.T) {
 			module, err := parser.Parse()
 			require.NoError(t, err)
 
-			route, ok := module.Items[0].(*interpreter.Route)
+			route, ok := module.Items[0].(*ast.Route)
 			require.True(t, ok)
 			assert.Equal(t, tt.expectedMethod, route.Method)
 		})
@@ -611,7 +611,7 @@ func TestParser_ComplexPathParameters(t *testing.T) {
 			module, err := parser.Parse()
 			require.NoError(t, err)
 
-			route, ok := module.Items[0].(*interpreter.Route)
+			route, ok := module.Items[0].(*ast.Route)
 			require.True(t, ok)
 			assert.Equal(t, tt.expectedPath, route.Path)
 		})
@@ -623,13 +623,13 @@ func TestParser_ReturnTypes(t *testing.T) {
 	tests := []struct {
 		name          string
 		returnTypeStr string
-		expectedType  interpreter.Type
+		expectedType  ast.Type
 	}{
-		{"named type", "-> User", interpreter.NamedType{Name: "User"}},
-		{"int type", "-> int", interpreter.IntType{}},
-		{"str type", "-> str", interpreter.StringType{}},
-		{"bool type", "-> bool", interpreter.BoolType{}},
-		{"float type", "-> float", interpreter.FloatType{}},
+		{"named type", "-> User", ast.NamedType{Name: "User"}},
+		{"int type", "-> int", ast.IntType{}},
+		{"str type", "-> str", ast.StringType{}},
+		{"bool type", "-> bool", ast.BoolType{}},
+		{"float type", "-> float", ast.FloatType{}},
 	}
 
 	for _, tt := range tests {
@@ -643,7 +643,7 @@ func TestParser_ReturnTypes(t *testing.T) {
 			module, err := parser.Parse()
 			require.NoError(t, err)
 
-			route, ok := module.Items[0].(*interpreter.Route)
+			route, ok := module.Items[0].(*ast.Route)
 			require.True(t, ok)
 			assert.Equal(t, tt.expectedType, route.ReturnType)
 		})
@@ -666,7 +666,7 @@ func TestParser_MultipleMiddlewares(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 
 	// Check auth
@@ -836,11 +836,11 @@ func TestParser_MultipleRoutes(t *testing.T) {
 
 	assert.Len(t, module.Items, 2)
 
-	route1, ok := module.Items[0].(*interpreter.Route)
+	route1, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 	assert.Equal(t, "/hello", route1.Path)
 
-	route2, ok := module.Items[1].(*interpreter.Route)
+	route2, ok := module.Items[1].(*ast.Route)
 	require.True(t, ok)
 	assert.Equal(t, "/goodbye", route2.Path)
 }
@@ -864,7 +864,7 @@ func TestParser_TypeDefFieldTypes(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 	assert.Equal(t, "ComplexType", typeDef.Name)
 	assert.GreaterOrEqual(t, len(typeDef.Fields), 4)
@@ -984,12 +984,12 @@ func TestParser_IfStatements(t *testing.T) {
 			module, err := parser.Parse()
 			require.NoError(t, err)
 
-			route, ok := module.Items[0].(*interpreter.Route)
+			route, ok := module.Items[0].(*ast.Route)
 			require.True(t, ok)
 			assert.Greater(t, len(route.Body), 0)
 
 			// First statement should be an if statement
-			_, ok = route.Body[0].(interpreter.IfStatement)
+			_, ok = route.Body[0].(ast.IfStatement)
 			assert.True(t, ok, "expected first statement to be IfStatement")
 		})
 	}
@@ -1051,7 +1051,7 @@ func TestParser_LogicalOperators(t *testing.T) {
 			module, err := parser.Parse()
 			require.NoError(t, err)
 
-			route, ok := module.Items[0].(*interpreter.Route)
+			route, ok := module.Items[0].(*ast.Route)
 			require.True(t, ok)
 			assert.Greater(t, len(route.Body), 0)
 		})
@@ -1128,16 +1128,16 @@ func TestParser_ArrayLiterals(t *testing.T) {
 			module, err := parser.Parse()
 			require.NoError(t, err)
 
-			route, ok := module.Items[0].(*interpreter.Route)
+			route, ok := module.Items[0].(*ast.Route)
 			require.True(t, ok)
 			assert.Greater(t, len(route.Body), 0)
 
 			// First statement should be assignment
-			assign, ok := route.Body[0].(interpreter.AssignStatement)
+			assign, ok := route.Body[0].(ast.AssignStatement)
 			assert.True(t, ok, "expected AssignStatement")
 
 			// Value should be an array expression
-			_, ok = assign.Value.(interpreter.ArrayExpr)
+			_, ok = assign.Value.(ast.ArrayExpr)
 			assert.True(t, ok, "expected ArrayExpr")
 		})
 	}
@@ -1174,15 +1174,15 @@ func TestParser_HelloWorldExample(t *testing.T) {
 	assert.Len(t, module.Items, 3)
 
 	// Check type def
-	_, ok := module.Items[0].(*interpreter.TypeDef)
+	_, ok := module.Items[0].(*ast.TypeDef)
 	assert.True(t, ok, "first item should be TypeDef")
 
 	// Check routes
-	route1, ok := module.Items[1].(*interpreter.Route)
+	route1, ok := module.Items[1].(*ast.Route)
 	assert.True(t, ok, "second item should be Route")
 	assert.Equal(t, "/hello", route1.Path)
 
-	route2, ok := module.Items[2].(*interpreter.Route)
+	route2, ok := module.Items[2].(*ast.Route)
 	assert.True(t, ok, "third item should be Route")
 	assert.Equal(t, "/greet/:name", route2.Path)
 }
@@ -1242,19 +1242,19 @@ func TestParser_SimpleWhileLoop(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 
 	require.Len(t, route.Body, 3)
 
 	// Check second statement is while loop
-	whileStmt, ok := route.Body[1].(interpreter.WhileStatement)
+	whileStmt, ok := route.Body[1].(ast.WhileStatement)
 	require.True(t, ok)
 
 	// Check condition
-	condExpr, ok := whileStmt.Condition.(interpreter.BinaryOpExpr)
+	condExpr, ok := whileStmt.Condition.(ast.BinaryOpExpr)
 	require.True(t, ok)
-	assert.Equal(t, interpreter.Lt, condExpr.Op)
+	assert.Equal(t, ast.Lt, condExpr.Op)
 
 	// Check body has one statement
 	require.Len(t, whileStmt.Body, 1)
@@ -1282,16 +1282,16 @@ func TestParser_NestedWhileLoops(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 
 	// Check outer while loop
-	outerWhile, ok := route.Body[1].(interpreter.WhileStatement)
+	outerWhile, ok := route.Body[1].(ast.WhileStatement)
 	require.True(t, ok)
 	require.Len(t, outerWhile.Body, 3)
 
 	// Check inner while loop
-	innerWhile, ok := outerWhile.Body[1].(interpreter.WhileStatement)
+	innerWhile, ok := outerWhile.Body[1].(ast.WhileStatement)
 	require.True(t, ok)
 	require.Len(t, innerWhile.Body, 1)
 }
@@ -1315,16 +1315,16 @@ func TestParser_WhileWithComplexCondition(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 
-	whileStmt, ok := route.Body[2].(interpreter.WhileStatement)
+	whileStmt, ok := route.Body[2].(ast.WhileStatement)
 	require.True(t, ok)
 
 	// Check condition is AND operation
-	condExpr, ok := whileStmt.Condition.(interpreter.BinaryOpExpr)
+	condExpr, ok := whileStmt.Condition.(ast.BinaryOpExpr)
 	require.True(t, ok)
-	assert.Equal(t, interpreter.And, condExpr.Op)
+	assert.Equal(t, ast.And, condExpr.Op)
 }
 
 func TestParser_WhileWithMultipleStatements(t *testing.T) {
@@ -1348,10 +1348,10 @@ func TestParser_WhileWithMultipleStatements(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 
-	whileStmt, ok := route.Body[2].(interpreter.WhileStatement)
+	whileStmt, ok := route.Body[2].(ast.WhileStatement)
 	require.True(t, ok)
 
 	// Check body has three statements
@@ -1380,17 +1380,17 @@ func TestParser_WhileWithIfStatement(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 
-	whileStmt, ok := route.Body[2].(interpreter.WhileStatement)
+	whileStmt, ok := route.Body[2].(ast.WhileStatement)
 	require.True(t, ok)
 
 	// Check body has two statements: if and assignment
 	require.Len(t, whileStmt.Body, 2)
 
 	// Check first statement is if
-	_, ok = whileStmt.Body[0].(interpreter.IfStatement)
+	_, ok = whileStmt.Body[0].(ast.IfStatement)
 	require.True(t, ok)
 }
 
@@ -1413,12 +1413,12 @@ func TestParser_ForLoop_SimpleArray(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 
 	// Check for statement
 	require.Len(t, route.Body, 3) // assignment, for loop, return
-	forStmt, ok := route.Body[1].(interpreter.ForStatement)
+	forStmt, ok := route.Body[1].(ast.ForStatement)
 	require.True(t, ok)
 
 	// Check loop variables
@@ -1426,7 +1426,7 @@ func TestParser_ForLoop_SimpleArray(t *testing.T) {
 	assert.Equal(t, "item", forStmt.ValueVar)
 
 	// Check iterable is a variable
-	iterableVar, ok := forStmt.Iterable.(interpreter.VariableExpr)
+	iterableVar, ok := forStmt.Iterable.(ast.VariableExpr)
 	require.True(t, ok)
 	assert.Equal(t, "items", iterableVar.Name)
 
@@ -1451,11 +1451,11 @@ func TestParser_ForLoop_WithIndex(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 
 	// Check for statement
-	forStmt, ok := route.Body[0].(interpreter.ForStatement)
+	forStmt, ok := route.Body[0].(ast.ForStatement)
 	require.True(t, ok)
 
 	// Check loop variables
@@ -1463,7 +1463,7 @@ func TestParser_ForLoop_WithIndex(t *testing.T) {
 	assert.Equal(t, "value", forStmt.ValueVar)
 
 	// Check iterable
-	iterableVar, ok := forStmt.Iterable.(interpreter.VariableExpr)
+	iterableVar, ok := forStmt.Iterable.(ast.VariableExpr)
 	require.True(t, ok)
 	assert.Equal(t, "array", iterableVar.Name)
 }
@@ -1485,14 +1485,14 @@ func TestParser_ForLoop_ArrayLiteral(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 
-	forStmt, ok := route.Body[0].(interpreter.ForStatement)
+	forStmt, ok := route.Body[0].(ast.ForStatement)
 	require.True(t, ok)
 
 	// Check iterable is an array literal
-	arrayExpr, ok := forStmt.Iterable.(interpreter.ArrayExpr)
+	arrayExpr, ok := forStmt.Iterable.(ast.ArrayExpr)
 	require.True(t, ok)
 	assert.Len(t, arrayExpr.Elements, 3)
 }
@@ -1514,10 +1514,10 @@ func TestParser_ForLoop_ObjectIteration(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 
-	forStmt, ok := route.Body[0].(interpreter.ForStatement)
+	forStmt, ok := route.Body[0].(ast.ForStatement)
 	require.True(t, ok)
 
 	// Check loop variables
@@ -1525,7 +1525,7 @@ func TestParser_ForLoop_ObjectIteration(t *testing.T) {
 	assert.Equal(t, "value", forStmt.ValueVar)
 
 	// Check iterable is an object
-	objExpr, ok := forStmt.Iterable.(interpreter.ObjectExpr)
+	objExpr, ok := forStmt.Iterable.(ast.ObjectExpr)
 	require.True(t, ok)
 	assert.Len(t, objExpr.Fields, 2)
 }
@@ -1549,17 +1549,17 @@ func TestParser_ForLoop_Nested(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 
 	// Outer for loop
-	outerFor, ok := route.Body[0].(interpreter.ForStatement)
+	outerFor, ok := route.Body[0].(ast.ForStatement)
 	require.True(t, ok)
 	assert.Equal(t, "row", outerFor.ValueVar)
 
 	// Inner for loop
 	require.Len(t, outerFor.Body, 1)
-	innerFor, ok := outerFor.Body[0].(interpreter.ForStatement)
+	innerFor, ok := outerFor.Body[0].(ast.ForStatement)
 	require.True(t, ok)
 	assert.Equal(t, "col", innerFor.ValueVar)
 
@@ -1591,16 +1591,16 @@ func TestParser_SwitchStatement_IntegerCases(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 
 	require.Len(t, route.Body, 2)
 
-	switchStmt, ok := route.Body[1].(interpreter.SwitchStatement)
+	switchStmt, ok := route.Body[1].(ast.SwitchStatement)
 	require.True(t, ok)
 
 	// Check switch value is a variable reference
-	varExpr, ok := switchStmt.Value.(interpreter.VariableExpr)
+	varExpr, ok := switchStmt.Value.(ast.VariableExpr)
 	require.True(t, ok)
 	assert.Equal(t, "status", varExpr.Name)
 
@@ -1608,17 +1608,17 @@ func TestParser_SwitchStatement_IntegerCases(t *testing.T) {
 	require.Len(t, switchStmt.Cases, 2)
 
 	// Case 1
-	case1Literal, ok := switchStmt.Cases[0].Value.(interpreter.LiteralExpr)
+	case1Literal, ok := switchStmt.Cases[0].Value.(ast.LiteralExpr)
 	require.True(t, ok)
-	intLit1, ok := case1Literal.Value.(interpreter.IntLiteral)
+	intLit1, ok := case1Literal.Value.(ast.IntLiteral)
 	require.True(t, ok)
 	assert.Equal(t, int64(1), intLit1.Value)
 	require.Len(t, switchStmt.Cases[0].Body, 1)
 
 	// Case 2
-	case2Literal, ok := switchStmt.Cases[1].Value.(interpreter.LiteralExpr)
+	case2Literal, ok := switchStmt.Cases[1].Value.(ast.LiteralExpr)
 	require.True(t, ok)
-	intLit2, ok := case2Literal.Value.(interpreter.IntLiteral)
+	intLit2, ok := case2Literal.Value.(ast.IntLiteral)
 	require.True(t, ok)
 	assert.Equal(t, int64(2), intLit2.Value)
 	require.Len(t, switchStmt.Cases[1].Body, 1)
@@ -1650,24 +1650,24 @@ func TestParser_SwitchStatement_StringCases(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 
-	switchStmt, ok := route.Body[0].(interpreter.SwitchStatement)
+	switchStmt, ok := route.Body[0].(ast.SwitchStatement)
 	require.True(t, ok)
 
 	// Check string cases
 	require.Len(t, switchStmt.Cases, 2)
 
-	case1Literal, ok := switchStmt.Cases[0].Value.(interpreter.LiteralExpr)
+	case1Literal, ok := switchStmt.Cases[0].Value.(ast.LiteralExpr)
 	require.True(t, ok)
-	strLit1, ok := case1Literal.Value.(interpreter.StringLiteral)
+	strLit1, ok := case1Literal.Value.(ast.StringLiteral)
 	require.True(t, ok)
 	assert.Equal(t, "pending", strLit1.Value)
 
-	case2Literal, ok := switchStmt.Cases[1].Value.(interpreter.LiteralExpr)
+	case2Literal, ok := switchStmt.Cases[1].Value.(ast.LiteralExpr)
 	require.True(t, ok)
-	strLit2, ok := case2Literal.Value.(interpreter.StringLiteral)
+	strLit2, ok := case2Literal.Value.(ast.StringLiteral)
 	require.True(t, ok)
 	assert.Equal(t, "shipped", strLit2.Value)
 }
@@ -1688,8 +1688,8 @@ func TestParser_SwitchStatement_NoDefault(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	route := module.Items[0].(*interpreter.Route)
-	switchStmt := route.Body[0].(interpreter.SwitchStatement)
+	route := module.Items[0].(*ast.Route)
+	switchStmt := route.Body[0].(ast.SwitchStatement)
 
 	require.Len(t, switchStmt.Cases, 1)
 	assert.Nil(t, switchStmt.Default)
@@ -1723,8 +1723,8 @@ func TestParser_SwitchStatement_MultipleCases(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	route := module.Items[0].(*interpreter.Route)
-	switchStmt := route.Body[0].(interpreter.SwitchStatement)
+	route := module.Items[0].(*ast.Route)
+	switchStmt := route.Body[0].(ast.SwitchStatement)
 
 	require.Len(t, switchStmt.Cases, 5)
 }
@@ -1752,18 +1752,18 @@ func TestParser_SwitchStatement_NestedStatements(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	route := module.Items[0].(*interpreter.Route)
-	switchStmt := route.Body[0].(interpreter.SwitchStatement)
+	route := module.Items[0].(*ast.Route)
+	switchStmt := route.Body[0].(ast.SwitchStatement)
 
 	// Check case body has multiple statements
 	require.Len(t, switchStmt.Cases[0].Body, 2)
 
 	// First should be assignment
-	_, ok := switchStmt.Cases[0].Body[0].(interpreter.AssignStatement)
+	_, ok := switchStmt.Cases[0].Body[0].(ast.AssignStatement)
 	require.True(t, ok)
 
 	// Second should be if statement
-	_, ok = switchStmt.Cases[0].Body[1].(interpreter.IfStatement)
+	_, ok = switchStmt.Cases[0].Body[1].(ast.IfStatement)
 	require.True(t, ok)
 
 	// Check default has multiple statements
@@ -1785,7 +1785,7 @@ func TestParser_CLICommand_BangSyntax(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	cmd, ok := module.Items[0].(*interpreter.Command)
+	cmd, ok := module.Items[0].(*ast.Command)
 	require.True(t, ok, "Expected Command, got %T", module.Items[0])
 
 	assert.Equal(t, "greet", cmd.Name)
@@ -1818,7 +1818,7 @@ func TestParser_CLICommand_AtCommandSyntax(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	cmd, ok := module.Items[0].(*interpreter.Command)
+	cmd, ok := module.Items[0].(*ast.Command)
 	require.True(t, ok)
 
 	assert.Equal(t, "hello", cmd.Name)
@@ -1839,7 +1839,7 @@ func TestParser_CLICommand_WithDescription(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	cmd, ok := module.Items[0].(*interpreter.Command)
+	cmd, ok := module.Items[0].(*ast.Command)
 	require.True(t, ok)
 
 	assert.Equal(t, "deploy", cmd.Name)
@@ -1860,12 +1860,12 @@ func TestParser_CLICommand_WithReturnType(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	cmd, ok := module.Items[0].(*interpreter.Command)
+	cmd, ok := module.Items[0].(*ast.Command)
 	require.True(t, ok)
 
 	assert.Equal(t, "add", cmd.Name)
 	assert.NotNil(t, cmd.ReturnType)
-	assert.IsType(t, interpreter.IntType{}, cmd.ReturnType)
+	assert.IsType(t, ast.IntType{}, cmd.ReturnType)
 }
 
 // Test Cron Task Directive (* syntax)
@@ -1884,7 +1884,7 @@ func TestParser_CronTask_StarSyntax(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	task, ok := module.Items[0].(*interpreter.CronTask)
+	task, ok := module.Items[0].(*ast.CronTask)
 	require.True(t, ok, "Expected CronTask, got %T", module.Items[0])
 
 	assert.Equal(t, "0 0 * * *", task.Schedule)
@@ -1905,7 +1905,7 @@ func TestParser_CronTask_AtCronSyntax(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	task, ok := module.Items[0].(*interpreter.CronTask)
+	task, ok := module.Items[0].(*ast.CronTask)
 	require.True(t, ok)
 
 	assert.Equal(t, "*/5 * * * *", task.Schedule)
@@ -1925,7 +1925,7 @@ func TestParser_CronTask_WithTimezone(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	task, ok := module.Items[0].(*interpreter.CronTask)
+	task, ok := module.Items[0].(*ast.CronTask)
 	require.True(t, ok)
 
 	assert.Equal(t, "0 9 * * 1-5", task.Schedule)
@@ -1948,7 +1948,7 @@ func TestParser_CronTask_WithInjections(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	task, ok := module.Items[0].(*interpreter.CronTask)
+	task, ok := module.Items[0].(*ast.CronTask)
 	require.True(t, ok)
 
 	assert.Len(t, task.Injections, 1)
@@ -1969,7 +1969,7 @@ func TestParser_CronTask_WithRetries(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	task, ok := module.Items[0].(*interpreter.CronTask)
+	task, ok := module.Items[0].(*ast.CronTask)
 	require.True(t, ok)
 
 	assert.Equal(t, 3, task.Retries)
@@ -1991,7 +1991,7 @@ func TestParser_EventHandler_TildeSyntax(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	handler, ok := module.Items[0].(*interpreter.EventHandler)
+	handler, ok := module.Items[0].(*ast.EventHandler)
 	require.True(t, ok, "Expected EventHandler, got %T", module.Items[0])
 
 	assert.Equal(t, "user.created", handler.EventType)
@@ -2012,7 +2012,7 @@ func TestParser_EventHandler_AtEventSyntax(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	handler, ok := module.Items[0].(*interpreter.EventHandler)
+	handler, ok := module.Items[0].(*ast.EventHandler)
 	require.True(t, ok)
 
 	assert.Equal(t, "order.paid", handler.EventType)
@@ -2031,7 +2031,7 @@ func TestParser_EventHandler_UnquotedEventType(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	handler, ok := module.Items[0].(*interpreter.EventHandler)
+	handler, ok := module.Items[0].(*ast.EventHandler)
 	require.True(t, ok)
 
 	assert.Equal(t, "user.deleted", handler.EventType)
@@ -2051,7 +2051,7 @@ func TestParser_EventHandler_Async(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	handler, ok := module.Items[0].(*interpreter.EventHandler)
+	handler, ok := module.Items[0].(*ast.EventHandler)
 	require.True(t, ok)
 
 	assert.Equal(t, "email.send", handler.EventType)
@@ -2073,7 +2073,7 @@ func TestParser_EventHandler_WithInjections(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	handler, ok := module.Items[0].(*interpreter.EventHandler)
+	handler, ok := module.Items[0].(*ast.EventHandler)
 	require.True(t, ok)
 
 	assert.Len(t, handler.Injections, 1)
@@ -2097,7 +2097,7 @@ func TestParser_QueueWorker_AmpersandSyntax(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	worker, ok := module.Items[0].(*interpreter.QueueWorker)
+	worker, ok := module.Items[0].(*ast.QueueWorker)
 	require.True(t, ok, "Expected QueueWorker, got %T", module.Items[0])
 
 	assert.Equal(t, "email.send", worker.QueueName)
@@ -2118,7 +2118,7 @@ func TestParser_QueueWorker_AtQueueSyntax(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	worker, ok := module.Items[0].(*interpreter.QueueWorker)
+	worker, ok := module.Items[0].(*ast.QueueWorker)
 	require.True(t, ok)
 
 	assert.Equal(t, "image.resize", worker.QueueName)
@@ -2137,7 +2137,7 @@ func TestParser_QueueWorker_UnquotedQueueName(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	worker, ok := module.Items[0].(*interpreter.QueueWorker)
+	worker, ok := module.Items[0].(*ast.QueueWorker)
 	require.True(t, ok)
 
 	assert.Equal(t, "video.process", worker.QueueName)
@@ -2157,7 +2157,7 @@ func TestParser_QueueWorker_WithConcurrency(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	worker, ok := module.Items[0].(*interpreter.QueueWorker)
+	worker, ok := module.Items[0].(*ast.QueueWorker)
 	require.True(t, ok)
 
 	assert.Equal(t, 5, worker.Concurrency)
@@ -2178,7 +2178,7 @@ func TestParser_QueueWorker_WithRetriesAndTimeout(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	worker, ok := module.Items[0].(*interpreter.QueueWorker)
+	worker, ok := module.Items[0].(*ast.QueueWorker)
 	require.True(t, ok)
 
 	assert.Equal(t, 3, worker.MaxRetries)
@@ -2200,7 +2200,7 @@ func TestParser_QueueWorker_WithInjections(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	worker, ok := module.Items[0].(*interpreter.QueueWorker)
+	worker, ok := module.Items[0].(*ast.QueueWorker)
 	require.True(t, ok)
 
 	assert.Len(t, worker.Injections, 1)
@@ -2213,7 +2213,7 @@ func TestParser_MixedModule_AllDirectiveTypes(t *testing.T) {
 	tests := []struct {
 		name   string
 		source string
-		check  func(*testing.T, interpreter.Item)
+		check  func(*testing.T, ast.Item)
 	}{
 		{
 			name: "TypeDef",
@@ -2221,8 +2221,8 @@ func TestParser_MixedModule_AllDirectiveTypes(t *testing.T) {
   id: int!
   name: str!
 }`,
-			check: func(t *testing.T, item interpreter.Item) {
-				_, ok := item.(*interpreter.TypeDef)
+			check: func(t *testing.T, item ast.Item) {
+				_, ok := item.(*ast.TypeDef)
 				assert.True(t, ok, "Expected TypeDef")
 			},
 		},
@@ -2231,8 +2231,8 @@ func TestParser_MixedModule_AllDirectiveTypes(t *testing.T) {
 			source: `@ GET /users {
   > {users: []}
 }`,
-			check: func(t *testing.T, item interpreter.Item) {
-				_, ok := item.(*interpreter.Route)
+			check: func(t *testing.T, item ast.Item) {
+				_, ok := item.(*ast.Route)
 				assert.True(t, ok, "Expected Route")
 			},
 		},
@@ -2279,7 +2279,7 @@ func TestParser_Directive_ComplexBody(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	cmd, ok := module.Items[0].(*interpreter.Command)
+	cmd, ok := module.Items[0].(*ast.Command)
 	require.True(t, ok)
 
 	// Should have: assign, assign, while, for, return (5 statements)
@@ -2291,7 +2291,7 @@ func TestParser_UnaryOperators(t *testing.T) {
 	tests := []struct {
 		name    string
 		source  string
-		checkFn func(t *testing.T, module *interpreter.Module)
+		checkFn func(t *testing.T, module *ast.Module)
 	}{
 		{
 			name: "unary not operator",
@@ -2299,12 +2299,12 @@ func TestParser_UnaryOperators(t *testing.T) {
   $ valid = !false
   > {valid: valid}
 }`,
-			checkFn: func(t *testing.T, module *interpreter.Module) {
-				route := module.Items[0].(*interpreter.Route)
-				assign := route.Body[0].(interpreter.AssignStatement)
-				unary, ok := assign.Value.(interpreter.UnaryOpExpr)
+			checkFn: func(t *testing.T, module *ast.Module) {
+				route := module.Items[0].(*ast.Route)
+				assign := route.Body[0].(ast.AssignStatement)
+				unary, ok := assign.Value.(ast.UnaryOpExpr)
 				require.True(t, ok, "expected UnaryOpExpr")
-				assert.Equal(t, interpreter.Not, unary.Op)
+				assert.Equal(t, ast.Not, unary.Op)
 			},
 		},
 		{
@@ -2313,12 +2313,12 @@ func TestParser_UnaryOperators(t *testing.T) {
   $ neg = -42
   > {neg: neg}
 }`,
-			checkFn: func(t *testing.T, module *interpreter.Module) {
-				route := module.Items[0].(*interpreter.Route)
-				assign := route.Body[0].(interpreter.AssignStatement)
-				unary, ok := assign.Value.(interpreter.UnaryOpExpr)
+			checkFn: func(t *testing.T, module *ast.Module) {
+				route := module.Items[0].(*ast.Route)
+				assign := route.Body[0].(ast.AssignStatement)
+				unary, ok := assign.Value.(ast.UnaryOpExpr)
 				require.True(t, ok, "expected UnaryOpExpr")
-				assert.Equal(t, interpreter.Neg, unary.Op)
+				assert.Equal(t, ast.Neg, unary.Op)
 			},
 		},
 		{
@@ -2327,15 +2327,15 @@ func TestParser_UnaryOperators(t *testing.T) {
   $ result = !!true
   > {result: result}
 }`,
-			checkFn: func(t *testing.T, module *interpreter.Module) {
-				route := module.Items[0].(*interpreter.Route)
-				assign := route.Body[0].(interpreter.AssignStatement)
-				outer, ok := assign.Value.(interpreter.UnaryOpExpr)
+			checkFn: func(t *testing.T, module *ast.Module) {
+				route := module.Items[0].(*ast.Route)
+				assign := route.Body[0].(ast.AssignStatement)
+				outer, ok := assign.Value.(ast.UnaryOpExpr)
 				require.True(t, ok, "expected outer UnaryOpExpr")
-				assert.Equal(t, interpreter.Not, outer.Op)
-				inner, ok := outer.Right.(interpreter.UnaryOpExpr)
+				assert.Equal(t, ast.Not, outer.Op)
+				inner, ok := outer.Right.(ast.UnaryOpExpr)
 				require.True(t, ok, "expected inner UnaryOpExpr")
-				assert.Equal(t, interpreter.Not, inner.Op)
+				assert.Equal(t, ast.Not, inner.Op)
 			},
 		},
 	}
@@ -2442,7 +2442,7 @@ func TestParser_RateLimitVariations(t *testing.T) {
 			module, err := parser.Parse()
 			require.NoError(t, err)
 
-			route := module.Items[0].(*interpreter.Route)
+			route := module.Items[0].(*ast.Route)
 			require.NotNil(t, route.RateLimit)
 			assert.Equal(t, tt.expectedReqs, route.RateLimit.Requests)
 			assert.Equal(t, tt.expectedWindow, route.RateLimit.Window)
@@ -2510,7 +2510,7 @@ func TestParser_TypeDefWithoutColon(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 	assert.Equal(t, "Product", typeDef.Name)
 	assert.Len(t, typeDef.Fields, 3)
@@ -2531,7 +2531,7 @@ func TestParser_ValidationStatement(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	route := module.Items[0].(*interpreter.Route)
+	route := module.Items[0].(*ast.Route)
 	require.GreaterOrEqual(t, len(route.Body), 1)
 }
 
@@ -2551,7 +2551,7 @@ func TestParser_ExpressionStatements(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	route := module.Items[0].(*interpreter.Route)
+	route := module.Items[0].(*ast.Route)
 	require.GreaterOrEqual(t, len(route.Body), 2)
 }
 
@@ -2709,7 +2709,7 @@ func TestParser_AuthConfigVariations(t *testing.T) {
 			module, err := parser.Parse()
 			require.NoError(t, err)
 
-			route := module.Items[0].(*interpreter.Route)
+			route := module.Items[0].(*ast.Route)
 			require.NotNil(t, route.Auth)
 		})
 	}
@@ -2982,35 +2982,35 @@ func TestParser_MatchExpr_LiteralPatterns(t *testing.T) {
 	require.NotNil(t, module)
 	require.Len(t, module.Items, 1)
 
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 	require.Len(t, route.Body, 2)
 
 	// First statement is the assignment with match expression
 	// Try both pointer and value types
-	var assignStmt interpreter.AssignStatement
-	if ptr, ok := route.Body[0].(*interpreter.AssignStatement); ok {
+	var assignStmt ast.AssignStatement
+	if ptr, ok := route.Body[0].(*ast.AssignStatement); ok {
 		assignStmt = *ptr
-	} else if val, ok := route.Body[0].(interpreter.AssignStatement); ok {
+	} else if val, ok := route.Body[0].(ast.AssignStatement); ok {
 		assignStmt = val
 	} else {
 		t.Fatalf("expected AssignStatement, got %T", route.Body[0])
 	}
 	assert.Equal(t, "result", assignStmt.Target)
 
-	matchExpr, ok := assignStmt.Value.(interpreter.MatchExpr)
+	matchExpr, ok := assignStmt.Value.(ast.MatchExpr)
 	require.True(t, ok)
 	require.Len(t, matchExpr.Cases, 3)
 
 	// Check first case: 200 => "OK"
-	lit1, ok := matchExpr.Cases[0].Pattern.(interpreter.LiteralPattern)
+	lit1, ok := matchExpr.Cases[0].Pattern.(ast.LiteralPattern)
 	require.True(t, ok)
-	intLit, ok := lit1.Value.(interpreter.IntLiteral)
+	intLit, ok := lit1.Value.(ast.IntLiteral)
 	require.True(t, ok)
 	assert.Equal(t, int64(200), intLit.Value)
 
 	// Check wildcard case
-	_, ok = matchExpr.Cases[2].Pattern.(interpreter.WildcardPattern)
+	_, ok = matchExpr.Cases[2].Pattern.(ast.WildcardPattern)
 	assert.True(t, ok)
 }
 
@@ -3032,19 +3032,19 @@ func TestParser_MatchExpr_WithGuard(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, module)
 
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 
-	var assignStmt interpreter.AssignStatement
-	if ptr, ok := route.Body[0].(*interpreter.AssignStatement); ok {
+	var assignStmt ast.AssignStatement
+	if ptr, ok := route.Body[0].(*ast.AssignStatement); ok {
 		assignStmt = *ptr
-	} else if val, ok := route.Body[0].(interpreter.AssignStatement); ok {
+	} else if val, ok := route.Body[0].(ast.AssignStatement); ok {
 		assignStmt = val
 	} else {
 		t.Fatalf("expected AssignStatement, got %T", route.Body[0])
 	}
 
-	matchExpr, ok := assignStmt.Value.(interpreter.MatchExpr)
+	matchExpr, ok := assignStmt.Value.(ast.MatchExpr)
 	require.True(t, ok)
 	require.Len(t, matchExpr.Cases, 2)
 
@@ -3072,24 +3072,24 @@ func TestParser_MatchExpr_ObjectPattern(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, module)
 
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 
-	var assignStmt interpreter.AssignStatement
-	if ptr, ok := route.Body[0].(*interpreter.AssignStatement); ok {
+	var assignStmt ast.AssignStatement
+	if ptr, ok := route.Body[0].(*ast.AssignStatement); ok {
 		assignStmt = *ptr
-	} else if val, ok := route.Body[0].(interpreter.AssignStatement); ok {
+	} else if val, ok := route.Body[0].(ast.AssignStatement); ok {
 		assignStmt = val
 	} else {
 		t.Fatalf("expected AssignStatement, got %T", route.Body[0])
 	}
 
-	matchExpr, ok := assignStmt.Value.(interpreter.MatchExpr)
+	matchExpr, ok := assignStmt.Value.(ast.MatchExpr)
 	require.True(t, ok)
 	require.Len(t, matchExpr.Cases, 2)
 
 	// First case should be an object pattern
-	objPattern, ok := matchExpr.Cases[0].Pattern.(interpreter.ObjectPattern)
+	objPattern, ok := matchExpr.Cases[0].Pattern.(ast.ObjectPattern)
 	require.True(t, ok)
 	require.Len(t, objPattern.Fields, 2)
 	assert.Equal(t, "name", objPattern.Fields[0].Key)
@@ -3115,30 +3115,30 @@ func TestParser_MatchExpr_ArrayPattern(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, module)
 
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 
-	var assignStmt interpreter.AssignStatement
-	if ptr, ok := route.Body[0].(*interpreter.AssignStatement); ok {
+	var assignStmt ast.AssignStatement
+	if ptr, ok := route.Body[0].(*ast.AssignStatement); ok {
 		assignStmt = *ptr
-	} else if val, ok := route.Body[0].(interpreter.AssignStatement); ok {
+	} else if val, ok := route.Body[0].(ast.AssignStatement); ok {
 		assignStmt = val
 	} else {
 		t.Fatalf("expected AssignStatement, got %T", route.Body[0])
 	}
 
-	matchExpr, ok := assignStmt.Value.(interpreter.MatchExpr)
+	matchExpr, ok := assignStmt.Value.(ast.MatchExpr)
 	require.True(t, ok)
 	require.Len(t, matchExpr.Cases, 3)
 
 	// First case: [first, second]
-	arrPattern1, ok := matchExpr.Cases[0].Pattern.(interpreter.ArrayPattern)
+	arrPattern1, ok := matchExpr.Cases[0].Pattern.(ast.ArrayPattern)
 	require.True(t, ok)
 	require.Len(t, arrPattern1.Elements, 2)
 	assert.Nil(t, arrPattern1.Rest)
 
 	// Second case: [head, ...rest]
-	arrPattern2, ok := matchExpr.Cases[1].Pattern.(interpreter.ArrayPattern)
+	arrPattern2, ok := matchExpr.Cases[1].Pattern.(ast.ArrayPattern)
 	require.True(t, ok)
 	require.Len(t, arrPattern2.Elements, 1)
 	require.NotNil(t, arrPattern2.Rest)
@@ -3188,7 +3188,7 @@ func TestParser_FieldAnnotations(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	td, ok := module.Items[0].(*interpreter.TypeDef)
+	td, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 	require.Len(t, td.Fields, 3)
 
@@ -3227,7 +3227,7 @@ func TestParser_FieldAnnotationWithPattern(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	td, ok := module.Items[0].(*interpreter.TypeDef)
+	td, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 	require.Len(t, td.Fields[0].Annotations, 1)
 	assert.Equal(t, "pattern", td.Fields[0].Annotations[0].Name)
@@ -3247,7 +3247,7 @@ func TestParser_FieldAnnotationOneOf(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	td, ok := module.Items[0].(*interpreter.TypeDef)
+	td, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 	require.Len(t, td.Fields[0].Annotations, 1)
 	ann := td.Fields[0].Annotations[0]
@@ -3270,7 +3270,7 @@ func TestParser_FieldNoAnnotations(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	td, ok := module.Items[0].(*interpreter.TypeDef)
+	td, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 	assert.Empty(t, td.Fields[0].Annotations)
 }
@@ -3289,13 +3289,13 @@ func TestParser_SSERoute(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, module.Items, 1)
 
-	route, ok := module.Items[0].(*interpreter.Route)
-	require.True(t, ok, "expected *interpreter.Route, got %T", module.Items[0])
-	assert.Equal(t, interpreter.SSE, route.Method)
+	route, ok := module.Items[0].(*ast.Route)
+	require.True(t, ok, "expected *ast.Route, got %T", module.Items[0])
+	assert.Equal(t, ast.SSE, route.Method)
 	assert.Equal(t, "/events", route.Path)
 	require.Len(t, route.Body, 1)
 
-	yieldStmt, ok := route.Body[0].(interpreter.YieldStatement)
+	yieldStmt, ok := route.Body[0].(ast.YieldStatement)
 	require.True(t, ok, "expected YieldStatement, got %T", route.Body[0])
 	assert.NotNil(t, yieldStmt.Value)
 }
@@ -3314,9 +3314,9 @@ func TestParser_SSERouteWithPathParams(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, module.Items, 1)
 
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
-	assert.Equal(t, interpreter.SSE, route.Method)
+	assert.Equal(t, ast.SSE, route.Method)
 	assert.Equal(t, "/events/:userId", route.Path)
 }
 
@@ -3333,10 +3333,10 @@ func TestParser_YieldStatement(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 	require.Len(t, route.Body, 1)
 
-	_, ok = route.Body[0].(interpreter.YieldStatement)
+	_, ok = route.Body[0].(ast.YieldStatement)
 	assert.True(t, ok, "expected YieldStatement, got %T", route.Body[0])
 }

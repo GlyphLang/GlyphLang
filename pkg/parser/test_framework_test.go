@@ -1,9 +1,9 @@
 package parser
 
 import (
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -114,12 +114,12 @@ func TestParseTestBlock(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	tb, ok := module.Items[0].(*interpreter.TestBlock)
+	tb, ok := module.Items[0].(*ast.TestBlock)
 	require.True(t, ok, "expected TestBlock, got %T", module.Items[0])
 	assert.Equal(t, "should pass", tb.Name)
 	assert.Len(t, tb.Body, 1)
 
-	assertStmt, ok := tb.Body[0].(interpreter.AssertStatement)
+	assertStmt, ok := tb.Body[0].(ast.AssertStatement)
 	require.True(t, ok, "expected AssertStatement, got %T", tb.Body[0])
 	assert.Nil(t, assertStmt.Message)
 }
@@ -138,10 +138,10 @@ func TestParseTestBlockWithMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	tb := module.Items[0].(*interpreter.TestBlock)
+	tb := module.Items[0].(*ast.TestBlock)
 	assert.Equal(t, "with message", tb.Name)
 
-	assertStmt := tb.Body[0].(interpreter.AssertStatement)
+	assertStmt := tb.Body[0].(ast.AssertStatement)
 	assert.NotNil(t, assertStmt.Message)
 }
 
@@ -160,16 +160,16 @@ func TestParseTestBlockWithVariables(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	tb := module.Items[0].(*interpreter.TestBlock)
+	tb := module.Items[0].(*ast.TestBlock)
 	assert.Equal(t, "variable test", tb.Name)
 	assert.Len(t, tb.Body, 2)
 
 	// First statement is AssignStatement
-	_, ok := tb.Body[0].(interpreter.AssignStatement)
+	_, ok := tb.Body[0].(ast.AssignStatement)
 	assert.True(t, ok)
 
 	// Second is AssertStatement
-	_, ok = tb.Body[1].(interpreter.AssertStatement)
+	_, ok = tb.Body[1].(ast.AssertStatement)
 	assert.True(t, ok)
 }
 
@@ -192,10 +192,10 @@ test "second" {
 
 	require.Len(t, module.Items, 2)
 
-	tb1 := module.Items[0].(*interpreter.TestBlock)
+	tb1 := module.Items[0].(*ast.TestBlock)
 	assert.Equal(t, "first", tb1.Name)
 
-	tb2 := module.Items[1].(*interpreter.TestBlock)
+	tb2 := module.Items[1].(*ast.TestBlock)
 	assert.Equal(t, "second", tb2.Name)
 }
 
@@ -217,7 +217,7 @@ func TestParseTestBlockWithExpression(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	tb := module.Items[0].(*interpreter.TestBlock)
+	tb := module.Items[0].(*ast.TestBlock)
 	assert.Len(t, tb.Body, 5) // 1 assign + 4 asserts
 }
 
@@ -236,7 +236,7 @@ func TestParseTestBlockExpandedSyntax(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	tb := module.Items[0].(*interpreter.TestBlock)
+	tb := module.Items[0].(*ast.TestBlock)
 	assert.Equal(t, "expanded test", tb.Name)
 	assert.Len(t, tb.Body, 2)
 }
@@ -288,9 +288,9 @@ test "double works" {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 2)
-	_, ok := module.Items[0].(*interpreter.Function)
+	_, ok := module.Items[0].(*ast.Function)
 	assert.True(t, ok)
-	_, ok = module.Items[1].(*interpreter.TestBlock)
+	_, ok = module.Items[1].(*ast.TestBlock)
 	assert.True(t, ok)
 }
 

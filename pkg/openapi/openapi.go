@@ -3,10 +3,10 @@ package openapi
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"sort"
 	"strings"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"gopkg.in/yaml.v3"
 )
 
@@ -118,7 +118,7 @@ func NewGenerator(title, version string) *Generator {
 }
 
 // Generate produces an OpenAPI 3.0 spec from a parsed GlyphLang module.
-func (g *Generator) Generate(module *interpreter.Module) *Spec {
+func (g *Generator) Generate(module *ast.Module) *Spec {
 	spec := &Spec{
 		OpenAPI: "3.0.3",
 		Info: Info{
@@ -133,8 +133,8 @@ func (g *Generator) Generate(module *interpreter.Module) *Spec {
 	}
 
 	// First pass: collect all type definitions for schemas
-	// Note: the parser may return either value types (interpreter.TypeDef) or pointer
-	// types (*interpreter.TypeDef), so getTypeDef (defined at line 474) handles both.
+	// Note: the parser may return either value types (ast.TypeDef) or pointer
+	// types (*ast.TypeDef), so getTypeDef (defined at line 474) handles both.
 	for _, item := range module.Items {
 		td := getTypeDef(item)
 		if td != nil {
@@ -143,15 +143,15 @@ func (g *Generator) Generate(module *interpreter.Module) *Spec {
 	}
 
 	// Second pass: process routes
-	// Note: the parser may return either value types (interpreter.Route) or pointer
-	// types (*interpreter.Route), so getRoute (defined at line 462) handles both.
+	// Note: the parser may return either value types (ast.Route) or pointer
+	// types (*ast.Route), so getRoute (defined at line 462) handles both.
 	hasAuth := false
 	for _, item := range module.Items {
 		route := getRoute(item)
 		if route == nil {
 			continue
 		}
-		if route.Method == interpreter.WebSocket {
+		if route.Method == ast.WebSocket {
 			continue
 		}
 
@@ -164,15 +164,15 @@ func (g *Generator) Generate(module *interpreter.Module) *Spec {
 		op := g.routeToOperation(route, spec.Components.Schemas)
 
 		switch route.Method {
-		case interpreter.Get:
+		case ast.Get:
 			spec.Paths[openAPIPath].Get = op
-		case interpreter.Post:
+		case ast.Post:
 			spec.Paths[openAPIPath].Post = op
-		case interpreter.Put:
+		case ast.Put:
 			spec.Paths[openAPIPath].Put = op
-		case interpreter.Delete:
+		case ast.Delete:
 			spec.Paths[openAPIPath].Delete = op
-		case interpreter.Patch:
+		case ast.Patch:
 			spec.Paths[openAPIPath].Patch = op
 		}
 
@@ -203,7 +203,7 @@ func (s *Spec) ToYAML() ([]byte, error) {
 	return yaml.Marshal(s)
 }
 
-func (g *Generator) routeToOperation(route *interpreter.Route, schemas map[string]*Schema) *Operation {
+func (g *Generator) routeToOperation(route *ast.Route, schemas map[string]*Schema) *Operation {
 	op := &Operation{
 		OperationID: generateOperationID(route),
 		Responses:   make(map[string]*Response),
@@ -238,7 +238,7 @@ func (g *Generator) routeToOperation(route *interpreter.Route, schemas map[strin
 	}
 
 	// Handle request body for POST/PUT/PATCH
-	if route.Method == interpreter.Post || route.Method == interpreter.Put || route.Method == interpreter.Patch {
+	if route.Method == ast.Post || route.Method == ast.Put || route.Method == ast.Patch {
 		if route.InputType != nil {
 			op.RequestBody = &RequestBody{
 				Required: true,
@@ -265,7 +265,7 @@ func (g *Generator) routeToOperation(route *interpreter.Route, schemas map[strin
 		responseSchema := g.typeToSchema(route.ReturnType)
 
 		// Check for union type (e.g., User | NotFound)
-		if union, ok := route.ReturnType.(interpreter.UnionType); ok {
+		if union, ok := route.ReturnType.(ast.UnionType); ok {
 			op.Responses["200"] = &Response{
 				Description: "Successful response",
 				Content: map[string]MediaType{
@@ -324,7 +324,7 @@ func (g *Generator) routeToOperation(route *interpreter.Route, schemas map[strin
 	return op
 }
 
-func (g *Generator) typeDefToSchema(td *interpreter.TypeDef) *Schema {
+func (g *Generator) typeDefToSchema(td *ast.TypeDef) *Schema {
 	schema := &Schema{
 		Type:       "object",
 		Properties: make(map[string]*Schema),
@@ -349,40 +349,40 @@ func (g *Generator) typeDefToSchema(td *interpreter.TypeDef) *Schema {
 	return schema
 }
 
-func (g *Generator) typeToSchema(t interpreter.Type) *Schema {
+func (g *Generator) typeToSchema(t ast.Type) *Schema {
 	if t == nil {
 		return &Schema{Type: "object"}
 	}
 
 	switch typ := t.(type) {
-	case interpreter.IntType:
+	case ast.IntType:
 		return &Schema{Type: "integer", Format: "int64"}
-	case interpreter.FloatType:
+	case ast.FloatType:
 		return &Schema{Type: "number", Format: "double"}
-	case interpreter.StringType:
+	case ast.StringType:
 		return &Schema{Type: "string"}
-	case interpreter.BoolType:
+	case ast.BoolType:
 		return &Schema{Type: "boolean"}
-	case interpreter.ArrayType:
+	case ast.ArrayType:
 		return &Schema{
 			Type:  "array",
 			Items: g.typeToSchema(typ.ElementType),
 		}
-	case interpreter.OptionalType:
+	case ast.OptionalType:
 		inner := g.typeToSchema(typ.InnerType)
 		inner.Nullable = true
 		return inner
-	case interpreter.NamedType:
+	case ast.NamedType:
 		return g.namedTypeToSchema(typ.Name)
-	case interpreter.UnionType:
+	case ast.UnionType:
 		var schemas []*Schema
 		for _, ut := range typ.Types {
 			schemas = append(schemas, g.typeToSchema(ut))
 		}
 		return &Schema{OneOf: schemas}
-	case interpreter.GenericType:
+	case ast.GenericType:
 		return g.genericTypeToSchema(typ)
-	case interpreter.DatabaseType:
+	case ast.DatabaseType:
 		return &Schema{Type: "object"}
 	default:
 		return &Schema{Type: "object"}
@@ -408,9 +408,9 @@ func (g *Generator) namedTypeToSchema(name string) *Schema {
 	}
 }
 
-func (g *Generator) genericTypeToSchema(gt interpreter.GenericType) *Schema {
+func (g *Generator) genericTypeToSchema(gt ast.GenericType) *Schema {
 	baseName := ""
-	if named, ok := gt.BaseType.(interpreter.NamedType); ok {
+	if named, ok := gt.BaseType.(ast.NamedType); ok {
 		baseName = named.Name
 	}
 
@@ -431,7 +431,7 @@ func (g *Generator) genericTypeToSchema(gt interpreter.GenericType) *Schema {
 	}
 }
 
-func (g *Generator) addSecurityScheme(spec *Spec, auth *interpreter.AuthConfig) {
+func (g *Generator) addSecurityScheme(spec *Spec, auth *ast.AuthConfig) {
 	schemeName := authTypeToSchemeName(auth.AuthType)
 	if _, exists := spec.Components.SecuritySchemes[schemeName]; exists {
 		return
@@ -464,11 +464,11 @@ func (g *Generator) addSecurityScheme(spec *Spec, auth *interpreter.AuthConfig) 
 }
 
 // getRoute extracts a *Route from an Item, handling both value and pointer types.
-func getRoute(item interpreter.Item) *interpreter.Route {
+func getRoute(item ast.Item) *ast.Route {
 	switch v := item.(type) {
-	case interpreter.Route:
+	case ast.Route:
 		return &v
-	case *interpreter.Route:
+	case *ast.Route:
 		return v
 	default:
 		return nil
@@ -476,11 +476,11 @@ func getRoute(item interpreter.Item) *interpreter.Route {
 }
 
 // getTypeDef extracts a *TypeDef from an Item, handling both value and pointer types.
-func getTypeDef(item interpreter.Item) *interpreter.TypeDef {
+func getTypeDef(item ast.Item) *ast.TypeDef {
 	switch v := item.(type) {
-	case interpreter.TypeDef:
+	case ast.TypeDef:
 		return &v
-	case *interpreter.TypeDef:
+	case *ast.TypeDef:
 		return v
 	default:
 		return nil
@@ -509,7 +509,7 @@ func extractPathParams(path string) []string {
 	return params
 }
 
-func generateOperationID(route *interpreter.Route) string {
+func generateOperationID(route *ast.Route) string {
 	method := strings.ToLower(route.Method.String())
 	parts := strings.Split(route.Path, "/")
 
@@ -562,8 +562,8 @@ func deriveTag(path string) string {
 	return ""
 }
 
-func inferStatusCode(t interpreter.Type) string {
-	if named, ok := t.(interpreter.NamedType); ok {
+func inferStatusCode(t ast.Type) string {
+	if named, ok := t.(ast.NamedType); ok {
 		lower := strings.ToLower(named.Name)
 		switch {
 		case strings.Contains(lower, "notfound"):
@@ -583,8 +583,8 @@ func inferStatusCode(t interpreter.Type) string {
 	return "default"
 }
 
-func inferDescription(t interpreter.Type) string {
-	if named, ok := t.(interpreter.NamedType); ok {
+func inferDescription(t ast.Type) string {
+	if named, ok := t.(ast.NamedType); ok {
 		lower := strings.ToLower(named.Name)
 		switch {
 		case strings.Contains(lower, "notfound"):
@@ -608,7 +608,7 @@ func inferDescription(t interpreter.Type) string {
 }
 
 // GenerateFromModule is a convenience function to generate an OpenAPI spec from a module.
-func GenerateFromModule(module *interpreter.Module, title, version string) *Spec {
+func GenerateFromModule(module *ast.Module, title, version string) *Spec {
 	gen := NewGenerator(title, version)
 	return gen.Generate(module)
 }

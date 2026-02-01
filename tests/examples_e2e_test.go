@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/glyphlang/glyph/pkg/ast"
 	"github.com/glyphlang/glyph/pkg/compiler"
 	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/server"
@@ -133,7 +134,7 @@ func TestExampleProgramModuleStructure(t *testing.T) {
 
 		routeCount := 0
 		for _, item := range module.Items {
-			if _, ok := item.(*interpreter.Route); ok {
+			if _, ok := item.(*ast.Route); ok {
 				routeCount++
 			}
 		}
@@ -159,9 +160,9 @@ func TestExampleProgramModuleStructure(t *testing.T) {
 		routeCount := 0
 		for _, item := range module.Items {
 			switch item.(type) {
-			case *interpreter.TypeDef:
+			case *ast.TypeDef:
 				typeDefCount++
-			case *interpreter.Route:
+			case *ast.Route:
 				routeCount++
 			}
 		}
@@ -211,7 +212,7 @@ func TestInterpreterRouteExecution(t *testing.T) {
 		}
 
 		for _, item := range module.Items {
-			if route, ok := item.(*interpreter.Route); ok {
+			if route, ok := item.(*ast.Route); ok {
 				result, err := interp.ExecuteRouteSimple(route, map[string]string{})
 				if err != nil {
 					t.Fatalf("Route execution failed: %v", err)
@@ -252,7 +253,7 @@ func TestInterpreterRouteExecution(t *testing.T) {
 		}
 
 		for _, item := range module.Items {
-			if route, ok := item.(*interpreter.Route); ok {
+			if route, ok := item.(*ast.Route); ok {
 				result, err := interp.ExecuteRouteSimple(route, map[string]string{})
 				if err != nil {
 					t.Fatalf("Route execution failed: %v", err)
@@ -295,7 +296,7 @@ func TestInterpreterRouteExecution(t *testing.T) {
 		}
 
 		for _, item := range module.Items {
-			if route, ok := item.(*interpreter.Route); ok {
+			if route, ok := item.(*ast.Route); ok {
 				result, err := interp.ExecuteRouteSimple(route, map[string]string{})
 				if err != nil {
 					t.Fatalf("Route execution failed: %v", err)
@@ -331,7 +332,7 @@ func TestInterpreterRouteExecution(t *testing.T) {
 		}
 
 		for _, item := range module.Items {
-			if route, ok := item.(*interpreter.Route); ok {
+			if route, ok := item.(*ast.Route); ok {
 				result, err := interp.ExecuteRouteSimple(route, map[string]string{"name": "Alice"})
 				if err != nil {
 					t.Fatalf("Route execution failed: %v", err)
@@ -370,7 +371,7 @@ func TestInterpreterRouteExecution(t *testing.T) {
 		}
 
 		for _, item := range module.Items {
-			if route, ok := item.(*interpreter.Route); ok {
+			if route, ok := item.(*ast.Route); ok {
 				req := &interpreter.Request{
 					Path:   "/test",
 					Method: "GET",

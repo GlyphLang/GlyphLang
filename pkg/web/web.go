@@ -398,8 +398,43 @@ func (rh *ResponseHelper) SendText(w http.ResponseWriter, status int, textConten
 }
 
 // SendFile sends a file as the response. Content type is detected from the filename extension.
-func (rh *ResponseHelper) SendFile(w http.ResponseWriter, r *http.Request, targetPath string) error {
-	file, err := os.Open(targetPath)
+// The rootDir parameter restricts file access to the given directory tree. If rootDir is empty,
+// the current working directory is used.
+func (rh *ResponseHelper) SendFile(w http.ResponseWriter, r *http.Request, rootDir, targetPath string) error {
+	if rootDir == "" {
+		var err error
+		rootDir, err = os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to determine working directory: %w", err)
+		}
+	}
+
+	absRoot, err := filepath.Abs(rootDir)
+	if err != nil {
+		return fmt.Errorf("failed to resolve root directory: %w", err)
+	}
+
+	// Clean and resolve the target path relative to root
+	cleanPath := filepath.Clean(targetPath)
+	if !filepath.IsAbs(cleanPath) {
+		cleanPath = filepath.Join(absRoot, cleanPath)
+	}
+
+	// Resolve symlinks to get the real path on disk
+	realPath, err := filepath.EvalSymlinks(cleanPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("file not found: %s", targetPath)
+		}
+		return fmt.Errorf("failed to resolve file path: %w", err)
+	}
+
+	// Path traversal protection: verify resolved path is under the root
+	if !isSubPath(absRoot, realPath) {
+		return fmt.Errorf("access denied: path escapes root directory")
+	}
+
+	file, err := os.Open(realPath)
 	if err != nil {
 		return fmt.Errorf("failed to open file %s: %w", targetPath, err)
 	}
@@ -410,7 +445,11 @@ func (rh *ResponseHelper) SendFile(w http.ResponseWriter, r *http.Request, targe
 		return fmt.Errorf("failed to stat file %s: %w", targetPath, err)
 	}
 
-	fileExt := filepath.Ext(targetPath)
+	if stat.IsDir() {
+		return fmt.Errorf("path is a directory, not a file: %s", targetPath)
+	}
+
+	fileExt := filepath.Ext(realPath)
 	contentType := mime.TypeByExtension(fileExt)
 	if contentType != "" {
 		w.Header().Set("Content-Type", contentType)

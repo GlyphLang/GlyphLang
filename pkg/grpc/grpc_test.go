@@ -1,42 +1,42 @@
 package grpc
 
 import (
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // TestGenerateProtoBasic verifies proto generation from a simple service
 func TestGenerateProtoBasic(t *testing.T) {
-	services := map[string]interpreter.GRPCService{
+	services := map[string]ast.GRPCService{
 		"UserService": {
 			Name: "UserService",
-			Methods: []interpreter.GRPCMethod{
+			Methods: []ast.GRPCMethod{
 				{
 					Name:       "GetUser",
-					InputType:  interpreter.NamedType{Name: "GetUserRequest"},
-					ReturnType: interpreter.NamedType{Name: "User"},
-					StreamType: interpreter.GRPCUnary,
+					InputType:  ast.NamedType{Name: "GetUserRequest"},
+					ReturnType: ast.NamedType{Name: "User"},
+					StreamType: ast.GRPCUnary,
 				},
 			},
 		},
 	}
 
-	typeDefs := map[string]interpreter.TypeDef{
+	typeDefs := map[string]ast.TypeDef{
 		"User": {
 			Name: "User",
-			Fields: []interpreter.Field{
-				{Name: "id", TypeAnnotation: interpreter.IntType{}},
-				{Name: "name", TypeAnnotation: interpreter.StringType{}},
-				{Name: "email", TypeAnnotation: interpreter.StringType{}},
+			Fields: []ast.Field{
+				{Name: "id", TypeAnnotation: ast.IntType{}},
+				{Name: "name", TypeAnnotation: ast.StringType{}},
+				{Name: "email", TypeAnnotation: ast.StringType{}},
 			},
 		},
 		"GetUserRequest": {
 			Name: "GetUserRequest",
-			Fields: []interpreter.Field{
-				{Name: "id", TypeAnnotation: interpreter.IntType{}},
+			Fields: []ast.Field{
+				{Name: "id", TypeAnnotation: ast.IntType{}},
 			},
 		},
 	}
@@ -58,27 +58,27 @@ func TestGenerateProtoBasic(t *testing.T) {
 
 // TestGenerateProtoWithStreaming verifies proto generation with streaming methods
 func TestGenerateProtoWithStreaming(t *testing.T) {
-	services := map[string]interpreter.GRPCService{
+	services := map[string]ast.GRPCService{
 		"ChatService": {
 			Name: "ChatService",
-			Methods: []interpreter.GRPCMethod{
+			Methods: []ast.GRPCMethod{
 				{
 					Name:       "ListMessages",
-					InputType:  interpreter.NamedType{Name: "ListRequest"},
-					ReturnType: interpreter.NamedType{Name: "Message"},
-					StreamType: interpreter.GRPCServerStream,
+					InputType:  ast.NamedType{Name: "ListRequest"},
+					ReturnType: ast.NamedType{Name: "Message"},
+					StreamType: ast.GRPCServerStream,
 				},
 				{
 					Name:       "SendMessages",
-					InputType:  interpreter.NamedType{Name: "Message"},
-					ReturnType: interpreter.NamedType{Name: "SendResult"},
-					StreamType: interpreter.GRPCClientStream,
+					InputType:  ast.NamedType{Name: "Message"},
+					ReturnType: ast.NamedType{Name: "SendResult"},
+					StreamType: ast.GRPCClientStream,
 				},
 				{
 					Name:       "Chat",
-					InputType:  interpreter.NamedType{Name: "Message"},
-					ReturnType: interpreter.NamedType{Name: "Message"},
-					StreamType: interpreter.GRPCBidirectional,
+					InputType:  ast.NamedType{Name: "Message"},
+					ReturnType: ast.NamedType{Name: "Message"},
+					StreamType: ast.GRPCBidirectional,
 				},
 			},
 		},
@@ -95,15 +95,15 @@ func TestGenerateProtoWithStreaming(t *testing.T) {
 
 // TestGenerateProtoFieldTypes verifies type mapping from Glyph to proto types
 func TestGenerateProtoFieldTypes(t *testing.T) {
-	typeDefs := map[string]interpreter.TypeDef{
+	typeDefs := map[string]ast.TypeDef{
 		"Item": {
 			Name: "Item",
-			Fields: []interpreter.Field{
-				{Name: "id", TypeAnnotation: interpreter.IntType{}},
-				{Name: "name", TypeAnnotation: interpreter.StringType{}},
-				{Name: "active", TypeAnnotation: interpreter.BoolType{}},
-				{Name: "price", TypeAnnotation: interpreter.FloatType{}},
-				{Name: "tags", TypeAnnotation: interpreter.ArrayType{ElementType: interpreter.StringType{}}},
+			Fields: []ast.Field{
+				{Name: "id", TypeAnnotation: ast.IntType{}},
+				{Name: "name", TypeAnnotation: ast.StringType{}},
+				{Name: "active", TypeAnnotation: ast.BoolType{}},
+				{Name: "price", TypeAnnotation: ast.FloatType{}},
+				{Name: "tags", TypeAnnotation: ast.ArrayType{ElementType: ast.StringType{}}},
 			},
 		},
 	}
@@ -126,13 +126,13 @@ func TestGenerateProtoFieldTypes(t *testing.T) {
 
 // TestGenerateProtoFieldNumbers verifies proto field numbering
 func TestGenerateProtoFieldNumbers(t *testing.T) {
-	typeDefs := map[string]interpreter.TypeDef{
+	typeDefs := map[string]ast.TypeDef{
 		"Person": {
 			Name: "Person",
-			Fields: []interpreter.Field{
-				{Name: "first", TypeAnnotation: interpreter.StringType{}},
-				{Name: "last", TypeAnnotation: interpreter.StringType{}},
-				{Name: "age", TypeAnnotation: interpreter.IntType{}},
+			Fields: []ast.Field{
+				{Name: "first", TypeAnnotation: ast.StringType{}},
+				{Name: "last", TypeAnnotation: ast.StringType{}},
+				{Name: "age", TypeAnnotation: ast.IntType{}},
 			},
 		},
 	}
@@ -167,15 +167,15 @@ func TestSnakeCase(t *testing.T) {
 // TestGlyphTypeToProto verifies type conversion
 func TestGlyphTypeToProto(t *testing.T) {
 	tests := []struct {
-		input    interpreter.Type
+		input    ast.Type
 		expected string
 	}{
-		{interpreter.IntType{}, "int64"},
-		{interpreter.StringType{}, "string"},
-		{interpreter.BoolType{}, "bool"},
-		{interpreter.FloatType{}, "double"},
-		{interpreter.NamedType{Name: "User"}, "User"},
-		{interpreter.OptionalType{InnerType: interpreter.IntType{}}, "int64"},
+		{ast.IntType{}, "int64"},
+		{ast.StringType{}, "string"},
+		{ast.BoolType{}, "bool"},
+		{ast.FloatType{}, "double"},
+		{ast.NamedType{Name: "User"}, "User"},
+		{ast.OptionalType{InnerType: ast.IntType{}}, "int64"},
 		{nil, "string"},
 	}
 
@@ -195,25 +195,25 @@ func TestGenerateProtoEmptyPackage(t *testing.T) {
 
 // TestGRPCStreamTypeString verifies stream type string representations
 func TestGRPCStreamTypeString(t *testing.T) {
-	assert.Equal(t, "unary", interpreter.GRPCUnary.String())
-	assert.Equal(t, "server_stream", interpreter.GRPCServerStream.String())
-	assert.Equal(t, "client_stream", interpreter.GRPCClientStream.String())
-	assert.Equal(t, "bidirectional", interpreter.GRPCBidirectional.String())
+	assert.Equal(t, "unary", ast.GRPCUnary.String())
+	assert.Equal(t, "server_stream", ast.GRPCServerStream.String())
+	assert.Equal(t, "client_stream", ast.GRPCClientStream.String())
+	assert.Equal(t, "bidirectional", ast.GRPCBidirectional.String())
 }
 
 // TestGenerateProtoMultipleServices verifies multiple services in one proto file
 func TestGenerateProtoMultipleServices(t *testing.T) {
-	services := map[string]interpreter.GRPCService{
+	services := map[string]ast.GRPCService{
 		"UserService": {
 			Name: "UserService",
-			Methods: []interpreter.GRPCMethod{
-				{Name: "GetUser", InputType: interpreter.NamedType{Name: "GetUserRequest"}, ReturnType: interpreter.NamedType{Name: "User"}},
+			Methods: []ast.GRPCMethod{
+				{Name: "GetUser", InputType: ast.NamedType{Name: "GetUserRequest"}, ReturnType: ast.NamedType{Name: "User"}},
 			},
 		},
 		"OrderService": {
 			Name: "OrderService",
-			Methods: []interpreter.GRPCMethod{
-				{Name: "GetOrder", InputType: interpreter.NamedType{Name: "GetOrderRequest"}, ReturnType: interpreter.NamedType{Name: "Order"}},
+			Methods: []ast.GRPCMethod{
+				{Name: "GetOrder", InputType: ast.NamedType{Name: "GetOrderRequest"}, ReturnType: ast.NamedType{Name: "Order"}},
 			},
 		},
 	}

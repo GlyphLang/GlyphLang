@@ -1,9 +1,19 @@
 package websocket
 
-import "time"
+import (
+	"log"
+	"net/http"
+	"strings"
+	"time"
+)
 
 // Config holds WebSocket server configuration
 type Config struct {
+	// Origin control
+	// If empty, only same-origin requests are allowed.
+	// Use ["*"] to allow all origins (not recommended for production).
+	AllowedOrigins []string
+
 	// Connection limits
 	MaxConnectionsPerHub  int
 	MaxConnectionsPerRoom int
@@ -51,9 +61,9 @@ const (
 // DefaultConfig returns a default configuration
 func DefaultConfig() *Config {
 	return &Config{
-		// Connection limits (0 = unlimited)
-		MaxConnectionsPerHub:  0,
-		MaxConnectionsPerRoom: 0,
+		// Connection limits
+		MaxConnectionsPerHub:  10000,
+		MaxConnectionsPerRoom: 1000,
 
 		// Heartbeat settings (enabled by default)
 		EnableHeartbeat:   true,
@@ -139,4 +149,37 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// CheckOrigin returns a function that validates the Origin header of a
+// WebSocket upgrade request against the configured AllowedOrigins list.
+// If no origins are configured, only same-origin requests are allowed.
+func (c *Config) CheckOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		// No origin header — same-origin or non-browser client; allow.
+		return true
+	}
+
+	// If allowed origins are configured, check against them.
+	for _, allowed := range c.AllowedOrigins {
+		if allowed == "*" {
+			log.Println("[WS] WARNING: AllowedOrigins contains wildcard '*'; all origins are permitted")
+			return true
+		}
+		if strings.EqualFold(origin, allowed) {
+			return true
+		}
+	}
+
+	// No explicit allowed origins configured — enforce same-origin.
+	if len(c.AllowedOrigins) == 0 {
+		host := r.Host
+		// Origin is a full URL (e.g. "https://example.com"), Host is just the
+		// host (e.g. "example.com" or "example.com:8080"). Check if the origin
+		// ends with the host.
+		return strings.HasSuffix(origin, "://"+host)
+	}
+
+	return false
 }

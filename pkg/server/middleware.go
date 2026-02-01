@@ -1,6 +1,9 @@
 package server
 
 import (
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/hex"
 	"log"
 	"net/http"
 	"runtime/debug"
@@ -211,6 +214,7 @@ type AuthRateLimitConfig struct {
 	LockoutDuration time.Duration // Initial lockout duration (default: 1 minute)
 	MaxLockout      time.Duration // Maximum lockout duration with exponential backoff (default: 15 minutes)
 	ResetAfter      time.Duration // Reset failure count after this duration of no failures (default: 15 minutes)
+	TrustProxy      bool          // When true, use X-Forwarded-For/X-Real-IP headers for client IP
 }
 
 // DefaultAuthRateLimitConfig returns sensible defaults for auth rate limiting
@@ -252,9 +256,26 @@ func BasicAuthMiddlewareWithConfig(validTokens map[string]bool, config AuthRateL
 		}
 	}
 
+	// Background cleanup: remove stale auth failure entries periodically
+	go func() {
+		ticker := time.NewTicker(60 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			mu.Lock()
+			now := time.Now()
+			for ip, tracker := range failureTrackers {
+				// Remove entries that have expired past the lockout and reset periods
+				if now.Sub(tracker.lastFailure) > config.ResetAfter && now.After(tracker.lockedUntil) {
+					delete(failureTrackers, ip)
+				}
+			}
+			mu.Unlock()
+		}
+	}()
+
 	return func(next RouteHandler) RouteHandler {
 		return func(ctx *Context) error {
-			clientIP := getClientIP(ctx.Request)
+			clientIP := getClientIP(ctx.Request, config.TrustProxy)
 
 			mu.Lock()
 			// Evict stale entries when map exceeds capacity
@@ -336,7 +357,7 @@ func recordAuthFailure(clientIP string, trackers map[string]*authFailureTracker,
 
 // TrustedProxies holds the set of trusted proxy IPs.
 // Only requests from these IPs will have X-Forwarded-For/X-Real-IP headers honored.
-// If empty, proxy headers are ignored and RemoteAddr is always used (secure default).
+// If empty and trustProxy is true, all proxy headers are trusted.
 var TrustedProxies = map[string]bool{}
 
 // SetTrustedProxies configures the set of trusted proxy IP addresses.
@@ -350,18 +371,26 @@ func SetTrustedProxies(proxies []string) {
 	TrustedProxies = m
 }
 
-// getClientIP extracts the real client IP address from an HTTP request.
-// Proxy headers (X-Forwarded-For, X-Real-IP) are only trusted when
-// the request comes from a configured trusted proxy.
-func getClientIP(r *http.Request) string {
-	remoteIP := r.RemoteAddr
-	// Strip port from RemoteAddr if present
-	if idx := strings.LastIndex(remoteIP, ":"); idx != -1 {
-		remoteIP = remoteIP[:idx]
-	}
+// getClientIP extracts the client IP address from an HTTP request.
+// When trustProxy is true, it checks X-Forwarded-For and X-Real-IP headers
+// (for proxy setups). If TrustedProxies is configured, proxy headers are
+// only honored when the request comes from a trusted proxy IP.
+// When trustProxy is false (the default), only RemoteAddr is used,
+// preventing clients from spoofing their IP via headers.
+func getClientIP(r *http.Request, trustProxy bool) string {
+	if trustProxy {
+		// If TrustedProxies is configured, only honor proxy headers from trusted IPs
+		if len(TrustedProxies) > 0 {
+			remoteIP := r.RemoteAddr
+			// Strip port from RemoteAddr if present
+			if idx := strings.LastIndex(remoteIP, ":"); idx != -1 {
+				remoteIP = remoteIP[:idx]
+			}
+			if !TrustedProxies[remoteIP] {
+				return r.RemoteAddr
+			}
+		}
 
-	// Only trust proxy headers from configured trusted proxies
-	if TrustedProxies[remoteIP] {
 		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 			parts := strings.Split(xff, ",")
 			return strings.TrimSpace(parts[0])
@@ -379,11 +408,11 @@ func getClientIP(r *http.Request) string {
 type RateLimiterConfig struct {
 	RequestsPerMinute int
 	BurstSize         int
+	TrustProxy        bool // When true, use X-Forwarded-For/X-Real-IP headers for client IP
 }
 
 // RateLimitMiddleware implements simple in-memory rate limiting
 func RateLimitMiddleware(config RateLimiterConfig) Middleware {
-	// Simple in-memory store (not production-ready, use Redis in production)
 	type clientLimit struct {
 		tokens       int
 		lastRefill   time.Time
@@ -394,10 +423,25 @@ func RateLimitMiddleware(config RateLimiterConfig) Middleware {
 	var mu sync.Mutex
 	limits := make(map[string]*clientLimit)
 
+	// Background cleanup: remove stale entries every 60 seconds
+	go func() {
+		ticker := time.NewTicker(60 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			mu.Lock()
+			now := time.Now()
+			for ip, limit := range limits {
+				if now.Sub(limit.lastRefill) > 10*time.Minute {
+					delete(limits, ip)
+				}
+			}
+			mu.Unlock()
+		}
+	}()
+
 	return func(next RouteHandler) RouteHandler {
 		return func(ctx *Context) error {
-			// Get client identifier (IP address) - supports proxied requests
-			clientIP := getClientIP(ctx.Request)
+			clientIP := getClientIP(ctx.Request, config.TrustProxy)
 
 			mu.Lock()
 
@@ -425,7 +469,6 @@ func RateLimitMiddleware(config RateLimiterConfig) Middleware {
 				limits[clientIP] = limit
 			}
 
-			// Refill tokens based on time passed
 			now := time.Now()
 			elapsed := now.Sub(limit.lastRefill)
 			tokensToAdd := int(elapsed.Minutes() * float64(config.RequestsPerMinute))
@@ -438,14 +481,12 @@ func RateLimitMiddleware(config RateLimiterConfig) Middleware {
 				limit.lastRefill = now
 			}
 
-			// Check if request is allowed
 			if limit.tokens <= 0 {
 				mu.Unlock()
 				log.Printf("[RATE_LIMIT] Rate limit exceeded for %s", clientIP)
 				return SendError(ctx, 429, "rate limit exceeded")
 			}
 
-			// Consume a token
 			limit.tokens--
 			limit.requestCount++
 			mu.Unlock()
@@ -579,4 +620,67 @@ func TracingMiddleware(config interface{}) Middleware {
 			return next(ctx)
 		}
 	}
+}
+
+// CSRFMiddleware provides Cross-Site Request Forgery protection.
+// It generates a random token and sets it as a cookie. On state-changing requests
+// (POST, PUT, PATCH, DELETE), it validates the token from either the X-CSRF-Token
+// header or the csrf_token form field. This middleware is opt-in.
+func CSRFMiddleware() Middleware {
+	return func(next RouteHandler) RouteHandler {
+		return func(ctx *Context) error {
+			r := ctx.Request
+			w := ctx.ResponseWriter
+
+			// Safe methods: generate/refresh token but don't validate
+			if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
+				ensureCSRFCookie(w, r)
+				return next(ctx)
+			}
+
+			// State-changing methods: validate the token
+			cookie, err := r.Cookie("csrf_token")
+			if err != nil || cookie.Value == "" {
+				return SendError(ctx, http.StatusForbidden, "CSRF token missing")
+			}
+
+			// Check X-CSRF-Token header first, then form field
+			token := r.Header.Get("X-CSRF-Token")
+			if token == "" {
+				token = r.FormValue("csrf_token")
+			}
+			if token == "" {
+				return SendError(ctx, http.StatusForbidden, "CSRF token missing from request")
+			}
+
+			if subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(token)) != 1 {
+				return SendError(ctx, http.StatusForbidden, "CSRF token invalid")
+			}
+
+			return next(ctx)
+		}
+	}
+}
+
+// ensureCSRFCookie generates a CSRF token cookie if one is not already present.
+func ensureCSRFCookie(w http.ResponseWriter, r *http.Request) {
+	if _, err := r.Cookie("csrf_token"); err == nil {
+		return // Cookie already exists
+	}
+
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		log.Printf("[CSRF] Failed to generate token: %v", err)
+		return
+	}
+	token := hex.EncodeToString(tokenBytes)
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "csrf_token",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: false, // JS needs to read it to include in requests
+		SameSite: http.SameSiteStrictMode,
+		Secure:   r.TLS != nil,
+	})
 }

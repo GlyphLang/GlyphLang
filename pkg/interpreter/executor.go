@@ -1,6 +1,10 @@
 package interpreter
 
-import "fmt"
+import (
+	. "github.com/glyphlang/glyph/pkg/ast"
+
+	"fmt"
+)
 
 // returnValue is a special error type to handle return statements
 type returnValue struct {

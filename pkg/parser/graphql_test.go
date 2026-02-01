@@ -1,9 +1,9 @@
 package parser
 
 import (
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -35,15 +35,15 @@ func TestParseGraphQLQueryResolver(t *testing.T) {
 	require.NoError(t, err, "Parse should not return an error")
 	require.Len(t, module.Items, 1)
 
-	resolver, ok := module.Items[0].(*interpreter.GraphQLResolver)
+	resolver, ok := module.Items[0].(*ast.GraphQLResolver)
 	require.True(t, ok, "item should be a GraphQLResolver")
-	assert.Equal(t, interpreter.GraphQLQuery, resolver.Operation)
+	assert.Equal(t, ast.GraphQLQuery, resolver.Operation)
 	assert.Equal(t, "user", resolver.FieldName)
 	require.Len(t, resolver.Params, 1)
 	assert.Equal(t, "id", resolver.Params[0].Name)
-	assert.IsType(t, interpreter.IntType{}, resolver.Params[0].TypeAnnotation)
+	assert.IsType(t, ast.IntType{}, resolver.Params[0].TypeAnnotation)
 
-	returnType, ok := resolver.ReturnType.(interpreter.NamedType)
+	returnType, ok := resolver.ReturnType.(ast.NamedType)
 	require.True(t, ok, "return type should be NamedType")
 	assert.Equal(t, "User", returnType.Name)
 	assert.Len(t, resolver.Body, 1)
@@ -60,9 +60,9 @@ func TestParseGraphQLMutationResolver(t *testing.T) {
 	require.NoError(t, err, "Parse should not return an error")
 	require.Len(t, module.Items, 1)
 
-	resolver, ok := module.Items[0].(*interpreter.GraphQLResolver)
+	resolver, ok := module.Items[0].(*ast.GraphQLResolver)
 	require.True(t, ok, "item should be a GraphQLResolver")
-	assert.Equal(t, interpreter.GraphQLMutation, resolver.Operation)
+	assert.Equal(t, ast.GraphQLMutation, resolver.Operation)
 	assert.Equal(t, "createUser", resolver.FieldName)
 	require.Len(t, resolver.Params, 2)
 	assert.Equal(t, "name", resolver.Params[0].Name)
@@ -82,9 +82,9 @@ func TestParseGraphQLSubscriptionResolver(t *testing.T) {
 	require.NoError(t, err, "Parse should not return an error")
 	require.Len(t, module.Items, 1)
 
-	resolver, ok := module.Items[0].(*interpreter.GraphQLResolver)
+	resolver, ok := module.Items[0].(*ast.GraphQLResolver)
 	require.True(t, ok, "item should be a GraphQLResolver")
-	assert.Equal(t, interpreter.GraphQLSubscription, resolver.Operation)
+	assert.Equal(t, ast.GraphQLSubscription, resolver.Operation)
 	assert.Equal(t, "userCreated", resolver.FieldName)
 	assert.Empty(t, resolver.Params)
 }
@@ -101,7 +101,7 @@ func TestParseGraphQLResolverWithInjection(t *testing.T) {
 	require.NoError(t, err, "Parse should not return an error")
 	require.Len(t, module.Items, 1)
 
-	resolver, ok := module.Items[0].(*interpreter.GraphQLResolver)
+	resolver, ok := module.Items[0].(*ast.GraphQLResolver)
 	require.True(t, ok, "item should be a GraphQLResolver")
 	require.Len(t, resolver.Injections, 1)
 	assert.Equal(t, "db", resolver.Injections[0].Name)
@@ -119,7 +119,7 @@ func TestParseGraphQLResolverWithAuth(t *testing.T) {
 	require.NoError(t, err, "Parse should not return an error")
 	require.Len(t, module.Items, 1)
 
-	resolver, ok := module.Items[0].(*interpreter.GraphQLResolver)
+	resolver, ok := module.Items[0].(*ast.GraphQLResolver)
 	require.True(t, ok, "item should be a GraphQLResolver")
 	require.NotNil(t, resolver.Auth, "auth should not be nil")
 	assert.Equal(t, "jwt", resolver.Auth.AuthType)
@@ -136,7 +136,7 @@ func TestParseGraphQLResolverNoParams(t *testing.T) {
 	require.NoError(t, err, "Parse should not return an error")
 	require.Len(t, module.Items, 1)
 
-	resolver, ok := module.Items[0].(*interpreter.GraphQLResolver)
+	resolver, ok := module.Items[0].(*ast.GraphQLResolver)
 	require.True(t, ok, "item should be a GraphQLResolver")
 	assert.Equal(t, "hello", resolver.FieldName)
 	assert.Empty(t, resolver.Params)
@@ -179,17 +179,17 @@ func TestParseMultipleGraphQLResolvers(t *testing.T) {
 	require.NoError(t, err, "Parse should not return an error")
 	require.Len(t, module.Items, 3)
 
-	r1, ok := module.Items[0].(*interpreter.GraphQLResolver)
+	r1, ok := module.Items[0].(*ast.GraphQLResolver)
 	require.True(t, ok)
-	assert.Equal(t, interpreter.GraphQLQuery, r1.Operation)
+	assert.Equal(t, ast.GraphQLQuery, r1.Operation)
 
-	r2, ok := module.Items[1].(*interpreter.GraphQLResolver)
+	r2, ok := module.Items[1].(*ast.GraphQLResolver)
 	require.True(t, ok)
-	assert.Equal(t, interpreter.GraphQLMutation, r2.Operation)
+	assert.Equal(t, ast.GraphQLMutation, r2.Operation)
 
-	r3, ok := module.Items[2].(*interpreter.GraphQLResolver)
+	r3, ok := module.Items[2].(*ast.GraphQLResolver)
 	require.True(t, ok)
-	assert.Equal(t, interpreter.GraphQLSubscription, r3.Operation)
+	assert.Equal(t, ast.GraphQLSubscription, r3.Operation)
 }
 
 // TestParseExpandedGraphQLQuery verifies .glyphx expanded syntax parsing
@@ -203,8 +203,8 @@ func TestParseExpandedGraphQLQuery(t *testing.T) {
 	require.NoError(t, err, "Parse should not return an error")
 	require.Len(t, module.Items, 1)
 
-	resolver, ok := module.Items[0].(*interpreter.GraphQLResolver)
+	resolver, ok := module.Items[0].(*ast.GraphQLResolver)
 	require.True(t, ok, "item should be a GraphQLResolver")
-	assert.Equal(t, interpreter.GraphQLQuery, resolver.Operation)
+	assert.Equal(t, ast.GraphQLQuery, resolver.Operation)
 	assert.Equal(t, "user", resolver.FieldName)
 }

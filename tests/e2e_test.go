@@ -3,6 +3,7 @@ package tests
 import (
 	"context"
 	"fmt"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,7 +16,6 @@ import (
 	"github.com/glyphlang/glyph/pkg/compiler"
 	"github.com/glyphlang/glyph/pkg/database"
 	"github.com/glyphlang/glyph/pkg/hotreload"
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/server"
 	"github.com/glyphlang/glyph/pkg/vm"
 )
@@ -53,7 +53,7 @@ func createTestServer(interpreter server.Interpreter) *server.Server {
 }
 
 // Helper function to parse source code into a Module (E2E version)
-func parseSourceE2E(source string) (*interpreter.Module, error) {
+func parseSourceE2E(source string) (*ast.Module, error) {
 	return parseSource(source)
 }
 
@@ -86,14 +86,7 @@ func TestHelloWorldExample(t *testing.T) {
 	helper.AssertNoError(err, "Execution failed")
 	helper.AssertNotNil(result, "Result should not be nil")
 
-	// TODO: When server is implemented:
-	// 4. Start HTTP server with routes
-	// 5. Make request to /hello
-	// 6. Verify response contains "Hello, World!"
-	// 7. Make request to /greet/Alice
-	// 8. Verify response contains "Hello, Alice!"
-
-	t.Log("Hello-world example compilation successful")
+	t.Skip("Skipping HTTP verification: server route execution not yet integrated with compiled bytecode")
 }
 
 // TestRestAPIExample tests the rest-api example end-to-end
@@ -156,14 +149,7 @@ func TestSimpleRouteE2E(t *testing.T) {
 	helper.AssertNoError(err, "Execution failed")
 	helper.AssertNotNil(result, "Result should not be nil")
 
-	// TODO: When interpreter/server is ready:
-	// - Start server with this route
-	// - Make GET request to /test
-	// - Verify response: {status: "ok"}
-	// - Verify status code: 200
-	// - Verify content-type: application/json
-
-	t.Log("Simple route test passed")
+	t.Skip("Skipping HTTP verification: server route execution not yet integrated with compiled bytecode")
 }
 
 // TestPathParametersE2E tests routes with path parameters
@@ -180,16 +166,9 @@ func TestPathParametersE2E(t *testing.T) {
 	comp := compiler.NewCompiler()
 	bytecode, err := comp.Compile(module)
 	helper.AssertNoError(err, "Compilation failed")
-	_ = bytecode // TODO: Use bytecode when server is ready
+	helper.AssertNotNil(bytecode, "Bytecode should not be nil")
 
-	// TODO: When server is ready:
-	// - Execute bytecode with path parameter context
-	// - Test GET /greet/Alice -> {message: "Hello, Alice!"}
-	// - Test GET /greet/Bob -> {message: "Hello, Bob!"}
-	// - Test GET /greet/ (no param) -> Should return 404
-	// - Test GET /greet (no param) -> Should return 404
-
-	t.Log("Path parameters test passed (compilation)")
+	t.Skip("Skipping: server-side path parameter execution and response verification not yet implemented")
 }
 
 // TestJSONSerializationE2E tests JSON response serialization
@@ -206,16 +185,9 @@ func TestJSONSerializationE2E(t *testing.T) {
 	comp := compiler.NewCompiler()
 	bytecode, err := comp.Compile(module)
 	helper.AssertNoError(err, "Compilation failed")
-	_ = bytecode // TODO: Use bytecode when server is ready
+	helper.AssertNotNil(bytecode, "Bytecode should not be nil")
 
-	// TODO: When server is ready:
-	// - Start server
-	// - Make GET request to /api/user
-	// - Verify JSON structure matches User type
-	// - Verify fields: id=1, name="Test User", email="test@example.com"
-	// - Verify Content-Type header is application/json
-
-	t.Log("JSON serialization test passed (compilation)")
+	t.Skip("Skipping: server-side JSON response verification not yet implemented")
 }
 
 // TestMultipleRoutesE2E tests multiple routes in one program
@@ -232,16 +204,9 @@ func TestMultipleRoutesE2E(t *testing.T) {
 	comp := compiler.NewCompiler()
 	bytecode, err := comp.Compile(module)
 	helper.AssertNoError(err, "Compilation with multiple routes failed")
-	_ = bytecode // TODO: Use bytecode when server is ready
+	helper.AssertNotNil(bytecode, "Bytecode should not be nil")
 
-	// TODO: When server is ready:
-	// Test GET /health -> {status: "ok", timestamp: ...}
-	// Test GET /version -> {version: "0.1.0"}
-	// Test GET /info/123 -> {id: "123", info: "Details about 123"}
-	// Verify all routes are registered correctly
-	// Verify routes don't interfere with each other
-
-	t.Log("Multiple routes test passed (compilation)")
+	t.Skip("Skipping: server-side multi-route execution and response verification not yet implemented")
 }
 
 // TestHTTPMethodsE2E tests different HTTP methods
@@ -258,16 +223,9 @@ func TestHTTPMethodsE2E(t *testing.T) {
 	comp := compiler.NewCompiler()
 	bytecode, err := comp.Compile(module)
 	helper.AssertNoError(err, "POST route compilation failed")
-	_ = bytecode // TODO: Use bytecode when server is ready
+	helper.AssertNotNil(bytecode, "Bytecode should not be nil")
 
-	// TODO: When server is ready:
-	// Test POST /api/users with valid JSON body
-	// Test POST with missing required fields -> Should return 400
-	// Test POST with invalid email format -> Should return 400
-	// Test GET /api/users -> Should return 404 or 405 (Method Not Allowed)
-	// Test POST with name too long -> Should return 400
-
-	t.Log("HTTP methods test passed (compilation)")
+	t.Skip("Skipping: server-side HTTP method handling and request validation not yet implemented")
 }
 
 // TestAuthenticationE2E tests authentication middleware
@@ -284,15 +242,9 @@ func TestAuthenticationE2E(t *testing.T) {
 	comp := compiler.NewCompiler()
 	bytecode, err := comp.Compile(module)
 	helper.AssertNoError(err, "Auth route compilation failed")
-	_ = bytecode // TODO: Use bytecode when auth middleware is ready
+	helper.AssertNotNil(bytecode, "Bytecode should not be nil")
 
-	// TODO: When auth middleware is implemented:
-	// Test GET /api/protected without auth header -> 401 Unauthorized
-	// Test GET /api/protected with invalid JWT -> 401 Unauthorized
-	// Test GET /api/protected with valid JWT -> 200 OK
-	// Test rate limiting (make 101 requests in 1 minute) -> 429 Too Many Requests
-
-	t.Log("Authentication test passed (compilation)")
+	t.Skip("Skipping: auth middleware integration with compiled bytecode not yet implemented")
 }
 
 // TestErrorHandlingE2E tests error handling and error responses
@@ -309,15 +261,9 @@ func TestErrorHandlingE2E(t *testing.T) {
 	comp := compiler.NewCompiler()
 	bytecode, err := comp.Compile(module)
 	helper.AssertNoError(err, "Error handling route compilation failed")
-	_ = bytecode // TODO: Use bytecode when error handling is ready
+	helper.AssertNotNil(bytecode, "Bytecode should not be nil")
 
-	// TODO: When error handling is implemented:
-	// Test GET /api/data/999 (not found) -> Error response
-	// Test GET /api/data/invalid (invalid ID) -> Error response
-	// Verify error response structure matches Error type
-	// Verify proper HTTP status codes (404, 400, 500)
-
-	t.Log("Error handling test passed (compilation)")
+	t.Skip("Skipping: server-side error handling and error response verification not yet implemented")
 }
 
 // TestInvalidSyntaxE2E tests that invalid syntax is rejected
@@ -335,11 +281,10 @@ func TestInvalidSyntaxE2E(t *testing.T) {
 	comp := compiler.NewCompiler()
 	bytecode, err := comp.Compile(module)
 
-	// TODO: When parser is implemented:
-	// This should fail at compilation with a syntax error
-	// For now, the placeholder compiler doesn't validate syntax
+	// Note: The compiler does not yet perform full syntax validation.
+	// Once strict validation is added, this test should fail at compilation.
 	if err == nil && bytecode != nil {
-		t.Log("Invalid syntax test: placeholder compiler doesn't validate yet")
+		t.Skip("Skipping: compiler does not yet validate syntax for rejection")
 	} else {
 		helper.AssertError(err, "Invalid syntax should fail compilation")
 	}
@@ -347,16 +292,7 @@ func TestInvalidSyntaxE2E(t *testing.T) {
 
 // TestServerStartupShutdownE2E tests server lifecycle
 func TestServerStartupShutdownE2E(t *testing.T) {
-	t.Skip("Skipping until server implementation is ready")
-
-	// TODO: When server is implemented:
-	// 1. Compile a simple program
-	// 2. Start development server
-	// 3. Verify server is listening on port 3000
-	// 4. Make a health check request
-	// 5. Gracefully shut down server
-	// 6. Verify server stopped accepting connections
-	// 7. Test server restart works correctly
+	t.Skip("Skipping: server lifecycle management (startup, health check, graceful shutdown) not yet implemented")
 }
 
 // TestHotReloadE2E tests development server hot reload
@@ -1389,8 +1325,9 @@ func TestSecurityFeaturesE2E(t *testing.T) {
 		// Create a server with rate limiting middleware
 		// Use a very small burst size to ensure we can exhaust it quickly
 		rateLimitConfig := server.RateLimiterConfig{
-			RequestsPerMinute: 1, // Very slow refill rate
-			BurstSize:         3, // Small burst size
+			RequestsPerMinute: 1,    // Very slow refill rate
+			BurstSize:         3,    // Small burst size
+			TrustProxy:        true, // Trust X-Forwarded-For for consistent client IP in test
 		}
 
 		srv := server.NewServer(

@@ -1,9 +1,8 @@
 package lsp
 
 import (
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
-
-	"github.com/glyphlang/glyph/pkg/interpreter"
 )
 
 func TestDocumentManager(t *testing.T) {
@@ -114,7 +113,7 @@ func TestDocumentParsing(t *testing.T) {
 	}
 
 	// Check for TypeDef
-	typeDef, ok := doc.AST.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := doc.AST.Items[0].(*ast.TypeDef)
 	if !ok {
 		t.Error("Expected first item to be TypeDef")
 	} else if typeDef.Name != "User" {
@@ -122,7 +121,7 @@ func TestDocumentParsing(t *testing.T) {
 	}
 
 	// Check for Route
-	route, ok := doc.AST.Items[1].(*interpreter.Route)
+	route, ok := doc.AST.Items[1].(*ast.Route)
 	if !ok {
 		t.Error("Expected second item to be Route")
 	} else if route.Path != "/api/user" {

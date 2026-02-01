@@ -393,7 +393,7 @@ func TestSendFile(t *testing.T) {
 	rh := NewResponseHelper()
 	req := httptest.NewRequest(http.MethodGet, "/doc.txt", nil)
 	rec := httptest.NewRecorder()
-	err = rh.SendFile(rec, req, filePath)
+	err = rh.SendFile(rec, req, tmpDir, filePath)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Body.String(), "file content")
@@ -403,7 +403,7 @@ func TestSendFileNotFound(t *testing.T) {
 	rh := NewResponseHelper()
 	req := httptest.NewRequest(http.MethodGet, "/missing.txt", nil)
 	rec := httptest.NewRecorder()
-	err := rh.SendFile(rec, req, "/nonexistent/path/file.txt")
+	err := rh.SendFile(rec, req, "/nonexistent", "/nonexistent/path/file.txt")
 	assert.Error(t, err)
 }
 

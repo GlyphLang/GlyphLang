@@ -2,11 +2,11 @@ package jit
 
 import (
 	"fmt"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"sync"
 	"sync/atomic"
 
 	"github.com/glyphlang/glyph/pkg/compiler"
-	"github.com/glyphlang/glyph/pkg/interpreter"
 )
 
 // TypeSpecialization represents specialized code for specific type combinations
@@ -195,7 +195,7 @@ func NewTypeSpecializedCompiler(profiler *Profiler) *TypeSpecializedCompiler {
 }
 
 // CompileWithTypeInfo compiles a route with type specialization hints
-func (tsc *TypeSpecializedCompiler) CompileWithTypeInfo(route *interpreter.Route, types map[string]string) ([]byte, error) {
+func (tsc *TypeSpecializedCompiler) CompileWithTypeInfo(route *ast.Route, types map[string]string) ([]byte, error) {
 	// For now, compile with aggressive optimizations
 	// In a full implementation, we would:
 	// 1. Insert type guards at entry

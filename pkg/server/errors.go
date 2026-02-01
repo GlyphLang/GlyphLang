@@ -53,10 +53,9 @@ func (e *BaseError) ToResponse() *ErrorResponse {
 		Message: e.Msg,
 	}
 
+	// Only include the explicit developer-set detail, never raw error internals
 	if e.Detail != "" {
 		resp.Details = e.Detail
-	} else if e.Cause != nil {
-		resp.Details = e.Cause.Error()
 	}
 
 	return resp

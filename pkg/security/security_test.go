@@ -1,37 +1,36 @@
 package security
 
 import (
+	"github.com/glyphlang/glyph/pkg/ast"
 	"strings"
 	"testing"
-
-	"github.com/glyphlang/glyph/pkg/interpreter"
 )
 
 func TestSQLInjectionDetector_DetectInRoute(t *testing.T) {
 	tests := []struct {
 		name          string
-		route         *interpreter.Route
+		route         *ast.Route
 		expectWarning bool
 		warningType   string
 	}{
 		{
 			name: "SQL injection via string concatenation",
-			route: &interpreter.Route{
+			route: &ast.Route{
 				Path:   "/users",
-				Method: interpreter.Get,
-				Body: []interpreter.Statement{
-					interpreter.AssignStatement{
+				Method: ast.Get,
+				Body: []ast.Statement{
+					ast.AssignStatement{
 						Target: "query",
-						Value: interpreter.BinaryOpExpr{
-							Op: interpreter.Add,
-							Left: interpreter.LiteralExpr{
-								Value: interpreter.StringLiteral{Value: "SELECT * FROM users WHERE id = "},
+						Value: ast.BinaryOpExpr{
+							Op: ast.Add,
+							Left: ast.LiteralExpr{
+								Value: ast.StringLiteral{Value: "SELECT * FROM users WHERE id = "},
 							},
-							Right: interpreter.VariableExpr{Name: "userId"},
+							Right: ast.VariableExpr{Name: "userId"},
 						},
 					},
-					interpreter.ReturnStatement{
-						Value: interpreter.VariableExpr{Name: "query"},
+					ast.ReturnStatement{
+						Value: ast.VariableExpr{Name: "query"},
 					},
 				},
 			},
@@ -40,22 +39,22 @@ func TestSQLInjectionDetector_DetectInRoute(t *testing.T) {
 		},
 		{
 			name: "Safe query without SQL keywords",
-			route: &interpreter.Route{
+			route: &ast.Route{
 				Path:   "/greet",
-				Method: interpreter.Get,
-				Body: []interpreter.Statement{
-					interpreter.AssignStatement{
+				Method: ast.Get,
+				Body: []ast.Statement{
+					ast.AssignStatement{
 						Target: "message",
-						Value: interpreter.BinaryOpExpr{
-							Op: interpreter.Add,
-							Left: interpreter.LiteralExpr{
-								Value: interpreter.StringLiteral{Value: "Hello "},
+						Value: ast.BinaryOpExpr{
+							Op: ast.Add,
+							Left: ast.LiteralExpr{
+								Value: ast.StringLiteral{Value: "Hello "},
 							},
-							Right: interpreter.VariableExpr{Name: "name"},
+							Right: ast.VariableExpr{Name: "name"},
 						},
 					},
-					interpreter.ReturnStatement{
-						Value: interpreter.VariableExpr{Name: "message"},
+					ast.ReturnStatement{
+						Value: ast.VariableExpr{Name: "message"},
 					},
 				},
 			},
@@ -88,15 +87,15 @@ func TestSQLInjectionDetector_DetectInRoute(t *testing.T) {
 func TestXSSDetector_DetectXSS(t *testing.T) {
 	tests := []struct {
 		name             string
-		expr             interpreter.Expr
+		expr             ast.Expr
 		expectWarning    bool
 		minWarningCount  int
 		containsSeverity string
 	}{
 		{
 			name: "HTML tags in string literal",
-			expr: interpreter.LiteralExpr{
-				Value: interpreter.StringLiteral{
+			expr: ast.LiteralExpr{
+				Value: ast.StringLiteral{
 					Value: "<div>Hello World</div>",
 				},
 			},
@@ -106,8 +105,8 @@ func TestXSSDetector_DetectXSS(t *testing.T) {
 		},
 		{
 			name: "Script tags in string literal",
-			expr: interpreter.LiteralExpr{
-				Value: interpreter.StringLiteral{
+			expr: ast.LiteralExpr{
+				Value: ast.StringLiteral{
 					Value: "<script>alert('xss')</script>",
 				},
 			},
@@ -117,8 +116,8 @@ func TestXSSDetector_DetectXSS(t *testing.T) {
 		},
 		{
 			name: "Event handler in string",
-			expr: interpreter.LiteralExpr{
-				Value: interpreter.StringLiteral{
+			expr: ast.LiteralExpr{
+				Value: ast.StringLiteral{
 					Value: "<img onerror='alert(1)' src=x>",
 				},
 			},
@@ -128,8 +127,8 @@ func TestXSSDetector_DetectXSS(t *testing.T) {
 		},
 		{
 			name: "Plain text literal",
-			expr: interpreter.LiteralExpr{
-				Value: interpreter.StringLiteral{
+			expr: ast.LiteralExpr{
+				Value: ast.StringLiteral{
 					Value: "Hello World",
 				},
 			},
@@ -137,14 +136,14 @@ func TestXSSDetector_DetectXSS(t *testing.T) {
 		},
 		{
 			name: "Concatenating HTML with user input",
-			expr: interpreter.BinaryOpExpr{
-				Op: interpreter.Add,
-				Left: interpreter.LiteralExpr{
-					Value: interpreter.StringLiteral{
+			expr: ast.BinaryOpExpr{
+				Op: ast.Add,
+				Left: ast.LiteralExpr{
+					Value: ast.StringLiteral{
 						Value: "<div>",
 					},
 				},
-				Right: interpreter.VariableExpr{Name: "request"},
+				Right: ast.VariableExpr{Name: "request"},
 			},
 			expectWarning:    true,
 			minWarningCount:  1,
@@ -187,42 +186,42 @@ func TestXSSDetector_DetectXSS(t *testing.T) {
 func TestRequiresHTMLEscape(t *testing.T) {
 	tests := []struct {
 		name         string
-		expr         interpreter.Expr
+		expr         ast.Expr
 		expectEscape bool
 	}{
 		{
 			name:         "User input variable",
-			expr:         interpreter.VariableExpr{Name: "request"},
+			expr:         ast.VariableExpr{Name: "request"},
 			expectEscape: true,
 		},
 		{
 			name: "Field access from request",
-			expr: interpreter.FieldAccessExpr{
-				Object: interpreter.VariableExpr{Name: "req"},
+			expr: ast.FieldAccessExpr{
+				Object: ast.VariableExpr{Name: "req"},
 				Field:  "body",
 			},
 			expectEscape: true,
 		},
 		{
 			name:         "Safe variable",
-			expr:         interpreter.VariableExpr{Name: "staticContent"},
+			expr:         ast.VariableExpr{Name: "staticContent"},
 			expectEscape: false,
 		},
 		{
 			name: "Binary operation with user input",
-			expr: interpreter.BinaryOpExpr{
-				Op:    interpreter.Add,
-				Left:  interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "Hello "}},
-				Right: interpreter.VariableExpr{Name: "input"},
+			expr: ast.BinaryOpExpr{
+				Op:    ast.Add,
+				Left:  ast.LiteralExpr{Value: ast.StringLiteral{Value: "Hello "}},
+				Right: ast.VariableExpr{Name: "input"},
 			},
 			expectEscape: true,
 		},
 		{
 			name: "Already escaped with escapeHTML",
-			expr: interpreter.FunctionCallExpr{
+			expr: ast.FunctionCallExpr{
 				Name: "escapeHTML",
-				Args: []interpreter.Expr{
-					interpreter.VariableExpr{Name: "request"},
+				Args: []ast.Expr{
+					ast.VariableExpr{Name: "request"},
 				},
 			},
 			expectEscape: false,
@@ -338,19 +337,19 @@ func TestSanitizeSQL(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "Remove SQL comments",
+			name:     "SQL comments are preserved (use parameterized queries instead)",
 			input:    "SELECT * FROM users -- comment",
-			expected: "SELECT * FROM users ",
+			expected: "SELECT * FROM users -- comment",
 		},
 		{
-			name:     "Remove block comments",
+			name:     "Block comments are preserved (use parameterized queries instead)",
 			input:    "SELECT * /* comment */ FROM users",
-			expected: "SELECT *  FROM users",
+			expected: "SELECT * /* comment */ FROM users",
 		},
 		{
 			name:     "Escape single quotes",
 			input:    "Robert'; DROP TABLE users--",
-			expected: "Robert''; DROP TABLE users",
+			expected: "Robert''; DROP TABLE users--",
 		},
 		{
 			name:     "Remove null bytes",
@@ -372,35 +371,35 @@ func TestSanitizeSQL(t *testing.T) {
 func TestIsSafeQuery(t *testing.T) {
 	tests := []struct {
 		name     string
-		expr     interpreter.Expr
+		expr     ast.Expr
 		expected bool
 	}{
 		{
 			name: "Unsafe - SQL concatenation",
-			expr: interpreter.BinaryOpExpr{
-				Op: interpreter.Add,
-				Left: interpreter.LiteralExpr{
-					Value: interpreter.StringLiteral{Value: "SELECT * FROM users WHERE id = "},
+			expr: ast.BinaryOpExpr{
+				Op: ast.Add,
+				Left: ast.LiteralExpr{
+					Value: ast.StringLiteral{Value: "SELECT * FROM users WHERE id = "},
 				},
-				Right: interpreter.VariableExpr{Name: "userId"},
+				Right: ast.VariableExpr{Name: "userId"},
 			},
 			expected: false,
 		},
 		{
 			name: "Safe - no SQL keywords",
-			expr: interpreter.BinaryOpExpr{
-				Op: interpreter.Add,
-				Left: interpreter.LiteralExpr{
-					Value: interpreter.StringLiteral{Value: "Hello "},
+			expr: ast.BinaryOpExpr{
+				Op: ast.Add,
+				Left: ast.LiteralExpr{
+					Value: ast.StringLiteral{Value: "Hello "},
 				},
-				Right: interpreter.VariableExpr{Name: "name"},
+				Right: ast.VariableExpr{Name: "name"},
 			},
 			expected: true,
 		},
 		{
 			name: "Safe - simple literal",
-			expr: interpreter.LiteralExpr{
-				Value: interpreter.StringLiteral{Value: "Some text"},
+			expr: ast.LiteralExpr{
+				Value: ast.StringLiteral{Value: "Some text"},
 			},
 			expected: true,
 		},
@@ -420,45 +419,45 @@ func TestIsSafeQuery(t *testing.T) {
 func TestXSSDetector_FunctionCall(t *testing.T) {
 	tests := []struct {
 		name          string
-		expr          interpreter.Expr
+		expr          ast.Expr
 		expectWarning bool
 	}{
 		{
 			name: "HTML rendering function with user input",
-			expr: interpreter.FunctionCallExpr{
+			expr: ast.FunctionCallExpr{
 				Name: "renderHTML",
-				Args: []interpreter.Expr{
-					interpreter.VariableExpr{Name: "request"},
+				Args: []ast.Expr{
+					ast.VariableExpr{Name: "request"},
 				},
 			},
 			expectWarning: true,
 		},
 		{
 			name: "Safe escape function",
-			expr: interpreter.FunctionCallExpr{
+			expr: ast.FunctionCallExpr{
 				Name: "escapeHTML",
-				Args: []interpreter.Expr{
-					interpreter.VariableExpr{Name: "request"},
+				Args: []ast.Expr{
+					ast.VariableExpr{Name: "request"},
 				},
 			},
 			expectWarning: false,
 		},
 		{
 			name: "innerHTML function",
-			expr: interpreter.FunctionCallExpr{
+			expr: ast.FunctionCallExpr{
 				Name: "innerHTML",
-				Args: []interpreter.Expr{
-					interpreter.VariableExpr{Name: "input"},
+				Args: []ast.Expr{
+					ast.VariableExpr{Name: "input"},
 				},
 			},
 			expectWarning: true,
 		},
 		{
 			name: "Regular function with literal",
-			expr: interpreter.FunctionCallExpr{
+			expr: ast.FunctionCallExpr{
 				Name: "process",
-				Args: []interpreter.Expr{
-					interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "safe"}},
+				Args: []ast.Expr{
+					ast.LiteralExpr{Value: ast.StringLiteral{Value: "safe"}},
 				},
 			},
 			expectWarning: false,
@@ -482,51 +481,51 @@ func TestXSSDetector_FunctionCall(t *testing.T) {
 func TestXSSDetector_ObjectExpr(t *testing.T) {
 	tests := []struct {
 		name          string
-		expr          interpreter.Expr
+		expr          ast.Expr
 		expectWarning bool
 	}{
 		{
 			name: "Object with HTML content type",
-			expr: interpreter.ObjectExpr{
-				Fields: []interpreter.ObjectField{
-					{Key: "content-type", Value: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "text/html"}}},
+			expr: ast.ObjectExpr{
+				Fields: []ast.ObjectField{
+					{Key: "content-type", Value: ast.LiteralExpr{Value: ast.StringLiteral{Value: "text/html"}}},
 				},
 			},
 			expectWarning: true,
 		},
 		{
 			name: "Object with body field and user input",
-			expr: interpreter.ObjectExpr{
-				Fields: []interpreter.ObjectField{
-					{Key: "body", Value: interpreter.VariableExpr{Name: "request"}},
+			expr: ast.ObjectExpr{
+				Fields: []ast.ObjectField{
+					{Key: "body", Value: ast.VariableExpr{Name: "request"}},
 				},
 			},
 			expectWarning: true,
 		},
 		{
 			name: "Object with html field and user input",
-			expr: interpreter.ObjectExpr{
-				Fields: []interpreter.ObjectField{
-					{Key: "html", Value: interpreter.VariableExpr{Name: "input"}},
+			expr: ast.ObjectExpr{
+				Fields: []ast.ObjectField{
+					{Key: "html", Value: ast.VariableExpr{Name: "input"}},
 				},
 			},
 			expectWarning: true,
 		},
 		{
 			name: "Safe object with JSON content type",
-			expr: interpreter.ObjectExpr{
-				Fields: []interpreter.ObjectField{
-					{Key: "content-type", Value: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "application/json"}}},
+			expr: ast.ObjectExpr{
+				Fields: []ast.ObjectField{
+					{Key: "content-type", Value: ast.LiteralExpr{Value: ast.StringLiteral{Value: "application/json"}}},
 				},
 			},
 			expectWarning: false,
 		},
 		{
 			name: "Object with safe literal values",
-			expr: interpreter.ObjectExpr{
-				Fields: []interpreter.ObjectField{
-					{Key: "status", Value: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 200}}},
-					{Key: "message", Value: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "success"}}},
+			expr: ast.ObjectExpr{
+				Fields: []ast.ObjectField{
+					{Key: "status", Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: 200}}},
+					{Key: "message", Value: ast.LiteralExpr{Value: ast.StringLiteral{Value: "success"}}},
 				},
 			},
 			expectWarning: false,
@@ -570,42 +569,42 @@ func TestAnalyzeVariable(t *testing.T) {
 	// Test by concatenating user input with HTML tags
 	tests := []struct {
 		name          string
-		expr          interpreter.Expr
+		expr          ast.Expr
 		expectWarning bool
 	}{
 		{
 			name: "User input concatenated with HTML",
-			expr: interpreter.BinaryOpExpr{
-				Left:  interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "<div>"}},
-				Op:    interpreter.Add,
-				Right: interpreter.VariableExpr{Name: "request"},
+			expr: ast.BinaryOpExpr{
+				Left:  ast.LiteralExpr{Value: ast.StringLiteral{Value: "<div>"}},
+				Op:    ast.Add,
+				Right: ast.VariableExpr{Name: "request"},
 			},
 			expectWarning: true,
 		},
 		{
 			name: "Input concatenated with HTML",
-			expr: interpreter.BinaryOpExpr{
-				Left:  interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "<span>"}},
-				Op:    interpreter.Add,
-				Right: interpreter.VariableExpr{Name: "input"},
+			expr: ast.BinaryOpExpr{
+				Left:  ast.LiteralExpr{Value: ast.StringLiteral{Value: "<span>"}},
+				Op:    ast.Add,
+				Right: ast.VariableExpr{Name: "input"},
 			},
 			expectWarning: true,
 		},
 		{
 			name: "Any variable concatenated with HTML triggers warning",
-			expr: interpreter.BinaryOpExpr{
-				Left:  interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "<p>"}},
-				Op:    interpreter.Add,
-				Right: interpreter.VariableExpr{Name: "config"},
+			expr: ast.BinaryOpExpr{
+				Left:  ast.LiteralExpr{Value: ast.StringLiteral{Value: "<p>"}},
+				Op:    ast.Add,
+				Right: ast.VariableExpr{Name: "config"},
 			},
 			expectWarning: true, // HTML + any variable is flagged
 		},
 		{
 			name: "Safe string concatenation without HTML",
-			expr: interpreter.BinaryOpExpr{
-				Left:  interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "Hello "}},
-				Op:    interpreter.Add,
-				Right: interpreter.VariableExpr{Name: "request"},
+			expr: ast.BinaryOpExpr{
+				Left:  ast.LiteralExpr{Value: ast.StringLiteral{Value: "Hello "}},
+				Op:    ast.Add,
+				Right: ast.VariableExpr{Name: "request"},
 			},
 			expectWarning: false,
 		},
@@ -628,7 +627,7 @@ func TestAnalyzeVariable(t *testing.T) {
 func TestRequiresHTMLEscapeAdvanced(t *testing.T) {
 	tests := []struct {
 		name     string
-		expr     interpreter.Expr
+		expr     ast.Expr
 		expected bool
 	}{
 		{
@@ -638,27 +637,27 @@ func TestRequiresHTMLEscapeAdvanced(t *testing.T) {
 		},
 		{
 			name:     "User input variable",
-			expr:     interpreter.VariableExpr{Name: "request"},
+			expr:     ast.VariableExpr{Name: "request"},
 			expected: true,
 		},
 		{
 			name:     "Safe variable",
-			expr:     interpreter.VariableExpr{Name: "config"},
+			expr:     ast.VariableExpr{Name: "config"},
 			expected: false,
 		},
 		{
 			name: "Field access on user input",
-			expr: interpreter.FieldAccessExpr{
-				Object: interpreter.VariableExpr{Name: "request"},
+			expr: ast.FieldAccessExpr{
+				Object: ast.VariableExpr{Name: "request"},
 				Field:  "body",
 			},
 			expected: true,
 		},
 		{
 			name: "Nested field access on user input",
-			expr: interpreter.FieldAccessExpr{
-				Object: interpreter.FieldAccessExpr{
-					Object: interpreter.VariableExpr{Name: "request"},
+			expr: ast.FieldAccessExpr{
+				Object: ast.FieldAccessExpr{
+					Object: ast.VariableExpr{Name: "request"},
 					Field:  "data",
 				},
 				Field: "value",
@@ -667,77 +666,77 @@ func TestRequiresHTMLEscapeAdvanced(t *testing.T) {
 		},
 		{
 			name: "Binary op with user input on left",
-			expr: interpreter.BinaryOpExpr{
-				Left:  interpreter.VariableExpr{Name: "input"},
-				Op:    interpreter.Add,
-				Right: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "suffix"}},
+			expr: ast.BinaryOpExpr{
+				Left:  ast.VariableExpr{Name: "input"},
+				Op:    ast.Add,
+				Right: ast.LiteralExpr{Value: ast.StringLiteral{Value: "suffix"}},
 			},
 			expected: true,
 		},
 		{
 			name: "Binary op with user input on right",
-			expr: interpreter.BinaryOpExpr{
-				Left:  interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "prefix"}},
-				Op:    interpreter.Add,
-				Right: interpreter.VariableExpr{Name: "query"},
+			expr: ast.BinaryOpExpr{
+				Left:  ast.LiteralExpr{Value: ast.StringLiteral{Value: "prefix"}},
+				Op:    ast.Add,
+				Right: ast.VariableExpr{Name: "query"},
 			},
 			expected: true,
 		},
 		{
 			name: "Safe escape function",
-			expr: interpreter.FunctionCallExpr{
+			expr: ast.FunctionCallExpr{
 				Name: "escapeHTML",
-				Args: []interpreter.Expr{interpreter.VariableExpr{Name: "request"}},
+				Args: []ast.Expr{ast.VariableExpr{Name: "request"}},
 			},
 			expected: false,
 		},
 		{
 			name: "Sanitize function",
-			expr: interpreter.FunctionCallExpr{
+			expr: ast.FunctionCallExpr{
 				Name: "sanitize",
-				Args: []interpreter.Expr{interpreter.VariableExpr{Name: "input"}},
+				Args: []ast.Expr{ast.VariableExpr{Name: "input"}},
 			},
 			expected: false,
 		},
 		{
 			name: "Unsafe function with user input arg",
-			expr: interpreter.FunctionCallExpr{
+			expr: ast.FunctionCallExpr{
 				Name: "render",
-				Args: []interpreter.Expr{interpreter.VariableExpr{Name: "request"}},
+				Args: []ast.Expr{ast.VariableExpr{Name: "request"}},
 			},
 			expected: true,
 		},
 		{
 			name: "Function with no unsafe args",
-			expr: interpreter.FunctionCallExpr{
+			expr: ast.FunctionCallExpr{
 				Name: "render",
-				Args: []interpreter.Expr{interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "safe"}}},
+				Args: []ast.Expr{ast.LiteralExpr{Value: ast.StringLiteral{Value: "safe"}}},
 			},
 			expected: false,
 		},
 		{
 			name: "Array with user input element",
-			expr: interpreter.ArrayExpr{
-				Elements: []interpreter.Expr{
-					interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "safe"}},
-					interpreter.VariableExpr{Name: "request"},
+			expr: ast.ArrayExpr{
+				Elements: []ast.Expr{
+					ast.LiteralExpr{Value: ast.StringLiteral{Value: "safe"}},
+					ast.VariableExpr{Name: "request"},
 				},
 			},
 			expected: true,
 		},
 		{
 			name: "Array with all safe elements",
-			expr: interpreter.ArrayExpr{
-				Elements: []interpreter.Expr{
-					interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "a"}},
-					interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "b"}},
+			expr: ast.ArrayExpr{
+				Elements: []ast.Expr{
+					ast.LiteralExpr{Value: ast.StringLiteral{Value: "a"}},
+					ast.LiteralExpr{Value: ast.StringLiteral{Value: "b"}},
 				},
 			},
 			expected: false,
 		},
 		{
 			name:     "Literal expression",
-			expr:     interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "safe"}},
+			expr:     ast.LiteralExpr{Value: ast.StringLiteral{Value: "safe"}},
 			expected: false,
 		},
 	}
@@ -756,7 +755,7 @@ func TestRequiresHTMLEscapeAdvanced(t *testing.T) {
 func TestExprToString(t *testing.T) {
 	tests := []struct {
 		name     string
-		expr     interpreter.Expr
+		expr     ast.Expr
 		contains string
 	}{
 		{
@@ -766,60 +765,60 @@ func TestExprToString(t *testing.T) {
 		},
 		{
 			name:     "String literal",
-			expr:     interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "hello"}},
+			expr:     ast.LiteralExpr{Value: ast.StringLiteral{Value: "hello"}},
 			contains: "hello",
 		},
 		{
 			name:     "Int literal",
-			expr:     interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+			expr:     ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
 			contains: "42",
 		},
 		{
 			name:     "Bool literal",
-			expr:     interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
+			expr:     ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
 			contains: "true",
 		},
 		{
 			name:     "Float literal",
-			expr:     interpreter.LiteralExpr{Value: interpreter.FloatLiteral{Value: 3.14}},
+			expr:     ast.LiteralExpr{Value: ast.FloatLiteral{Value: 3.14}},
 			contains: "3.14",
 		},
 		{
 			name:     "Variable expression",
-			expr:     interpreter.VariableExpr{Name: "myVar"},
+			expr:     ast.VariableExpr{Name: "myVar"},
 			contains: "myVar",
 		},
 		{
 			name: "Field access",
-			expr: interpreter.FieldAccessExpr{
-				Object: interpreter.VariableExpr{Name: "obj"},
+			expr: ast.FieldAccessExpr{
+				Object: ast.VariableExpr{Name: "obj"},
 				Field:  "field",
 			},
 			contains: "obj.field",
 		},
 		{
 			name: "Binary operation",
-			expr: interpreter.BinaryOpExpr{
-				Left:  interpreter.VariableExpr{Name: "a"},
-				Op:    interpreter.Add,
-				Right: interpreter.VariableExpr{Name: "b"},
+			expr: ast.BinaryOpExpr{
+				Left:  ast.VariableExpr{Name: "a"},
+				Op:    ast.Add,
+				Right: ast.VariableExpr{Name: "b"},
 			},
 			contains: "a",
 		},
 		{
 			name: "Function call",
-			expr: interpreter.FunctionCallExpr{
+			expr: ast.FunctionCallExpr{
 				Name: "myFunc",
-				Args: []interpreter.Expr{interpreter.VariableExpr{Name: "arg1"}},
+				Args: []ast.Expr{ast.VariableExpr{Name: "arg1"}},
 			},
 			contains: "myFunc",
 		},
 		{
 			name: "Array expression",
-			expr: interpreter.ArrayExpr{
-				Elements: []interpreter.Expr{
-					interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-					interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+			expr: ast.ArrayExpr{
+				Elements: []ast.Expr{
+					ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+					ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 				},
 			},
 			contains: "1",
@@ -840,17 +839,17 @@ func TestExprToString(t *testing.T) {
 func TestContainsUserInputViaXSS(t *testing.T) {
 	tests := []struct {
 		name          string
-		expr          interpreter.Expr
+		expr          ast.Expr
 		expectWarning bool
 	}{
 		{
 			name: "Nested field access with user input",
-			expr: interpreter.BinaryOpExpr{
-				Left: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "<div>"}},
-				Op:   interpreter.Add,
-				Right: interpreter.FieldAccessExpr{
-					Object: interpreter.FieldAccessExpr{
-						Object: interpreter.VariableExpr{Name: "request"},
+			expr: ast.BinaryOpExpr{
+				Left: ast.LiteralExpr{Value: ast.StringLiteral{Value: "<div>"}},
+				Op:   ast.Add,
+				Right: ast.FieldAccessExpr{
+					Object: ast.FieldAccessExpr{
+						Object: ast.VariableExpr{Name: "request"},
 						Field:  "body",
 					},
 					Field: "username",
@@ -860,13 +859,13 @@ func TestContainsUserInputViaXSS(t *testing.T) {
 		},
 		{
 			name: "Deep binary expression with user input",
-			expr: interpreter.BinaryOpExpr{
-				Left: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "<p>"}},
-				Op:   interpreter.Add,
-				Right: interpreter.BinaryOpExpr{
-					Left:  interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "Hello "}},
-					Op:    interpreter.Add,
-					Right: interpreter.VariableExpr{Name: "input"},
+			expr: ast.BinaryOpExpr{
+				Left: ast.LiteralExpr{Value: ast.StringLiteral{Value: "<p>"}},
+				Op:   ast.Add,
+				Right: ast.BinaryOpExpr{
+					Left:  ast.LiteralExpr{Value: ast.StringLiteral{Value: "Hello "}},
+					Op:    ast.Add,
+					Right: ast.VariableExpr{Name: "input"},
 				},
 			},
 			expectWarning: true,

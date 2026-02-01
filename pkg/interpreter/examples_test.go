@@ -1,8 +1,11 @@
 package interpreter
 
 import (
+	. "github.com/glyphlang/glyph/pkg/ast"
+
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -217,7 +220,9 @@ func TestInterpreter_HelloWorldExample(t *testing.T) {
 	obj2, ok := result2.(map[string]interface{})
 	require.True(t, ok)
 	assert.Equal(t, "Hello, World!", obj2["text"])
-	assert.Equal(t, int64(1234567890), obj2["timestamp"])
+	ts2, ok2 := obj2["timestamp"].(int64)
+	require.True(t, ok2, "timestamp should be int64")
+	assert.InDelta(t, time.Now().Unix(), ts2, 2, "timestamp should be within 2 seconds of current time")
 }
 
 // Test: Conditional Logic

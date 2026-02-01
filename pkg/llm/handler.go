@@ -566,7 +566,8 @@ func (h *Handler) doHTTPRequest(method, url string, body interface{}, headers ma
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	const maxLLMResponseSize = 50 << 20 // 50 MB
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxLLMResponseSize))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}

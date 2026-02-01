@@ -2,14 +2,13 @@ package openapi
 
 import (
 	"encoding/json"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
-
-	"github.com/glyphlang/glyph/pkg/interpreter"
 )
 
 func TestGenerator_EmptyModule(t *testing.T) {
 	gen := NewGenerator("Test API", "1.0.0")
-	module := &interpreter.Module{Items: []interpreter.Item{}}
+	module := &ast.Module{Items: []ast.Item{}}
 	spec := gen.Generate(module)
 
 	if spec.OpenAPI != "3.0.3" {
@@ -28,12 +27,12 @@ func TestGenerator_EmptyModule(t *testing.T) {
 
 func TestGenerator_SimpleGetRoute(t *testing.T) {
 	gen := NewGenerator("Test API", "1.0.0")
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			interpreter.Route{
+	module := &ast.Module{
+		Items: []ast.Item{
+			ast.Route{
 				Path:   "/api/health",
-				Method: interpreter.Get,
-				Body:   []interpreter.Statement{},
+				Method: ast.Get,
+				Body:   []ast.Statement{},
 			},
 		},
 	}
@@ -57,13 +56,13 @@ func TestGenerator_SimpleGetRoute(t *testing.T) {
 
 func TestGenerator_AllHTTPMethods(t *testing.T) {
 	gen := NewGenerator("Test API", "1.0.0")
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			interpreter.Route{Path: "/api/users", Method: interpreter.Get},
-			interpreter.Route{Path: "/api/users", Method: interpreter.Post},
-			interpreter.Route{Path: "/api/users/:id", Method: interpreter.Put},
-			interpreter.Route{Path: "/api/users/:id", Method: interpreter.Delete},
-			interpreter.Route{Path: "/api/users/:id", Method: interpreter.Patch},
+	module := &ast.Module{
+		Items: []ast.Item{
+			ast.Route{Path: "/api/users", Method: ast.Get},
+			ast.Route{Path: "/api/users", Method: ast.Post},
+			ast.Route{Path: "/api/users/:id", Method: ast.Put},
+			ast.Route{Path: "/api/users/:id", Method: ast.Delete},
+			ast.Route{Path: "/api/users/:id", Method: ast.Patch},
 		},
 	}
 
@@ -97,11 +96,11 @@ func TestGenerator_AllHTTPMethods(t *testing.T) {
 
 func TestGenerator_PathParameters(t *testing.T) {
 	gen := NewGenerator("Test API", "1.0.0")
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			interpreter.Route{
+	module := &ast.Module{
+		Items: []ast.Item{
+			ast.Route{
 				Path:   "/api/users/:userId/posts/:postId",
-				Method: interpreter.Get,
+				Method: ast.Get,
 			},
 		},
 	}
@@ -128,15 +127,15 @@ func TestGenerator_PathParameters(t *testing.T) {
 
 func TestGenerator_QueryParameters(t *testing.T) {
 	gen := NewGenerator("Test API", "1.0.0")
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			interpreter.Route{
+	module := &ast.Module{
+		Items: []ast.Item{
+			ast.Route{
 				Path:   "/api/users",
-				Method: interpreter.Get,
-				QueryParams: []interpreter.QueryParamDecl{
-					{Name: "page", Type: interpreter.IntType{}, Required: false},
-					{Name: "q", Type: interpreter.StringType{}, Required: true},
-					{Name: "tags", Type: interpreter.StringType{}, Required: false, IsArray: true},
+				Method: ast.Get,
+				QueryParams: []ast.QueryParamDecl{
+					{Name: "page", Type: ast.IntType{}, Required: false},
+					{Name: "q", Type: ast.StringType{}, Required: true},
+					{Name: "tags", Type: ast.StringType{}, Required: false, IsArray: true},
 				},
 			},
 		},
@@ -170,17 +169,17 @@ func TestGenerator_QueryParameters(t *testing.T) {
 
 func TestGenerator_TypeDefinitions(t *testing.T) {
 	gen := NewGenerator("Test API", "1.0.0")
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			interpreter.TypeDef{
+	module := &ast.Module{
+		Items: []ast.Item{
+			ast.TypeDef{
 				Name: "User",
-				Fields: []interpreter.Field{
-					{Name: "id", TypeAnnotation: interpreter.IntType{}, Required: true},
-					{Name: "name", TypeAnnotation: interpreter.StringType{}, Required: true},
-					{Name: "email", TypeAnnotation: interpreter.OptionalType{InnerType: interpreter.StringType{}}, Required: false},
-					{Name: "roles", TypeAnnotation: interpreter.ArrayType{ElementType: interpreter.StringType{}}},
-					{Name: "score", TypeAnnotation: interpreter.FloatType{}, Required: true},
-					{Name: "active", TypeAnnotation: interpreter.BoolType{}, Required: true},
+				Fields: []ast.Field{
+					{Name: "id", TypeAnnotation: ast.IntType{}, Required: true},
+					{Name: "name", TypeAnnotation: ast.StringType{}, Required: true},
+					{Name: "email", TypeAnnotation: ast.OptionalType{InnerType: ast.StringType{}}, Required: false},
+					{Name: "roles", TypeAnnotation: ast.ArrayType{ElementType: ast.StringType{}}},
+					{Name: "score", TypeAnnotation: ast.FloatType{}, Required: true},
+					{Name: "active", TypeAnnotation: ast.BoolType{}, Required: true},
 				},
 			},
 		},
@@ -231,18 +230,18 @@ func TestGenerator_TypeDefinitions(t *testing.T) {
 
 func TestGenerator_ReturnTypeRef(t *testing.T) {
 	gen := NewGenerator("Test API", "1.0.0")
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			interpreter.TypeDef{
+	module := &ast.Module{
+		Items: []ast.Item{
+			ast.TypeDef{
 				Name: "User",
-				Fields: []interpreter.Field{
-					{Name: "id", TypeAnnotation: interpreter.IntType{}, Required: true},
+				Fields: []ast.Field{
+					{Name: "id", TypeAnnotation: ast.IntType{}, Required: true},
 				},
 			},
-			interpreter.Route{
+			ast.Route{
 				Path:       "/api/users/:id",
-				Method:     interpreter.Get,
-				ReturnType: interpreter.NamedType{Name: "User"},
+				Method:     ast.Get,
+				ReturnType: ast.NamedType{Name: "User"},
 			},
 		},
 	}
@@ -259,15 +258,15 @@ func TestGenerator_ReturnTypeRef(t *testing.T) {
 
 func TestGenerator_UnionReturnType(t *testing.T) {
 	gen := NewGenerator("Test API", "1.0.0")
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			interpreter.Route{
+	module := &ast.Module{
+		Items: []ast.Item{
+			ast.Route{
 				Path:   "/api/users/:id",
-				Method: interpreter.Get,
-				ReturnType: interpreter.UnionType{
-					Types: []interpreter.Type{
-						interpreter.NamedType{Name: "User"},
-						interpreter.NamedType{Name: "NotFound"},
+				Method: ast.Get,
+				ReturnType: ast.UnionType{
+					Types: []ast.Type{
+						ast.NamedType{Name: "User"},
+						ast.NamedType{Name: "NotFound"},
 					},
 				},
 			},
@@ -287,12 +286,12 @@ func TestGenerator_UnionReturnType(t *testing.T) {
 
 func TestGenerator_AuthJWT(t *testing.T) {
 	gen := NewGenerator("Test API", "1.0.0")
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			interpreter.Route{
+	module := &ast.Module{
+		Items: []ast.Item{
+			ast.Route{
 				Path:   "/api/me",
-				Method: interpreter.Get,
-				Auth:   &interpreter.AuthConfig{AuthType: "jwt", Required: true},
+				Method: ast.Get,
+				Auth:   &ast.AuthConfig{AuthType: "jwt", Required: true},
 			},
 		},
 	}
@@ -320,19 +319,19 @@ func TestGenerator_AuthJWT(t *testing.T) {
 
 func TestGenerator_RequestBody(t *testing.T) {
 	gen := NewGenerator("Test API", "1.0.0")
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			interpreter.TypeDef{
+	module := &ast.Module{
+		Items: []ast.Item{
+			ast.TypeDef{
 				Name: "CreateUserRequest",
-				Fields: []interpreter.Field{
-					{Name: "name", TypeAnnotation: interpreter.StringType{}, Required: true},
-					{Name: "email", TypeAnnotation: interpreter.StringType{}, Required: true},
+				Fields: []ast.Field{
+					{Name: "name", TypeAnnotation: ast.StringType{}, Required: true},
+					{Name: "email", TypeAnnotation: ast.StringType{}, Required: true},
 				},
 			},
-			interpreter.Route{
+			ast.Route{
 				Path:      "/api/users",
-				Method:    interpreter.Post,
-				InputType: interpreter.NamedType{Name: "CreateUserRequest"},
+				Method:    ast.Post,
+				InputType: ast.NamedType{Name: "CreateUserRequest"},
 			},
 		},
 	}
@@ -355,11 +354,11 @@ func TestGenerator_RequestBody(t *testing.T) {
 
 func TestGenerator_PostWithoutInputType(t *testing.T) {
 	gen := NewGenerator("Test API", "1.0.0")
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			interpreter.Route{
+	module := &ast.Module{
+		Items: []ast.Item{
+			ast.Route{
 				Path:   "/api/action",
-				Method: interpreter.Post,
+				Method: ast.Post,
 			},
 		},
 	}
@@ -378,12 +377,12 @@ func TestGenerator_PostWithoutInputType(t *testing.T) {
 
 func TestGenerator_NamedTypeTimestamp(t *testing.T) {
 	gen := NewGenerator("Test API", "1.0.0")
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			interpreter.TypeDef{
+	module := &ast.Module{
+		Items: []ast.Item{
+			ast.TypeDef{
 				Name: "Event",
-				Fields: []interpreter.Field{
-					{Name: "created_at", TypeAnnotation: interpreter.NamedType{Name: "timestamp"}, Required: true},
+				Fields: []ast.Field{
+					{Name: "created_at", TypeAnnotation: ast.NamedType{Name: "timestamp"}, Required: true},
 				},
 			},
 		},
@@ -400,16 +399,16 @@ func TestGenerator_NamedTypeTimestamp(t *testing.T) {
 
 func TestGenerator_GenericListType(t *testing.T) {
 	gen := NewGenerator("Test API", "1.0.0")
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			interpreter.TypeDef{
+	module := &ast.Module{
+		Items: []ast.Item{
+			ast.TypeDef{
 				Name: "UserList",
-				Fields: []interpreter.Field{
+				Fields: []ast.Field{
 					{
 						Name: "users",
-						TypeAnnotation: interpreter.GenericType{
-							BaseType: interpreter.NamedType{Name: "List"},
-							TypeArgs: []interpreter.Type{interpreter.NamedType{Name: "User"}},
+						TypeAnnotation: ast.GenericType{
+							BaseType: ast.NamedType{Name: "List"},
+							TypeArgs: []ast.Type{ast.NamedType{Name: "User"}},
 						},
 					},
 				},
@@ -431,15 +430,15 @@ func TestGenerator_GenericListType(t *testing.T) {
 
 func TestGenerator_WebSocketSkipped(t *testing.T) {
 	gen := NewGenerator("Test API", "1.0.0")
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			interpreter.Route{
+	module := &ast.Module{
+		Items: []ast.Item{
+			ast.Route{
 				Path:   "/ws/chat",
-				Method: interpreter.WebSocket,
+				Method: ast.WebSocket,
 			},
-			interpreter.Route{
+			ast.Route{
 				Path:   "/api/health",
-				Method: interpreter.Get,
+				Method: ast.Get,
 			},
 		},
 	}
@@ -456,18 +455,18 @@ func TestGenerator_WebSocketSkipped(t *testing.T) {
 
 func TestGenerator_OperationID(t *testing.T) {
 	tests := []struct {
-		method   interpreter.HttpMethod
+		method   ast.HttpMethod
 		path     string
 		expected string
 	}{
-		{interpreter.Get, "/api/users", "getApi_users"},
-		{interpreter.Post, "/api/users", "postApi_users"},
-		{interpreter.Get, "/api/users/:id", "getApi_users_byId"},
-		{interpreter.Delete, "/api/users/:id/posts/:postId", "deleteApi_users_byId_posts_byPostId"},
+		{ast.Get, "/api/users", "getApi_users"},
+		{ast.Post, "/api/users", "postApi_users"},
+		{ast.Get, "/api/users/:id", "getApi_users_byId"},
+		{ast.Delete, "/api/users/:id/posts/:postId", "deleteApi_users_byId_posts_byPostId"},
 	}
 
 	for _, tt := range tests {
-		route := &interpreter.Route{Path: tt.path, Method: tt.method}
+		route := &ast.Route{Path: tt.path, Method: tt.method}
 		got := generateOperationID(route)
 		if got != tt.expected {
 			t.Errorf("operationID for %s %s: expected %s, got %s", tt.method, tt.path, tt.expected, got)
@@ -477,10 +476,10 @@ func TestGenerator_OperationID(t *testing.T) {
 
 func TestGenerator_Tags(t *testing.T) {
 	gen := NewGenerator("Test API", "1.0.0")
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			interpreter.Route{Path: "/api/users", Method: interpreter.Get},
-			interpreter.Route{Path: "/api/todos", Method: interpreter.Get},
+	module := &ast.Module{
+		Items: []ast.Item{
+			ast.Route{Path: "/api/users", Method: ast.Get},
+			ast.Route{Path: "/api/todos", Method: ast.Get},
 		},
 	}
 
@@ -607,11 +606,11 @@ func TestFormatSpec(t *testing.T) {
 }
 
 func TestGenerateFromModule(t *testing.T) {
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			interpreter.Route{
+	module := &ast.Module{
+		Items: []ast.Item{
+			ast.Route{
 				Path:   "/api/test",
-				Method: interpreter.Get,
+				Method: ast.Get,
 			},
 		},
 	}
@@ -627,17 +626,17 @@ func TestGenerateFromModule(t *testing.T) {
 
 func TestGenerator_MultipleAuthTypes(t *testing.T) {
 	gen := NewGenerator("Test API", "1.0.0")
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			interpreter.Route{
+	module := &ast.Module{
+		Items: []ast.Item{
+			ast.Route{
 				Path:   "/api/jwt-route",
-				Method: interpreter.Get,
-				Auth:   &interpreter.AuthConfig{AuthType: "jwt"},
+				Method: ast.Get,
+				Auth:   &ast.AuthConfig{AuthType: "jwt"},
 			},
-			interpreter.Route{
+			ast.Route{
 				Path:   "/api/basic-route",
-				Method: interpreter.Get,
-				Auth:   &interpreter.AuthConfig{AuthType: "basic"},
+				Method: ast.Get,
+				Auth:   &ast.AuthConfig{AuthType: "basic"},
 			},
 		},
 	}
@@ -654,11 +653,11 @@ func TestGenerator_MultipleAuthTypes(t *testing.T) {
 
 func TestGenerator_NoAuthNoSecuritySchemes(t *testing.T) {
 	gen := NewGenerator("Test API", "1.0.0")
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			interpreter.Route{
+	module := &ast.Module{
+		Items: []ast.Item{
+			ast.Route{
 				Path:   "/api/public",
-				Method: interpreter.Get,
+				Method: ast.Get,
 			},
 		},
 	}

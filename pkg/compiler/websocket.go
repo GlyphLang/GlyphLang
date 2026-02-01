@@ -2,8 +2,8 @@ package compiler
 
 import (
 	"fmt"
+	"github.com/glyphlang/glyph/pkg/ast"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/server"
 	"github.com/glyphlang/glyph/pkg/vm"
 )
@@ -18,7 +18,7 @@ type CompiledWebSocketRoute struct {
 }
 
 // CompileWebSocketRoute compiles a WebSocket route to bytecode
-func (c *Compiler) CompileWebSocketRoute(route *interpreter.WebSocketRoute) (*CompiledWebSocketRoute, error) {
+func (c *Compiler) CompileWebSocketRoute(route *ast.WebSocketRoute) (*CompiledWebSocketRoute, error) {
 	compiled := &CompiledWebSocketRoute{
 		Path: route.Path,
 	}
@@ -31,13 +31,13 @@ func (c *Compiler) CompileWebSocketRoute(route *interpreter.WebSocketRoute) (*Co
 		}
 
 		switch event.EventType {
-		case interpreter.WSEventConnect:
+		case ast.WSEventConnect:
 			compiled.OnConnect = bytecode
-		case interpreter.WSEventMessage:
+		case ast.WSEventMessage:
 			compiled.OnMessage = bytecode
-		case interpreter.WSEventDisconnect:
+		case ast.WSEventDisconnect:
 			compiled.OnDisconnect = bytecode
-		case interpreter.WSEventError:
+		case ast.WSEventError:
 			compiled.OnError = bytecode
 		}
 	}
@@ -46,7 +46,7 @@ func (c *Compiler) CompileWebSocketRoute(route *interpreter.WebSocketRoute) (*Co
 }
 
 // compileWebSocketEvent compiles a WebSocket event handler
-func (c *Compiler) compileWebSocketEvent(event interpreter.WebSocketEvent, routePath string) ([]byte, error) {
+func (c *Compiler) compileWebSocketEvent(event ast.WebSocketEvent, routePath string) ([]byte, error) {
 	// Create a new compiler for this event handler
 	eventCompiler := &Compiler{
 		constants:    make([]vm.Value, 0),
@@ -96,19 +96,19 @@ func (c *Compiler) compileWebSocketEvent(event interpreter.WebSocketEvent, route
 }
 
 // compileWebSocketStatement compiles a statement in WebSocket context
-func (c *Compiler) compileWebSocketStatement(stmt interpreter.Statement) error {
+func (c *Compiler) compileWebSocketStatement(stmt ast.Statement) error {
 	switch s := stmt.(type) {
-	case *interpreter.WsSendStatement:
+	case *ast.WsSendStatement:
 		return c.compileWsSend(s)
-	case interpreter.WsSendStatement:
+	case ast.WsSendStatement:
 		return c.compileWsSend(&s)
-	case *interpreter.WsBroadcastStatement:
+	case *ast.WsBroadcastStatement:
 		return c.compileWsBroadcast(s)
-	case interpreter.WsBroadcastStatement:
+	case ast.WsBroadcastStatement:
 		return c.compileWsBroadcast(&s)
-	case *interpreter.WsCloseStatement:
+	case *ast.WsCloseStatement:
 		return c.compileWsClose(s)
-	case interpreter.WsCloseStatement:
+	case ast.WsCloseStatement:
 		return c.compileWsClose(&s)
 	default:
 		// Fall back to regular statement compilation
@@ -117,7 +117,7 @@ func (c *Compiler) compileWebSocketStatement(stmt interpreter.Statement) error {
 }
 
 // compileWsSend compiles a ws.send statement
-func (c *Compiler) compileWsSend(stmt *interpreter.WsSendStatement) error {
+func (c *Compiler) compileWsSend(stmt *ast.WsSendStatement) error {
 	// Compile the message expression
 	if err := c.compileExpression(stmt.Message); err != nil {
 		return fmt.Errorf("failed to compile ws.send message: %w", err)
@@ -130,7 +130,7 @@ func (c *Compiler) compileWsSend(stmt *interpreter.WsSendStatement) error {
 }
 
 // compileWsBroadcast compiles a ws.broadcast statement
-func (c *Compiler) compileWsBroadcast(stmt *interpreter.WsBroadcastStatement) error {
+func (c *Compiler) compileWsBroadcast(stmt *ast.WsBroadcastStatement) error {
 	// Check if we have an "except" clause
 	if stmt.Except != nil {
 		// Compile the except expression (client to exclude)
@@ -151,7 +151,7 @@ func (c *Compiler) compileWsBroadcast(stmt *interpreter.WsBroadcastStatement) er
 }
 
 // compileWsClose compiles a ws.close statement
-func (c *Compiler) compileWsClose(stmt *interpreter.WsCloseStatement) error {
+func (c *Compiler) compileWsClose(stmt *ast.WsCloseStatement) error {
 	// Compile the reason expression
 	if err := c.compileExpression(stmt.Reason); err != nil {
 		return fmt.Errorf("failed to compile ws.close reason: %w", err)
@@ -164,7 +164,7 @@ func (c *Compiler) compileWsClose(stmt *interpreter.WsCloseStatement) error {
 }
 
 // compileFunctionCallForWs handles WebSocket-specific function calls like ws.join, ws.leave, etc.
-func (c *Compiler) compileFunctionCallForWs(expr *interpreter.FunctionCallExpr) (bool, error) {
+func (c *Compiler) compileFunctionCallForWs(expr *ast.FunctionCallExpr) (bool, error) {
 	switch expr.Name {
 	case "ws.send":
 		if len(expr.Args) != 1 {
@@ -222,7 +222,7 @@ func (c *Compiler) compileFunctionCallForWs(expr *interpreter.FunctionCallExpr) 
 		return true, nil
 
 	case "ws.close":
-		reason := &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: ""}}
+		reason := &ast.LiteralExpr{Value: ast.StringLiteral{Value: ""}}
 		if len(expr.Args) == 1 {
 			if err := c.compileExpression(expr.Args[0]); err != nil {
 				return true, err
@@ -285,15 +285,15 @@ func (c *Compiler) compileFunctionCallForWs(expr *interpreter.FunctionCallExpr) 
 }
 
 // getEventName returns a string name for a WebSocket event type
-func getEventName(eventType interpreter.WebSocketEventType) string {
+func getEventName(eventType ast.WebSocketEventType) string {
 	switch eventType {
-	case interpreter.WSEventConnect:
+	case ast.WSEventConnect:
 		return "connect"
-	case interpreter.WSEventMessage:
+	case ast.WSEventMessage:
 		return "message"
-	case interpreter.WSEventDisconnect:
+	case ast.WSEventDisconnect:
 		return "disconnect"
-	case interpreter.WSEventError:
+	case ast.WSEventError:
 		return "error"
 	default:
 		return "unknown"
@@ -301,16 +301,16 @@ func getEventName(eventType interpreter.WebSocketEventType) string {
 }
 
 // CompileModule compiles a module, handling both HTTP routes and WebSocket routes
-func (c *Compiler) CompileModule(module *interpreter.Module) (*CompiledModule, error) {
+func (c *Compiler) CompileModule(module *ast.Module) (*CompiledModule, error) {
 	result := &CompiledModule{
 		Routes:          make(map[string][]byte),
 		WebSocketRoutes: make(map[string]*CompiledWebSocketRoute),
-		TypeDefs:        make(map[string]*interpreter.TypeDef),
+		TypeDefs:        make(map[string]*ast.TypeDef),
 	}
 
 	for _, item := range module.Items {
 		switch i := item.(type) {
-		case *interpreter.Route:
+		case *ast.Route:
 			bytecode, err := c.CompileRoute(i)
 			if err != nil {
 				return nil, fmt.Errorf("failed to compile route %s %s: %w", i.Method, i.Path, err)
@@ -318,14 +318,14 @@ func (c *Compiler) CompileModule(module *interpreter.Module) (*CompiledModule, e
 			key := fmt.Sprintf("%s %s", i.Method, i.Path)
 			result.Routes[key] = bytecode
 
-		case *interpreter.WebSocketRoute:
+		case *ast.WebSocketRoute:
 			compiled, err := c.CompileWebSocketRoute(i)
 			if err != nil {
 				return nil, fmt.Errorf("failed to compile WebSocket route %s: %w", i.Path, err)
 			}
 			result.WebSocketRoutes[i.Path] = compiled
 
-		case *interpreter.TypeDef:
+		case *ast.TypeDef:
 			result.TypeDefs[i.Name] = i
 		}
 	}
@@ -337,5 +337,5 @@ func (c *Compiler) CompileModule(module *interpreter.Module) (*CompiledModule, e
 type CompiledModule struct {
 	Routes          map[string][]byte                  // HTTP routes: "METHOD /path" -> bytecode
 	WebSocketRoutes map[string]*CompiledWebSocketRoute // WS routes: "/path" -> compiled handlers
-	TypeDefs        map[string]*interpreter.TypeDef    // Type definitions
+	TypeDefs        map[string]*ast.TypeDef            // Type definitions
 }

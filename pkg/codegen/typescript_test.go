@@ -1,10 +1,10 @@
 package codegen
 
 import (
+	"github.com/glyphlang/glyph/pkg/ast"
 	"strings"
 	"testing"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -12,14 +12,14 @@ import (
 func TestTypeScriptGenerator_Interface(t *testing.T) {
 	gen := NewTypeScriptGenerator("http://localhost:3000")
 
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.TypeDef{
+	module := &ast.Module{
+		Items: []ast.Item{
+			&ast.TypeDef{
 				Name: "User",
-				Fields: []interpreter.Field{
-					{Name: "id", TypeAnnotation: interpreter.NamedType{Name: "int"}, Required: true},
-					{Name: "name", TypeAnnotation: interpreter.NamedType{Name: "str"}, Required: true},
-					{Name: "email", TypeAnnotation: interpreter.NamedType{Name: "str"}, Required: false},
+				Fields: []ast.Field{
+					{Name: "id", TypeAnnotation: ast.NamedType{Name: "int"}, Required: true},
+					{Name: "name", TypeAnnotation: ast.NamedType{Name: "str"}, Required: true},
+					{Name: "email", TypeAnnotation: ast.NamedType{Name: "str"}, Required: false},
 				},
 			},
 		},
@@ -35,13 +35,13 @@ func TestTypeScriptGenerator_Interface(t *testing.T) {
 func TestTypeScriptGenerator_GetRoute(t *testing.T) {
 	gen := NewTypeScriptGenerator("http://localhost:3000")
 
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.Route{
+	module := &ast.Module{
+		Items: []ast.Item{
+			&ast.Route{
 				Path:       "/api/users/:id",
-				Method:     interpreter.Get,
-				ReturnType: interpreter.NamedType{Name: "User"},
-				Body:       []interpreter.Statement{},
+				Method:     ast.Get,
+				ReturnType: ast.NamedType{Name: "User"},
+				Body:       []ast.Statement{},
 			},
 		},
 	}
@@ -54,14 +54,14 @@ func TestTypeScriptGenerator_GetRoute(t *testing.T) {
 func TestTypeScriptGenerator_PostRoute(t *testing.T) {
 	gen := NewTypeScriptGenerator("http://localhost:3000")
 
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.Route{
+	module := &ast.Module{
+		Items: []ast.Item{
+			&ast.Route{
 				Path:       "/api/users",
-				Method:     interpreter.Post,
-				ReturnType: interpreter.NamedType{Name: "User"},
-				InputType:  interpreter.NamedType{Name: "CreateUserInput"},
-				Body:       []interpreter.Statement{},
+				Method:     ast.Post,
+				ReturnType: ast.NamedType{Name: "User"},
+				InputType:  ast.NamedType{Name: "CreateUserInput"},
+				Body:       []ast.Statement{},
 			},
 		},
 	}
@@ -74,12 +74,12 @@ func TestTypeScriptGenerator_PostRoute(t *testing.T) {
 func TestTypeScriptGenerator_DeleteRoute(t *testing.T) {
 	gen := NewTypeScriptGenerator("http://localhost:3000")
 
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.Route{
+	module := &ast.Module{
+		Items: []ast.Item{
+			&ast.Route{
 				Path:   "/api/users/:id",
-				Method: interpreter.Delete,
-				Body:   []interpreter.Statement{},
+				Method: ast.Delete,
+				Body:   []ast.Statement{},
 			},
 		},
 	}
@@ -91,8 +91,8 @@ func TestTypeScriptGenerator_DeleteRoute(t *testing.T) {
 func TestTypeScriptGenerator_ClientClass(t *testing.T) {
 	gen := NewTypeScriptGenerator("http://localhost:3000")
 
-	module := &interpreter.Module{
-		Items: []interpreter.Item{},
+	module := &ast.Module{
+		Items: []ast.Item{},
 	}
 
 	code := gen.Generate(module)
@@ -105,38 +105,38 @@ func TestTypeScriptGenerator_ClientClass(t *testing.T) {
 func TestTypeScriptGenerator_FullModule(t *testing.T) {
 	gen := NewTypeScriptGenerator("http://localhost:3000")
 
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.TypeDef{
+	module := &ast.Module{
+		Items: []ast.Item{
+			&ast.TypeDef{
 				Name: "Todo",
-				Fields: []interpreter.Field{
-					{Name: "id", TypeAnnotation: interpreter.NamedType{Name: "int"}, Required: true},
-					{Name: "title", TypeAnnotation: interpreter.NamedType{Name: "str"}, Required: true},
-					{Name: "done", TypeAnnotation: interpreter.NamedType{Name: "bool"}, Required: true},
+				Fields: []ast.Field{
+					{Name: "id", TypeAnnotation: ast.NamedType{Name: "int"}, Required: true},
+					{Name: "title", TypeAnnotation: ast.NamedType{Name: "str"}, Required: true},
+					{Name: "done", TypeAnnotation: ast.NamedType{Name: "bool"}, Required: true},
 				},
 			},
-			&interpreter.Route{
+			&ast.Route{
 				Path:       "/api/todos",
-				Method:     interpreter.Get,
-				ReturnType: interpreter.ArrayType{ElementType: interpreter.NamedType{Name: "Todo"}},
-				Body:       []interpreter.Statement{},
+				Method:     ast.Get,
+				ReturnType: ast.ArrayType{ElementType: ast.NamedType{Name: "Todo"}},
+				Body:       []ast.Statement{},
 			},
-			&interpreter.Route{
+			&ast.Route{
 				Path:       "/api/todos/:id",
-				Method:     interpreter.Get,
-				ReturnType: interpreter.NamedType{Name: "Todo"},
-				Body:       []interpreter.Statement{},
+				Method:     ast.Get,
+				ReturnType: ast.NamedType{Name: "Todo"},
+				Body:       []ast.Statement{},
 			},
-			&interpreter.Route{
+			&ast.Route{
 				Path:       "/api/todos",
-				Method:     interpreter.Post,
-				ReturnType: interpreter.NamedType{Name: "Todo"},
-				Body:       []interpreter.Statement{},
+				Method:     ast.Post,
+				ReturnType: ast.NamedType{Name: "Todo"},
+				Body:       []ast.Statement{},
 			},
-			&interpreter.Route{
+			&ast.Route{
 				Path:   "/api/todos/:id",
-				Method: interpreter.Delete,
-				Body:   []interpreter.Statement{},
+				Method: ast.Delete,
+				Body:   []ast.Statement{},
 			},
 		},
 	}
@@ -157,18 +157,18 @@ func TestTypeScriptGenerator_FullModule(t *testing.T) {
 
 func TestGlyphTypeToTS(t *testing.T) {
 	tests := []struct {
-		input    interpreter.Type
+		input    ast.Type
 		expected string
 	}{
-		{interpreter.NamedType{Name: "int"}, "number"},
-		{interpreter.NamedType{Name: "float"}, "number"},
-		{interpreter.NamedType{Name: "str"}, "string"},
-		{interpreter.NamedType{Name: "string"}, "string"},
-		{interpreter.NamedType{Name: "bool"}, "boolean"},
-		{interpreter.NamedType{Name: "any"}, "unknown"},
-		{interpreter.NamedType{Name: "User"}, "User"},
-		{interpreter.ArrayType{ElementType: interpreter.NamedType{Name: "int"}}, "number[]"},
-		{interpreter.OptionalType{InnerType: interpreter.NamedType{Name: "str"}}, "string | null"},
+		{ast.NamedType{Name: "int"}, "number"},
+		{ast.NamedType{Name: "float"}, "number"},
+		{ast.NamedType{Name: "str"}, "string"},
+		{ast.NamedType{Name: "string"}, "string"},
+		{ast.NamedType{Name: "bool"}, "boolean"},
+		{ast.NamedType{Name: "any"}, "unknown"},
+		{ast.NamedType{Name: "User"}, "User"},
+		{ast.ArrayType{ElementType: ast.NamedType{Name: "int"}}, "number[]"},
+		{ast.OptionalType{InnerType: ast.NamedType{Name: "str"}}, "string | null"},
 		{nil, "unknown"},
 	}
 
@@ -192,19 +192,19 @@ func TestGlyphPathToTemplate(t *testing.T) {
 
 func TestRouteToMethodName(t *testing.T) {
 	tests := []struct {
-		method interpreter.HttpMethod
+		method ast.HttpMethod
 		path   string
 		expect string
 	}{
-		{interpreter.Get, "/api/users", "getApiUsers"},
-		{interpreter.Post, "/api/users", "createApiUsers"},
-		{interpreter.Put, "/api/users/:id", "updateApiUsers"},
-		{interpreter.Delete, "/api/users/:id", "deleteApiUsers"},
-		{interpreter.Patch, "/api/users/:id", "patchApiUsers"},
+		{ast.Get, "/api/users", "getApiUsers"},
+		{ast.Post, "/api/users", "createApiUsers"},
+		{ast.Put, "/api/users/:id", "updateApiUsers"},
+		{ast.Delete, "/api/users/:id", "deleteApiUsers"},
+		{ast.Patch, "/api/users/:id", "patchApiUsers"},
 	}
 
 	for _, tt := range tests {
-		route := &interpreter.Route{Method: tt.method, Path: tt.path}
+		route := &ast.Route{Method: tt.method, Path: tt.path}
 		assert.Equal(t, tt.expect, routeToMethodName(route))
 	}
 }
@@ -218,17 +218,17 @@ func TestCapitalize(t *testing.T) {
 func TestTypeScriptGenerator_SkipsWebSocket(t *testing.T) {
 	gen := NewTypeScriptGenerator("http://localhost:3000")
 
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.Route{
+	module := &ast.Module{
+		Items: []ast.Item{
+			&ast.Route{
 				Path:   "/ws/chat",
-				Method: interpreter.WebSocket,
-				Body:   []interpreter.Statement{},
+				Method: ast.WebSocket,
+				Body:   []ast.Statement{},
 			},
-			&interpreter.Route{
+			&ast.Route{
 				Path:   "/api/health",
-				Method: interpreter.Get,
-				Body:   []interpreter.Statement{},
+				Method: ast.Get,
+				Body:   []ast.Statement{},
 			},
 		},
 	}
@@ -241,18 +241,18 @@ func TestTypeScriptGenerator_SkipsWebSocket(t *testing.T) {
 func TestTypeScriptGenerator_OutputIsValid(t *testing.T) {
 	gen := NewTypeScriptGenerator("http://localhost:3000")
 
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.TypeDef{
+	module := &ast.Module{
+		Items: []ast.Item{
+			&ast.TypeDef{
 				Name: "Item",
-				Fields: []interpreter.Field{
-					{Name: "id", TypeAnnotation: interpreter.NamedType{Name: "int"}, Required: true},
+				Fields: []ast.Field{
+					{Name: "id", TypeAnnotation: ast.NamedType{Name: "int"}, Required: true},
 				},
 			},
-			&interpreter.Route{
+			&ast.Route{
 				Path:   "/items",
-				Method: interpreter.Get,
-				Body:   []interpreter.Statement{},
+				Method: ast.Get,
+				Body:   []ast.Statement{},
 			},
 		},
 	}

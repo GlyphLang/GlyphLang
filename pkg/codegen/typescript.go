@@ -2,9 +2,8 @@ package codegen
 
 import (
 	"fmt"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"strings"
-
-	"github.com/glyphlang/glyph/pkg/interpreter"
 )
 
 // TypeScriptGenerator generates TypeScript API client code from a GlyphLang Module.
@@ -18,14 +17,14 @@ func NewTypeScriptGenerator(baseURL string) *TypeScriptGenerator {
 }
 
 // Generate produces TypeScript source code from a parsed GlyphLang module.
-func (g *TypeScriptGenerator) Generate(module *interpreter.Module) string {
+func (g *TypeScriptGenerator) Generate(module *ast.Module) string {
 	var sb strings.Builder
 
 	sb.WriteString("// Auto-generated TypeScript client from GlyphLang\n")
 	sb.WriteString("// Do not edit manually\n\n")
 
 	// Collect type definitions
-	var typeDefs []*interpreter.TypeDef
+	var typeDefs []*ast.TypeDef
 	for _, item := range module.Items {
 		td := getTypeDef(item)
 		if td != nil {
@@ -40,10 +39,10 @@ func (g *TypeScriptGenerator) Generate(module *interpreter.Module) string {
 	}
 
 	// Collect routes
-	var routes []*interpreter.Route
+	var routes []*ast.Route
 	for _, item := range module.Items {
 		route := getRoute(item)
-		if route != nil && route.Method != interpreter.WebSocket {
+		if route != nil && route.Method != ast.WebSocket {
 			routes = append(routes, route)
 		}
 	}
@@ -55,7 +54,7 @@ func (g *TypeScriptGenerator) Generate(module *interpreter.Module) string {
 }
 
 // generateInterface writes a TypeScript interface for a type definition.
-func (g *TypeScriptGenerator) generateInterface(sb *strings.Builder, td *interpreter.TypeDef) {
+func (g *TypeScriptGenerator) generateInterface(sb *strings.Builder, td *ast.TypeDef) {
 	fmt.Fprintf(sb, "export interface %s {\n", td.Name)
 	for _, field := range td.Fields {
 		tsType := glyphTypeToTS(field.TypeAnnotation)
@@ -69,7 +68,7 @@ func (g *TypeScriptGenerator) generateInterface(sb *strings.Builder, td *interpr
 }
 
 // generateClient writes a TypeScript API client class.
-func (g *TypeScriptGenerator) generateClient(sb *strings.Builder, routes []*interpreter.Route, typeDefs []*interpreter.TypeDef) {
+func (g *TypeScriptGenerator) generateClient(sb *strings.Builder, routes []*ast.Route, typeDefs []*ast.TypeDef) {
 	sb.WriteString("export class ApiClient {\n")
 	sb.WriteString("  private baseUrl: string;\n")
 	sb.WriteString("  private headers: Record<string, string>;\n\n")
@@ -100,7 +99,7 @@ func (g *TypeScriptGenerator) generateClient(sb *strings.Builder, routes []*inte
 }
 
 // generateMethod writes a single client method for a route.
-func (g *TypeScriptGenerator) generateMethod(sb *strings.Builder, route *interpreter.Route, typeDefs []*interpreter.TypeDef) {
+func (g *TypeScriptGenerator) generateMethod(sb *strings.Builder, route *ast.Route, typeDefs []*ast.TypeDef) {
 	methodName := routeToMethodName(route)
 	httpMethod := strings.ToUpper(route.Method.String())
 	pathParams := extractPathParams(route.Path)
@@ -143,12 +142,12 @@ func (g *TypeScriptGenerator) generateMethod(sb *strings.Builder, route *interpr
 // --- Helper functions ---
 
 // glyphTypeToTS maps a GlyphLang type to a TypeScript type string.
-func glyphTypeToTS(t interpreter.Type) string {
+func glyphTypeToTS(t ast.Type) string {
 	if t == nil {
 		return "unknown"
 	}
 	switch v := t.(type) {
-	case interpreter.NamedType:
+	case ast.NamedType:
 		switch v.Name {
 		case "int", "float":
 			return "number"
@@ -161,13 +160,13 @@ func glyphTypeToTS(t interpreter.Type) string {
 		default:
 			return v.Name
 		}
-	case interpreter.ArrayType:
+	case ast.ArrayType:
 		elemType := glyphTypeToTS(v.ElementType)
 		return elemType + "[]"
-	case interpreter.OptionalType:
+	case ast.OptionalType:
 		innerType := glyphTypeToTS(v.InnerType)
 		return innerType + " | null"
-	case interpreter.UnionType:
+	case ast.UnionType:
 		var parts []string
 		for _, member := range v.Types {
 			parts = append(parts, glyphTypeToTS(member))
@@ -203,7 +202,7 @@ func glyphPathToTemplate(path string) string {
 }
 
 // routeToMethodName generates a camelCase method name from a route.
-func routeToMethodName(route *interpreter.Route) string {
+func routeToMethodName(route *ast.Route) string {
 	method := strings.ToLower(route.Method.String())
 
 	// Build name from path segments
@@ -246,22 +245,22 @@ func capitalize(s string) string {
 }
 
 // getRoute extracts a Route from an Item, handling both value and pointer types.
-func getRoute(item interpreter.Item) *interpreter.Route {
+func getRoute(item ast.Item) *ast.Route {
 	switch v := item.(type) {
-	case interpreter.Route:
+	case ast.Route:
 		return &v
-	case *interpreter.Route:
+	case *ast.Route:
 		return v
 	}
 	return nil
 }
 
 // getTypeDef extracts a TypeDef from an Item, handling both value and pointer types.
-func getTypeDef(item interpreter.Item) *interpreter.TypeDef {
+func getTypeDef(item ast.Item) *ast.TypeDef {
 	switch v := item.(type) {
-	case interpreter.TypeDef:
+	case ast.TypeDef:
 		return &v
-	case *interpreter.TypeDef:
+	case *ast.TypeDef:
 		return v
 	}
 	return nil
