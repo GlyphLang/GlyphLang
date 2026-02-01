@@ -378,7 +378,13 @@ func builtinIndexOf(i *Interpreter, args []Expr, env *Environment) (interface{},
 	if !ok {
 		return nil, fmt.Errorf("indexOf() expects second argument to be a string, got %T", substrArg)
 	}
-	return int64(strings.Index(str, substr)), nil
+	byteIndex := strings.Index(str, substr)
+	if byteIndex < 0 {
+		return int64(-1), nil
+	}
+	// Convert byte offset to rune offset for Unicode consistency
+	runeIndex := len([]rune(str[:byteIndex]))
+	return int64(runeIndex), nil
 }
 
 func builtinCharAt(i *Interpreter, args []Expr, env *Environment) (interface{}, error) {

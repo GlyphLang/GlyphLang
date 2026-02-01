@@ -1069,6 +1069,7 @@ func hasOperand(opcode byte) bool {
 		byte(vm.OpCall):        true,
 		byte(vm.OpBuildObject): true,
 		byte(vm.OpBuildArray):  true,
+		byte(vm.OpAsync):       true,
 	}
 	return withOperand[opcode]
 }

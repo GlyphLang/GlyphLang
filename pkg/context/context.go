@@ -169,7 +169,14 @@ func (g *Generator) findGlyphFiles() ([]string, error) {
 		}
 		// Include .glyph files
 		if strings.HasSuffix(path, ".glyph") {
-			relPath, _ := filepath.Rel(g.rootDir, path)
+			relPath, err := filepath.Rel(g.rootDir, path)
+			if err != nil {
+				return fmt.Errorf("failed to compute relative path for %s: %w", path, err)
+			}
+			// Reject paths that escape the root directory
+			if strings.HasPrefix(relPath, "..") {
+				return nil
+			}
 			files = append(files, relPath)
 		}
 		return nil
@@ -544,10 +551,16 @@ func (ctx *ProjectContext) ToCompact() string {
 	sb.WriteString("# Glyph Project Context\n")
 	sb.WriteString(fmt.Sprintf("# Hash: %s\n\n", ctx.ProjectHash[:12]))
 
-	// Types section
+	// Types section (sorted for deterministic output)
 	if len(ctx.Types) > 0 {
 		sb.WriteString("## Types\n")
-		for name, t := range ctx.Types {
+		typeNames := make([]string, 0, len(ctx.Types))
+		for name := range ctx.Types {
+			typeNames = append(typeNames, name)
+		}
+		sort.Strings(typeNames)
+		for _, name := range typeNames {
+			t := ctx.Types[name]
 			if len(t.TypeParams) > 0 {
 				sb.WriteString(fmt.Sprintf(": %s<%s> { %s }\n", name, strings.Join(t.TypeParams, ", "), strings.Join(t.Fields, ", ")))
 			} else {
@@ -573,10 +586,16 @@ func (ctx *ProjectContext) ToCompact() string {
 		sb.WriteString("\n")
 	}
 
-	// Functions section
+	// Functions section (sorted for deterministic output)
 	if len(ctx.Functions) > 0 {
 		sb.WriteString("## Functions\n")
-		for name, f := range ctx.Functions {
+		funcNames := make([]string, 0, len(ctx.Functions))
+		for name := range ctx.Functions {
+			funcNames = append(funcNames, name)
+		}
+		sort.Strings(funcNames)
+		for _, name := range funcNames {
+			f := ctx.Functions[name]
 			if len(f.TypeParams) > 0 {
 				sb.WriteString(fmt.Sprintf("fn %s<%s>(%s) -> %s\n", name, strings.Join(f.TypeParams, ", "), strings.Join(f.Params, ", "), f.Returns))
 			} else {
@@ -586,10 +605,16 @@ func (ctx *ProjectContext) ToCompact() string {
 		sb.WriteString("\n")
 	}
 
-	// Commands section
+	// Commands section (sorted for deterministic output)
 	if len(ctx.Commands) > 0 {
 		sb.WriteString("## Commands\n")
-		for name, c := range ctx.Commands {
+		cmdNames := make([]string, 0, len(ctx.Commands))
+		for name := range ctx.Commands {
+			cmdNames = append(cmdNames, name)
+		}
+		sort.Strings(cmdNames)
+		for _, name := range cmdNames {
+			c := ctx.Commands[name]
 			sb.WriteString(fmt.Sprintf("@ command %s %s\n", name, strings.Join(c.Params, " ")))
 		}
 		sb.WriteString("\n")
@@ -1231,10 +1256,16 @@ func (tc *TargetedContext) ToCompact() string {
 		sb.WriteString("\n")
 	}
 
-	// Types
+	// Types (sorted for deterministic output)
 	if len(tc.Types) > 0 {
 		sb.WriteString("## Types\n")
-		for name, t := range tc.Types {
+		tcTypeNames := make([]string, 0, len(tc.Types))
+		for name := range tc.Types {
+			tcTypeNames = append(tcTypeNames, name)
+		}
+		sort.Strings(tcTypeNames)
+		for _, name := range tcTypeNames {
+			t := tc.Types[name]
 			if len(t.TypeParams) > 0 {
 				sb.WriteString(fmt.Sprintf(": %s<%s> { %s }\n", name, strings.Join(t.TypeParams, ", "), strings.Join(t.Fields, ", ")))
 			} else {
@@ -1260,10 +1291,16 @@ func (tc *TargetedContext) ToCompact() string {
 		sb.WriteString("\n")
 	}
 
-	// Functions
+	// Functions (sorted for deterministic output)
 	if len(tc.Functions) > 0 {
 		sb.WriteString("## Functions\n")
-		for name, f := range tc.Functions {
+		tcFuncNames := make([]string, 0, len(tc.Functions))
+		for name := range tc.Functions {
+			tcFuncNames = append(tcFuncNames, name)
+		}
+		sort.Strings(tcFuncNames)
+		for _, name := range tcFuncNames {
+			f := tc.Functions[name]
 			if len(f.TypeParams) > 0 {
 				sb.WriteString(fmt.Sprintf("! %s<%s>(%s): %s\n", name, strings.Join(f.TypeParams, ", "), strings.Join(f.Params, ", "), f.Returns))
 			} else {
