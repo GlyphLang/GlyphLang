@@ -5,9 +5,9 @@ package email
 import (
 	"bytes"
 	"fmt"
+	"html/template"
 	"strings"
 	"sync"
-	"text/template"
 )
 
 // Provider defines the interface that all email providers must implement.

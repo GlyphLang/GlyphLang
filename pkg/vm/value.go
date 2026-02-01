@@ -1,6 +1,10 @@
 package vm
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+	"time"
+)
 
 // Value represents a runtime value
 type Value interface {
@@ -100,10 +104,19 @@ func (v *FutureValue) MarshalJSON() ([]byte, error) {
 	}
 }
 
-// Await blocks until the future is resolved and returns the result
+// DefaultAsyncTimeout is the maximum time to wait for an async future.
+const DefaultAsyncTimeout = 30 * time.Second
+
+// Await blocks until the future is resolved and returns the result.
+// Times out after DefaultAsyncTimeout to prevent goroutine leaks.
 func (v *FutureValue) Await() (Value, error) {
 	if v.Done != nil {
-		<-v.Done
+		select {
+		case <-v.Done:
+			// Resolved normally
+		case <-time.After(DefaultAsyncTimeout):
+			return nil, fmt.Errorf("async operation timed out after %v", DefaultAsyncTimeout)
+		}
 	}
 	if v.Error != nil {
 		return nil, v.Error

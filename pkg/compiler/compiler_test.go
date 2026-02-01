@@ -56,7 +56,10 @@ func TestCompileLiteral(t *testing.T) {
 			}
 
 			// Execute and verify
-			bytecode := c.buildBytecode()
+			bytecode, err := c.buildBytecode()
+			if err != nil {
+				t.Fatalf("buildBytecode() error: %v", err)
+			}
 			vmInstance := vm.NewVM()
 			result, err := vmInstance.Execute(bytecode)
 			if err != nil {
@@ -161,7 +164,10 @@ func TestCompileBinaryOp(t *testing.T) {
 			c.emit(vm.OpHalt)
 
 			// Execute and verify
-			bytecode := c.buildBytecode()
+			bytecode, err := c.buildBytecode()
+			if err != nil {
+				t.Fatalf("buildBytecode() error: %v", err)
+			}
 			vmInstance := vm.NewVM()
 			result, err := vmInstance.Execute(bytecode)
 			if err != nil {
@@ -3168,7 +3174,10 @@ func TestCompileUnaryOp(t *testing.T) {
 				t.Fatalf("compileExpression() error: %v", err)
 			}
 
-			bytecode := c.buildBytecode()
+			bytecode, err := c.buildBytecode()
+			if err != nil {
+				t.Fatalf("buildBytecode() error: %v", err)
+			}
 			vmInstance := vm.NewVM()
 			result, err := vmInstance.Execute(bytecode)
 			if err != nil {

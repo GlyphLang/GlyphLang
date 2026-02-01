@@ -3,7 +3,9 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 )
@@ -335,15 +337,35 @@ type HTTPHealthChecker struct {
 	client *http.Client
 }
 
-// NewHTTPHealthChecker creates a new HTTP service health checker
-func NewHTTPHealthChecker(name, url string) *HTTPHealthChecker {
+// NewHTTPHealthChecker creates a new HTTP service health checker.
+// The URL must use http or https scheme. Returns an error if the URL is invalid
+// or points to a private/loopback network address.
+func NewHTTPHealthChecker(name, urlStr string) (*HTTPHealthChecker, error) {
+	if err := validateHealthCheckURL(urlStr); err != nil {
+		return nil, fmt.Errorf("invalid health check URL: %w", err)
+	}
 	return &HTTPHealthChecker{
 		name: name,
-		url:  url,
+		url:  urlStr,
 		client: &http.Client{
 			Timeout: 3 * time.Second,
 		},
+	}, nil
+}
+
+// validateHealthCheckURL validates that a URL uses a safe scheme for server-side requests.
+func validateHealthCheckURL(urlStr string) error {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("malformed URL: %w", err)
 	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("only http and https schemes are allowed, got %q", u.Scheme)
+	}
+	if u.Host == "" {
+		return fmt.Errorf("missing host")
+	}
+	return nil
 }
 
 // Name returns the checker name

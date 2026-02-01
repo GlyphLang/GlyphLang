@@ -3,6 +3,7 @@ package oauth2
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 )
 
@@ -28,8 +29,9 @@ func GeneratePKCE() (*PKCEParams, error) {
 }
 
 // VerifyPKCE verifies a PKCE code verifier against a code challenge
+// using constant-time comparison to prevent timing side-channel attacks
 func VerifyPKCE(codeVerifier, codeChallenge string) bool {
 	hash := sha256.Sum256([]byte(codeVerifier))
 	expected := base64.RawURLEncoding.EncodeToString(hash[:])
-	return expected == codeChallenge
+	return subtle.ConstantTimeCompare([]byte(expected), []byte(codeChallenge)) == 1
 }

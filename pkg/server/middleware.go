@@ -9,6 +9,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -355,20 +356,28 @@ func recordAuthFailure(clientIP string, trackers map[string]*authFailureTracker,
 	}
 }
 
-// TrustedProxies holds the set of trusted proxy IPs.
-// Only requests from these IPs will have X-Forwarded-For/X-Real-IP headers honored.
-// If empty and trustProxy is true, all proxy headers are trusted.
-var TrustedProxies = map[string]bool{}
+// trustedProxies holds the set of trusted proxy IPs using atomic.Value for
+// concurrent read/write safety. The stored value is always map[string]bool.
+var trustedProxies atomic.Value
+
+func init() {
+	trustedProxies.Store(map[string]bool{})
+}
+
+func loadTrustedProxies() map[string]bool {
+	return trustedProxies.Load().(map[string]bool)
+}
 
 // SetTrustedProxies configures the set of trusted proxy IP addresses.
 // Only requests from these addresses will have their X-Forwarded-For
 // and X-Real-IP headers honored for client IP extraction.
+// This function is safe for concurrent use.
 func SetTrustedProxies(proxies []string) {
 	m := make(map[string]bool, len(proxies))
 	for _, p := range proxies {
 		m[p] = true
 	}
-	TrustedProxies = m
+	trustedProxies.Store(m)
 }
 
 // getClientIP extracts the client IP address from an HTTP request.
@@ -380,13 +389,14 @@ func SetTrustedProxies(proxies []string) {
 func getClientIP(r *http.Request, trustProxy bool) string {
 	if trustProxy {
 		// If TrustedProxies is configured, only honor proxy headers from trusted IPs
-		if len(TrustedProxies) > 0 {
+		tp := loadTrustedProxies()
+		if len(tp) > 0 {
 			remoteIP := r.RemoteAddr
 			// Strip port from RemoteAddr if present
 			if idx := strings.LastIndex(remoteIP, ":"); idx != -1 {
 				remoteIP = remoteIP[:idx]
 			}
-			if !TrustedProxies[remoteIP] {
+			if !tp[remoteIP] {
 				return r.RemoteAddr
 			}
 		}

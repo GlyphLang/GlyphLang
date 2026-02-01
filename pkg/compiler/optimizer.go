@@ -416,28 +416,28 @@ func (o *Optimizer) foldBinaryOp(expr *ast.BinaryOpExpr) ast.Expr {
 	right := o.OptimizeExpression(expr.Right)
 
 	// Arithmetic identities: x op x = constant (for OptAggressive)
+	// NOTE: These optimizations are only safe for integer types.
+	// For floats, NaN != NaN (IEEE 754), and x/0 must produce an error.
+	// We only apply these when both sides are provably integer-typed literals.
 	if o.level >= OptAggressive {
-		if areExprsEqual(left, right) {
+		if areExprsEqual(left, right) && isProvablyIntegerExpr(left) {
 			switch expr.Op {
 			case ast.Sub:
-				// x - x = 0
+				// x - x = 0 (safe for integers)
 				return &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}}
-			case ast.Div:
-				// x / x = 1 (assuming x != 0, which we can't verify at compile time)
-				// Only optimize if safe
-				return &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}}
 			case ast.Eq:
-				// x == x = true
+				// x == x = true (safe for integers, not for NaN floats)
 				return &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}}
 			case ast.Ne:
-				// x != x = false
+				// x != x = false (safe for integers, not for NaN floats)
 				return &ast.LiteralExpr{Value: ast.BoolLiteral{Value: false}}
 			case ast.Le, ast.Ge:
-				// x <= x = true, x >= x = true
+				// x <= x = true, x >= x = true (safe for integers)
 				return &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}}
 			case ast.Lt, ast.Gt:
-				// x < x = false, x > x = false
+				// x < x = false, x > x = false (safe for integers)
 				return &ast.LiteralExpr{Value: ast.BoolLiteral{Value: false}}
+				// NOTE: x / x = 1 is NOT safe -- x could be 0 at runtime
 			}
 		}
 	}
@@ -464,6 +464,18 @@ func (o *Optimizer) foldBinaryOp(expr *ast.BinaryOpExpr) ast.Expr {
 		Left:  left,
 		Right: right,
 	}
+}
+
+// isProvablyIntegerExpr returns true if the expression is provably integer-typed
+// (e.g., an integer literal). This is used to guard identity optimizations that
+// are unsafe for floats (NaN) or zero-valued expressions.
+func isProvablyIntegerExpr(e ast.Expr) bool {
+	if lit, ok := e.(*ast.LiteralExpr); ok {
+		if _, isInt := lit.Value.(ast.IntLiteral); isInt {
+			return true
+		}
+	}
+	return false
 }
 
 // areExprsEqual checks if two expressions are structurally equal
@@ -800,7 +812,6 @@ func getModifiedVariablesInStmt(stmt ast.Statement, modified map[string]bool) {
 	case ast.ReassignStatement:
 		modified[s.Target] = true
 	case *ast.IfStatement:
-		getModifiedVariablesInStmt(&ast.AssignStatement{}, modified)
 		for _, thenStmt := range s.ThenBlock {
 			getModifiedVariablesInStmt(thenStmt, modified)
 		}

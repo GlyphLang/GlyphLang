@@ -102,8 +102,12 @@ func (m *hotReloadManager) startDevServerInternal() (*http.Server, error) {
 	}
 
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", m.port),
-		Handler: loggingMiddleware(mux),
+		Addr:           fmt.Sprintf(":%d", m.port),
+		Handler:        loggingMiddleware(mux),
+		ReadTimeout:    15 * time.Second,
+		WriteTimeout:   15 * time.Second,
+		IdleTimeout:    60 * time.Second,
+		MaxHeaderBytes: 1 << 20, // 1 MB
 	}
 
 	// Start server in background

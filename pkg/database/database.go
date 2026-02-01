@@ -63,7 +63,7 @@ func ParseConnectionString(connStr string) (*Config, error) {
 		Driver:          u.Scheme,
 		Host:            u.Hostname(),
 		Database:        u.Path[1:], // Remove leading slash
-		SSLMode:         "disable",
+		SSLMode:         "prefer",
 		MaxOpenConns:    25,
 		MaxIdleConns:    5,
 		ConnMaxLifetime: 5 * time.Minute,

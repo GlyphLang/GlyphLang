@@ -99,7 +99,7 @@ func (c *Compiler) Compile(module *ast.Module) ([]byte, error) {
 		// Types are compile-time only, so just return a halt instruction
 		c.Reset()
 		c.emit(vm.OpHalt)
-		return c.buildBytecode(), nil
+		return c.buildBytecode()
 	}
 
 	// Empty module
@@ -167,7 +167,7 @@ func (c *Compiler) CompileRoute(route *ast.Route) ([]byte, error) {
 	}
 
 	// Build final bytecode
-	return c.buildBytecode(), nil
+	return c.buildBytecode()
 }
 
 // CompileCommand compiles a CLI command to bytecode
@@ -195,7 +195,7 @@ func (c *Compiler) CompileCommand(cmd *ast.Command) ([]byte, error) {
 		c.emit(vm.OpHalt)
 	}
 
-	return c.buildBytecode(), nil
+	return c.buildBytecode()
 }
 
 // CompileCronTask compiles a cron task to bytecode
@@ -223,7 +223,7 @@ func (c *Compiler) CompileCronTask(task *ast.CronTask) ([]byte, error) {
 		c.emit(vm.OpHalt)
 	}
 
-	return c.buildBytecode(), nil
+	return c.buildBytecode()
 }
 
 // CompileEventHandler compiles an event handler to bytecode
@@ -257,7 +257,7 @@ func (c *Compiler) CompileEventHandler(handler *ast.EventHandler) ([]byte, error
 		c.emit(vm.OpHalt)
 	}
 
-	return c.buildBytecode(), nil
+	return c.buildBytecode()
 }
 
 // CompileQueueWorker compiles a queue worker to bytecode
@@ -291,7 +291,7 @@ func (c *Compiler) CompileQueueWorker(worker *ast.QueueWorker) ([]byte, error) {
 		c.emit(vm.OpHalt)
 	}
 
-	return c.buildBytecode(), nil
+	return c.buildBytecode()
 }
 
 // normalizeStatement converts pointer-typed statements to their value form.
@@ -982,8 +982,9 @@ func (c *Compiler) patchJump(offset int, target uint32) {
 	binary.LittleEndian.PutUint32(c.code[offset+1:offset+5], target)
 }
 
-// buildBytecode constructs the final bytecode with header
-func (c *Compiler) buildBytecode() []byte {
+// buildBytecode constructs the final bytecode with header.
+// Returns an error if any constant cannot be serialized.
+func (c *Compiler) buildBytecode() ([]byte, error) {
 	bytecode := []byte{0x47, 0x4C, 0x59, 0x50} // Magic "GLYP"
 
 	// Version (little-endian u32)
@@ -998,7 +999,11 @@ func (c *Compiler) buildBytecode() []byte {
 
 	// Serialize constants
 	for _, constant := range c.constants {
-		bytecode = append(bytecode, serializeConstant(constant)...)
+		serialized, err := serializeConstant(constant)
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize constant: %w", err)
+		}
+		bytecode = append(bytecode, serialized...)
 	}
 
 	// Instruction count
@@ -1017,7 +1022,7 @@ func (c *Compiler) buildBytecode() []byte {
 	// Instructions
 	bytecode = append(bytecode, c.code...)
 
-	return bytecode
+	return bytecode, nil
 }
 
 // adjustJumpTargets adjusts all jump instruction operands by adding the header offset
@@ -1064,39 +1069,40 @@ func hasOperand(opcode byte) bool {
 		byte(vm.OpCall):        true,
 		byte(vm.OpBuildObject): true,
 		byte(vm.OpBuildArray):  true,
+		byte(vm.OpAsync):       true,
 	}
 	return withOperand[opcode]
 }
 
-// serializeConstant serializes a constant value
-func serializeConstant(c vm.Value) []byte {
+// serializeConstant serializes a constant value into bytecode format.
+func serializeConstant(c vm.Value) ([]byte, error) {
 	switch v := c.(type) {
 	case vm.NullValue:
-		return []byte{0x00}
+		return []byte{0x00}, nil
 	case vm.IntValue:
 		buf := make([]byte, 9)
 		buf[0] = 0x01
 		binary.LittleEndian.PutUint64(buf[1:], uint64(v.Val))
-		return buf
+		return buf, nil
 	case vm.FloatValue:
 		buf := make([]byte, 9)
 		buf[0] = 0x02
 		binary.LittleEndian.PutUint64(buf[1:], math.Float64bits(v.Val))
-		return buf
+		return buf, nil
 	case vm.BoolValue:
 		if v.Val {
-			return []byte{0x03, 0x01}
+			return []byte{0x03, 0x01}, nil
 		}
-		return []byte{0x03, 0x00}
+		return []byte{0x03, 0x00}, nil
 	case vm.StringValue:
 		buf := []byte{0x04}
 		length := make([]byte, 4)
 		binary.LittleEndian.PutUint32(length, uint32(len(v.Val)))
 		buf = append(buf, length...)
 		buf = append(buf, []byte(v.Val)...)
-		return buf
+		return buf, nil
 	default:
-		return nil
+		return nil, fmt.Errorf("unsupported constant type: %T", c)
 	}
 }
 

@@ -5,6 +5,8 @@ import (
 	"github.com/glyphlang/glyph/pkg/ast"
 )
 
+const maxMacroExpansionDepth = 100
+
 // MacroExpander handles compile-time macro expansion
 type MacroExpander struct {
 	macros map[string]*ast.MacroDef
@@ -74,6 +76,16 @@ func (e *MacroExpander) ExpandModule(module *ast.Module) (*ast.Module, error) {
 
 // ExpandMacroInvocation expands a single macro invocation
 func (e *MacroExpander) ExpandMacroInvocation(inv *ast.MacroInvocation) ([]ast.Node, error) {
+	return e.expandMacroWithDepth(inv, 0)
+}
+
+// expandMacroWithDepth is the depth-tracked implementation of macro expansion.
+// It guards against infinite recursion from self-referential or mutually-recursive macros.
+func (e *MacroExpander) expandMacroWithDepth(inv *ast.MacroInvocation, depth int) ([]ast.Node, error) {
+	if depth >= maxMacroExpansionDepth {
+		return nil, fmt.Errorf("macro expansion depth limit exceeded (%d) while expanding %q", maxMacroExpansionDepth, inv.Name)
+	}
+
 	macro, ok := e.macros[inv.Name]
 	if !ok {
 		return nil, fmt.Errorf("undefined macro: %s", inv.Name)
@@ -99,7 +111,7 @@ func (e *MacroExpander) ExpandMacroInvocation(inv *ast.MacroInvocation) ([]ast.N
 		}
 		// Recursively expand any nested macro invocations
 		if expandedInv, ok := expanded.(*ast.MacroInvocation); ok {
-			nested, err := e.ExpandMacroInvocation(expandedInv)
+			nested, err := e.expandMacroWithDepth(expandedInv, depth+1)
 			if err != nil {
 				return nil, err
 			}

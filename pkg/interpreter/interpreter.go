@@ -5,8 +5,12 @@ import (
 
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 )
+
+// maxEvalDepth is the maximum recursion depth for expression evaluation.
+const maxEvalDepth = 500
 
 // Interpreter is the main interpreter struct
 type Interpreter struct {
@@ -16,6 +20,7 @@ type Interpreter struct {
 	commands         map[string]Command
 	cronTasks        []CronTask
 	eventHandlers    map[string][]EventHandler
+	eventMu          sync.RWMutex
 	queueWorkers     map[string]QueueWorker
 	grpcServices     map[string]GRPCService     // key: service name
 	grpcHandlers     map[string]GRPCHandler     // key: method name
@@ -31,6 +36,7 @@ type Interpreter struct {
 	constants        map[string]struct{}      // Tracks names that are constants (immutable)
 	contracts        map[string]ContractDef   // Contract definitions by name
 	traitDefs        map[string]TraitDef      // Trait definitions by name
+	evalDepth        int                      // Current recursion depth for evaluation
 }
 
 // NewInterpreter creates a new interpreter instance
@@ -136,7 +142,9 @@ func (i *Interpreter) LoadModuleWithPath(module Module, basePath string) error {
 			i.cronTasks = append(i.cronTasks, *it)
 
 		case *EventHandler:
+			i.eventMu.Lock()
 			i.eventHandlers[it.EventType] = append(i.eventHandlers[it.EventType], *it)
+			i.eventMu.Unlock()
 
 		case *QueueWorker:
 			i.queueWorkers[it.QueueName] = *it
@@ -751,7 +759,11 @@ func (i *Interpreter) ExecuteEventHandler(handler *EventHandler, eventData inter
 
 // EmitEvent triggers all handlers for a given event type
 func (i *Interpreter) EmitEvent(eventType string, eventData interface{}) error {
-	handlers := i.eventHandlers[eventType]
+	i.eventMu.RLock()
+	handlers := make([]EventHandler, len(i.eventHandlers[eventType]))
+	copy(handlers, i.eventHandlers[eventType])
+	i.eventMu.RUnlock()
+
 	for _, handler := range handlers {
 		if handler.Async {
 			// In a real implementation, this would be executed asynchronously

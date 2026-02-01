@@ -2337,29 +2337,31 @@ func TestFoldBinaryOp_UnsupportedBoolOp(t *testing.T) {
 func TestFoldBinaryOp_AggressiveIdentities(t *testing.T) {
 	opt := NewOptimizer(OptAggressive)
 
-	xVar := &ast.VariableExpr{Name: "x"}
+	// Use integer literals to test identity folding (safe for integers).
+	// Variable expressions are NOT folded because their type is unknown at
+	// compile time (could be float NaN, or zero for division).
+	intLit := &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}}
 
 	tests := []struct {
 		name     string
 		op       ast.BinOp
 		expected interface{} // bool or int64
 	}{
-		{"x - x = 0", ast.Sub, int64(0)},
-		{"x / x = 1", ast.Div, int64(1)},
-		{"x == x = true", ast.Eq, true},
-		{"x != x = false", ast.Ne, false},
-		{"x <= x = true", ast.Le, true},
-		{"x >= x = true", ast.Ge, true},
-		{"x < x = false", ast.Lt, false},
-		{"x > x = false", ast.Gt, false},
+		{"int - int = 0", ast.Sub, int64(0)},
+		{"int == int = true", ast.Eq, true},
+		{"int != int = false", ast.Ne, false},
+		{"int <= int = true", ast.Le, true},
+		{"int >= int = true", ast.Ge, true},
+		{"int < int = false", ast.Lt, false},
+		{"int > int = false", ast.Gt, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			expr := &ast.BinaryOpExpr{
 				Op:    tt.op,
-				Left:  xVar,
-				Right: xVar,
+				Left:  intLit,
+				Right: intLit,
 			}
 			result := opt.OptimizeExpression(expr)
 			litExpr, ok := result.(*ast.LiteralExpr)
@@ -2374,13 +2376,24 @@ func TestFoldBinaryOp_AggressiveIdentities(t *testing.T) {
 					t.Errorf("Expected %v, got %v", expected, litExpr.Value)
 				}
 			case int64:
-				intLit, ok := litExpr.Value.(ast.IntLiteral)
-				if !ok || intLit.Value != expected {
+				intResult, ok := litExpr.Value.(ast.IntLiteral)
+				if !ok || intResult.Value != expected {
 					t.Errorf("Expected %v, got %v", expected, litExpr.Value)
 				}
 			}
 		})
 	}
+
+	// Verify that variable identity folding is NOT applied (unsafe for
+	// unknown types: float NaN, division by zero, etc.)
+	t.Run("variable x/x is NOT folded", func(t *testing.T) {
+		xVar := &ast.VariableExpr{Name: "x"}
+		expr := &ast.BinaryOpExpr{Op: ast.Div, Left: xVar, Right: xVar}
+		result := opt.OptimizeExpression(expr)
+		if _, ok := result.(*ast.BinaryOpExpr); !ok {
+			t.Fatalf("Expected BinaryOpExpr (not folded), got %T", result)
+		}
+	})
 }
 
 func TestAlgebraicSimplify_BooleanOps(t *testing.T) {

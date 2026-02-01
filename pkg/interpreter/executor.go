@@ -4,6 +4,7 @@ import (
 	. "github.com/glyphlang/glyph/pkg/ast"
 
 	"fmt"
+	"strings"
 )
 
 // returnValue is a special error type to handle return statements
@@ -104,6 +105,11 @@ func (i *Interpreter) executeStatements(stmts []Statement, env *Environment) (in
 
 // executeAssign executes a variable assignment
 func (i *Interpreter) executeAssign(stmt AssignStatement, env *Environment) (interface{}, error) {
+	// Handle dot-notation field assignment (e.g., obj.field = value)
+	if parts := strings.SplitN(stmt.Target, ".", 2); len(parts) == 2 {
+		return i.executeFieldAssign(parts[0], parts[1], stmt.Value, env)
+	}
+
 	// Check for redeclaration in current scope (issue #70)
 	// Variables declared with $ cannot be redeclared in the same scope
 	if env.HasLocal(stmt.Target) {
@@ -125,8 +131,49 @@ func (i *Interpreter) executeAssign(stmt AssignStatement, env *Environment) (int
 	return value, nil
 }
 
+// executeFieldAssign handles dot-notation field assignment like obj.field = value
+func (i *Interpreter) executeFieldAssign(objName, fieldPath string, valueExpr Expr, env *Environment) (interface{}, error) {
+	objVal, err := env.Get(objName)
+	if err != nil {
+		return nil, fmt.Errorf("cannot assign to field of undeclared variable '%s'", objName)
+	}
+
+	obj, ok := objVal.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("cannot assign to field of non-object variable '%s' (type %T)", objName, objVal)
+	}
+
+	value, err := i.EvaluateExpression(valueExpr, env)
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle nested field access (e.g., obj.a.b)
+	parts := strings.Split(fieldPath, ".")
+	current := obj
+	for _, part := range parts[:len(parts)-1] {
+		next, exists := current[part]
+		if !exists {
+			return nil, fmt.Errorf("field '%s' does not exist on object", part)
+		}
+		nextObj, ok := next.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("cannot access field on non-object value at '%s'", part)
+		}
+		current = nextObj
+	}
+
+	current[parts[len(parts)-1]] = value
+	return value, nil
+}
+
 // executeReassign executes a variable reassignment (without $ prefix)
 func (i *Interpreter) executeReassign(stmt ReassignStatement, env *Environment) (interface{}, error) {
+	// Handle dot-notation field reassignment (e.g., obj.field = value)
+	if parts := strings.SplitN(stmt.Target, ".", 2); len(parts) == 2 {
+		return i.executeFieldAssign(parts[0], parts[1], stmt.Value, env)
+	}
+
 	// Check that the variable exists (must be previously declared)
 	if !env.Has(stmt.Target) {
 		return nil, fmt.Errorf("cannot assign to undeclared variable '%s'", stmt.Target)
@@ -207,12 +254,19 @@ func (i *Interpreter) executeIf(stmt IfStatement, env *Environment) (interface{}
 	return nil, nil
 }
 
+// maxWhileIterations is the safety limit for while loops to prevent infinite loops.
+const maxWhileIterations = 1_000_000
+
 // executeWhile executes a while loop
 func (i *Interpreter) executeWhile(stmt WhileStatement, env *Environment) (interface{}, error) {
 	var result interface{}
 
 	// Execute the loop until the condition is false
-	for {
+	for iterations := 0; ; iterations++ {
+		if iterations >= maxWhileIterations {
+			return nil, fmt.Errorf("while loop exceeded maximum iterations (%d)", maxWhileIterations)
+		}
+
 		// Evaluate condition in parent environment (can access loop variables from previous iterations)
 		condition, err := i.EvaluateExpression(stmt.Condition, env)
 		if err != nil {
@@ -289,13 +343,11 @@ func (i *Interpreter) executeFor(stmt ForStatement, env *Environment) (interface
 			// Define the loop variables for this iteration
 			if stmt.KeyVar != "" {
 				loopEnv.Define(stmt.KeyVar, key)
+				loopEnv.Define(stmt.ValueVar, value)
 			} else {
-				// If no key variable, use the value variable for the key
-				// This allows "for key in object" syntax
-				loopEnv.Define(stmt.ValueVar, key)
-				continue
+				// If no key variable, iterate over values
+				loopEnv.Define(stmt.ValueVar, value)
 			}
-			loopEnv.Define(stmt.ValueVar, value)
 
 			// Execute loop body
 			result, err = i.executeStatements(stmt.Body, loopEnv)

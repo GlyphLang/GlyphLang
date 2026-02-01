@@ -287,11 +287,18 @@ func (p *Profiler) GetCallGraph() map[string]*CallGraphNode {
 	return graph
 }
 
-// AnalyzeTypeStability analyzes if a variable has stable types (monomorphic)
+// AnalyzeTypeStability analyzes if a variable has stable types (monomorphic).
+// This method acquires its own read lock and is safe for standalone use.
 func (p *Profiler) AnalyzeTypeStability(routeName, variableName string) (isStable bool, dominantType string) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
+	return p.analyzeTypeStabilityUnlocked(routeName, variableName)
+}
+
+// analyzeTypeStabilityUnlocked performs the type stability analysis without
+// acquiring the lock. Callers must hold p.mutex (read or write) before calling.
+func (p *Profiler) analyzeTypeStabilityUnlocked(routeName, variableName string) (isStable bool, dominantType string) {
 	profile, exists := p.profiles[routeName]
 	if !exists {
 		return false, ""
@@ -320,7 +327,9 @@ func (p *Profiler) AnalyzeTypeStability(routeName, variableName string) (isStabl
 	return stability > 0.95, maxType
 }
 
-// GetMonomorphicVariables returns variables that have stable types
+// GetMonomorphicVariables returns variables that have stable types.
+// Uses the unlocked helper to avoid nested RLock calls which can deadlock
+// when a writer is waiting between the two RLock acquisitions.
 func (p *Profiler) GetMonomorphicVariables(routeName string) map[string]string {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
@@ -333,7 +342,7 @@ func (p *Profiler) GetMonomorphicVariables(routeName string) map[string]string {
 	}
 
 	for varName := range profile.TypeProfile.VariableTypes {
-		if isStable, dominantType := p.AnalyzeTypeStability(routeName, varName); isStable {
+		if isStable, dominantType := p.analyzeTypeStabilityUnlocked(routeName, varName); isStable {
 			result[varName] = dominantType
 		}
 	}

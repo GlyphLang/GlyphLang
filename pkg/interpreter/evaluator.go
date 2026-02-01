@@ -21,6 +21,12 @@ func capitalizeFirst(s string) string {
 
 // EvaluateExpression evaluates an expression and returns its value
 func (i *Interpreter) EvaluateExpression(expr Expr, env *Environment) (interface{}, error) {
+	i.evalDepth++
+	if i.evalDepth > maxEvalDepth {
+		i.evalDepth--
+		return nil, fmt.Errorf("maximum evaluation depth exceeded (%d levels)", maxEvalDepth)
+	}
+	defer func() { i.evalDepth-- }()
 	switch e := expr.(type) {
 	case LiteralExpr:
 		return i.evaluateLiteral(e.Value)
@@ -187,6 +193,52 @@ func (i *Interpreter) evaluateLiteral(lit Literal) (interface{}, error) {
 
 // evaluateBinaryOp evaluates a binary operation
 func (i *Interpreter) evaluateBinaryOp(expr BinaryOpExpr, env *Environment) (interface{}, error) {
+	// Short-circuit evaluation for logical operators
+	if expr.Op == And {
+		left, err := i.EvaluateExpression(expr.Left, env)
+		if err != nil {
+			return nil, err
+		}
+		leftBool, ok := left.(bool)
+		if !ok {
+			return nil, fmt.Errorf("logical AND operator requires boolean operands, got %T", left)
+		}
+		if !leftBool {
+			return false, nil
+		}
+		right, err := i.EvaluateExpression(expr.Right, env)
+		if err != nil {
+			return nil, err
+		}
+		rightBool, ok := right.(bool)
+		if !ok {
+			return nil, fmt.Errorf("logical AND operator requires boolean operands, got %T", right)
+		}
+		return rightBool, nil
+	}
+	if expr.Op == Or {
+		left, err := i.EvaluateExpression(expr.Left, env)
+		if err != nil {
+			return nil, err
+		}
+		leftBool, ok := left.(bool)
+		if !ok {
+			return nil, fmt.Errorf("logical OR operator requires boolean operands, got %T", left)
+		}
+		if leftBool {
+			return true, nil
+		}
+		right, err := i.EvaluateExpression(expr.Right, env)
+		if err != nil {
+			return nil, err
+		}
+		rightBool, ok := right.(bool)
+		if !ok {
+			return nil, fmt.Errorf("logical OR operator requires boolean operands, got %T", right)
+		}
+		return rightBool, nil
+	}
+
 	left, err := i.EvaluateExpression(expr.Left, env)
 	if err != nil {
 		return nil, err
@@ -218,10 +270,6 @@ func (i *Interpreter) evaluateBinaryOp(expr BinaryOpExpr, env *Environment) (int
 		return i.evaluateGt(left, right)
 	case Ge:
 		return i.evaluateGe(left, right)
-	case And:
-		return i.evaluateAnd(left, right)
-	case Or:
-		return i.evaluateOr(left, right)
 	default:
 		return nil, fmt.Errorf("unsupported binary operator: %s", expr.Op)
 	}
