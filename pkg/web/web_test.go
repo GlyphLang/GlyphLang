@@ -462,10 +462,11 @@ func TestMockHTTPResponseWriter(t *testing.T) {
 // --- isSubPath ---
 
 func TestIsSubPath(t *testing.T) {
-	assert.True(t, isSubPath("/var/www", "/var/www"))
-	assert.True(t, isSubPath("/var/www", "/var/www/index.html"))
-	assert.True(t, isSubPath("/var/www", "/var/www/sub/file.txt"))
-	assert.False(t, isSubPath("/var/www", "/var/www-evil/file"))
-	assert.False(t, isSubPath("/var/www", "/etc/passwd"))
-	assert.False(t, isSubPath("/var/www", "/var/ww"))
+	root := filepath.Join(string(filepath.Separator), "var", "www")
+	assert.True(t, isSubPath(root, root))
+	assert.True(t, isSubPath(root, filepath.Join(root, "index.html")))
+	assert.True(t, isSubPath(root, filepath.Join(root, "sub", "file.txt")))
+	assert.False(t, isSubPath(root, filepath.Join(string(filepath.Separator), "var", "www-evil", "file")))
+	assert.False(t, isSubPath(root, filepath.Join(string(filepath.Separator), "etc", "passwd")))
+	assert.False(t, isSubPath(root, filepath.Join(string(filepath.Separator), "var", "ww")))
 }
