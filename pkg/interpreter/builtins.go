@@ -603,6 +603,7 @@ func builtinRandomInt(i *Interpreter, args []Expr, env *Environment) (interface{
 	if minVal > maxVal {
 		return nil, fmt.Errorf("randomInt() requires min <= max, got min=%d, max=%d", minVal, maxVal)
 	}
+	// #nosec G404 -- non-cryptographic PRNG intentional for general-purpose scripting use
 	return minVal + rand.Int63n(maxVal-minVal+1), nil
 }
 
