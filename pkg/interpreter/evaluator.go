@@ -167,7 +167,7 @@ func (i *Interpreter) evaluateArrayIndexExpr(expr ArrayIndexExpr, env *Environme
 		if val, exists := obj[keyStr]; exists {
 			return val, nil
 		}
-		return nil, fmt.Errorf("key '%s' not found in object", keyStr)
+		return nil, nil
 	}
 
 	return nil, fmt.Errorf("cannot index %T", arrayVal)
@@ -873,6 +873,16 @@ func (i *Interpreter) executeFunction(fn Function, args []Expr, env *Environment
 			return nil, fmt.Errorf("missing required argument %s in function %s", param.Name, fn.Name)
 		}
 
+		// Auto-coerce float64 to int64 when parameter expects int.
+		// JSON numbers always arrive as float64 from HTTP request bodies,
+		// so this coercion is necessary for web server routes to work
+		// with typed function parameters. Only whole numbers are coerced.
+		if fVal, ok := argVal.(float64); ok {
+			if _, isInt := param.TypeAnnotation.(IntType); isInt && fVal == float64(int64(fVal)) {
+				argVal = int64(fVal)
+			}
+		}
+
 		// Validate argument type matches parameter type annotation
 		// Optional parameters can be nil without type checking
 		skipTypeCheck := argVal == nil && !param.Required
@@ -962,6 +972,16 @@ func (i *Interpreter) executeGenericFunction(fn Function, typeArgs []Type, args 
 	// Bind arguments to parameters with type checking
 	for idx, param := range instantiatedFn.Params {
 		argVal := argValues[idx]
+
+		// Auto-coerce float64 to int64 when parameter expects int.
+		// JSON numbers always arrive as float64 from HTTP request bodies,
+		// so this coercion is necessary for web server routes to work
+		// with typed function parameters. Only whole numbers are coerced.
+		if fVal, ok := argVal.(float64); ok {
+			if _, isInt := param.TypeAnnotation.(IntType); isInt && fVal == float64(int64(fVal)) {
+				argVal = int64(fVal)
+			}
+		}
 
 		// Validate argument type matches the instantiated parameter type
 		if param.TypeAnnotation != nil {

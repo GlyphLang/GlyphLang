@@ -65,8 +65,13 @@ func setupRoutes(module *ast.Module, filePath string, forceInterpreter ...bool) 
 		}
 	}
 
-	// Create WebSocket server
-	wsServer = websocket.NewServer()
+	// Create WebSocket server with CORS-aware origin checking
+	var wsConfig *websocket.Config
+	if corsOrigin := os.Getenv("GLYPH_CORS_ORIGIN"); corsOrigin != "" {
+		wsConfig = websocket.DefaultConfig()
+		wsConfig.AllowedOrigins = []string{corsOrigin}
+	}
+	wsServer = websocket.NewServer(wsConfig)
 
 	// Create router and register routes
 	router = server.NewRouter()

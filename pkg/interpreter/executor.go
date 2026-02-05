@@ -86,6 +86,9 @@ func (i *Interpreter) ExecuteStatement(stmt Statement, env *Environment) (interf
 	case IndexAssignStatement:
 		return i.executeIndexAssign(s, env)
 
+	case ExpressionStatement:
+		return i.EvaluateExpression(s.Expr, env)
+
 	default:
 		return nil, fmt.Errorf("unsupported statement type: %T", stmt)
 	}

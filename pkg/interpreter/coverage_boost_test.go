@@ -761,12 +761,12 @@ func TestEvaluateArrayIndexExpr_MapMissingKey(t *testing.T) {
 	obj := map[string]interface{}{"name": "Alice"}
 	env.Define("obj", obj)
 
-	_, err := interp.EvaluateExpression(ArrayIndexExpr{
+	result, err := interp.EvaluateExpression(ArrayIndexExpr{
 		Array: VariableExpr{Name: "obj"},
 		Index: LiteralExpr{Value: StringLiteral{Value: "missing"}},
 	}, env)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "key 'missing' not found")
+	assert.NoError(t, err)
+	assert.Nil(t, result)
 }
 
 func TestEvaluateArrayIndexExpr_NonIndexable(t *testing.T) {

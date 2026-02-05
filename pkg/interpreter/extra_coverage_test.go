@@ -734,18 +734,20 @@ func TestGetMethodNamesWithMethods(t *testing.T) {
 	}
 }
 
-// TestUnsupportedStatementType tests ExecuteStatement with unsupported type
-func TestUnsupportedStatementType(t *testing.T) {
+// TestExpressionStatementExecution tests ExecuteStatement with ExpressionStatement
+func TestExpressionStatementExecution(t *testing.T) {
 	interp := NewInterpreter()
 	env := NewEnvironment()
 
-	// WsSendStatement is a statement but not in the switch
-	// Actually let's test with ExpressionStatement which should be unsupported
+	// ExpressionStatement should evaluate its expression and return the result
 	stmt := ExpressionStatement{Expr: LiteralExpr{Value: IntLiteral{Value: 42}}}
 
-	_, err := interp.ExecuteStatement(stmt, env)
-	if err == nil {
-		t.Error("unsupported statement type should fail")
+	result, err := interp.ExecuteStatement(stmt, env)
+	if err != nil {
+		t.Errorf("ExpressionStatement should succeed, got error: %v", err)
+	}
+	if result != int64(42) {
+		t.Errorf("expected 42, got %v", result)
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	. "github.com/glyphlang/glyph/pkg/ast"
 
 	"fmt"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -205,6 +206,12 @@ func (i *Interpreter) processImport(importStmt *ImportStatement, basePath string
 		return fmt.Errorf("failed to import '%s': %w", importStmt.Path, err)
 	}
 
+	// Load all module-internal functions and constants so that imported
+	// functions can call sibling functions from the same module.
+	if err := i.loadModuleInternals(loadedModule); err != nil {
+		return err
+	}
+
 	if importStmt.Selective {
 		// Selective import: from "path" import { name1, name2 }
 		for _, name := range importStmt.Names {
@@ -228,6 +235,12 @@ func (i *Interpreter) processImport(importStmt *ImportStatement, basePath string
 				i.typeDefs[importName] = *exp
 			case *Command:
 				i.commands[importName] = *exp
+			case *ConstDecl:
+				value, err := i.EvaluateExpression(exp.Value, i.globalEnv)
+				if err != nil {
+					return fmt.Errorf("error evaluating constant %s: %v", exp.Name, err)
+				}
+				i.globalEnv.Define(importName, value)
 			default:
 				i.globalEnv.Define(importName, exp)
 			}
@@ -254,6 +267,55 @@ func (i *Interpreter) processImport(importStmt *ImportStatement, basePath string
 		i.globalEnv.Define(namespace, moduleObj)
 	}
 
+	return nil
+}
+
+// loadModuleInternals registers all functions and constants from a loaded
+// module into the interpreter so that imported functions can resolve calls
+// to sibling functions from the same module. This is called during module
+// import processing (single-threaded initialization). Functions/constants
+// are only registered if they don't already exist to avoid overwriting
+// explicit imports or previously loaded definitions. The module's own
+// import statements are also processed to load transitive dependencies.
+// Circular imports are safe because processImport checks the module cache.
+func (i *Interpreter) loadModuleInternals(mod *LoadedModule) error {
+	if mod == nil || mod.Exports == nil {
+		return nil
+	}
+
+	// Process the module's own imports to resolve transitive dependencies.
+	if mod.Module != nil {
+		basePath := filepath.Dir(mod.Path)
+		for _, item := range mod.Module.Items {
+			if importStmt, ok := item.(*ImportStatement); ok {
+				if err := i.processImport(importStmt, basePath); err != nil {
+					return fmt.Errorf("transitive import error in %s: %w", mod.Path, err)
+				}
+			}
+		}
+	}
+
+	for name, exported := range mod.Exports {
+		if exported == nil {
+			continue
+		}
+		switch exp := exported.(type) {
+		case *Function:
+			if _, exists := i.functions[name]; !exists {
+				i.functions[name] = *exp
+				i.globalEnv.Define(name, *exp)
+			}
+		case *ConstDecl:
+			if _, err := i.globalEnv.Get(name); err != nil {
+				if exp.Value != nil {
+					value, evalErr := i.EvaluateExpression(exp.Value, i.globalEnv)
+					if evalErr == nil {
+						i.globalEnv.Define(name, value)
+					}
+				}
+			}
+		}
+	}
 	return nil
 }
 

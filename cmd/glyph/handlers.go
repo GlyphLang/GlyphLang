@@ -229,9 +229,31 @@ func executeRoute(route *ast.Route, ctx *server.Context, interp *interpreter.Int
 	return response.Body, nil
 }
 
-// createHandler creates the main HTTP handler
+// createHandler creates the main HTTP handler.
+// CORS is configured via the GLYPH_CORS_ORIGIN environment variable.
+// Set it to a specific origin (e.g. "http://localhost:8080") or "*" to
+// allow all origins (credentials will be disabled). When unset, no CORS
+// headers are added.
 func createHandler(router *server.Router) http.HandlerFunc {
+	corsOrigin := os.Getenv("GLYPH_CORS_ORIGIN")
+
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Apply CORS headers when configured
+		if corsOrigin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", corsOrigin)
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			if corsOrigin == "*" {
+				w.Header().Set("Access-Control-Allow-Credentials", "false")
+			}
+
+			// Handle preflight requests
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+		}
+
 		method := server.HTTPMethod(r.Method)
 		route, params, err := router.Match(method, r.URL.Path)
 

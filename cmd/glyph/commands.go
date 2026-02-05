@@ -11,7 +11,6 @@ import (
 	"github.com/glyphlang/glyph/pkg/ast"
 	"github.com/glyphlang/glyph/pkg/compiler"
 	"github.com/glyphlang/glyph/pkg/decompiler"
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/lsp"
 	"github.com/glyphlang/glyph/pkg/parser"
 	"github.com/glyphlang/glyph/pkg/vm"
@@ -193,9 +192,13 @@ func runTest(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("parse error: %w", err)
 	}
 
-	// Create interpreter and load module
-	interp := interpreter.NewInterpreter()
-	if err := interp.LoadModule(*module); err != nil {
+	// Create interpreter with module resolution support and load module
+	interp := newConfiguredInterpreter()
+	basePath := filepath.Dir(filePath)
+	if basePath == "" {
+		basePath = "."
+	}
+	if err := interp.LoadModuleWithPath(*module, basePath); err != nil {
 		return fmt.Errorf("load error: %w", err)
 	}
 
