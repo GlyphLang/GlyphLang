@@ -7,7 +7,37 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![CLA](https://cla-assistant.io/readme/badge/GlyphLang/GlyphLang)](https://cla-assistant.io/GlyphLang/GlyphLang)
 
-**GlyphLang™** is the AI-first backend language for REST APIs. Minimal ceremony—just routes and types. Uses 23% fewer tokens than FastAPI and 57% fewer than Java, making LLM code generation faster and cheaper.
+**GlyphLang™** is an AI-first backend programming language designed to reduce boilerplate, lower LLM token costs, and ship production APIs faster.
+
+Modern backend development is increasingly written with AI—but existing languages and frameworks were never designed for AI generation. The result is bloated code, fragile outputs, high token costs, and endless glue logic.
+
+GlyphLang is built from the ground up to be:
+- Easy for AI to generate
+- Strict enough for production
+- Opinionated enough to stay simple
+
+It compiles to a single static binary, includes a built-in HTTP server and database access, and minimizes files, syntax and configuration so both humans _and_ AI can move faster.
+
+---
+
+**Why GlyphLang?**
+
+Same API, fewer tokens, fewer files:
+
+> FastAPI:
+> - ~300 lines
+> - 6–8 files
+> - External server, routing, validation, glue code
+> 
+> GlyphLang:
+> - ~60–80 lines
+> - 1 file
+> - Built-in server, routing, validation
+
+Less code isn't just productivity. It directly reduces:
+- LLM token usage
+- Generation errors
+- Maintenance surface area
 
 ```
 Glyph:  @ GET /users/:id -> User     (21 tokens)
@@ -15,18 +45,27 @@ Python: @app.route('/users/<id>')... (35 tokens)
 Java:   @GetMapping("/users/{id}")...  (28 tokens)
 ```
 
-**Why AI-first matters:**
-- Faster generation (fewer tokens = faster LLM response)
-- Lower cost (35-56% fewer tokens at scale)
-- More context (fit more business logic in context windows)
-- Consistent patterns (every route follows the same structure)
+---
 
-```glyph
-@ GET /hello/:name {
-  $ greeting = "Hello, " + name + "!"
-  > {message: greeting}
-}
-```
+**What you get**
+
+- AI-optimized syntax that minimizes boilerplate and token usage
+- Built-in HTTP server, async, database access, and WebSockets
+- Single static binary deployment
+- First-class CLI, LSP, and VS Code support
+- Designed for real production backends—not demos
+
+---
+
+**Who is this for?**
+
+- GlyphLang is a great fit if you:
+- Build AI-powered APIs or internal tools
+- Use LLMs heavily for backend code generation
+- Want fewer files, fewer abstractions, and lower AI costs
+- Prefer opinionated tooling over endless configuration
+
+---
 
 ## Features
 
