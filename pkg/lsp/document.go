@@ -2,9 +2,10 @@ package lsp
 
 import (
 	"fmt"
+	"github.com/glyphlang/glyph/pkg/ast"
+	"strings"
 	"sync"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/parser"
 )
 
@@ -14,7 +15,7 @@ type Document struct {
 	Version int
 	Content string
 	Lines   []string
-	AST     *interpreter.Module
+	AST     *ast.Module
 	Errors  []parser.ParseError
 }
 
@@ -114,11 +115,23 @@ func (dm *DocumentManager) GetAll() []*Document {
 	return docs
 }
 
+// IsGlyphX returns true if the document is a .glyphx file (expanded syntax)
+func (doc *Document) IsGlyphX() bool {
+	return strings.HasSuffix(doc.URI, ".glyphx")
+}
+
 // parseDocument parses a document and updates its AST and errors
 func (dm *DocumentManager) parseDocument(doc *Document) {
-	// Tokenize
-	lexer := parser.NewLexer(doc.Content)
-	tokens, err := lexer.Tokenize()
+	// Tokenize using the appropriate lexer based on file extension
+	var tokens []parser.Token
+	var err error
+	if doc.IsGlyphX() {
+		lexer := parser.NewExpandedLexer(doc.Content)
+		tokens, err = lexer.Tokenize()
+	} else {
+		lexer := parser.NewLexer(doc.Content)
+		tokens, err = lexer.Tokenize()
+	}
 	if err != nil {
 		// Lexer error
 		if parseErr, ok := err.(*parser.ParseError); ok {

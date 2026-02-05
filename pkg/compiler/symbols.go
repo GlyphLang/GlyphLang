@@ -12,12 +12,12 @@ const (
 
 // Symbol represents a variable in the symbol table
 type Symbol struct {
-	Name         string
-	Scope        SymbolScope
-	Index        int  // Index in constant pool for the name
-	IsDefined    bool // Whether this symbol has been assigned a value
-	ConstantIdx  int  // Index of the constant if it's a constant value
-	IsConstant   bool // Whether this is a compile-time constant
+	Name        string
+	Scope       SymbolScope
+	Index       int  // Index in constant pool for the name
+	IsDefined   bool // Whether this symbol has been assigned a value
+	ConstantIdx int  // Index of the constant if it's a constant value
+	IsConstant  bool // Whether this is a compile-time constant
 }
 
 // SymbolTable manages variable symbols and scopes

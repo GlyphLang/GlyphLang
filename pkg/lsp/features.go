@@ -2,9 +2,9 @@ package lsp
 
 import (
 	"fmt"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"strings"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/server"
 )
 
@@ -76,7 +76,7 @@ func GetHover(doc *Document, pos Position) *Hover {
 
 	// Check if it's a type definition
 	for _, item := range doc.AST.Items {
-		if typeDef, ok := item.(*interpreter.TypeDef); ok {
+		if typeDef, ok := item.(*ast.TypeDef); ok {
 			if typeDef.Name == word {
 				return &Hover{
 					Contents: MarkupContent{
@@ -90,7 +90,7 @@ func GetHover(doc *Document, pos Position) *Hover {
 
 	// Check if it's a route
 	for _, item := range doc.AST.Items {
-		if route, ok := item.(*interpreter.Route); ok {
+		if route, ok := item.(*ast.Route); ok {
 			// Check if position is in route path or body
 			if strings.Contains(route.Path, word) {
 				return &Hover{
@@ -105,7 +105,7 @@ func GetHover(doc *Document, pos Position) *Hover {
 
 	// Check if it's a command (pointer or value type)
 	for _, item := range doc.AST.Items {
-		if cmd, ok := item.(*interpreter.Command); ok {
+		if cmd, ok := item.(*ast.Command); ok {
 			if cmd.Name == word {
 				return &Hover{
 					Contents: MarkupContent{
@@ -114,7 +114,7 @@ func GetHover(doc *Document, pos Position) *Hover {
 					},
 				}
 			}
-		} else if cmd, ok := item.(interpreter.Command); ok {
+		} else if cmd, ok := item.(ast.Command); ok {
 			if cmd.Name == word {
 				return &Hover{
 					Contents: MarkupContent{
@@ -128,7 +128,7 @@ func GetHover(doc *Document, pos Position) *Hover {
 
 	// Check if it's a cron task (pointer or value type)
 	for _, item := range doc.AST.Items {
-		if cron, ok := item.(*interpreter.CronTask); ok {
+		if cron, ok := item.(*ast.CronTask); ok {
 			if cron.Name == word {
 				return &Hover{
 					Contents: MarkupContent{
@@ -137,7 +137,7 @@ func GetHover(doc *Document, pos Position) *Hover {
 					},
 				}
 			}
-		} else if cron, ok := item.(interpreter.CronTask); ok {
+		} else if cron, ok := item.(ast.CronTask); ok {
 			if cron.Name == word {
 				return &Hover{
 					Contents: MarkupContent{
@@ -151,7 +151,7 @@ func GetHover(doc *Document, pos Position) *Hover {
 
 	// Check if it's an event handler (pointer or value type)
 	for _, item := range doc.AST.Items {
-		if event, ok := item.(*interpreter.EventHandler); ok {
+		if event, ok := item.(*ast.EventHandler); ok {
 			if event.EventType == word {
 				return &Hover{
 					Contents: MarkupContent{
@@ -160,7 +160,7 @@ func GetHover(doc *Document, pos Position) *Hover {
 					},
 				}
 			}
-		} else if event, ok := item.(interpreter.EventHandler); ok {
+		} else if event, ok := item.(ast.EventHandler); ok {
 			if event.EventType == word {
 				return &Hover{
 					Contents: MarkupContent{
@@ -174,7 +174,7 @@ func GetHover(doc *Document, pos Position) *Hover {
 
 	// Check if it's a queue worker (pointer or value type)
 	for _, item := range doc.AST.Items {
-		if queue, ok := item.(*interpreter.QueueWorker); ok {
+		if queue, ok := item.(*ast.QueueWorker); ok {
 			if queue.QueueName == word {
 				return &Hover{
 					Contents: MarkupContent{
@@ -183,7 +183,7 @@ func GetHover(doc *Document, pos Position) *Hover {
 					},
 				}
 			}
-		} else if queue, ok := item.(interpreter.QueueWorker); ok {
+		} else if queue, ok := item.(ast.QueueWorker); ok {
 			if queue.QueueName == word {
 				return &Hover{
 					Contents: MarkupContent{
@@ -208,8 +208,19 @@ func GetHover(doc *Document, pos Position) *Hover {
 	return nil
 }
 
-// GetCompletion returns completion items at a position
+// GetCompletion returns completion items at a position.
+// For .glyphx files, returns expanded syntax keywords and snippets.
+// For .glyph files, returns compact syntax keywords and snippets.
+// The IsGlyphX() method on Document (defined in document.go:119) determines the syntax mode.
 func GetCompletion(doc *Document, pos Position) []CompletionItem {
+	if doc.IsGlyphX() {
+		return getExpandedCompletion(doc, pos)
+	}
+	return getCompactCompletion(doc, pos)
+}
+
+// getCompactCompletion returns completions for compact .glyph syntax
+func getCompactCompletion(doc *Document, pos Position) []CompletionItem {
 	var items []CompletionItem
 
 	// Add keywords
@@ -247,17 +258,7 @@ func GetCompletion(doc *Document, pos Position) []CompletionItem {
 	}
 
 	// Add defined types
-	if doc.AST != nil {
-		for _, item := range doc.AST.Items {
-			if typeDef, ok := item.(*interpreter.TypeDef); ok {
-				items = append(items, CompletionItem{
-					Label:  typeDef.Name,
-					Kind:   CompletionItemKindStruct,
-					Detail: "Type definition",
-				})
-			}
-		}
-	}
+	items = append(items, getDefinedTypeCompletions(doc)...)
 
 	// Add route snippets
 	items = append(items, CompletionItem{
@@ -323,6 +324,163 @@ func GetCompletion(doc *Document, pos Position) []CompletionItem {
 	return items
 }
 
+// getExpandedCompletion returns completions for expanded .glyphx syntax.
+// The expanded syntax uses human-readable keywords (route, type, let, return, etc.)
+// instead of the compact symbol-based syntax (@, :, $, >, etc.).
+func getExpandedCompletion(doc *Document, pos Position) []CompletionItem {
+	var items []CompletionItem
+
+	// Expanded syntax keywords (human-readable forms that map to compact symbols)
+	expandedKeywords := []struct {
+		label  string
+		detail string
+	}{
+		{"route", "Define an HTTP route handler (expands to @)"},
+		{"type", "Define a type (expands to :)"},
+		{"let", "Declare a variable (expands to $)"},
+		{"return", "Return a value (expands to >)"},
+		{"middleware", "Apply middleware (expands to +)"},
+		{"use", "Import/use a service (expands to %)"},
+		{"expects", "Declare expected input (expands to <)"},
+		{"validate", "Add validation (expands to ?)"},
+		{"handle", "Handle an event (expands to ~)"},
+		{"cron", "Define a scheduled task (expands to *)"},
+		{"command", "Define a CLI command (expands to !)"},
+		{"queue", "Define a queue worker (expands to &)"},
+		{"func", "Define a function (expands to =)"},
+		{"if", "Conditional statement"},
+		{"else", "Alternative branch"},
+		{"while", "Loop while condition is true"},
+		{"for", "Iterate over collection"},
+		{"in", "Iteration keyword"},
+		{"switch", "Multi-way branch"},
+		{"case", "Switch case"},
+		{"default", "Default case"},
+		{"true", "Boolean true"},
+		{"false", "Boolean false"},
+		{"null", "Null value"},
+		{"async", "Async modifier"},
+		{"await", "Await expression"},
+		{"import", "Import module"},
+		{"from", "Import source"},
+	}
+
+	for _, kw := range expandedKeywords {
+		items = append(items, CompletionItem{
+			Label:  kw.label,
+			Kind:   CompletionItemKindKeyword,
+			Detail: kw.detail,
+		})
+	}
+
+	// Add built-in types
+	types := []string{"int", "str", "string", "bool", "float"}
+	for _, t := range types {
+		items = append(items, CompletionItem{
+			Label:  t,
+			Kind:   CompletionItemKindClass,
+			Detail: "Built-in type",
+		})
+	}
+
+	// Add HTTP methods
+	methods := []string{"GET", "POST", "PUT", "DELETE", "PATCH"}
+	for _, m := range methods {
+		items = append(items, CompletionItem{
+			Label:  m,
+			Kind:   CompletionItemKindKeyword,
+			Detail: "HTTP method",
+		})
+	}
+
+	// Add defined types from AST
+	items = append(items, getDefinedTypeCompletions(doc)...)
+
+	// Expanded syntax snippets using human-readable keywords
+	items = append(items, CompletionItem{
+		Label:            "route-get",
+		Kind:             CompletionItemKindSnippet,
+		Detail:           "GET route (expanded)",
+		InsertText:       "route GET /${1:path} {\n  return {${2:response}}\n}",
+		InsertTextFormat: 2,
+	})
+
+	items = append(items, CompletionItem{
+		Label:            "route-post",
+		Kind:             CompletionItemKindSnippet,
+		Detail:           "POST route (expanded)",
+		InsertText:       "route POST /${1:path} {\n  return {${2:response}}\n}",
+		InsertTextFormat: 2,
+	})
+
+	items = append(items, CompletionItem{
+		Label:            "command-snippet",
+		Kind:             CompletionItemKindSnippet,
+		Detail:           "CLI command (expanded)",
+		InsertText:       "command ${1:name} ${2:param}: ${3:str}!\n  return ${4:\"result\"}",
+		InsertTextFormat: 2,
+	})
+
+	items = append(items, CompletionItem{
+		Label:            "cron-snippet",
+		Kind:             CompletionItemKindSnippet,
+		Detail:           "Scheduled task (expanded)",
+		InsertText:       "cron \"${1:0 0 * * *}\"\n  return ${2:\"task executed\"}",
+		InsertTextFormat: 2,
+	})
+
+	items = append(items, CompletionItem{
+		Label:            "handle-snippet",
+		Kind:             CompletionItemKindSnippet,
+		Detail:           "Event handler (expanded)",
+		InsertText:       "handle \"${1:event.type}\"\n  return ${2:\"event handled\"}",
+		InsertTextFormat: 2,
+	})
+
+	items = append(items, CompletionItem{
+		Label:            "queue-snippet",
+		Kind:             CompletionItemKindSnippet,
+		Detail:           "Queue worker (expanded)",
+		InsertText:       "queue \"${1:queue.name}\"\n  return ${2:\"message processed\"}",
+		InsertTextFormat: 2,
+	})
+
+	items = append(items, CompletionItem{
+		Label:            "typedef",
+		Kind:             CompletionItemKindSnippet,
+		Detail:           "Type definition (expanded)",
+		InsertText:       "type ${1:TypeName} {\n  ${2:field}: ${3:str}!\n}",
+		InsertTextFormat: 2,
+	})
+
+	items = append(items, CompletionItem{
+		Label:            "func-snippet",
+		Kind:             CompletionItemKindSnippet,
+		Detail:           "Function definition (expanded)",
+		InsertText:       "func ${1:name}(${2:param}: ${3:str}) {\n  return ${4:\"result\"}\n}",
+		InsertTextFormat: 2,
+	})
+
+	return items
+}
+
+// getDefinedTypeCompletions returns completions for types defined in the document AST
+func getDefinedTypeCompletions(doc *Document) []CompletionItem {
+	var items []CompletionItem
+	if doc.AST != nil {
+		for _, item := range doc.AST.Items {
+			if typeDef, ok := item.(*ast.TypeDef); ok {
+				items = append(items, CompletionItem{
+					Label:  typeDef.Name,
+					Kind:   CompletionItemKindStruct,
+					Detail: "Type definition",
+				})
+			}
+		}
+	}
+	return items
+}
+
 // GetDefinition returns the definition location for a symbol at position
 func GetDefinition(doc *Document, pos Position) []Location {
 	if doc.AST == nil {
@@ -336,7 +494,7 @@ func GetDefinition(doc *Document, pos Position) []Location {
 
 	// Find type definitions
 	for _, item := range doc.AST.Items {
-		if typeDef, ok := item.(*interpreter.TypeDef); ok {
+		if typeDef, ok := item.(*ast.TypeDef); ok {
 			if typeDef.Name == word {
 				// Return approximate location (we'd need position info in AST for exact location)
 				return []Location{
@@ -365,7 +523,7 @@ func GetDocumentSymbols(doc *Document) []DocumentSymbol {
 
 	for _, item := range doc.AST.Items {
 		switch v := item.(type) {
-		case *interpreter.TypeDef:
+		case *ast.TypeDef:
 			// Create symbol for type definition
 			symbol := DocumentSymbol{
 				Name:   v.Name,
@@ -401,7 +559,7 @@ func GetDocumentSymbols(doc *Document) []DocumentSymbol {
 
 			symbols = append(symbols, symbol)
 
-		case *interpreter.Route:
+		case *ast.Route:
 			// Create symbol for route
 			symbol := DocumentSymbol{
 				Name:   fmt.Sprintf("%s %s", v.Method, v.Path),
@@ -418,7 +576,7 @@ func GetDocumentSymbols(doc *Document) []DocumentSymbol {
 			}
 			symbols = append(symbols, symbol)
 
-		case *interpreter.Command:
+		case *ast.Command:
 			// Create symbol for CLI command (pointer type)
 			symbol := DocumentSymbol{
 				Name:   fmt.Sprintf("! %s", v.Name),
@@ -435,7 +593,7 @@ func GetDocumentSymbols(doc *Document) []DocumentSymbol {
 			}
 			symbols = append(symbols, symbol)
 
-		case interpreter.Command:
+		case ast.Command:
 			// Create symbol for CLI command (value type for compatibility)
 			symbol := DocumentSymbol{
 				Name:   fmt.Sprintf("! %s", v.Name),
@@ -452,7 +610,7 @@ func GetDocumentSymbols(doc *Document) []DocumentSymbol {
 			}
 			symbols = append(symbols, symbol)
 
-		case *interpreter.CronTask:
+		case *ast.CronTask:
 			// Create symbol for cron task (pointer type)
 			name := v.Name
 			if name == "" {
@@ -473,7 +631,7 @@ func GetDocumentSymbols(doc *Document) []DocumentSymbol {
 			}
 			symbols = append(symbols, symbol)
 
-		case interpreter.CronTask:
+		case ast.CronTask:
 			// Create symbol for cron task (value type for compatibility)
 			name := v.Name
 			if name == "" {
@@ -494,7 +652,7 @@ func GetDocumentSymbols(doc *Document) []DocumentSymbol {
 			}
 			symbols = append(symbols, symbol)
 
-		case *interpreter.EventHandler:
+		case *ast.EventHandler:
 			// Create symbol for event handler (pointer type)
 			symbol := DocumentSymbol{
 				Name:   fmt.Sprintf("~ %s", v.EventType),
@@ -511,7 +669,7 @@ func GetDocumentSymbols(doc *Document) []DocumentSymbol {
 			}
 			symbols = append(symbols, symbol)
 
-		case interpreter.EventHandler:
+		case ast.EventHandler:
 			// Create symbol for event handler (value type for compatibility)
 			symbol := DocumentSymbol{
 				Name:   fmt.Sprintf("~ %s", v.EventType),
@@ -528,7 +686,7 @@ func GetDocumentSymbols(doc *Document) []DocumentSymbol {
 			}
 			symbols = append(symbols, symbol)
 
-		case *interpreter.QueueWorker:
+		case *ast.QueueWorker:
 			// Create symbol for queue worker (pointer type)
 			symbol := DocumentSymbol{
 				Name:   fmt.Sprintf("& %s", v.QueueName),
@@ -545,7 +703,7 @@ func GetDocumentSymbols(doc *Document) []DocumentSymbol {
 			}
 			symbols = append(symbols, symbol)
 
-		case interpreter.QueueWorker:
+		case ast.QueueWorker:
 			// Create symbol for queue worker
 			symbol := DocumentSymbol{
 				Name:   fmt.Sprintf("& %s", v.QueueName),
@@ -562,7 +720,7 @@ func GetDocumentSymbols(doc *Document) []DocumentSymbol {
 			}
 			symbols = append(symbols, symbol)
 
-		case interpreter.Function:
+		case ast.Function:
 			// Create symbol for function
 			symbol := DocumentSymbol{
 				Name:   v.Name,
@@ -600,7 +758,7 @@ func GetReferences(doc *Document, pos Position, includeDeclaration bool) []Locat
 	// Find all references to this symbol in the AST
 	for _, item := range doc.AST.Items {
 		switch v := item.(type) {
-		case *interpreter.Route:
+		case *ast.Route:
 			// Check if the word is a route parameter
 			params := server.ExtractRouteParamNames(v.Path)
 			for _, param := range params {
@@ -619,7 +777,7 @@ func GetReferences(doc *Document, pos Position, includeDeclaration bool) []Locat
 			// Check route body for variable references
 			locations = append(locations, findReferencesInStatements(v.Body, word, doc.URI)...)
 
-		case interpreter.Function:
+		case ast.Function:
 			// Check function parameters
 			for _, param := range v.Params {
 				if param.Name == word && includeDeclaration {
@@ -636,7 +794,7 @@ func GetReferences(doc *Document, pos Position, includeDeclaration bool) []Locat
 			// Check function body
 			locations = append(locations, findReferencesInStatements(v.Body, word, doc.URI)...)
 
-		case *interpreter.TypeDef:
+		case *ast.TypeDef:
 			// Check if this is the type definition
 			if v.Name == word && includeDeclaration {
 				locations = append(locations, Location{
@@ -654,7 +812,7 @@ func GetReferences(doc *Document, pos Position, includeDeclaration bool) []Locat
 }
 
 // findReferencesInStatements finds all references to a symbol in a list of statements
-func findReferencesInStatements(stmts []interpreter.Statement, symbol string, uri string) []Location {
+func findReferencesInStatements(stmts []ast.Statement, symbol string, uri string) []Location {
 	var locations []Location
 
 	for _, stmt := range stmts {
@@ -665,11 +823,11 @@ func findReferencesInStatements(stmts []interpreter.Statement, symbol string, ur
 }
 
 // findReferencesInStatement finds all references to a symbol in a statement
-func findReferencesInStatement(stmt interpreter.Statement, symbol string, uri string) []Location {
+func findReferencesInStatement(stmt ast.Statement, symbol string, uri string) []Location {
 	var locations []Location
 
 	switch s := stmt.(type) {
-	case *interpreter.AssignStatement:
+	case *ast.AssignStatement:
 		// Check if the assignment target is our symbol
 		if s.Target == symbol {
 			locations = append(locations, Location{
@@ -683,7 +841,7 @@ func findReferencesInStatement(stmt interpreter.Statement, symbol string, uri st
 		// Check the value expression
 		locations = append(locations, findReferencesInExpression(s.Value, symbol, uri)...)
 
-	case interpreter.AssignStatement:
+	case ast.AssignStatement:
 		if s.Target == symbol {
 			locations = append(locations, Location{
 				URI: uri,
@@ -695,31 +853,31 @@ func findReferencesInStatement(stmt interpreter.Statement, symbol string, uri st
 		}
 		locations = append(locations, findReferencesInExpression(s.Value, symbol, uri)...)
 
-	case *interpreter.ReturnStatement:
+	case *ast.ReturnStatement:
 		locations = append(locations, findReferencesInExpression(s.Value, symbol, uri)...)
 
-	case interpreter.ReturnStatement:
+	case ast.ReturnStatement:
 		locations = append(locations, findReferencesInExpression(s.Value, symbol, uri)...)
 
-	case *interpreter.IfStatement:
+	case *ast.IfStatement:
 		locations = append(locations, findReferencesInExpression(s.Condition, symbol, uri)...)
 		locations = append(locations, findReferencesInStatements(s.ThenBlock, symbol, uri)...)
 		locations = append(locations, findReferencesInStatements(s.ElseBlock, symbol, uri)...)
 
-	case interpreter.IfStatement:
+	case ast.IfStatement:
 		locations = append(locations, findReferencesInExpression(s.Condition, symbol, uri)...)
 		locations = append(locations, findReferencesInStatements(s.ThenBlock, symbol, uri)...)
 		locations = append(locations, findReferencesInStatements(s.ElseBlock, symbol, uri)...)
 
-	case *interpreter.WhileStatement:
+	case *ast.WhileStatement:
 		locations = append(locations, findReferencesInExpression(s.Condition, symbol, uri)...)
 		locations = append(locations, findReferencesInStatements(s.Body, symbol, uri)...)
 
-	case interpreter.WhileStatement:
+	case ast.WhileStatement:
 		locations = append(locations, findReferencesInExpression(s.Condition, symbol, uri)...)
 		locations = append(locations, findReferencesInStatements(s.Body, symbol, uri)...)
 
-	case *interpreter.ReassignStatement:
+	case *ast.ReassignStatement:
 		// Check if the reassignment target is our symbol
 		if s.Target == symbol {
 			locations = append(locations, Location{
@@ -733,7 +891,7 @@ func findReferencesInStatement(stmt interpreter.Statement, symbol string, uri st
 		// Check the value expression
 		locations = append(locations, findReferencesInExpression(s.Value, symbol, uri)...)
 
-	case interpreter.ReassignStatement:
+	case ast.ReassignStatement:
 		if s.Target == symbol {
 			locations = append(locations, Location{
 				URI: uri,
@@ -750,11 +908,11 @@ func findReferencesInStatement(stmt interpreter.Statement, symbol string, uri st
 }
 
 // findReferencesInExpression finds all references to a symbol in an expression
-func findReferencesInExpression(expr interpreter.Expr, symbol string, uri string) []Location {
+func findReferencesInExpression(expr ast.Expr, symbol string, uri string) []Location {
 	var locations []Location
 
 	switch e := expr.(type) {
-	case *interpreter.VariableExpr:
+	case *ast.VariableExpr:
 		if e.Name == symbol {
 			locations = append(locations, Location{
 				URI: uri,
@@ -765,7 +923,7 @@ func findReferencesInExpression(expr interpreter.Expr, symbol string, uri string
 			})
 		}
 
-	case interpreter.VariableExpr:
+	case ast.VariableExpr:
 		if e.Name == symbol {
 			locations = append(locations, Location{
 				URI: uri,
@@ -776,38 +934,38 @@ func findReferencesInExpression(expr interpreter.Expr, symbol string, uri string
 			})
 		}
 
-	case *interpreter.BinaryOpExpr:
+	case *ast.BinaryOpExpr:
 		locations = append(locations, findReferencesInExpression(e.Left, symbol, uri)...)
 		locations = append(locations, findReferencesInExpression(e.Right, symbol, uri)...)
 
-	case interpreter.BinaryOpExpr:
+	case ast.BinaryOpExpr:
 		locations = append(locations, findReferencesInExpression(e.Left, symbol, uri)...)
 		locations = append(locations, findReferencesInExpression(e.Right, symbol, uri)...)
 
-	case *interpreter.ObjectExpr:
+	case *ast.ObjectExpr:
 		for _, field := range e.Fields {
 			locations = append(locations, findReferencesInExpression(field.Value, symbol, uri)...)
 		}
 
-	case interpreter.ObjectExpr:
+	case ast.ObjectExpr:
 		for _, field := range e.Fields {
 			locations = append(locations, findReferencesInExpression(field.Value, symbol, uri)...)
 		}
 
-	case *interpreter.ArrayExpr:
+	case *ast.ArrayExpr:
 		for _, elem := range e.Elements {
 			locations = append(locations, findReferencesInExpression(elem, symbol, uri)...)
 		}
 
-	case interpreter.ArrayExpr:
+	case ast.ArrayExpr:
 		for _, elem := range e.Elements {
 			locations = append(locations, findReferencesInExpression(elem, symbol, uri)...)
 		}
 
-	case *interpreter.FieldAccessExpr:
+	case *ast.FieldAccessExpr:
 		locations = append(locations, findReferencesInExpression(e.Object, symbol, uri)...)
 
-	case interpreter.FieldAccessExpr:
+	case ast.FieldAccessExpr:
 		locations = append(locations, findReferencesInExpression(e.Object, symbol, uri)...)
 	}
 
@@ -817,7 +975,7 @@ func findReferencesInExpression(expr interpreter.Expr, symbol string, uri string
 // Helper functions
 
 // checkTypes performs basic type checking and returns diagnostics
-func checkTypes(module *interpreter.Module) []Diagnostic {
+func checkTypes(module *ast.Module) []Diagnostic {
 	var diagnostics []Diagnostic
 
 	// For now, just check for undefined types in fields
@@ -830,16 +988,16 @@ func checkTypes(module *interpreter.Module) []Diagnostic {
 
 	// Collect defined types
 	for _, item := range module.Items {
-		if typeDef, ok := item.(*interpreter.TypeDef); ok {
+		if typeDef, ok := item.(*ast.TypeDef); ok {
 			knownTypes[typeDef.Name] = true
 		}
 	}
 
 	// Check for undefined types
 	for _, item := range module.Items {
-		if typeDef, ok := item.(*interpreter.TypeDef); ok {
+		if typeDef, ok := item.(*ast.TypeDef); ok {
 			for _, field := range typeDef.Fields {
-				if namedType, ok := field.TypeAnnotation.(interpreter.NamedType); ok {
+				if namedType, ok := field.TypeAnnotation.(ast.NamedType); ok {
 					if !knownTypes[namedType.Name] {
 						diagnostics = append(diagnostics, Diagnostic{
 							Range: Range{
@@ -859,9 +1017,9 @@ func checkTypes(module *interpreter.Module) []Diagnostic {
 	// Validate cron tasks (pointer or value type)
 	for _, item := range module.Items {
 		var schedule string
-		if cron, ok := item.(*interpreter.CronTask); ok {
+		if cron, ok := item.(*ast.CronTask); ok {
 			schedule = cron.Schedule
-		} else if cron, ok := item.(interpreter.CronTask); ok {
+		} else if cron, ok := item.(ast.CronTask); ok {
 			schedule = cron.Schedule
 		} else {
 			continue
@@ -882,9 +1040,9 @@ func checkTypes(module *interpreter.Module) []Diagnostic {
 	// Validate event handlers (pointer or value type)
 	for _, item := range module.Items {
 		var eventType string
-		if event, ok := item.(*interpreter.EventHandler); ok {
+		if event, ok := item.(*ast.EventHandler); ok {
 			eventType = event.EventType
-		} else if event, ok := item.(interpreter.EventHandler); ok {
+		} else if event, ok := item.(ast.EventHandler); ok {
 			eventType = event.EventType
 		} else {
 			continue
@@ -905,9 +1063,9 @@ func checkTypes(module *interpreter.Module) []Diagnostic {
 	// Validate queue workers (pointer or value type)
 	for _, item := range module.Items {
 		var queueName string
-		if queue, ok := item.(*interpreter.QueueWorker); ok {
+		if queue, ok := item.(*ast.QueueWorker); ok {
 			queueName = queue.QueueName
-		} else if queue, ok := item.(interpreter.QueueWorker); ok {
+		} else if queue, ok := item.(ast.QueueWorker); ok {
 			queueName = queue.QueueName
 		} else {
 			continue
@@ -928,9 +1086,9 @@ func checkTypes(module *interpreter.Module) []Diagnostic {
 	// Validate commands (pointer or value type)
 	for _, item := range module.Items {
 		var cmdName string
-		if cmd, ok := item.(*interpreter.Command); ok {
+		if cmd, ok := item.(*ast.Command); ok {
 			cmdName = cmd.Name
-		} else if cmd, ok := item.(interpreter.Command); ok {
+		} else if cmd, ok := item.(ast.Command); ok {
 			cmdName = cmd.Name
 		} else {
 			continue
@@ -951,28 +1109,45 @@ func checkTypes(module *interpreter.Module) []Diagnostic {
 	return diagnostics
 }
 
-// getKeywordInfo returns information about a keyword
+// getKeywordInfo returns information about a keyword.
+// Covers both compact (.glyph) and expanded (.glyphx) syntax keywords.
 func getKeywordInfo(keyword string) string {
 	keywordDocs := map[string]string{
-		"route":   "**route** - Defines an HTTP route handler (explicit form)\n\nExample:\n```glyph\n@ route /api/users [GET]\n  > {users: []}\n```",
-		"GET":     "**GET** - HTTP GET method for retrieving resources\n\nExample:\n```glyph\n@ GET /api/users\n  > {users: []}\n```",
-		"POST":    "**POST** - HTTP POST method for creating resources\n\nExample:\n```glyph\n@ POST /api/users\n  > {created: true}\n```",
-		"PUT":     "**PUT** - HTTP PUT method for replacing resources\n\nExample:\n```glyph\n@ PUT /api/users/:id\n  > {updated: true}\n```",
-		"DELETE":  "**DELETE** - HTTP DELETE method for removing resources\n\nExample:\n```glyph\n@ DELETE /api/users/:id\n  > {deleted: true}\n```",
-		"PATCH":   "**PATCH** - HTTP PATCH method for partial updates\n\nExample:\n```glyph\n@ PATCH /api/users/:id\n  > {patched: true}\n```",
-		"command": "**command** - Defines a CLI command\n\nExample:\n```glyph\n! command hello name: str!\n  > \"Hello \" + name\n```",
-		"cron":    "**cron** - Defines a scheduled task\n\nExample:\n```glyph\n* cron \"0 0 * * *\"\n  > \"Daily task executed\"\n```",
-		"event":   "**event** - Defines an event handler\n\nExample:\n```glyph\n~ event \"user.created\"\n  > \"Handle user creation\"\n```",
-		"queue":   "**queue** - Defines a message queue worker\n\nExample:\n```glyph\n& queue \"email.send\"\n  > \"Process email\"\n```",
+		// Shared keywords (same in both syntaxes)
+		"route":   "**route** - Defines an HTTP route handler\n\nCompact: `@ route /path [METHOD]`\nExpanded: `route /path [METHOD]`",
+		"GET":     "**GET** - HTTP GET method for retrieving resources",
+		"POST":    "**POST** - HTTP POST method for creating resources",
+		"PUT":     "**PUT** - HTTP PUT method for replacing resources",
+		"DELETE":  "**DELETE** - HTTP DELETE method for removing resources",
+		"PATCH":   "**PATCH** - HTTP PATCH method for partial updates",
+		"command": "**command** - Defines a CLI command\n\nCompact: `! command name`\nExpanded: `command name`",
+		"cron":    "**cron** - Defines a scheduled task\n\nCompact: `* cron \"schedule\"`\nExpanded: `cron \"schedule\"`",
+		"event":   "**event** - Defines an event handler\n\nCompact: `~ event \"type\"`\nExpanded: `handle \"type\"`",
+		"queue":   "**queue** - Defines a message queue worker\n\nCompact: `& queue \"name\"`\nExpanded: `queue \"name\"`",
 		"if":      "**if** - Conditional statement\n\nExample:\n```glyph\nif condition {\n  > {success: true}\n}\n```",
 		"else":    "**else** - Alternative branch for if statement",
-		"while":   "**while** - Loop that executes while condition is true\n\nExample:\n```glyph\nwhile count < 10 {\n  $ count = count + 1\n}\n```",
-		"for":     "**for** - Iterates over arrays or objects\n\nExample:\n```glyph\nfor item in items {\n  > item\n}\n```",
-		"switch":  "**switch** - Multi-way branch statement\n\nExample:\n```glyph\nswitch value {\n  case 1 { > \"one\" }\n  default { > \"other\" }\n}\n```",
+		"while":   "**while** - Loop that executes while condition is true",
+		"for":     "**for** - Iterates over arrays or objects",
+		"switch":  "**switch** - Multi-way branch statement",
 		"case":    "**case** - Branch in switch statement",
 		"default": "**default** - Default branch in switch statement",
 		"true":    "**true** - Boolean literal",
 		"false":   "**false** - Boolean literal",
+		// Expanded-only keywords (map to compact symbols)
+		"type":       "**type** - Define a type definition\n\nExpanded form of `:` in compact syntax\n\nExample:\n```glyphx\ntype User {\n  name: str!\n  email: str!\n}\n```",
+		"let":        "**let** - Declare a variable\n\nExpanded form of `$` in compact syntax\n\nExample:\n```glyphx\nlet result = db.query()\n```",
+		"return":     "**return** - Return a value from a handler\n\nExpanded form of `>` in compact syntax\n\nExample:\n```glyphx\nreturn {users: []}\n```",
+		"middleware": "**middleware** - Apply middleware to a route\n\nExpanded form of `+` in compact syntax\n\nExample:\n```glyphx\nmiddleware auth(jwt)\n```",
+		"use":        "**use** - Import or use a service\n\nExpanded form of `%` in compact syntax\n\nExample:\n```glyphx\nuse database(postgres)\n```",
+		"expects":    "**expects** - Declare expected input\n\nExpanded form of `<` in compact syntax\n\nExample:\n```glyphx\nexpects {name: str!, email: str!}\n```",
+		"validate":   "**validate** - Add validation rules\n\nExpanded form of `?` in compact syntax\n\nExample:\n```glyphx\nvalidate body.email email\n```",
+		"handle":     "**handle** - Handle an event\n\nExpanded form of `~` in compact syntax\n\nExample:\n```glyphx\nhandle \"user.created\" {\n  return \"event processed\"\n}\n```",
+		"func":       "**func** - Define a function\n\nExpanded form of `=` in compact syntax\n\nExample:\n```glyphx\nfunc greet(name: str) {\n  return \"Hello \" + name\n}\n```",
+		"null":       "**null** - Null literal value",
+		"async":      "**async** - Mark an operation as asynchronous",
+		"await":      "**await** - Wait for an async operation to complete",
+		"import":     "**import** - Import a module or dependency",
+		"from":       "**from** - Specify the source for an import",
 	}
 
 	return keywordDocs[keyword]
@@ -992,7 +1167,7 @@ func getBuiltInTypeInfo(typeName string) string {
 }
 
 // formatTypeDefHover formats a type definition for hover display
-func formatTypeDefHover(typeDef *interpreter.TypeDef) string {
+func formatTypeDefHover(typeDef *ast.TypeDef) string {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("**Type: %s**\n\n", typeDef.Name))
@@ -1013,7 +1188,7 @@ func formatTypeDefHover(typeDef *interpreter.TypeDef) string {
 }
 
 // formatRouteHover formats a route for hover display
-func formatRouteHover(route *interpreter.Route) string {
+func formatRouteHover(route *ast.Route) string {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("**Route: %s %s**\n\n", route.Method, route.Path))
@@ -1034,7 +1209,7 @@ func formatRouteHover(route *interpreter.Route) string {
 }
 
 // formatCommandHover formats a CLI command for hover display
-func formatCommandHover(cmd *interpreter.Command) string {
+func formatCommandHover(cmd *ast.Command) string {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("**CLI Command: %s**\n\n", cmd.Name))
@@ -1067,7 +1242,7 @@ func formatCommandHover(cmd *interpreter.Command) string {
 }
 
 // formatCronTaskHover formats a cron task for hover display
-func formatCronTaskHover(cron *interpreter.CronTask) string {
+func formatCronTaskHover(cron *ast.CronTask) string {
 	var sb strings.Builder
 
 	if cron.Name != "" {
@@ -1090,7 +1265,7 @@ func formatCronTaskHover(cron *interpreter.CronTask) string {
 }
 
 // formatEventHandlerHover formats an event handler for hover display
-func formatEventHandlerHover(event *interpreter.EventHandler) string {
+func formatEventHandlerHover(event *ast.EventHandler) string {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("**Event Handler: %s**\n\n", event.EventType))
@@ -1105,7 +1280,7 @@ func formatEventHandlerHover(event *interpreter.EventHandler) string {
 }
 
 // formatQueueWorkerHover formats a queue worker for hover display
-func formatQueueWorkerHover(queue *interpreter.QueueWorker) string {
+func formatQueueWorkerHover(queue *ast.QueueWorker) string {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("**Queue Worker: %s**\n\n", queue.QueueName))
@@ -1126,21 +1301,21 @@ func formatQueueWorkerHover(queue *interpreter.QueueWorker) string {
 }
 
 // formatType formats a type for display
-func formatType(t interpreter.Type) string {
+func formatType(t ast.Type) string {
 	switch v := t.(type) {
-	case interpreter.IntType:
+	case ast.IntType:
 		return "int"
-	case interpreter.StringType:
+	case ast.StringType:
 		return "str"
-	case interpreter.BoolType:
+	case ast.BoolType:
 		return "bool"
-	case interpreter.FloatType:
+	case ast.FloatType:
 		return "float"
-	case interpreter.ArrayType:
+	case ast.ArrayType:
 		return fmt.Sprintf("[%s]", formatType(v.ElementType))
-	case interpreter.OptionalType:
+	case ast.OptionalType:
 		return fmt.Sprintf("%s?", formatType(v.InnerType))
-	case interpreter.NamedType:
+	case ast.NamedType:
 		return v.Name
 	default:
 		return "unknown"
@@ -1148,12 +1323,12 @@ func formatType(t interpreter.Type) string {
 }
 
 // getOptimizerHints analyzes code and provides optimization suggestions
-func getOptimizerHints(module *interpreter.Module) []Diagnostic {
+func getOptimizerHints(module *ast.Module) []Diagnostic {
 	var diagnostics []Diagnostic
 
 	// Analyze each route for optimization opportunities
 	for _, item := range module.Items {
-		if route, ok := item.(*interpreter.Route); ok {
+		if route, ok := item.(*ast.Route); ok {
 			hints := analyzeRouteForOptimizations(route.Body)
 			diagnostics = append(diagnostics, hints...)
 		}
@@ -1163,12 +1338,12 @@ func getOptimizerHints(module *interpreter.Module) []Diagnostic {
 }
 
 // analyzeRouteForOptimizations looks for optimization opportunities in statements
-func analyzeRouteForOptimizations(stmts []interpreter.Statement) []Diagnostic {
+func analyzeRouteForOptimizations(stmts []ast.Statement) []Diagnostic {
 	var diagnostics []Diagnostic
 
 	for _, stmt := range stmts {
 		switch s := stmt.(type) {
-		case *interpreter.AssignStatement:
+		case *ast.AssignStatement:
 			// Check for constant folding opportunities
 			if hint := checkConstantFoldingOpportunity(s.Value); hint != "" {
 				diagnostics = append(diagnostics, Diagnostic{
@@ -1182,7 +1357,7 @@ func analyzeRouteForOptimizations(stmts []interpreter.Statement) []Diagnostic {
 				})
 			}
 
-		case *interpreter.WhileStatement:
+		case *ast.WhileStatement:
 			// Check for loop invariant code
 			if hint := checkLoopInvariants(s); hint != "" {
 				diagnostics = append(diagnostics, Diagnostic{
@@ -1202,10 +1377,10 @@ func analyzeRouteForOptimizations(stmts []interpreter.Statement) []Diagnostic {
 }
 
 // checkConstantFoldingOpportunity checks if an expression can be constant-folded
-func checkConstantFoldingOpportunity(expr interpreter.Expr) string {
-	if binOp, ok := expr.(*interpreter.BinaryOpExpr); ok {
-		leftLit, leftIsLit := binOp.Left.(*interpreter.LiteralExpr)
-		rightLit, rightIsLit := binOp.Right.(*interpreter.LiteralExpr)
+func checkConstantFoldingOpportunity(expr ast.Expr) string {
+	if binOp, ok := expr.(*ast.BinaryOpExpr); ok {
+		leftLit, leftIsLit := binOp.Left.(*ast.LiteralExpr)
+		rightLit, rightIsLit := binOp.Right.(*ast.LiteralExpr)
 
 		// Both operands are literals
 		if leftIsLit && rightIsLit {
@@ -1214,24 +1389,24 @@ func checkConstantFoldingOpportunity(expr interpreter.Expr) string {
 
 		// Check for algebraic simplifications
 		if leftIsLit {
-			if intLit, ok := leftLit.Value.(interpreter.IntLiteral); ok {
-				if intLit.Value == 0 && binOp.Op == interpreter.Add {
+			if intLit, ok := leftLit.Value.(ast.IntLiteral); ok {
+				if intLit.Value == 0 && binOp.Op == ast.Add {
 					return "💡 Adding zero has no effect. Use -O2 to remove redundant operations"
 				}
-				if intLit.Value == 1 && binOp.Op == interpreter.Mul {
+				if intLit.Value == 1 && binOp.Op == ast.Mul {
 					return "💡 Multiplying by one has no effect. Use -O2 to optimize"
 				}
 			}
 		}
 		if rightIsLit {
-			if intLit, ok := rightLit.Value.(interpreter.IntLiteral); ok {
-				if intLit.Value == 0 && binOp.Op == interpreter.Add {
+			if intLit, ok := rightLit.Value.(ast.IntLiteral); ok {
+				if intLit.Value == 0 && binOp.Op == ast.Add {
 					return "💡 Adding zero has no effect. Use -O2 to remove redundant operations"
 				}
-				if intLit.Value == 1 && binOp.Op == interpreter.Mul {
+				if intLit.Value == 1 && binOp.Op == ast.Mul {
 					return "💡 Multiplying by one has no effect. Use -O2 to optimize"
 				}
-				if intLit.Value == 2 && binOp.Op == interpreter.Mul {
+				if intLit.Value == 2 && binOp.Op == ast.Mul {
 					return "💡 Multiplying by 2 can be optimized to addition. Use -O3 for strength reduction"
 				}
 			}
@@ -1242,13 +1417,13 @@ func checkConstantFoldingOpportunity(expr interpreter.Expr) string {
 }
 
 // checkLoopInvariants checks for loop invariant code motion opportunities
-func checkLoopInvariants(whileStmt *interpreter.WhileStatement) string {
+func checkLoopInvariants(whileStmt *ast.WhileStatement) string {
 	// Count assignments that don't depend on loop variables
 	invariantCount := 0
 	totalCount := 0
 
 	for _, stmt := range whileStmt.Body {
-		if _, ok := stmt.(*interpreter.AssignStatement); ok {
+		if _, ok := stmt.(*ast.AssignStatement); ok {
 			totalCount++
 			// Simple heuristic: if it doesn't reference loop condition variables, it might be invariant
 			// A real implementation would do proper data flow analysis
@@ -1353,7 +1528,7 @@ func isRenameableSymbol(doc *Document, word string) bool {
 
 	// Check if it's a defined symbol (type, variable, route param)
 	for _, item := range doc.AST.Items {
-		if typeDef, ok := item.(*interpreter.TypeDef); ok {
+		if typeDef, ok := item.(*ast.TypeDef); ok {
 			if typeDef.Name == word {
 				return true
 			}
@@ -1364,7 +1539,7 @@ func isRenameableSymbol(doc *Document, word string) bool {
 				}
 			}
 		}
-		if route, ok := item.(*interpreter.Route); ok {
+		if route, ok := item.(*ast.Route); ok {
 			params := server.ExtractRouteParamNames(route.Path)
 			for _, param := range params {
 				if param == word {
@@ -1372,7 +1547,7 @@ func isRenameableSymbol(doc *Document, word string) bool {
 				}
 			}
 		}
-		if fn, ok := item.(interpreter.Function); ok {
+		if fn, ok := item.(ast.Function); ok {
 			if fn.Name == word {
 				return true
 			}
@@ -1570,10 +1745,10 @@ func generateSourceActions(doc *Document) []CodeAction {
 		hasTypes := false
 		hasRoutes := false
 		for _, item := range doc.AST.Items {
-			if _, ok := item.(*interpreter.TypeDef); ok {
+			if _, ok := item.(*ast.TypeDef); ok {
 				hasTypes = true
 			}
-			if _, ok := item.(*interpreter.Route); ok {
+			if _, ok := item.(*ast.Route); ok {
 				hasRoutes = true
 			}
 		}

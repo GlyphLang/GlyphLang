@@ -1,9 +1,9 @@
 package parser
 
 import (
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -74,7 +74,7 @@ func TestParser_StructFieldDefaults(t *testing.T) {
 			module, err := parser.Parse()
 			require.NoError(t, err)
 
-			typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+			typeDef, ok := module.Items[0].(*ast.TypeDef)
 			require.True(t, ok)
 			require.Len(t, typeDef.Fields, 1)
 
@@ -107,7 +107,7 @@ func TestParser_StructWithMixedFields(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 	require.Len(t, typeDef.Fields, 4)
 
@@ -145,7 +145,7 @@ func TestParser_FunctionParamDefaults(t *testing.T) {
 	module, err := parser.Parse()
 	require.NoError(t, err)
 
-	fn, ok := module.Items[0].(*interpreter.Function)
+	fn, ok := module.Items[0].(*ast.Function)
 	require.True(t, ok)
 	require.Len(t, fn.Params, 2)
 

@@ -1,6 +1,8 @@
 package interpreter
 
 import (
+	. "github.com/glyphlang/glyph/pkg/ast"
+
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,10 +26,10 @@ type ModuleResolver struct {
 
 // LoadedModule represents a parsed and loaded module
 type LoadedModule struct {
-	Path      string                  // The resolved file path
-	Module    *Module                 // The parsed AST
-	Exports   map[string]interface{}  // Exported items (functions, types, etc.)
-	Namespace string                  // Module namespace if declared
+	Path      string                 // The resolved file path
+	Module    *Module                // The parsed AST
+	Exports   map[string]interface{} // Exported items (functions, types, etc.)
+	Namespace string                 // Module namespace if declared
 }
 
 // NewModuleResolver creates a new module resolver
@@ -196,6 +198,9 @@ func (r *ModuleResolver) extractExports(module *Module) map[string]interface{} {
 			exports[key] = it
 		case *Command:
 			// Commands are exported by name
+			exports[it.Name] = it
+		case *ConstDecl:
+			// All top-level constants are exported
 			exports[it.Name] = it
 		}
 	}

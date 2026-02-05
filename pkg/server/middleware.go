@@ -1,11 +1,15 @@
 package server
 
 import (
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/hex"
 	"log"
 	"net/http"
 	"runtime/debug"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -211,6 +215,7 @@ type AuthRateLimitConfig struct {
 	LockoutDuration time.Duration // Initial lockout duration (default: 1 minute)
 	MaxLockout      time.Duration // Maximum lockout duration with exponential backoff (default: 15 minutes)
 	ResetAfter      time.Duration // Reset failure count after this duration of no failures (default: 15 minutes)
+	TrustProxy      bool          // When true, use X-Forwarded-For/X-Real-IP headers for client IP
 }
 
 // DefaultAuthRateLimitConfig returns sensible defaults for auth rate limiting
@@ -231,15 +236,54 @@ func BasicAuthMiddleware(validTokens map[string]bool) Middleware {
 
 // BasicAuthMiddlewareWithConfig provides token-based authentication with custom rate limit config
 func BasicAuthMiddlewareWithConfig(validTokens map[string]bool, config AuthRateLimitConfig) Middleware {
-	// Track failed auth attempts per IP
+	// Track failed auth attempts per IP.
+	// maxAuthTrackers caps the map size to prevent unbounded memory growth.
+	const maxAuthTrackers = 10000
 	var mu sync.Mutex
 	failureTrackers := make(map[string]*authFailureTracker)
 
+	// evictStaleTrackers removes entries that have not been updated within
+	// the ResetAfter window. Called under mu.Lock when the map exceeds capacity.
+	evictStaleTrackers := func() {
+		now := time.Now()
+		stale := make([]string, 0)
+		for ip, t := range failureTrackers {
+			if now.Sub(t.lastFailure) > config.ResetAfter {
+				stale = append(stale, ip)
+			}
+		}
+		for _, ip := range stale {
+			delete(failureTrackers, ip)
+		}
+	}
+
+	// Background cleanup: remove stale auth failure entries periodically
+	go func() {
+		ticker := time.NewTicker(60 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			mu.Lock()
+			now := time.Now()
+			for ip, tracker := range failureTrackers {
+				// Remove entries that have expired past the lockout and reset periods
+				if now.Sub(tracker.lastFailure) > config.ResetAfter && now.After(tracker.lockedUntil) {
+					delete(failureTrackers, ip)
+				}
+			}
+			mu.Unlock()
+		}
+	}()
+
 	return func(next RouteHandler) RouteHandler {
 		return func(ctx *Context) error {
-			clientIP := getClientIP(ctx.Request)
+			clientIP := getClientIP(ctx.Request, config.TrustProxy)
 
 			mu.Lock()
+			// Evict stale entries when map exceeds capacity
+			if len(failureTrackers) > maxAuthTrackers {
+				evictStaleTrackers()
+			}
+
 			tracker, exists := failureTrackers[clientIP]
 			if !exists {
 				tracker = &authFailureTracker{}
@@ -312,22 +356,60 @@ func recordAuthFailure(clientIP string, trackers map[string]*authFailureTracker,
 	}
 }
 
-// getClientIP extracts the real client IP address from an HTTP request
-// It checks X-Forwarded-For and X-Real-IP headers (for proxy setups)
-// before falling back to RemoteAddr
-func getClientIP(r *http.Request) string {
-	// Check X-Forwarded-For header (may contain multiple IPs, take the first)
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		parts := strings.Split(xff, ",")
-		return strings.TrimSpace(parts[0])
+// trustedProxies holds the set of trusted proxy IPs using atomic.Value for
+// concurrent read/write safety. The stored value is always map[string]bool.
+var trustedProxies atomic.Value
+
+func init() {
+	trustedProxies.Store(map[string]bool{})
+}
+
+func loadTrustedProxies() map[string]bool {
+	return trustedProxies.Load().(map[string]bool)
+}
+
+// SetTrustedProxies configures the set of trusted proxy IP addresses.
+// Only requests from these addresses will have their X-Forwarded-For
+// and X-Real-IP headers honored for client IP extraction.
+// This function is safe for concurrent use.
+func SetTrustedProxies(proxies []string) {
+	m := make(map[string]bool, len(proxies))
+	for _, p := range proxies {
+		m[p] = true
+	}
+	trustedProxies.Store(m)
+}
+
+// getClientIP extracts the client IP address from an HTTP request.
+// When trustProxy is true, it checks X-Forwarded-For and X-Real-IP headers
+// (for proxy setups). If TrustedProxies is configured, proxy headers are
+// only honored when the request comes from a trusted proxy IP.
+// When trustProxy is false (the default), only RemoteAddr is used,
+// preventing clients from spoofing their IP via headers.
+func getClientIP(r *http.Request, trustProxy bool) string {
+	if trustProxy {
+		// If TrustedProxies is configured, only honor proxy headers from trusted IPs
+		tp := loadTrustedProxies()
+		if len(tp) > 0 {
+			remoteIP := r.RemoteAddr
+			// Strip port from RemoteAddr if present
+			if idx := strings.LastIndex(remoteIP, ":"); idx != -1 {
+				remoteIP = remoteIP[:idx]
+			}
+			if !tp[remoteIP] {
+				return r.RemoteAddr
+			}
+		}
+
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			parts := strings.Split(xff, ",")
+			return strings.TrimSpace(parts[0])
+		}
+		if xri := r.Header.Get("X-Real-IP"); xri != "" {
+			return xri
+		}
 	}
 
-	// Check X-Real-IP header
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
-	}
-
-	// Fall back to RemoteAddr
 	return r.RemoteAddr
 }
 
@@ -336,26 +418,56 @@ func getClientIP(r *http.Request) string {
 type RateLimiterConfig struct {
 	RequestsPerMinute int
 	BurstSize         int
+	TrustProxy        bool // When true, use X-Forwarded-For/X-Real-IP headers for client IP
 }
 
 // RateLimitMiddleware implements simple in-memory rate limiting
 func RateLimitMiddleware(config RateLimiterConfig) Middleware {
-	// Simple in-memory store (not production-ready, use Redis in production)
 	type clientLimit struct {
 		tokens       int
 		lastRefill   time.Time
 		requestCount int
 	}
 
+	const maxRateLimitEntries = 10000
 	var mu sync.Mutex
 	limits := make(map[string]*clientLimit)
 
+	// Background cleanup: remove stale entries every 60 seconds
+	go func() {
+		ticker := time.NewTicker(60 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			mu.Lock()
+			now := time.Now()
+			for ip, limit := range limits {
+				if now.Sub(limit.lastRefill) > 10*time.Minute {
+					delete(limits, ip)
+				}
+			}
+			mu.Unlock()
+		}
+	}()
+
 	return func(next RouteHandler) RouteHandler {
 		return func(ctx *Context) error {
-			// Get client identifier (IP address) - supports proxied requests
-			clientIP := getClientIP(ctx.Request)
+			clientIP := getClientIP(ctx.Request, config.TrustProxy)
 
 			mu.Lock()
+
+			// Evict stale entries when map exceeds capacity
+			if len(limits) > maxRateLimitEntries {
+				now := time.Now()
+				stale := make([]string, 0)
+				for ip, l := range limits {
+					if now.Sub(l.lastRefill) > 5*time.Minute {
+						stale = append(stale, ip)
+					}
+				}
+				for _, ip := range stale {
+					delete(limits, ip)
+				}
+			}
 
 			// Get or create limit for this client
 			limit, exists := limits[clientIP]
@@ -367,7 +479,6 @@ func RateLimitMiddleware(config RateLimiterConfig) Middleware {
 				limits[clientIP] = limit
 			}
 
-			// Refill tokens based on time passed
 			now := time.Now()
 			elapsed := now.Sub(limit.lastRefill)
 			tokensToAdd := int(elapsed.Minutes() * float64(config.RequestsPerMinute))
@@ -380,14 +491,12 @@ func RateLimitMiddleware(config RateLimiterConfig) Middleware {
 				limit.lastRefill = now
 			}
 
-			// Check if request is allowed
 			if limit.tokens <= 0 {
 				mu.Unlock()
 				log.Printf("[RATE_LIMIT] Rate limit exceeded for %s", clientIP)
 				return SendError(ctx, 429, "rate limit exceeded")
 			}
 
-			// Consume a token
 			limit.tokens--
 			limit.requestCount++
 			mu.Unlock()
@@ -421,10 +530,13 @@ func TimeoutMiddleware(timeout time.Duration) Middleware {
 				done <- err
 			}()
 
+			timer := time.NewTimer(timeout)
+			defer timer.Stop()
+
 			select {
 			case err := <-done:
 				return err
-			case <-time.After(timeout):
+			case <-timer.C:
 				// Only send timeout error if handler hasn't started writing
 				if tw.tryClaimResponse() {
 					log.Printf("[TIMEOUT] Request timeout after %v: %s %s",
@@ -497,16 +609,18 @@ func (tw *timeoutWriter) Write(b []byte) (int, error) {
 // It should be added early in the middleware chain to trace the entire request lifecycle
 //
 // Usage:
-//   import "github.com/glyphlang/glyph/pkg/tracing"
 //
-//   config := tracing.DefaultMiddlewareConfig()
-//   server := NewServer(
-//       WithMiddleware(TracingMiddleware(config)),
-//   )
+//	import "github.com/glyphlang/glyph/pkg/tracing"
+//
+//	config := tracing.DefaultMiddlewareConfig()
+//	server := NewServer(
+//	    WithMiddleware(TracingMiddleware(config)),
+//	)
 //
 // Note: This requires the tracing package to be initialized first:
-//   tp, err := tracing.InitTracing(tracing.DefaultConfig())
-//   defer tp.Shutdown(context.Background())
+//
+//	tp, err := tracing.InitTracing(tracing.DefaultConfig())
+//	defer tp.Shutdown(context.Background())
 func TracingMiddleware(config interface{}) Middleware {
 	// The actual implementation is in pkg/tracing/integration.go
 	// This is just a placeholder that can be replaced when tracing is properly initialized
@@ -516,4 +630,67 @@ func TracingMiddleware(config interface{}) Middleware {
 			return next(ctx)
 		}
 	}
+}
+
+// CSRFMiddleware provides Cross-Site Request Forgery protection.
+// It generates a random token and sets it as a cookie. On state-changing requests
+// (POST, PUT, PATCH, DELETE), it validates the token from either the X-CSRF-Token
+// header or the csrf_token form field. This middleware is opt-in.
+func CSRFMiddleware() Middleware {
+	return func(next RouteHandler) RouteHandler {
+		return func(ctx *Context) error {
+			r := ctx.Request
+			w := ctx.ResponseWriter
+
+			// Safe methods: generate/refresh token but don't validate
+			if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
+				ensureCSRFCookie(w, r)
+				return next(ctx)
+			}
+
+			// State-changing methods: validate the token
+			cookie, err := r.Cookie("csrf_token")
+			if err != nil || cookie.Value == "" {
+				return SendError(ctx, http.StatusForbidden, "CSRF token missing")
+			}
+
+			// Check X-CSRF-Token header first, then form field
+			token := r.Header.Get("X-CSRF-Token")
+			if token == "" {
+				token = r.FormValue("csrf_token")
+			}
+			if token == "" {
+				return SendError(ctx, http.StatusForbidden, "CSRF token missing from request")
+			}
+
+			if subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(token)) != 1 {
+				return SendError(ctx, http.StatusForbidden, "CSRF token invalid")
+			}
+
+			return next(ctx)
+		}
+	}
+}
+
+// ensureCSRFCookie generates a CSRF token cookie if one is not already present.
+func ensureCSRFCookie(w http.ResponseWriter, r *http.Request) {
+	if _, err := r.Cookie("csrf_token"); err == nil {
+		return // Cookie already exists
+	}
+
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		log.Printf("[CSRF] Failed to generate token: %v", err)
+		return
+	}
+	token := hex.EncodeToString(tokenBytes)
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "csrf_token",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: false, // JS needs to read it to include in requests
+		SameSite: http.SameSiteStrictMode,
+		Secure:   r.TLS != nil,
+	})
 }

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/glyphlang/glyph/pkg/ast"
 	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/parser"
 )
@@ -156,7 +157,7 @@ func (v *Validator) createParseError(err error) *ValidationError {
 }
 
 // validateSemantics performs semantic validation on the AST
-func (v *Validator) validateSemantics(module *interpreter.Module, result *ValidationResult) {
+func (v *Validator) validateSemantics(module *ast.Module, result *ValidationResult) {
 	// Collect all defined types for reference checking
 	definedTypes := make(map[string]bool)
 	builtinTypes := map[string]bool{
@@ -170,7 +171,7 @@ func (v *Validator) validateSemantics(module *interpreter.Module, result *Valida
 
 	// First pass: collect all type definitions
 	for _, item := range module.Items {
-		if typeDef, ok := item.(*interpreter.TypeDef); ok {
+		if typeDef, ok := item.(*ast.TypeDef); ok {
 			if definedTypes[typeDef.Name] {
 				result.Errors = append(result.Errors, &ValidationError{
 					Type:      ErrTypeDuplicate,
@@ -188,11 +189,11 @@ func (v *Validator) validateSemantics(module *interpreter.Module, result *Valida
 	// Second pass: validate type references
 	for _, item := range module.Items {
 		switch node := item.(type) {
-		case *interpreter.TypeDef:
+		case *ast.TypeDef:
 			v.validateTypeFields(node, definedTypes, builtinTypes, result)
-		case *interpreter.Route:
+		case *ast.Route:
 			v.validateRoute(node, definedTypes, builtinTypes, result)
-		case *interpreter.Function:
+		case *ast.Function:
 			v.validateFunction(node, definedTypes, builtinTypes, result)
 		}
 	}
@@ -202,7 +203,7 @@ func (v *Validator) validateSemantics(module *interpreter.Module, result *Valida
 }
 
 // processImports processes import statements and adds imported types to the defined types map
-func (v *Validator) processImports(module *interpreter.Module, definedTypes map[string]bool, result *ValidationResult) {
+func (v *Validator) processImports(module *ast.Module, definedTypes map[string]bool, result *ValidationResult) {
 	// Get the base path for resolving relative imports
 	basePath := filepath.Dir(v.filePath)
 
@@ -211,7 +212,7 @@ func (v *Validator) processImports(module *interpreter.Module, definedTypes map[
 	resolver.AddSearchPath(basePath)
 
 	// Set up the parse function for the resolver
-	resolver.SetParseFunc(func(source string) (*interpreter.Module, error) {
+	resolver.SetParseFunc(func(source string) (*ast.Module, error) {
 		lexer := parser.NewLexer(source)
 		tokens, err := lexer.Tokenize()
 		if err != nil {
@@ -237,7 +238,7 @@ func (v *Validator) processImports(module *interpreter.Module, definedTypes map[
 	// Add imported types to the defined types map with their aliases
 	for alias, loadedModule := range imports {
 		for name, item := range loadedModule.Exports {
-			if _, isType := item.(*interpreter.TypeDef); isType {
+			if _, isType := item.(*ast.TypeDef); isType {
 				// Add the type with the alias prefix (e.g., "m.User")
 				qualifiedName := alias + "." + name
 				definedTypes[qualifiedName] = true
@@ -247,12 +248,12 @@ func (v *Validator) processImports(module *interpreter.Module, definedTypes map[
 
 	// Also process selective imports (from "./module" import { Type1, Type2 })
 	for _, item := range module.Items {
-		if importStmt, ok := item.(*interpreter.ImportStatement); ok && importStmt.Selective {
+		if importStmt, ok := item.(*ast.ImportStatement); ok && importStmt.Selective {
 			// For selective imports, the imported names are used directly without prefix
 			if loadedModule, exists := imports[importStmt.Path]; exists {
 				for _, importName := range importStmt.Names {
 					if item, ok := loadedModule.Exports[importName.Name]; ok {
-						if _, isType := item.(*interpreter.TypeDef); isType {
+						if _, isType := item.(*ast.TypeDef); isType {
 							// Use alias if provided, otherwise use original name
 							name := importName.Name
 							if importName.Alias != "" {
@@ -268,14 +269,14 @@ func (v *Validator) processImports(module *interpreter.Module, definedTypes map[
 }
 
 // validateTypeFields validates field types in a type definition
-func (v *Validator) validateTypeFields(typeDef *interpreter.TypeDef, defined, builtin map[string]bool, result *ValidationResult) {
+func (v *Validator) validateTypeFields(typeDef *ast.TypeDef, defined, builtin map[string]bool, result *ValidationResult) {
 	for _, field := range typeDef.Fields {
 		v.validateTypeRef(field.TypeAnnotation, defined, builtin, result, typeDef.Name)
 	}
 }
 
 // validateRoute validates a route definition
-func (v *Validator) validateRoute(route *interpreter.Route, defined, builtin map[string]bool, result *ValidationResult) {
+func (v *Validator) validateRoute(route *ast.Route, defined, builtin map[string]bool, result *ValidationResult) {
 	// Validate return type
 	if route.ReturnType != nil {
 		v.validateTypeRef(route.ReturnType, defined, builtin, result, fmt.Sprintf("route %s %s", route.Method, route.Path))
@@ -314,7 +315,7 @@ func (v *Validator) validateRoute(route *interpreter.Route, defined, builtin map
 }
 
 // validateFunction validates a function definition
-func (v *Validator) validateFunction(fn *interpreter.Function, defined, builtin map[string]bool, result *ValidationResult) {
+func (v *Validator) validateFunction(fn *ast.Function, defined, builtin map[string]bool, result *ValidationResult) {
 	// Validate return type
 	if fn.ReturnType != nil {
 		v.validateTypeRef(fn.ReturnType, defined, builtin, result, fmt.Sprintf("function %s", fn.Name))
@@ -327,13 +328,13 @@ func (v *Validator) validateFunction(fn *interpreter.Function, defined, builtin 
 }
 
 // validateTypeRef validates a type reference
-func (v *Validator) validateTypeRef(t interpreter.Type, defined, builtin map[string]bool, result *ValidationResult, context string) {
+func (v *Validator) validateTypeRef(t ast.Type, defined, builtin map[string]bool, result *ValidationResult, context string) {
 	if t == nil {
 		return
 	}
 
 	switch typ := t.(type) {
-	case interpreter.NamedType:
+	case ast.NamedType:
 		if !defined[typ.Name] && !builtin[typ.Name] {
 			result.Errors = append(result.Errors, &ValidationError{
 				Type:      ErrTypeUndefined,
@@ -344,11 +345,11 @@ func (v *Validator) validateTypeRef(t interpreter.Type, defined, builtin map[str
 			})
 			result.Valid = false
 		}
-	case interpreter.ArrayType:
+	case ast.ArrayType:
 		v.validateTypeRef(typ.ElementType, defined, builtin, result, context)
-	case interpreter.OptionalType:
+	case ast.OptionalType:
 		v.validateTypeRef(typ.InnerType, defined, builtin, result, context)
-	case interpreter.GenericType:
+	case ast.GenericType:
 		v.validateTypeRef(typ.BaseType, defined, builtin, result, context)
 		for _, arg := range typ.TypeArgs {
 			v.validateTypeRef(arg, defined, builtin, result, context)
@@ -357,11 +358,11 @@ func (v *Validator) validateTypeRef(t interpreter.Type, defined, builtin map[str
 }
 
 // checkCommonIssues checks for common coding issues
-func (v *Validator) checkCommonIssues(module *interpreter.Module, result *ValidationResult) {
+func (v *Validator) checkCommonIssues(module *ast.Module, result *ValidationResult) {
 	routePaths := make(map[string]bool)
 
 	for _, item := range module.Items {
-		if route, ok := item.(*interpreter.Route); ok {
+		if route, ok := item.(*ast.Route); ok {
 			key := fmt.Sprintf("%s %s", route.Method, route.Path)
 			if routePaths[key] {
 				result.Errors = append(result.Errors, &ValidationError{
@@ -379,16 +380,16 @@ func (v *Validator) checkCommonIssues(module *interpreter.Module, result *Valida
 }
 
 // collectStats collects statistics about the module
-func (v *Validator) collectStats(module *interpreter.Module, stats *ValidationStats) {
+func (v *Validator) collectStats(module *ast.Module, stats *ValidationStats) {
 	for _, item := range module.Items {
 		switch item.(type) {
-		case *interpreter.TypeDef:
+		case *ast.TypeDef:
 			stats.Types++
-		case *interpreter.Route:
+		case *ast.Route:
 			stats.Routes++
-		case *interpreter.Function:
+		case *ast.Function:
 			stats.Functions++
-		case *interpreter.Command:
+		case *ast.Command:
 			stats.Commands++
 		}
 	}

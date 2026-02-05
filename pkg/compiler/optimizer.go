@@ -2,8 +2,7 @@ package compiler
 
 import (
 	"fmt"
-
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 )
 
 // OptimizationLevel defines how aggressive optimization should be
@@ -18,29 +17,29 @@ const (
 // Optimizer performs optimization passes on AST
 type Optimizer struct {
 	level       OptimizationLevel
-	constants   map[string]interpreter.Literal       // Track constant values for variables
-	expressions map[string]string                    // Track expression -> variable name for CSE
-	copies      map[string]string                    // Track variable copies (x = y means copies[x] = y)
+	constants   map[string]ast.Literal // Track constant values for variables
+	expressions map[string]string      // Track expression -> variable name for CSE
+	copies      map[string]string      // Track variable copies (x = y means copies[x] = y)
 }
 
 // NewOptimizer creates a new optimizer instance
 func NewOptimizer(level OptimizationLevel) *Optimizer {
 	return &Optimizer{
 		level:       level,
-		constants:   make(map[string]interpreter.Literal),
+		constants:   make(map[string]ast.Literal),
 		expressions: make(map[string]string),
 		copies:      make(map[string]string),
 	}
 }
 
 // OptimizeExpression optimizes an expression
-func (o *Optimizer) OptimizeExpression(expr interpreter.Expr) interpreter.Expr {
+func (o *Optimizer) OptimizeExpression(expr ast.Expr) ast.Expr {
 	if o.level == OptNone {
 		return expr
 	}
 
 	switch e := expr.(type) {
-	case *interpreter.VariableExpr:
+	case *ast.VariableExpr:
 		// Copy propagation: follow copy chains
 		varName := e.Name
 		if o.level >= OptBasic {
@@ -63,36 +62,36 @@ func (o *Optimizer) OptimizeExpression(expr interpreter.Expr) interpreter.Expr {
 
 		// Constant propagation: replace variable with constant if known
 		if lit, ok := o.constants[varName]; ok {
-			return &interpreter.LiteralExpr{Value: lit}
+			return &ast.LiteralExpr{Value: lit}
 		}
 
 		// Return the resolved variable (might be different due to copy propagation)
 		if varName != e.Name {
-			return &interpreter.VariableExpr{Name: varName}
+			return &ast.VariableExpr{Name: varName}
 		}
 		return expr
-	case *interpreter.BinaryOpExpr:
+	case *ast.BinaryOpExpr:
 		return o.foldBinaryOp(e)
-	case *interpreter.ObjectExpr:
+	case *ast.ObjectExpr:
 		// Optimize object fields
-		fields := make([]interpreter.ObjectField, len(e.Fields))
+		fields := make([]ast.ObjectField, len(e.Fields))
 		for i, field := range e.Fields {
-			fields[i] = interpreter.ObjectField{
+			fields[i] = ast.ObjectField{
 				Key:   field.Key,
 				Value: o.OptimizeExpression(field.Value),
 			}
 		}
-		return &interpreter.ObjectExpr{Fields: fields}
-	case *interpreter.ArrayExpr:
+		return &ast.ObjectExpr{Fields: fields}
+	case *ast.ArrayExpr:
 		// Optimize array elements
-		elements := make([]interpreter.Expr, len(e.Elements))
+		elements := make([]ast.Expr, len(e.Elements))
 		for i, elem := range e.Elements {
 			elements[i] = o.OptimizeExpression(elem)
 		}
-		return &interpreter.ArrayExpr{Elements: elements}
-	case *interpreter.FieldAccessExpr:
+		return &ast.ArrayExpr{Elements: elements}
+	case *ast.FieldAccessExpr:
 		// Optimize the object expression
-		return &interpreter.FieldAccessExpr{
+		return &ast.FieldAccessExpr{
 			Object: o.OptimizeExpression(e.Object),
 			Field:  e.Field,
 		}
@@ -102,12 +101,12 @@ func (o *Optimizer) OptimizeExpression(expr interpreter.Expr) interpreter.Expr {
 }
 
 // OptimizeStatements optimizes a list of statements
-func (o *Optimizer) OptimizeStatements(stmts []interpreter.Statement) []interpreter.Statement {
+func (o *Optimizer) OptimizeStatements(stmts []ast.Statement) []ast.Statement {
 	if o.level == OptNone {
 		return stmts
 	}
 
-	result := make([]interpreter.Statement, 0, len(stmts))
+	result := make([]ast.Statement, 0, len(stmts))
 	reachedReturn := false
 
 	for _, stmt := range stmts {
@@ -117,12 +116,12 @@ func (o *Optimizer) OptimizeStatements(stmts []interpreter.Statement) []interpre
 		}
 
 		switch s := stmt.(type) {
-		case *interpreter.AssignStatement:
+		case *ast.AssignStatement:
 			// Optimize the value expression
 			optimizedValue := o.OptimizeExpression(s.Value)
 
 			// Copy propagation: track variable-to-variable assignments
-			if varExpr, ok := optimizedValue.(*interpreter.VariableExpr); ok {
+			if varExpr, ok := optimizedValue.(*ast.VariableExpr); ok {
 				o.copies[s.Target] = varExpr.Name
 				// Invalidate constant and expression tracking for this variable
 				delete(o.constants, s.Target)
@@ -137,7 +136,7 @@ func (o *Optimizer) OptimizeStatements(stmts []interpreter.Statement) []interpre
 						// Check if this expression was already computed
 						if existingVar, ok := o.expressions[key]; ok {
 							// Reuse the existing variable
-							optimizedValue = &interpreter.VariableExpr{Name: existingVar}
+							optimizedValue = &ast.VariableExpr{Name: existingVar}
 							// Now it's a copy
 							o.copies[s.Target] = existingVar
 						} else {
@@ -148,7 +147,7 @@ func (o *Optimizer) OptimizeStatements(stmts []interpreter.Statement) []interpre
 				}
 
 				// Track constant assignments for constant propagation
-				if litExpr, ok := optimizedValue.(*interpreter.LiteralExpr); ok {
+				if litExpr, ok := optimizedValue.(*ast.LiteralExpr); ok {
 					o.constants[s.Target] = litExpr.Value
 				} else {
 					// Non-constant assignment, invalidate any previous constant
@@ -156,18 +155,18 @@ func (o *Optimizer) OptimizeStatements(stmts []interpreter.Statement) []interpre
 				}
 			}
 
-			optimized := &interpreter.AssignStatement{
+			optimized := &ast.AssignStatement{
 				Target: s.Target,
 				Value:  optimizedValue,
 			}
 			result = append(result, optimized)
 
-		case *interpreter.ReassignStatement:
+		case *ast.ReassignStatement:
 			// Optimize the value expression (same logic as AssignStatement)
 			optimizedValue := o.OptimizeExpression(s.Value)
 
 			// Copy propagation: track variable-to-variable assignments
-			if varExpr, ok := optimizedValue.(*interpreter.VariableExpr); ok {
+			if varExpr, ok := optimizedValue.(*ast.VariableExpr); ok {
 				o.copies[s.Target] = varExpr.Name
 				// Invalidate constant and expression tracking for this variable
 				delete(o.constants, s.Target)
@@ -182,7 +181,7 @@ func (o *Optimizer) OptimizeStatements(stmts []interpreter.Statement) []interpre
 						// Check if this expression was already computed
 						if existingVar, ok := o.expressions[key]; ok {
 							// Reuse the existing variable
-							optimizedValue = &interpreter.VariableExpr{Name: existingVar}
+							optimizedValue = &ast.VariableExpr{Name: existingVar}
 							// Now it's a copy
 							o.copies[s.Target] = existingVar
 						} else {
@@ -193,7 +192,7 @@ func (o *Optimizer) OptimizeStatements(stmts []interpreter.Statement) []interpre
 				}
 
 				// Track constant assignments for constant propagation
-				if litExpr, ok := optimizedValue.(*interpreter.LiteralExpr); ok {
+				if litExpr, ok := optimizedValue.(*ast.LiteralExpr); ok {
 					o.constants[s.Target] = litExpr.Value
 				} else {
 					// Non-constant assignment, invalidate any previous constant
@@ -201,17 +200,17 @@ func (o *Optimizer) OptimizeStatements(stmts []interpreter.Statement) []interpre
 				}
 			}
 
-			optimized := &interpreter.ReassignStatement{
+			optimized := &ast.ReassignStatement{
 				Target: s.Target,
 				Value:  optimizedValue,
 			}
 			result = append(result, optimized)
 
-		case interpreter.ReassignStatement:
-			// Same as *interpreter.ReassignStatement
+		case ast.ReassignStatement:
+			// Same as *ast.ReassignStatement
 			optimizedValue := o.OptimizeExpression(s.Value)
 
-			if varExpr, ok := optimizedValue.(*interpreter.VariableExpr); ok {
+			if varExpr, ok := optimizedValue.(*ast.VariableExpr); ok {
 				o.copies[s.Target] = varExpr.Name
 				delete(o.constants, s.Target)
 			} else {
@@ -221,7 +220,7 @@ func (o *Optimizer) OptimizeStatements(stmts []interpreter.Statement) []interpre
 					key := exprKey(optimizedValue)
 					if key != "" {
 						if existingVar, ok := o.expressions[key]; ok {
-							optimizedValue = &interpreter.VariableExpr{Name: existingVar}
+							optimizedValue = &ast.VariableExpr{Name: existingVar}
 							o.copies[s.Target] = existingVar
 						} else {
 							o.expressions[key] = s.Target
@@ -229,33 +228,33 @@ func (o *Optimizer) OptimizeStatements(stmts []interpreter.Statement) []interpre
 					}
 				}
 
-				if litExpr, ok := optimizedValue.(*interpreter.LiteralExpr); ok {
+				if litExpr, ok := optimizedValue.(*ast.LiteralExpr); ok {
 					o.constants[s.Target] = litExpr.Value
 				} else {
 					delete(o.constants, s.Target)
 				}
 			}
 
-			result = append(result, &interpreter.ReassignStatement{
+			result = append(result, &ast.ReassignStatement{
 				Target: s.Target,
 				Value:  optimizedValue,
 			})
 
-		case *interpreter.ReturnStatement:
+		case *ast.ReturnStatement:
 			// Optimize return value
-			optimized := &interpreter.ReturnStatement{
+			optimized := &ast.ReturnStatement{
 				Value: o.OptimizeExpression(s.Value),
 			}
 			result = append(result, optimized)
 			reachedReturn = true
 
-		case *interpreter.IfStatement:
+		case *ast.IfStatement:
 			// Try to optimize the condition
 			condition := o.OptimizeExpression(s.Condition)
 
 			// Check if condition is a constant boolean
-			if litExpr, ok := condition.(*interpreter.LiteralExpr); ok {
-				if boolLit, ok := litExpr.Value.(interpreter.BoolLiteral); ok {
+			if litExpr, ok := condition.(*ast.LiteralExpr); ok {
+				if boolLit, ok := litExpr.Value.(ast.BoolLiteral); ok {
 					// Constant condition - eliminate dead branch
 					if boolLit.Value {
 						// Condition is always true - use only then block
@@ -269,14 +268,14 @@ func (o *Optimizer) OptimizeStatements(stmts []interpreter.Statement) []interpre
 			}
 
 			// Not a constant condition - optimize both branches
-			optimized := &interpreter.IfStatement{
+			optimized := &ast.IfStatement{
 				Condition: condition,
 				ThenBlock: o.OptimizeStatements(s.ThenBlock),
 				ElseBlock: o.OptimizeStatements(s.ElseBlock),
 			}
 			result = append(result, optimized)
 
-		case *interpreter.WhileStatement:
+		case *ast.WhileStatement:
 			// First, invalidate constants for any variables modified in the loop body
 			// because the loop may execute multiple times or not at all
 			modifiedVars := getModifiedVariables(s.Body)
@@ -287,8 +286,8 @@ func (o *Optimizer) OptimizeStatements(stmts []interpreter.Statement) []interpre
 			}
 
 			// Loop invariant code motion (OptAggressive only)
-			var invariantStmts []interpreter.Statement
-			var loopBody []interpreter.Statement
+			var invariantStmts []ast.Statement
+			var loopBody []ast.Statement
 
 			if o.level >= OptAggressive {
 				// Also check if condition uses any variables
@@ -296,7 +295,7 @@ func (o *Optimizer) OptimizeStatements(stmts []interpreter.Statement) []interpre
 
 				// Separate invariant assignments from loop-variant ones
 				for _, bodyStmt := range s.Body {
-					if assignStmt, ok := bodyStmt.(*interpreter.AssignStatement); ok {
+					if assignStmt, ok := bodyStmt.(*ast.AssignStatement); ok {
 						// Check if this assignment is loop-invariant
 						// An assignment is invariant if:
 						// 1. Its RHS doesn't depend on modified variables
@@ -315,17 +314,17 @@ func (o *Optimizer) OptimizeStatements(stmts []interpreter.Statement) []interpre
 
 			// Add invariant statements before the loop
 			for _, invStmt := range invariantStmts {
-				result = append(result, o.OptimizeStatements([]interpreter.Statement{invStmt})...)
+				result = append(result, o.OptimizeStatements([]ast.Statement{invStmt})...)
 			}
 
 			// Optimize condition and remaining loop body
-			optimized := &interpreter.WhileStatement{
+			optimized := &ast.WhileStatement{
 				Condition: o.OptimizeExpression(s.Condition),
 				Body:      o.OptimizeStatements(loopBody),
 			}
 			result = append(result, optimized)
 
-		case *interpreter.ForStatement:
+		case *ast.ForStatement:
 			// Invalidate constants for any variables modified in the for loop body
 			// because the loop may execute multiple times or not at all
 			modifiedVars := getModifiedVariables(s.Body)
@@ -344,8 +343,8 @@ func (o *Optimizer) OptimizeStatements(stmts []interpreter.Statement) []interpre
 			// Add the for statement unchanged (could optimize body in future)
 			result = append(result, s)
 
-		case interpreter.ForStatement:
-			// Same as *interpreter.ForStatement
+		case ast.ForStatement:
+			// Same as *ast.ForStatement
 			modifiedVars := getModifiedVariables(s.Body)
 			for varName := range modifiedVars {
 				delete(o.constants, varName)
@@ -360,7 +359,7 @@ func (o *Optimizer) OptimizeStatements(stmts []interpreter.Statement) []interpre
 			delete(o.copies, s.ValueVar)
 			result = append(result, &s)
 
-		case *interpreter.SwitchStatement:
+		case *ast.SwitchStatement:
 			// Invalidate constants for any variables modified in switch case bodies
 			// because we don't know which case will execute at compile time
 			for _, switchCase := range s.Cases {
@@ -382,8 +381,8 @@ func (o *Optimizer) OptimizeStatements(stmts []interpreter.Statement) []interpre
 			}
 			result = append(result, s)
 
-		case interpreter.SwitchStatement:
-			// Same as *interpreter.SwitchStatement
+		case ast.SwitchStatement:
+			// Same as *ast.SwitchStatement
 			for _, switchCase := range s.Cases {
 				modifiedVars := getModifiedVariables(switchCase.Body)
 				for varName := range modifiedVars {
@@ -411,41 +410,41 @@ func (o *Optimizer) OptimizeStatements(stmts []interpreter.Statement) []interpre
 }
 
 // foldBinaryOp performs constant folding on binary operations
-func (o *Optimizer) foldBinaryOp(expr *interpreter.BinaryOpExpr) interpreter.Expr {
+func (o *Optimizer) foldBinaryOp(expr *ast.BinaryOpExpr) ast.Expr {
 	// First optimize operands recursively
 	left := o.OptimizeExpression(expr.Left)
 	right := o.OptimizeExpression(expr.Right)
 
 	// Arithmetic identities: x op x = constant (for OptAggressive)
+	// NOTE: These optimizations are only safe for integer types.
+	// For floats, NaN != NaN (IEEE 754), and x/0 must produce an error.
+	// We only apply these when both sides are provably integer-typed literals.
 	if o.level >= OptAggressive {
-		if areExprsEqual(left, right) {
+		if areExprsEqual(left, right) && isProvablyIntegerExpr(left) {
 			switch expr.Op {
-			case interpreter.Sub:
-				// x - x = 0
-				return &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}}
-			case interpreter.Div:
-				// x / x = 1 (assuming x != 0, which we can't verify at compile time)
-				// Only optimize if safe
-				return &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}}
-			case interpreter.Eq:
-				// x == x = true
-				return &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}}
-			case interpreter.Ne:
-				// x != x = false
-				return &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: false}}
-			case interpreter.Le, interpreter.Ge:
-				// x <= x = true, x >= x = true
-				return &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}}
-			case interpreter.Lt, interpreter.Gt:
-				// x < x = false, x > x = false
-				return &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: false}}
+			case ast.Sub:
+				// x - x = 0 (safe for integers)
+				return &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}}
+			case ast.Eq:
+				// x == x = true (safe for integers, not for NaN floats)
+				return &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}}
+			case ast.Ne:
+				// x != x = false (safe for integers, not for NaN floats)
+				return &ast.LiteralExpr{Value: ast.BoolLiteral{Value: false}}
+			case ast.Le, ast.Ge:
+				// x <= x = true, x >= x = true (safe for integers)
+				return &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}}
+			case ast.Lt, ast.Gt:
+				// x < x = false, x > x = false (safe for integers)
+				return &ast.LiteralExpr{Value: ast.BoolLiteral{Value: false}}
+				// NOTE: x / x = 1 is NOT safe -- x could be 0 at runtime
 			}
 		}
 	}
 
 	// Try to extract literal values
-	leftLit, leftIsLit := left.(*interpreter.LiteralExpr)
-	rightLit, rightIsLit := right.(*interpreter.LiteralExpr)
+	leftLit, leftIsLit := left.(*ast.LiteralExpr)
+	rightLit, rightIsLit := right.(*ast.LiteralExpr)
 
 	// Both operands are literals - fold the operation
 	if leftIsLit && rightIsLit {
@@ -460,22 +459,34 @@ func (o *Optimizer) foldBinaryOp(expr *interpreter.BinaryOpExpr) interpreter.Exp
 	}
 
 	// Return optimized but not fully folded expression
-	return &interpreter.BinaryOpExpr{
+	return &ast.BinaryOpExpr{
 		Op:    expr.Op,
 		Left:  left,
 		Right: right,
 	}
 }
 
+// isProvablyIntegerExpr returns true if the expression is provably integer-typed
+// (e.g., an integer literal). This is used to guard identity optimizations that
+// are unsafe for floats (NaN) or zero-valued expressions.
+func isProvablyIntegerExpr(e ast.Expr) bool {
+	if lit, ok := e.(*ast.LiteralExpr); ok {
+		if _, isInt := lit.Value.(ast.IntLiteral); isInt {
+			return true
+		}
+	}
+	return false
+}
+
 // areExprsEqual checks if two expressions are structurally equal
-func areExprsEqual(a, b interpreter.Expr) bool {
+func areExprsEqual(a, b ast.Expr) bool {
 	switch aExpr := a.(type) {
-	case *interpreter.VariableExpr:
-		if bExpr, ok := b.(*interpreter.VariableExpr); ok {
+	case *ast.VariableExpr:
+		if bExpr, ok := b.(*ast.VariableExpr); ok {
 			return aExpr.Name == bExpr.Name
 		}
-	case *interpreter.LiteralExpr:
-		if bExpr, ok := b.(*interpreter.LiteralExpr); ok {
+	case *ast.LiteralExpr:
+		if bExpr, ok := b.(*ast.LiteralExpr); ok {
 			return literalsEqual(aExpr.Value, bExpr.Value)
 		}
 	}
@@ -483,148 +494,148 @@ func areExprsEqual(a, b interpreter.Expr) bool {
 }
 
 // literalsEqual compares two literals for equality
-func literalsEqual(a, b interpreter.Literal) bool {
+func literalsEqual(a, b ast.Literal) bool {
 	switch aLit := a.(type) {
-	case interpreter.IntLiteral:
-		if bLit, ok := b.(interpreter.IntLiteral); ok {
+	case ast.IntLiteral:
+		if bLit, ok := b.(ast.IntLiteral); ok {
 			return aLit.Value == bLit.Value
 		}
-	case interpreter.FloatLiteral:
-		if bLit, ok := b.(interpreter.FloatLiteral); ok {
+	case ast.FloatLiteral:
+		if bLit, ok := b.(ast.FloatLiteral); ok {
 			return aLit.Value == bLit.Value
 		}
-	case interpreter.BoolLiteral:
-		if bLit, ok := b.(interpreter.BoolLiteral); ok {
+	case ast.BoolLiteral:
+		if bLit, ok := b.(ast.BoolLiteral); ok {
 			return aLit.Value == bLit.Value
 		}
-	case interpreter.StringLiteral:
-		if bLit, ok := b.(interpreter.StringLiteral); ok {
+	case ast.StringLiteral:
+		if bLit, ok := b.(ast.StringLiteral); ok {
 			return aLit.Value == bLit.Value
 		}
-	case interpreter.NullLiteral:
-		_, ok := b.(interpreter.NullLiteral)
+	case ast.NullLiteral:
+		_, ok := b.(ast.NullLiteral)
 		return ok
 	}
 	return false
 }
 
 // foldLiteralBinaryOp folds binary operations on two literals
-func (o *Optimizer) foldLiteralBinaryOp(op interpreter.BinOp, left, right *interpreter.LiteralExpr) interpreter.Expr {
+func (o *Optimizer) foldLiteralBinaryOp(op ast.BinOp, left, right *ast.LiteralExpr) ast.Expr {
 	// Extract int literals
-	leftInt, leftIsInt := left.Value.(interpreter.IntLiteral)
-	rightInt, rightIsInt := right.Value.(interpreter.IntLiteral)
+	leftInt, leftIsInt := left.Value.(ast.IntLiteral)
+	rightInt, rightIsInt := right.Value.(ast.IntLiteral)
 
 	// Extract float literals
-	leftFloat, leftIsFloat := left.Value.(interpreter.FloatLiteral)
-	rightFloat, rightIsFloat := right.Value.(interpreter.FloatLiteral)
+	leftFloat, leftIsFloat := left.Value.(ast.FloatLiteral)
+	rightFloat, rightIsFloat := right.Value.(ast.FloatLiteral)
 
 	// Extract bool literals
-	leftBool, leftIsBool := left.Value.(interpreter.BoolLiteral)
-	rightBool, rightIsBool := right.Value.(interpreter.BoolLiteral)
+	leftBool, leftIsBool := left.Value.(ast.BoolLiteral)
+	rightBool, rightIsBool := right.Value.(ast.BoolLiteral)
 
 	// Arithmetic operations on integers
 	if leftIsInt && rightIsInt {
 		var result int64
 		switch op {
-		case interpreter.Add:
+		case ast.Add:
 			result = leftInt.Value + rightInt.Value
-			return &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: result}}
-		case interpreter.Sub:
+			return &ast.LiteralExpr{Value: ast.IntLiteral{Value: result}}
+		case ast.Sub:
 			result = leftInt.Value - rightInt.Value
-			return &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: result}}
-		case interpreter.Mul:
+			return &ast.LiteralExpr{Value: ast.IntLiteral{Value: result}}
+		case ast.Mul:
 			result = leftInt.Value * rightInt.Value
-			return &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: result}}
-		case interpreter.Div:
+			return &ast.LiteralExpr{Value: ast.IntLiteral{Value: result}}
+		case ast.Div:
 			if rightInt.Value != 0 {
 				result = leftInt.Value / rightInt.Value
-				return &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: result}}
+				return &ast.LiteralExpr{Value: ast.IntLiteral{Value: result}}
 			}
 		}
 
 		// Comparison operations on integers
 		var boolResult bool
 		switch op {
-		case interpreter.Eq:
+		case ast.Eq:
 			boolResult = leftInt.Value == rightInt.Value
-		case interpreter.Ne:
+		case ast.Ne:
 			boolResult = leftInt.Value != rightInt.Value
-		case interpreter.Lt:
+		case ast.Lt:
 			boolResult = leftInt.Value < rightInt.Value
-		case interpreter.Le:
+		case ast.Le:
 			boolResult = leftInt.Value <= rightInt.Value
-		case interpreter.Gt:
+		case ast.Gt:
 			boolResult = leftInt.Value > rightInt.Value
-		case interpreter.Ge:
+		case ast.Ge:
 			boolResult = leftInt.Value >= rightInt.Value
 		default:
 			goto noFold
 		}
-		return &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: boolResult}}
+		return &ast.LiteralExpr{Value: ast.BoolLiteral{Value: boolResult}}
 	}
 
 	// Arithmetic operations on floats
 	if leftIsFloat && rightIsFloat {
 		var result float64
 		switch op {
-		case interpreter.Add:
+		case ast.Add:
 			result = leftFloat.Value + rightFloat.Value
-			return &interpreter.LiteralExpr{Value: interpreter.FloatLiteral{Value: result}}
-		case interpreter.Sub:
+			return &ast.LiteralExpr{Value: ast.FloatLiteral{Value: result}}
+		case ast.Sub:
 			result = leftFloat.Value - rightFloat.Value
-			return &interpreter.LiteralExpr{Value: interpreter.FloatLiteral{Value: result}}
-		case interpreter.Mul:
+			return &ast.LiteralExpr{Value: ast.FloatLiteral{Value: result}}
+		case ast.Mul:
 			result = leftFloat.Value * rightFloat.Value
-			return &interpreter.LiteralExpr{Value: interpreter.FloatLiteral{Value: result}}
-		case interpreter.Div:
+			return &ast.LiteralExpr{Value: ast.FloatLiteral{Value: result}}
+		case ast.Div:
 			if rightFloat.Value != 0 {
 				result = leftFloat.Value / rightFloat.Value
-				return &interpreter.LiteralExpr{Value: interpreter.FloatLiteral{Value: result}}
+				return &ast.LiteralExpr{Value: ast.FloatLiteral{Value: result}}
 			}
 		}
 
 		// Comparison operations on floats
 		var boolResult bool
 		switch op {
-		case interpreter.Eq:
+		case ast.Eq:
 			boolResult = leftFloat.Value == rightFloat.Value
-		case interpreter.Ne:
+		case ast.Ne:
 			boolResult = leftFloat.Value != rightFloat.Value
-		case interpreter.Lt:
+		case ast.Lt:
 			boolResult = leftFloat.Value < rightFloat.Value
-		case interpreter.Le:
+		case ast.Le:
 			boolResult = leftFloat.Value <= rightFloat.Value
-		case interpreter.Gt:
+		case ast.Gt:
 			boolResult = leftFloat.Value > rightFloat.Value
-		case interpreter.Ge:
+		case ast.Ge:
 			boolResult = leftFloat.Value >= rightFloat.Value
 		default:
 			goto noFold
 		}
-		return &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: boolResult}}
+		return &ast.LiteralExpr{Value: ast.BoolLiteral{Value: boolResult}}
 	}
 
 	// Boolean operations
 	if leftIsBool && rightIsBool {
 		var result bool
 		switch op {
-		case interpreter.And:
+		case ast.And:
 			result = leftBool.Value && rightBool.Value
-		case interpreter.Or:
+		case ast.Or:
 			result = leftBool.Value || rightBool.Value
-		case interpreter.Eq:
+		case ast.Eq:
 			result = leftBool.Value == rightBool.Value
-		case interpreter.Ne:
+		case ast.Ne:
 			result = leftBool.Value != rightBool.Value
 		default:
 			goto noFold
 		}
-		return &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: result}}
+		return &ast.LiteralExpr{Value: ast.BoolLiteral{Value: result}}
 	}
 
 noFold:
 	// Cannot fold - return original expression
-	return &interpreter.BinaryOpExpr{
+	return &ast.BinaryOpExpr{
 		Op:    op,
 		Left:  left,
 		Right: right,
@@ -632,15 +643,15 @@ noFold:
 }
 
 // algebraicSimplify performs algebraic simplifications
-func (o *Optimizer) algebraicSimplify(op interpreter.BinOp, left, right interpreter.Expr, leftIsLit bool) interpreter.Expr {
-	var litExpr *interpreter.LiteralExpr
-	var varExpr interpreter.Expr
+func (o *Optimizer) algebraicSimplify(op ast.BinOp, left, right ast.Expr, leftIsLit bool) ast.Expr {
+	var litExpr *ast.LiteralExpr
+	var varExpr ast.Expr
 
 	if leftIsLit {
-		litExpr, _ = left.(*interpreter.LiteralExpr)
+		litExpr, _ = left.(*ast.LiteralExpr)
 		varExpr = right
 	} else {
-		litExpr, _ = right.(*interpreter.LiteralExpr)
+		litExpr, _ = right.(*ast.LiteralExpr)
 		varExpr = left
 	}
 
@@ -649,9 +660,9 @@ func (o *Optimizer) algebraicSimplify(op interpreter.BinOp, left, right interpre
 	}
 
 	// Check for numeric literals
-	intLit, isInt := litExpr.Value.(interpreter.IntLiteral)
-	floatLit, isFloat := litExpr.Value.(interpreter.FloatLiteral)
-	boolLit, isBool := litExpr.Value.(interpreter.BoolLiteral)
+	intLit, isInt := litExpr.Value.(ast.IntLiteral)
+	floatLit, isFloat := litExpr.Value.(ast.FloatLiteral)
+	boolLit, isBool := litExpr.Value.(ast.BoolLiteral)
 
 	isZero := (isInt && intLit.Value == 0) || (isFloat && floatLit.Value == 0)
 	isOne := (isInt && intLit.Value == 1) || (isFloat && floatLit.Value == 1)
@@ -660,20 +671,20 @@ func (o *Optimizer) algebraicSimplify(op interpreter.BinOp, left, right interpre
 	isFalse := isBool && !boolLit.Value
 
 	switch op {
-	case interpreter.Add:
+	case ast.Add:
 		// x + 0 = x, 0 + x = x
 		if isZero {
 			return varExpr
 		}
-	case interpreter.Sub:
+	case ast.Sub:
 		// x - 0 = x
 		if !leftIsLit && isZero {
 			return varExpr
 		}
-	case interpreter.Mul:
+	case ast.Mul:
 		// x * 0 = 0, 0 * x = 0
 		if isZero {
-			return &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}}
+			return &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}}
 		}
 		// x * 1 = x, 1 * x = x
 		if isOne {
@@ -682,30 +693,30 @@ func (o *Optimizer) algebraicSimplify(op interpreter.BinOp, left, right interpre
 		// Strength reduction: x * 2 = x + x, 2 * x = x + x
 		// Addition is typically faster than multiplication
 		if isTwo && o.level >= OptAggressive {
-			return &interpreter.BinaryOpExpr{
-				Op:    interpreter.Add,
+			return &ast.BinaryOpExpr{
+				Op:    ast.Add,
 				Left:  varExpr,
 				Right: varExpr,
 			}
 		}
-	case interpreter.Div:
+	case ast.Div:
 		// x / 1 = x
 		if !leftIsLit && isOne {
 			return varExpr
 		}
-	case interpreter.And:
+	case ast.And:
 		// true && x = x, x && true = x
 		if isTrue {
 			return varExpr
 		}
 		// false && x = false, x && false = false
 		if isFalse {
-			return &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: false}}
+			return &ast.LiteralExpr{Value: ast.BoolLiteral{Value: false}}
 		}
-	case interpreter.Or:
+	case ast.Or:
 		// true || x = true, x || true = true
 		if isTrue {
-			return &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}}
+			return &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}}
 		}
 		// false || x = x, x || false = x
 		if isFalse {
@@ -717,15 +728,15 @@ func (o *Optimizer) algebraicSimplify(op interpreter.BinOp, left, right interpre
 }
 
 // exprKey creates a unique key for an expression for CSE
-func exprKey(expr interpreter.Expr) string {
+func exprKey(expr ast.Expr) string {
 	switch e := expr.(type) {
-	case *interpreter.LiteralExpr:
+	case *ast.LiteralExpr:
 		// Literals don't need CSE (they're already constants)
 		return ""
-	case *interpreter.VariableExpr:
+	case *ast.VariableExpr:
 		// Variables don't need CSE
 		return ""
-	case *interpreter.BinaryOpExpr:
+	case *ast.BinaryOpExpr:
 		leftKey := exprKey(e.Left)
 		rightKey := exprKey(e.Right)
 
@@ -751,9 +762,9 @@ func exprKey(expr interpreter.Expr) string {
 }
 
 // isVarOrLit checks if expression is a variable or literal
-func isVarOrLit(expr interpreter.Expr) bool {
+func isVarOrLit(expr ast.Expr) bool {
 	switch expr.(type) {
-	case *interpreter.VariableExpr, *interpreter.LiteralExpr:
+	case *ast.VariableExpr, *ast.LiteralExpr:
 		return true
 	default:
 		return false
@@ -761,19 +772,19 @@ func isVarOrLit(expr interpreter.Expr) bool {
 }
 
 // exprToString converts simple expressions to strings
-func exprToString(expr interpreter.Expr) string {
+func exprToString(expr ast.Expr) string {
 	switch e := expr.(type) {
-	case *interpreter.VariableExpr:
+	case *ast.VariableExpr:
 		return fmt.Sprintf("var:%s", e.Name)
-	case *interpreter.LiteralExpr:
+	case *ast.LiteralExpr:
 		switch lit := e.Value.(type) {
-		case interpreter.IntLiteral:
+		case ast.IntLiteral:
 			return fmt.Sprintf("int:%d", lit.Value)
-		case interpreter.FloatLiteral:
+		case ast.FloatLiteral:
 			return fmt.Sprintf("float:%f", lit.Value)
-		case interpreter.BoolLiteral:
+		case ast.BoolLiteral:
 			return fmt.Sprintf("bool:%v", lit.Value)
-		case interpreter.StringLiteral:
+		case ast.StringLiteral:
 			return fmt.Sprintf("str:%s", lit.Value)
 		}
 	}
@@ -781,7 +792,7 @@ func exprToString(expr interpreter.Expr) string {
 }
 
 // getModifiedVariables returns the set of variables modified by a list of statements
-func getModifiedVariables(stmts []interpreter.Statement) map[string]bool {
+func getModifiedVariables(stmts []ast.Statement) map[string]bool {
 	modified := make(map[string]bool)
 	for _, stmt := range stmts {
 		getModifiedVariablesInStmt(stmt, modified)
@@ -790,29 +801,28 @@ func getModifiedVariables(stmts []interpreter.Statement) map[string]bool {
 }
 
 // getModifiedVariablesInStmt adds modified variables from a statement to the map
-func getModifiedVariablesInStmt(stmt interpreter.Statement, modified map[string]bool) {
+func getModifiedVariablesInStmt(stmt ast.Statement, modified map[string]bool) {
 	switch s := stmt.(type) {
-	case *interpreter.AssignStatement:
+	case *ast.AssignStatement:
 		modified[s.Target] = true
-	case interpreter.AssignStatement:
+	case ast.AssignStatement:
 		modified[s.Target] = true
-	case *interpreter.ReassignStatement:
+	case *ast.ReassignStatement:
 		modified[s.Target] = true
-	case interpreter.ReassignStatement:
+	case ast.ReassignStatement:
 		modified[s.Target] = true
-	case *interpreter.IfStatement:
-		getModifiedVariablesInStmt(&interpreter.AssignStatement{}, modified)
+	case *ast.IfStatement:
 		for _, thenStmt := range s.ThenBlock {
 			getModifiedVariablesInStmt(thenStmt, modified)
 		}
 		for _, elseStmt := range s.ElseBlock {
 			getModifiedVariablesInStmt(elseStmt, modified)
 		}
-	case *interpreter.WhileStatement:
+	case *ast.WhileStatement:
 		for _, bodyStmt := range s.Body {
 			getModifiedVariablesInStmt(bodyStmt, modified)
 		}
-	case *interpreter.ForStatement:
+	case *ast.ForStatement:
 		// Mark loop variables as modified
 		modified[s.ValueVar] = true
 		if s.KeyVar != "" {
@@ -822,8 +832,8 @@ func getModifiedVariablesInStmt(stmt interpreter.Statement, modified map[string]
 		for _, bodyStmt := range s.Body {
 			getModifiedVariablesInStmt(bodyStmt, modified)
 		}
-	case interpreter.ForStatement:
-		// Same as *interpreter.ForStatement
+	case ast.ForStatement:
+		// Same as *ast.ForStatement
 		modified[s.ValueVar] = true
 		if s.KeyVar != "" {
 			modified[s.KeyVar] = true
@@ -835,35 +845,35 @@ func getModifiedVariablesInStmt(stmt interpreter.Statement, modified map[string]
 }
 
 // getUsedVariables returns the set of variables used in an expression
-func getUsedVariables(expr interpreter.Expr) map[string]bool {
+func getUsedVariables(expr ast.Expr) map[string]bool {
 	used := make(map[string]bool)
 	getUsedVariablesInExpr(expr, used)
 	return used
 }
 
 // getUsedVariablesInExpr adds used variables from an expression to the map
-func getUsedVariablesInExpr(expr interpreter.Expr, used map[string]bool) {
+func getUsedVariablesInExpr(expr ast.Expr, used map[string]bool) {
 	switch e := expr.(type) {
-	case *interpreter.VariableExpr:
+	case *ast.VariableExpr:
 		used[e.Name] = true
-	case *interpreter.BinaryOpExpr:
+	case *ast.BinaryOpExpr:
 		getUsedVariablesInExpr(e.Left, used)
 		getUsedVariablesInExpr(e.Right, used)
-	case *interpreter.ObjectExpr:
+	case *ast.ObjectExpr:
 		for _, field := range e.Fields {
 			getUsedVariablesInExpr(field.Value, used)
 		}
-	case *interpreter.ArrayExpr:
+	case *ast.ArrayExpr:
 		for _, elem := range e.Elements {
 			getUsedVariablesInExpr(elem, used)
 		}
-	case *interpreter.FieldAccessExpr:
+	case *ast.FieldAccessExpr:
 		getUsedVariablesInExpr(e.Object, used)
 	}
 }
 
 // isExprInvariant checks if an expression is loop-invariant (doesn't depend on modified vars)
-func isExprInvariant(expr interpreter.Expr, modifiedVars map[string]bool) bool {
+func isExprInvariant(expr ast.Expr, modifiedVars map[string]bool) bool {
 	usedVars := getUsedVariables(expr)
 	for varName := range usedVars {
 		if modifiedVars[varName] {
@@ -880,8 +890,8 @@ func isExprInvariant(expr interpreter.Expr, modifiedVars map[string]bool) bool {
 // PeepholePattern represents a pattern for peephole optimization
 type PeepholePattern struct {
 	Name        string
-	Match       func([]interpreter.Statement, int) (bool, int) // returns (matched, length)
-	Replace     func([]interpreter.Statement, int) []interpreter.Statement
+	Match       func([]ast.Statement, int) (bool, int) // returns (matched, length)
+	Replace     func([]ast.Statement, int) []ast.Statement
 	Description string
 }
 
@@ -891,11 +901,11 @@ var peepholePatterns = []PeepholePattern{
 	{
 		Name:        "double_negation",
 		Description: "Remove double negation",
-		Match: func(stmts []interpreter.Statement, i int) (bool, int) {
+		Match: func(stmts []ast.Statement, i int) (bool, int) {
 			// This would need UnaryOpExpr support in the AST
 			return false, 0
 		},
-		Replace: func(stmts []interpreter.Statement, i int) []interpreter.Statement {
+		Replace: func(stmts []ast.Statement, i int) []ast.Statement {
 			return nil
 		},
 	},
@@ -903,9 +913,9 @@ var peepholePatterns = []PeepholePattern{
 	{
 		Name:        "self_assignment",
 		Description: "Remove self-assignment",
-		Match: func(stmts []interpreter.Statement, i int) (bool, int) {
-			if assign, ok := stmts[i].(*interpreter.AssignStatement); ok {
-				if varExpr, ok := assign.Value.(*interpreter.VariableExpr); ok {
+		Match: func(stmts []ast.Statement, i int) (bool, int) {
+			if assign, ok := stmts[i].(*ast.AssignStatement); ok {
+				if varExpr, ok := assign.Value.(*ast.VariableExpr); ok {
 					if varExpr.Name == assign.Target {
 						return true, 1
 					}
@@ -913,7 +923,7 @@ var peepholePatterns = []PeepholePattern{
 			}
 			return false, 0
 		},
-		Replace: func(stmts []interpreter.Statement, i int) []interpreter.Statement {
+		Replace: func(stmts []ast.Statement, i int) []ast.Statement {
 			return nil // Remove the statement
 		},
 	},
@@ -921,12 +931,12 @@ var peepholePatterns = []PeepholePattern{
 	{
 		Name:        "redundant_assignment",
 		Description: "Remove redundant assignments to same variable",
-		Match: func(stmts []interpreter.Statement, i int) (bool, int) {
+		Match: func(stmts []ast.Statement, i int) (bool, int) {
 			if i+1 >= len(stmts) {
 				return false, 0
 			}
-			assign1, ok1 := stmts[i].(*interpreter.AssignStatement)
-			assign2, ok2 := stmts[i+1].(*interpreter.AssignStatement)
+			assign1, ok1 := stmts[i].(*ast.AssignStatement)
+			assign2, ok2 := stmts[i+1].(*ast.AssignStatement)
 			if ok1 && ok2 && assign1.Target == assign2.Target {
 				// Check that first value doesn't have side effects
 				if !exprHasSideEffects(assign1.Value) {
@@ -935,46 +945,46 @@ var peepholePatterns = []PeepholePattern{
 			}
 			return false, 0
 		},
-		Replace: func(stmts []interpreter.Statement, i int) []interpreter.Statement {
+		Replace: func(stmts []ast.Statement, i int) []ast.Statement {
 			// Keep only the second assignment
-			return []interpreter.Statement{stmts[i+1]}
+			return []ast.Statement{stmts[i+1]}
 		},
 	},
 }
 
 // exprHasSideEffects checks if an expression might have side effects
-func exprHasSideEffects(expr interpreter.Expr) bool {
+func exprHasSideEffects(expr ast.Expr) bool {
 	switch e := expr.(type) {
-	case *interpreter.FunctionCallExpr:
+	case *ast.FunctionCallExpr:
 		return true // Function calls may have side effects
-	case interpreter.FunctionCallExpr:
+	case ast.FunctionCallExpr:
 		return true
-	case *interpreter.BinaryOpExpr:
+	case *ast.BinaryOpExpr:
 		return exprHasSideEffects(e.Left) || exprHasSideEffects(e.Right)
-	case interpreter.BinaryOpExpr:
+	case ast.BinaryOpExpr:
 		return exprHasSideEffects(e.Left) || exprHasSideEffects(e.Right)
-	case *interpreter.ObjectExpr:
+	case *ast.ObjectExpr:
 		for _, field := range e.Fields {
 			if exprHasSideEffects(field.Value) {
 				return true
 			}
 		}
 		return false
-	case interpreter.ObjectExpr:
+	case ast.ObjectExpr:
 		for _, field := range e.Fields {
 			if exprHasSideEffects(field.Value) {
 				return true
 			}
 		}
 		return false
-	case *interpreter.ArrayExpr:
+	case *ast.ArrayExpr:
 		for _, elem := range e.Elements {
 			if exprHasSideEffects(elem) {
 				return true
 			}
 		}
 		return false
-	case interpreter.ArrayExpr:
+	case ast.ArrayExpr:
 		for _, elem := range e.Elements {
 			if exprHasSideEffects(elem) {
 				return true
@@ -987,12 +997,12 @@ func exprHasSideEffects(expr interpreter.Expr) bool {
 }
 
 // ApplyPeepholeOptimizations applies peephole optimizations to statements
-func (o *Optimizer) ApplyPeepholeOptimizations(stmts []interpreter.Statement) []interpreter.Statement {
+func (o *Optimizer) ApplyPeepholeOptimizations(stmts []ast.Statement) []ast.Statement {
 	if o.level < OptAggressive {
 		return stmts
 	}
 
-	result := make([]interpreter.Statement, 0, len(stmts))
+	result := make([]ast.Statement, 0, len(stmts))
 	i := 0
 
 	for i < len(stmts) {
@@ -1025,11 +1035,11 @@ func (o *Optimizer) ApplyPeepholeOptimizations(stmts []interpreter.Statement) []
 
 // InlineCandidate represents a function that can be inlined
 type InlineCandidate struct {
-	Name       string
-	Params     []string
-	Body       []interpreter.Statement
-	BodySize   int
-	CallCount  int
+	Name        string
+	Params      []string
+	Body        []ast.Statement
+	BodySize    int
+	CallCount   int
 	IsRecursive bool
 }
 
@@ -1048,7 +1058,7 @@ func NewFunctionInliner() *FunctionInliner {
 }
 
 // AnalyzeFunction analyzes a function for inlining potential
-func (fi *FunctionInliner) AnalyzeFunction(fn interpreter.Function) {
+func (fi *FunctionInliner) AnalyzeFunction(fn ast.Function) {
 	// Count body size
 	bodySize := countStatements(fn.Body)
 
@@ -1091,14 +1101,14 @@ func (fi *FunctionInliner) ShouldInline(name string) bool {
 }
 
 // InlineCall inlines a function call
-func (fi *FunctionInliner) InlineCall(call *interpreter.FunctionCallExpr) []interpreter.Statement {
+func (fi *FunctionInliner) InlineCall(call *ast.FunctionCallExpr) []ast.Statement {
 	candidate, ok := fi.candidates[call.Name]
 	if !ok {
 		return nil
 	}
 
 	// Create parameter bindings
-	bindings := make(map[string]interpreter.Expr)
+	bindings := make(map[string]ast.Expr)
 	for i, param := range candidate.Params {
 		if i < len(call.Args) {
 			bindings[param] = call.Args[i]
@@ -1112,24 +1122,24 @@ func (fi *FunctionInliner) InlineCall(call *interpreter.FunctionCallExpr) []inte
 }
 
 // countStatements counts the number of statements recursively
-func countStatements(stmts []interpreter.Statement) int {
+func countStatements(stmts []ast.Statement) int {
 	count := 0
 	for _, stmt := range stmts {
 		count++
 		switch s := stmt.(type) {
-		case *interpreter.IfStatement:
+		case *ast.IfStatement:
 			count += countStatements(s.ThenBlock)
 			count += countStatements(s.ElseBlock)
-		case interpreter.IfStatement:
+		case ast.IfStatement:
 			count += countStatements(s.ThenBlock)
 			count += countStatements(s.ElseBlock)
-		case *interpreter.WhileStatement:
+		case *ast.WhileStatement:
 			count += countStatements(s.Body)
-		case interpreter.WhileStatement:
+		case ast.WhileStatement:
 			count += countStatements(s.Body)
-		case *interpreter.ForStatement:
+		case *ast.ForStatement:
 			count += countStatements(s.Body)
-		case interpreter.ForStatement:
+		case ast.ForStatement:
 			count += countStatements(s.Body)
 		}
 	}
@@ -1137,7 +1147,7 @@ func countStatements(stmts []interpreter.Statement) int {
 }
 
 // containsCallTo checks if statements contain a call to a specific function
-func containsCallTo(stmts []interpreter.Statement, fnName string) bool {
+func containsCallTo(stmts []ast.Statement, fnName string) bool {
 	for _, stmt := range stmts {
 		if containsCallInStmt(stmt, fnName) {
 			return true
@@ -1147,52 +1157,52 @@ func containsCallTo(stmts []interpreter.Statement, fnName string) bool {
 }
 
 // containsCallInStmt checks if a statement contains a call to a specific function
-func containsCallInStmt(stmt interpreter.Statement, fnName string) bool {
+func containsCallInStmt(stmt ast.Statement, fnName string) bool {
 	switch s := stmt.(type) {
-	case *interpreter.AssignStatement:
+	case *ast.AssignStatement:
 		return containsCallInExpr(s.Value, fnName)
-	case interpreter.AssignStatement:
+	case ast.AssignStatement:
 		return containsCallInExpr(s.Value, fnName)
-	case *interpreter.ReassignStatement:
+	case *ast.ReassignStatement:
 		return containsCallInExpr(s.Value, fnName)
-	case interpreter.ReassignStatement:
+	case ast.ReassignStatement:
 		return containsCallInExpr(s.Value, fnName)
-	case *interpreter.ReturnStatement:
+	case *ast.ReturnStatement:
 		return containsCallInExpr(s.Value, fnName)
-	case interpreter.ReturnStatement:
+	case ast.ReturnStatement:
 		return containsCallInExpr(s.Value, fnName)
-	case *interpreter.IfStatement:
+	case *ast.IfStatement:
 		if containsCallInExpr(s.Condition, fnName) {
 			return true
 		}
 		return containsCallTo(s.ThenBlock, fnName) || containsCallTo(s.ElseBlock, fnName)
-	case interpreter.IfStatement:
+	case ast.IfStatement:
 		if containsCallInExpr(s.Condition, fnName) {
 			return true
 		}
 		return containsCallTo(s.ThenBlock, fnName) || containsCallTo(s.ElseBlock, fnName)
-	case *interpreter.WhileStatement:
+	case *ast.WhileStatement:
 		if containsCallInExpr(s.Condition, fnName) {
 			return true
 		}
 		return containsCallTo(s.Body, fnName)
-	case interpreter.WhileStatement:
+	case ast.WhileStatement:
 		if containsCallInExpr(s.Condition, fnName) {
 			return true
 		}
 		return containsCallTo(s.Body, fnName)
-	case *interpreter.ExpressionStatement:
+	case *ast.ExpressionStatement:
 		return containsCallInExpr(s.Expr, fnName)
-	case interpreter.ExpressionStatement:
+	case ast.ExpressionStatement:
 		return containsCallInExpr(s.Expr, fnName)
 	}
 	return false
 }
 
 // containsCallInExpr checks if an expression contains a call to a specific function
-func containsCallInExpr(expr interpreter.Expr, fnName string) bool {
+func containsCallInExpr(expr ast.Expr, fnName string) bool {
 	switch e := expr.(type) {
-	case *interpreter.FunctionCallExpr:
+	case *ast.FunctionCallExpr:
 		if e.Name == fnName {
 			return true
 		}
@@ -1201,7 +1211,7 @@ func containsCallInExpr(expr interpreter.Expr, fnName string) bool {
 				return true
 			}
 		}
-	case interpreter.FunctionCallExpr:
+	case ast.FunctionCallExpr:
 		if e.Name == fnName {
 			return true
 		}
@@ -1210,45 +1220,45 @@ func containsCallInExpr(expr interpreter.Expr, fnName string) bool {
 				return true
 			}
 		}
-	case *interpreter.BinaryOpExpr:
+	case *ast.BinaryOpExpr:
 		return containsCallInExpr(e.Left, fnName) || containsCallInExpr(e.Right, fnName)
-	case interpreter.BinaryOpExpr:
+	case ast.BinaryOpExpr:
 		return containsCallInExpr(e.Left, fnName) || containsCallInExpr(e.Right, fnName)
-	case *interpreter.ObjectExpr:
+	case *ast.ObjectExpr:
 		for _, field := range e.Fields {
 			if containsCallInExpr(field.Value, fnName) {
 				return true
 			}
 		}
-	case interpreter.ObjectExpr:
+	case ast.ObjectExpr:
 		for _, field := range e.Fields {
 			if containsCallInExpr(field.Value, fnName) {
 				return true
 			}
 		}
-	case *interpreter.ArrayExpr:
+	case *ast.ArrayExpr:
 		for _, elem := range e.Elements {
 			if containsCallInExpr(elem, fnName) {
 				return true
 			}
 		}
-	case interpreter.ArrayExpr:
+	case ast.ArrayExpr:
 		for _, elem := range e.Elements {
 			if containsCallInExpr(elem, fnName) {
 				return true
 			}
 		}
-	case *interpreter.FieldAccessExpr:
+	case *ast.FieldAccessExpr:
 		return containsCallInExpr(e.Object, fnName)
-	case interpreter.FieldAccessExpr:
+	case ast.FieldAccessExpr:
 		return containsCallInExpr(e.Object, fnName)
 	}
 	return false
 }
 
 // substituteParams substitutes parameters with their values in statements
-func substituteParams(stmts []interpreter.Statement, bindings map[string]interpreter.Expr) []interpreter.Statement {
-	result := make([]interpreter.Statement, len(stmts))
+func substituteParams(stmts []ast.Statement, bindings map[string]ast.Expr) []ast.Statement {
+	result := make([]ast.Statement, len(stmts))
 	for i, stmt := range stmts {
 		result[i] = substituteParamsInStmt(stmt, bindings)
 	}
@@ -1256,55 +1266,55 @@ func substituteParams(stmts []interpreter.Statement, bindings map[string]interpr
 }
 
 // substituteParamsInStmt substitutes parameters in a statement
-func substituteParamsInStmt(stmt interpreter.Statement, bindings map[string]interpreter.Expr) interpreter.Statement {
+func substituteParamsInStmt(stmt ast.Statement, bindings map[string]ast.Expr) ast.Statement {
 	switch s := stmt.(type) {
-	case *interpreter.AssignStatement:
-		return &interpreter.AssignStatement{
+	case *ast.AssignStatement:
+		return &ast.AssignStatement{
 			Target: s.Target,
 			Value:  substituteParamsInExpr(s.Value, bindings),
 		}
-	case interpreter.AssignStatement:
-		return &interpreter.AssignStatement{
+	case ast.AssignStatement:
+		return &ast.AssignStatement{
 			Target: s.Target,
 			Value:  substituteParamsInExpr(s.Value, bindings),
 		}
-	case *interpreter.ReassignStatement:
-		return &interpreter.ReassignStatement{
+	case *ast.ReassignStatement:
+		return &ast.ReassignStatement{
 			Target: s.Target,
 			Value:  substituteParamsInExpr(s.Value, bindings),
 		}
-	case interpreter.ReassignStatement:
-		return &interpreter.ReassignStatement{
+	case ast.ReassignStatement:
+		return &ast.ReassignStatement{
 			Target: s.Target,
 			Value:  substituteParamsInExpr(s.Value, bindings),
 		}
-	case *interpreter.ReturnStatement:
-		return &interpreter.ReturnStatement{
+	case *ast.ReturnStatement:
+		return &ast.ReturnStatement{
 			Value: substituteParamsInExpr(s.Value, bindings),
 		}
-	case interpreter.ReturnStatement:
-		return &interpreter.ReturnStatement{
+	case ast.ReturnStatement:
+		return &ast.ReturnStatement{
 			Value: substituteParamsInExpr(s.Value, bindings),
 		}
-	case *interpreter.IfStatement:
-		return &interpreter.IfStatement{
+	case *ast.IfStatement:
+		return &ast.IfStatement{
 			Condition: substituteParamsInExpr(s.Condition, bindings),
 			ThenBlock: substituteParams(s.ThenBlock, bindings),
 			ElseBlock: substituteParams(s.ElseBlock, bindings),
 		}
-	case interpreter.IfStatement:
-		return &interpreter.IfStatement{
+	case ast.IfStatement:
+		return &ast.IfStatement{
 			Condition: substituteParamsInExpr(s.Condition, bindings),
 			ThenBlock: substituteParams(s.ThenBlock, bindings),
 			ElseBlock: substituteParams(s.ElseBlock, bindings),
 		}
-	case *interpreter.WhileStatement:
-		return &interpreter.WhileStatement{
+	case *ast.WhileStatement:
+		return &ast.WhileStatement{
 			Condition: substituteParamsInExpr(s.Condition, bindings),
 			Body:      substituteParams(s.Body, bindings),
 		}
-	case interpreter.WhileStatement:
-		return &interpreter.WhileStatement{
+	case ast.WhileStatement:
+		return &ast.WhileStatement{
 			Condition: substituteParamsInExpr(s.Condition, bindings),
 			Body:      substituteParams(s.Body, bindings),
 		}
@@ -1314,82 +1324,82 @@ func substituteParamsInStmt(stmt interpreter.Statement, bindings map[string]inte
 }
 
 // substituteParamsInExpr substitutes parameters in an expression
-func substituteParamsInExpr(expr interpreter.Expr, bindings map[string]interpreter.Expr) interpreter.Expr {
+func substituteParamsInExpr(expr ast.Expr, bindings map[string]ast.Expr) ast.Expr {
 	switch e := expr.(type) {
-	case *interpreter.VariableExpr:
+	case *ast.VariableExpr:
 		if replacement, ok := bindings[e.Name]; ok {
 			return replacement
 		}
 		return expr
-	case interpreter.VariableExpr:
+	case ast.VariableExpr:
 		if replacement, ok := bindings[e.Name]; ok {
 			return replacement
 		}
 		return expr
-	case *interpreter.BinaryOpExpr:
-		return &interpreter.BinaryOpExpr{
+	case *ast.BinaryOpExpr:
+		return &ast.BinaryOpExpr{
 			Op:    e.Op,
 			Left:  substituteParamsInExpr(e.Left, bindings),
 			Right: substituteParamsInExpr(e.Right, bindings),
 		}
-	case interpreter.BinaryOpExpr:
-		return &interpreter.BinaryOpExpr{
+	case ast.BinaryOpExpr:
+		return &ast.BinaryOpExpr{
 			Op:    e.Op,
 			Left:  substituteParamsInExpr(e.Left, bindings),
 			Right: substituteParamsInExpr(e.Right, bindings),
 		}
-	case *interpreter.ObjectExpr:
-		fields := make([]interpreter.ObjectField, len(e.Fields))
+	case *ast.ObjectExpr:
+		fields := make([]ast.ObjectField, len(e.Fields))
 		for i, field := range e.Fields {
-			fields[i] = interpreter.ObjectField{
+			fields[i] = ast.ObjectField{
 				Key:   field.Key,
 				Value: substituteParamsInExpr(field.Value, bindings),
 			}
 		}
-		return &interpreter.ObjectExpr{Fields: fields}
-	case interpreter.ObjectExpr:
-		fields := make([]interpreter.ObjectField, len(e.Fields))
+		return &ast.ObjectExpr{Fields: fields}
+	case ast.ObjectExpr:
+		fields := make([]ast.ObjectField, len(e.Fields))
 		for i, field := range e.Fields {
-			fields[i] = interpreter.ObjectField{
+			fields[i] = ast.ObjectField{
 				Key:   field.Key,
 				Value: substituteParamsInExpr(field.Value, bindings),
 			}
 		}
-		return &interpreter.ObjectExpr{Fields: fields}
-	case *interpreter.ArrayExpr:
-		elements := make([]interpreter.Expr, len(e.Elements))
+		return &ast.ObjectExpr{Fields: fields}
+	case *ast.ArrayExpr:
+		elements := make([]ast.Expr, len(e.Elements))
 		for i, elem := range e.Elements {
 			elements[i] = substituteParamsInExpr(elem, bindings)
 		}
-		return &interpreter.ArrayExpr{Elements: elements}
-	case interpreter.ArrayExpr:
-		elements := make([]interpreter.Expr, len(e.Elements))
+		return &ast.ArrayExpr{Elements: elements}
+	case ast.ArrayExpr:
+		elements := make([]ast.Expr, len(e.Elements))
 		for i, elem := range e.Elements {
 			elements[i] = substituteParamsInExpr(elem, bindings)
 		}
-		return &interpreter.ArrayExpr{Elements: elements}
-	case *interpreter.FieldAccessExpr:
-		return &interpreter.FieldAccessExpr{
+		return &ast.ArrayExpr{Elements: elements}
+	case *ast.FieldAccessExpr:
+		return &ast.FieldAccessExpr{
 			Object: substituteParamsInExpr(e.Object, bindings),
 			Field:  e.Field,
 		}
-	case interpreter.FieldAccessExpr:
-		return &interpreter.FieldAccessExpr{
+	case ast.FieldAccessExpr:
+		return &ast.FieldAccessExpr{
 			Object: substituteParamsInExpr(e.Object, bindings),
 			Field:  e.Field,
 		}
-	case *interpreter.FunctionCallExpr:
-		args := make([]interpreter.Expr, len(e.Args))
+	case *ast.FunctionCallExpr:
+		args := make([]ast.Expr, len(e.Args))
 		for i, arg := range e.Args {
 			args[i] = substituteParamsInExpr(arg, bindings)
 		}
-		return &interpreter.FunctionCallExpr{Name: e.Name, Args: args}
-	case interpreter.FunctionCallExpr:
-		args := make([]interpreter.Expr, len(e.Args))
+		return &ast.FunctionCallExpr{Name: e.Name, Args: args}
+	case ast.FunctionCallExpr:
+		args := make([]ast.Expr, len(e.Args))
 		for i, arg := range e.Args {
 			args[i] = substituteParamsInExpr(arg, bindings)
 		}
-		return &interpreter.FunctionCallExpr{Name: e.Name, Args: args}
+		return &ast.FunctionCallExpr{Name: e.Name, Args: args}
 	default:
 		return expr
 	}
@@ -1400,27 +1410,27 @@ func substituteParamsInExpr(expr interpreter.Expr, bindings map[string]interpret
 // ========================================
 
 // StrengthReduce applies strength reduction optimizations
-func (o *Optimizer) StrengthReduce(expr interpreter.Expr) interpreter.Expr {
+func (o *Optimizer) StrengthReduce(expr ast.Expr) ast.Expr {
 	if o.level < OptAggressive {
 		return expr
 	}
 
-	binOp, ok := expr.(*interpreter.BinaryOpExpr)
+	binOp, ok := expr.(*ast.BinaryOpExpr)
 	if !ok {
 		return expr
 	}
 
 	// Optimize multiplication by powers of 2
-	if binOp.Op == interpreter.Mul {
-		if lit, ok := binOp.Right.(*interpreter.LiteralExpr); ok {
-			if intLit, ok := lit.Value.(interpreter.IntLiteral); ok {
+	if binOp.Op == ast.Mul {
+		if lit, ok := binOp.Right.(*ast.LiteralExpr); ok {
+			if intLit, ok := lit.Value.(ast.IntLiteral); ok {
 				if isPowerOfTwo(intLit.Value) && intLit.Value > 0 {
 					shift := log2(intLit.Value)
 					// x * 2^n -> x << n (represented as x + x repeated)
 					// For now, convert x * 2 -> x + x, x * 4 -> (x + x) + (x + x)
 					if shift == 1 {
-						return &interpreter.BinaryOpExpr{
-							Op:    interpreter.Add,
+						return &ast.BinaryOpExpr{
+							Op:    ast.Add,
 							Left:  binOp.Left,
 							Right: binOp.Left,
 						}
@@ -1431,9 +1441,9 @@ func (o *Optimizer) StrengthReduce(expr interpreter.Expr) interpreter.Expr {
 	}
 
 	// Optimize division by powers of 2
-	if binOp.Op == interpreter.Div {
-		if lit, ok := binOp.Right.(*interpreter.LiteralExpr); ok {
-			if intLit, ok := lit.Value.(interpreter.IntLiteral); ok {
+	if binOp.Op == ast.Div {
+		if lit, ok := binOp.Right.(*ast.LiteralExpr); ok {
+			if intLit, ok := lit.Value.(ast.IntLiteral); ok {
 				if isPowerOfTwo(intLit.Value) && intLit.Value > 0 {
 					// x / 2^n -> x >> n (right shift)
 					// Note: This is only valid for unsigned integers
@@ -1467,13 +1477,13 @@ func log2(n int64) int {
 
 // OptimizationStats tracks statistics about optimizations performed
 type OptimizationStats struct {
-	ConstantsFolded      int
-	DeadCodeEliminated   int
-	CopiesPropagated     int
+	ConstantsFolded       int
+	DeadCodeEliminated    int
+	CopiesPropagated      int
 	ExpressionsEliminated int
-	LoopInvariants       int
-	FunctionsInlined     int
-	StrengthReductions   int
+	LoopInvariants        int
+	FunctionsInlined      int
+	StrengthReductions    int
 }
 
 // GetStats returns optimization statistics

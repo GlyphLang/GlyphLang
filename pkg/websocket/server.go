@@ -14,13 +14,13 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		// Allow all origins for now (should be configurable in production)
-		return true
-	},
+// newUpgrader creates a WebSocket upgrader with origin checking based on config.
+func newUpgrader(cfg *Config) websocket.Upgrader {
+	return websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin:     cfg.CheckOrigin,
+	}
 }
 
 // Hub maintains the set of active connections and broadcasts messages
@@ -109,25 +109,25 @@ func NewHubWithConfig(config *Config) *Hub {
 	config.Validate()
 
 	return &Hub{
-		connections:      make(map[*Connection]bool),
-		handleMessage:    make(chan *MessageContext, 256),
-		register:         make(chan *Connection),
-		unregister:       make(chan *Connection),
-		broadcast:        make(chan []byte, 256),
-		broadcastToRoom:  make(chan *RoomMessage, 256),
-		joinRoom:         make(chan *RoomAction, 256),
-		leaveRoom:        make(chan *RoomAction, 256),
-		roomManager:      NewRoomManagerWithConfig(config),
+		connections:       make(map[*Connection]bool),
+		handleMessage:     make(chan *MessageContext, 256),
+		register:          make(chan *Connection),
+		unregister:        make(chan *Connection),
+		broadcast:         make(chan []byte, 256),
+		broadcastToRoom:   make(chan *RoomMessage, 256),
+		joinRoom:          make(chan *RoomAction, 256),
+		leaveRoom:         make(chan *RoomAction, 256),
+		roomManager:       NewRoomManagerWithConfig(config),
 		handler:           NewHandler(),
 		onConnect:         make([]EventHandler, 0),
 		onDisconnect:      make([]EventHandler, 0),
 		routeOnConnect:    make(map[string][]EventHandler),
 		routeOnDisconnect: make(map[string][]EventHandler),
 		shutdown:          make(chan struct{}),
-		started:          make(chan struct{}),
-		config:           config,
-		metrics:          NewMetrics(),
-		connectionStates: make(map[string]*ConnectionState),
+		started:           make(chan struct{}),
+		config:            config,
+		metrics:           NewMetrics(),
+		connectionStates:  make(map[string]*ConnectionState),
 	}
 }
 
@@ -428,14 +428,28 @@ type Server struct {
 	upgrader websocket.Upgrader
 }
 
-// NewServer creates a new WebSocket server
-func NewServer() *Server {
+// NewServer creates a new WebSocket server.
+// An optional Config can be passed to configure origin checking and other settings.
+// If nil, DefaultConfig() is used (same-origin only).
+func NewServer(cfgs ...*Config) *Server {
+	var cfg *Config
+	if len(cfgs) > 0 && cfgs[0] != nil {
+		cfg = cfgs[0]
+	} else {
+		cfg = DefaultConfig()
+	}
+	// Validate corrects zero-value fields in-place; current implementation
+	// always returns nil, but we log defensively in case that changes.
+	if err := cfg.Validate(); err != nil {
+		log.Printf("[WS] Config validation warning: %v", err)
+	}
+
 	hub := NewHub()
 	go hub.Run()
 
 	return &Server{
 		hub:      hub,
-		upgrader: upgrader,
+		upgrader: newUpgrader(cfg),
 	}
 }
 

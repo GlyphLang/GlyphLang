@@ -8,9 +8,9 @@ import (
 
 // Common errors
 var (
-	ErrConnectionClosed = errors.New("connection closed")
-	ErrInvalidMessage   = errors.New("invalid message format")
-	ErrRoomNotFound     = errors.New("room not found")
+	ErrConnectionClosed   = errors.New("connection closed")
+	ErrInvalidMessage     = errors.New("invalid message format")
+	ErrRoomNotFound       = errors.New("room not found")
 	ErrConnectionNotFound = errors.New("connection not found")
 )
 
@@ -19,17 +19,17 @@ type MessageType string
 
 const (
 	// Message types
-	MessageTypeText      MessageType = "text"
-	MessageTypeBinary    MessageType = "binary"
-	MessageTypeJSON      MessageType = "json"
-	MessageTypeConnect   MessageType = "connect"
+	MessageTypeText       MessageType = "text"
+	MessageTypeBinary     MessageType = "binary"
+	MessageTypeJSON       MessageType = "json"
+	MessageTypeConnect    MessageType = "connect"
 	MessageTypeDisconnect MessageType = "disconnect"
-	MessageTypeError     MessageType = "error"
-	MessageTypeJoinRoom  MessageType = "join_room"
-	MessageTypeLeaveRoom MessageType = "leave_room"
-	MessageTypeBroadcast MessageType = "broadcast"
-	MessageTypePing      MessageType = "ping"
-	MessageTypePong      MessageType = "pong"
+	MessageTypeError      MessageType = "error"
+	MessageTypeJoinRoom   MessageType = "join_room"
+	MessageTypeLeaveRoom  MessageType = "leave_room"
+	MessageTypeBroadcast  MessageType = "broadcast"
+	MessageTypePing       MessageType = "ping"
+	MessageTypePong       MessageType = "pong"
 )
 
 // Message represents a WebSocket message
@@ -181,8 +181,8 @@ func (ctx *MessageContext) BroadcastToRoom(room string, msgType MessageType, dat
 		return
 	}
 	ctx.Conn.hub.broadcastToRoom <- &RoomMessage{
-		RoomName: room,
-		Message:  msgData,
+		RoomName:    room,
+		Message:     msgData,
 		ExcludeConn: ctx.Conn,
 	}
 }

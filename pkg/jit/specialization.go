@@ -2,21 +2,22 @@ package jit
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"sync/atomic"
 
+	"github.com/glyphlang/glyph/pkg/ast"
 	"github.com/glyphlang/glyph/pkg/compiler"
-	"github.com/glyphlang/glyph/pkg/interpreter"
 )
 
 // TypeSpecialization represents specialized code for specific type combinations
 type TypeSpecialization struct {
-	Name          string
-	Types         map[string]string // variable -> type
-	Bytecode      []byte
-	HitCount      int64
-	MissCount     int64
-	IsValid       bool
+	Name      string
+	Types     map[string]string // variable -> type
+	Bytecode  []byte
+	HitCount  int64
+	MissCount int64
+	IsValid   bool
 }
 
 // SpecializationCache caches type-specialized code
@@ -172,12 +173,18 @@ func typesMatch(a, b map[string]string) bool {
 	return true
 }
 
-// typeSignature creates a string signature for a type map
+// typeSignature creates a deterministic string signature for a type map.
+// Keys are sorted to ensure consistent signatures regardless of map iteration order.
 func typeSignature(types map[string]string) string {
-	// Create a deterministic signature
+	keys := make([]string, 0, len(types))
+	for k := range types {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
 	sig := ""
-	for k, v := range types {
-		sig += k + ":" + v + ","
+	for _, k := range keys {
+		sig += k + ":" + types[k] + ","
 	}
 	return sig
 }
@@ -195,7 +202,7 @@ func NewTypeSpecializedCompiler(profiler *Profiler) *TypeSpecializedCompiler {
 }
 
 // CompileWithTypeInfo compiles a route with type specialization hints
-func (tsc *TypeSpecializedCompiler) CompileWithTypeInfo(route *interpreter.Route, types map[string]string) ([]byte, error) {
+func (tsc *TypeSpecializedCompiler) CompileWithTypeInfo(route *ast.Route, types map[string]string) ([]byte, error) {
 	// For now, compile with aggressive optimizations
 	// In a full implementation, we would:
 	// 1. Insert type guards at entry
@@ -209,11 +216,11 @@ func (tsc *TypeSpecializedCompiler) CompileWithTypeInfo(route *interpreter.Route
 
 // InlineCandidate represents a function that could be inlined
 type InlineCandidate struct {
-	Name       string
-	CallCount  int64
+	Name        string
+	CallCount   int64
 	CallerCount int
-	BodySize   int
-	Score      float64 // Higher = better candidate for inlining
+	BodySize    int
+	Score       float64 // Higher = better candidate for inlining
 }
 
 // InliningDecision contains the decision about whether to inline a function
@@ -225,19 +232,19 @@ type InliningDecision struct {
 
 // InliningOracle decides whether functions should be inlined
 type InliningOracle struct {
-	profiler          *Profiler
-	maxInlineSize     int
-	minCallCount      int64
-	inlineThreshold   float64
+	profiler        *Profiler
+	maxInlineSize   int
+	minCallCount    int64
+	inlineThreshold float64
 }
 
 // NewInliningOracle creates a new inlining oracle
 func NewInliningOracle(profiler *Profiler) *InliningOracle {
 	return &InliningOracle{
 		profiler:        profiler,
-		maxInlineSize:   20,    // Max statements to inline
-		minCallCount:    10,    // Min calls before considering inlining
-		inlineThreshold: 0.5,   // Score threshold for inlining
+		maxInlineSize:   20,  // Max statements to inline
+		minCallCount:    10,  // Min calls before considering inlining
+		inlineThreshold: 0.5, // Score threshold for inlining
 	}
 }
 
@@ -318,9 +325,9 @@ func (io *InliningOracle) GetInlineCandidates() []InlineCandidate {
 
 // AdaptiveRecompilationTrigger determines when to trigger recompilation
 type AdaptiveRecompilationTrigger struct {
-	profiler           *Profiler
-	executionThreshold int64
-	timeThreshold      float64 // Average time increase threshold (ratio)
+	profiler            *Profiler
+	executionThreshold  int64
+	timeThreshold       float64 // Average time increase threshold (ratio)
 	typeChangeThreshold int
 }
 
@@ -328,9 +335,9 @@ type AdaptiveRecompilationTrigger struct {
 func NewAdaptiveRecompilationTrigger(profiler *Profiler) *AdaptiveRecompilationTrigger {
 	return &AdaptiveRecompilationTrigger{
 		profiler:            profiler,
-		executionThreshold:  50,   // Recompile after this many executions
-		timeThreshold:       1.5,  // Recompile if time increases by 50%
-		typeChangeThreshold: 5,    // Recompile after this many type changes
+		executionThreshold:  50,  // Recompile after this many executions
+		timeThreshold:       1.5, // Recompile if time increases by 50%
+		typeChangeThreshold: 5,   // Recompile after this many type changes
 	}
 }
 
@@ -390,8 +397,8 @@ type DeoptimizationRecord struct {
 
 // DeoptimizationTracker tracks deoptimization events
 type DeoptimizationTracker struct {
-	records []DeoptimizationRecord
-	mutex   sync.RWMutex
+	records    []DeoptimizationRecord
+	mutex      sync.RWMutex
 	maxRecords int
 }
 

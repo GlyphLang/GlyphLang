@@ -2,26 +2,27 @@
 // and expanded human-readable syntax.
 //
 // Compact (Glyph) syntax uses symbols:
-//   : -> type definition
-//   @ -> route
-//   $ -> variable assignment (let)
-//   > -> return
-//   + -> middleware
-//   % -> inject
-//   ~ -> event handler
-//   * -> cron task
-//   ! -> command
-//   & -> queue worker
+//
+//	: -> type definition
+//	@ -> route
+//	$ -> variable assignment (let)
+//	> -> return
+//	+ -> middleware
+//	% -> inject
+//	~ -> event handler
+//	* -> cron task
+//	! -> command
+//	& -> queue worker
 //
 // Expanded syntax uses keywords:
-//   type, route, let, return, middleware, inject, event, cron, command, queue
+//
+//	type, route, let, return, middleware, inject, event, cron, command, queue
 package formatter
 
 import (
 	"fmt"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"strings"
-
-	"github.com/glyphlang/glyph/pkg/interpreter"
 )
 
 // Mode determines the output format
@@ -50,7 +51,7 @@ func New(mode Mode) *Formatter {
 }
 
 // Format formats a module to source code
-func (f *Formatter) Format(module *interpreter.Module) string {
+func (f *Formatter) Format(module *ast.Module) string {
 	f.output.Reset()
 
 	for i, item := range module.Items {
@@ -63,34 +64,34 @@ func (f *Formatter) Format(module *interpreter.Module) string {
 	return f.output.String()
 }
 
-func (f *Formatter) formatItem(item interpreter.Item) {
+func (f *Formatter) formatItem(item ast.Item) {
 	switch v := item.(type) {
-	case *interpreter.TypeDef:
+	case *ast.TypeDef:
 		f.formatTypeDef(v)
-	case *interpreter.Route:
+	case *ast.Route:
 		f.formatRoute(v)
-	case *interpreter.Command:
+	case *ast.Command:
 		f.formatCommand(v)
-	case *interpreter.CronTask:
+	case *ast.CronTask:
 		f.formatCronTask(v)
-	case *interpreter.EventHandler:
+	case *ast.EventHandler:
 		f.formatEventHandler(v)
-	case *interpreter.QueueWorker:
+	case *ast.QueueWorker:
 		f.formatQueueWorker(v)
-	case *interpreter.Function:
+	case *ast.Function:
 		f.formatFunction(v)
-	case *interpreter.WebSocketRoute:
+	case *ast.WebSocketRoute:
 		f.formatWebSocketRoute(v)
-	case *interpreter.ImportStatement:
+	case *ast.ImportStatement:
 		f.formatImport(v)
-	case *interpreter.ModuleDecl:
+	case *ast.ModuleDecl:
 		f.formatModuleDecl(v)
-	case *interpreter.MacroDef:
+	case *ast.MacroDef:
 		f.formatMacroDef(v)
 	}
 }
 
-func (f *Formatter) formatTypeDef(td *interpreter.TypeDef) {
+func (f *Formatter) formatTypeDef(td *ast.TypeDef) {
 	if f.mode == Expanded {
 		f.write("type ")
 	} else {
@@ -133,7 +134,7 @@ func (f *Formatter) formatTypeDef(td *interpreter.TypeDef) {
 	f.writeln("}")
 }
 
-func (f *Formatter) formatRoute(r *interpreter.Route) {
+func (f *Formatter) formatRoute(r *ast.Route) {
 	if f.mode == Expanded {
 		f.write("route ")
 	} else {
@@ -214,7 +215,7 @@ func (f *Formatter) formatRoute(r *interpreter.Route) {
 	f.writeln("}")
 }
 
-func (f *Formatter) formatCommand(c *interpreter.Command) {
+func (f *Formatter) formatCommand(c *ast.Command) {
 	if f.mode == Expanded {
 		f.write("command ")
 	} else {
@@ -260,7 +261,7 @@ func (f *Formatter) formatCommand(c *interpreter.Command) {
 	f.writeln("}")
 }
 
-func (f *Formatter) formatCronTask(ct *interpreter.CronTask) {
+func (f *Formatter) formatCronTask(ct *ast.CronTask) {
 	if f.mode == Expanded {
 		f.write("cron ")
 	} else {
@@ -301,7 +302,7 @@ func (f *Formatter) formatCronTask(ct *interpreter.CronTask) {
 	f.writeln("}")
 }
 
-func (f *Formatter) formatEventHandler(eh *interpreter.EventHandler) {
+func (f *Formatter) formatEventHandler(eh *ast.EventHandler) {
 	if f.mode == Expanded {
 		f.write("handle ")
 	} else {
@@ -341,7 +342,7 @@ func (f *Formatter) formatEventHandler(eh *interpreter.EventHandler) {
 	f.writeln("}")
 }
 
-func (f *Formatter) formatQueueWorker(qw *interpreter.QueueWorker) {
+func (f *Formatter) formatQueueWorker(qw *ast.QueueWorker) {
 	if f.mode == Expanded {
 		f.write("queue ")
 	} else {
@@ -410,7 +411,7 @@ func (f *Formatter) formatQueueWorker(qw *interpreter.QueueWorker) {
 	f.writeln("}")
 }
 
-func (f *Formatter) formatFunction(fn *interpreter.Function) {
+func (f *Formatter) formatFunction(fn *ast.Function) {
 	if f.mode == Expanded {
 		f.write("func ")
 	} else {
@@ -460,7 +461,7 @@ func (f *Formatter) formatFunction(fn *interpreter.Function) {
 	f.writeln("}")
 }
 
-func (f *Formatter) formatWebSocketRoute(ws *interpreter.WebSocketRoute) {
+func (f *Formatter) formatWebSocketRoute(ws *ast.WebSocketRoute) {
 	if f.mode == Expanded {
 		f.write("route ")
 	} else {
@@ -474,13 +475,13 @@ func (f *Formatter) formatWebSocketRoute(ws *interpreter.WebSocketRoute) {
 	for _, event := range ws.Events {
 		f.writeIndent()
 		switch event.EventType {
-		case interpreter.WSEventConnect:
+		case ast.WSEventConnect:
 			f.writeln("on connect {")
-		case interpreter.WSEventDisconnect:
+		case ast.WSEventDisconnect:
 			f.writeln("on disconnect {")
-		case interpreter.WSEventMessage:
+		case ast.WSEventMessage:
 			f.writeln("on message {")
-		case interpreter.WSEventError:
+		case ast.WSEventError:
 			f.writeln("on error {")
 		}
 		f.indent++
@@ -497,7 +498,7 @@ func (f *Formatter) formatWebSocketRoute(ws *interpreter.WebSocketRoute) {
 	f.writeln("}")
 }
 
-func (f *Formatter) formatImport(imp *interpreter.ImportStatement) {
+func (f *Formatter) formatImport(imp *ast.ImportStatement) {
 	if imp.Selective {
 		f.write("from \"")
 		f.write(imp.Path)
@@ -525,13 +526,13 @@ func (f *Formatter) formatImport(imp *interpreter.ImportStatement) {
 	}
 }
 
-func (f *Formatter) formatModuleDecl(m *interpreter.ModuleDecl) {
+func (f *Formatter) formatModuleDecl(m *ast.ModuleDecl) {
 	f.write("module \"")
 	f.write(m.Name)
 	f.writeln("\"")
 }
 
-func (f *Formatter) formatMacroDef(m *interpreter.MacroDef) {
+func (f *Formatter) formatMacroDef(m *ast.MacroDef) {
 	f.write("macro! ")
 	f.write(m.Name)
 	f.write("(")
@@ -550,54 +551,54 @@ func (f *Formatter) formatMacroDef(m *interpreter.MacroDef) {
 	f.writeln("}")
 }
 
-func (f *Formatter) formatStatement(stmt interpreter.Statement) {
+func (f *Formatter) formatStatement(stmt ast.Statement) {
 	f.writeIndent()
 
 	switch v := stmt.(type) {
 	// Handle both pointer and value types for each statement
-	case interpreter.AssignStatement:
+	case ast.AssignStatement:
 		f.formatAssign(v.Target, v.Value)
-	case *interpreter.AssignStatement:
+	case *ast.AssignStatement:
 		f.formatAssign(v.Target, v.Value)
 
-	case interpreter.ReassignStatement:
+	case ast.ReassignStatement:
 		f.formatReassign(v.Target, v.Value)
-	case *interpreter.ReassignStatement:
+	case *ast.ReassignStatement:
 		f.formatReassign(v.Target, v.Value)
 
-	case interpreter.ReturnStatement:
+	case ast.ReturnStatement:
 		f.formatReturn(v.Value)
-	case *interpreter.ReturnStatement:
+	case *ast.ReturnStatement:
 		f.formatReturn(v.Value)
 
-	case interpreter.IfStatement:
+	case ast.IfStatement:
 		f.formatIf(v.Condition, v.ThenBlock, v.ElseBlock)
-	case *interpreter.IfStatement:
+	case *ast.IfStatement:
 		f.formatIf(v.Condition, v.ThenBlock, v.ElseBlock)
 
-	case interpreter.WhileStatement:
+	case ast.WhileStatement:
 		f.formatWhile(v.Condition, v.Body)
-	case *interpreter.WhileStatement:
+	case *ast.WhileStatement:
 		f.formatWhile(v.Condition, v.Body)
 
-	case interpreter.ForStatement:
+	case ast.ForStatement:
 		f.formatFor(v.KeyVar, v.ValueVar, v.Iterable, v.Body)
-	case *interpreter.ForStatement:
+	case *ast.ForStatement:
 		f.formatFor(v.KeyVar, v.ValueVar, v.Iterable, v.Body)
 
-	case interpreter.SwitchStatement:
+	case ast.SwitchStatement:
 		f.formatSwitch(v.Value, v.Cases, v.Default)
-	case *interpreter.SwitchStatement:
+	case *ast.SwitchStatement:
 		f.formatSwitch(v.Value, v.Cases, v.Default)
 
-	case interpreter.ExpressionStatement:
+	case ast.ExpressionStatement:
 		f.formatExpr(v.Expr)
 		f.writeln("")
-	case *interpreter.ExpressionStatement:
+	case *ast.ExpressionStatement:
 		f.formatExpr(v.Expr)
 		f.writeln("")
 
-	case interpreter.ValidationStatement:
+	case ast.ValidationStatement:
 		if f.mode == Expanded {
 			f.write("validate ")
 		} else {
@@ -605,7 +606,7 @@ func (f *Formatter) formatStatement(stmt interpreter.Statement) {
 		}
 		f.formatFunctionCall(v.Call)
 		f.writeln("")
-	case *interpreter.ValidationStatement:
+	case *ast.ValidationStatement:
 		if f.mode == Expanded {
 			f.write("validate ")
 		} else {
@@ -614,25 +615,25 @@ func (f *Formatter) formatStatement(stmt interpreter.Statement) {
 		f.formatFunctionCall(v.Call)
 		f.writeln("")
 
-	case interpreter.DbQueryStatement:
+	case ast.DbQueryStatement:
 		f.formatDbQuery(v.Var, v.Query, v.Params)
-	case *interpreter.DbQueryStatement:
+	case *ast.DbQueryStatement:
 		f.formatDbQuery(v.Var, v.Query, v.Params)
 
-	case interpreter.WsSendStatement:
+	case ast.WsSendStatement:
 		f.write("ws.send(")
 		f.formatExpr(v.Client)
 		f.write(", ")
 		f.formatExpr(v.Message)
 		f.writeln(")")
-	case *interpreter.WsSendStatement:
+	case *ast.WsSendStatement:
 		f.write("ws.send(")
 		f.formatExpr(v.Client)
 		f.write(", ")
 		f.formatExpr(v.Message)
 		f.writeln(")")
 
-	case interpreter.WsBroadcastStatement:
+	case ast.WsBroadcastStatement:
 		f.write("ws.broadcast(")
 		f.formatExpr(v.Message)
 		if v.Except != nil {
@@ -640,7 +641,7 @@ func (f *Formatter) formatStatement(stmt interpreter.Statement) {
 			f.formatExpr(*v.Except)
 		}
 		f.writeln(")")
-	case *interpreter.WsBroadcastStatement:
+	case *ast.WsBroadcastStatement:
 		f.write("ws.broadcast(")
 		f.formatExpr(v.Message)
 		if v.Except != nil {
@@ -649,7 +650,7 @@ func (f *Formatter) formatStatement(stmt interpreter.Statement) {
 		}
 		f.writeln(")")
 
-	case interpreter.WsCloseStatement:
+	case ast.WsCloseStatement:
 		f.write("ws.close(")
 		f.formatExpr(v.Client)
 		if v.Reason != nil {
@@ -657,7 +658,7 @@ func (f *Formatter) formatStatement(stmt interpreter.Statement) {
 			f.formatExpr(v.Reason)
 		}
 		f.writeln(")")
-	case *interpreter.WsCloseStatement:
+	case *ast.WsCloseStatement:
 		f.write("ws.close(")
 		f.formatExpr(v.Client)
 		if v.Reason != nil {
@@ -670,7 +671,7 @@ func (f *Formatter) formatStatement(stmt interpreter.Statement) {
 
 // Statement formatting helpers
 
-func (f *Formatter) formatAssign(target string, value interpreter.Expr) {
+func (f *Formatter) formatAssign(target string, value ast.Expr) {
 	if f.mode == Expanded {
 		f.write("let ")
 	} else {
@@ -682,14 +683,14 @@ func (f *Formatter) formatAssign(target string, value interpreter.Expr) {
 	f.writeln("")
 }
 
-func (f *Formatter) formatReassign(target string, value interpreter.Expr) {
+func (f *Formatter) formatReassign(target string, value ast.Expr) {
 	f.write(target)
 	f.write(" = ")
 	f.formatExpr(value)
 	f.writeln("")
 }
 
-func (f *Formatter) formatReturn(value interpreter.Expr) {
+func (f *Formatter) formatReturn(value ast.Expr) {
 	if f.mode == Expanded {
 		f.write("return ")
 	} else {
@@ -699,7 +700,7 @@ func (f *Formatter) formatReturn(value interpreter.Expr) {
 	f.writeln("")
 }
 
-func (f *Formatter) formatIf(condition interpreter.Expr, thenBlock, elseBlock []interpreter.Statement) {
+func (f *Formatter) formatIf(condition ast.Expr, thenBlock, elseBlock []ast.Statement) {
 	f.write("if ")
 	f.formatExpr(condition)
 	f.writeln(" {")
@@ -721,7 +722,7 @@ func (f *Formatter) formatIf(condition interpreter.Expr, thenBlock, elseBlock []
 	f.writeln("}")
 }
 
-func (f *Formatter) formatWhile(condition interpreter.Expr, body []interpreter.Statement) {
+func (f *Formatter) formatWhile(condition ast.Expr, body []ast.Statement) {
 	f.write("while ")
 	f.formatExpr(condition)
 	f.writeln(" {")
@@ -734,7 +735,7 @@ func (f *Formatter) formatWhile(condition interpreter.Expr, body []interpreter.S
 	f.writeln("}")
 }
 
-func (f *Formatter) formatFor(keyVar, valueVar string, iterable interpreter.Expr, body []interpreter.Statement) {
+func (f *Formatter) formatFor(keyVar, valueVar string, iterable ast.Expr, body []ast.Statement) {
 	f.write("for ")
 	if keyVar != "" {
 		f.write(keyVar)
@@ -753,7 +754,7 @@ func (f *Formatter) formatFor(keyVar, valueVar string, iterable interpreter.Expr
 	f.writeln("}")
 }
 
-func (f *Formatter) formatSwitch(value interpreter.Expr, cases []interpreter.SwitchCase, defaultBlock []interpreter.Statement) {
+func (f *Formatter) formatSwitch(value ast.Expr, cases []ast.SwitchCase, defaultBlock []ast.Statement) {
 	f.write("switch ")
 	f.formatExpr(value)
 	f.writeln(" {")
@@ -787,7 +788,7 @@ func (f *Formatter) formatSwitch(value interpreter.Expr, cases []interpreter.Swi
 	f.writeln("}")
 }
 
-func (f *Formatter) formatDbQuery(varName, query string, params []interpreter.Expr) {
+func (f *Formatter) formatDbQuery(varName, query string, params []ast.Expr) {
 	if f.mode == Expanded {
 		f.write("let ")
 	} else {
@@ -804,7 +805,7 @@ func (f *Formatter) formatDbQuery(varName, query string, params []interpreter.Ex
 	f.writeln(")")
 }
 
-func (f *Formatter) formatFunctionCall(call interpreter.FunctionCallExpr) {
+func (f *Formatter) formatFunctionCall(call ast.FunctionCallExpr) {
 	f.write(call.Name)
 	if len(call.TypeArgs) > 0 {
 		f.write("<")
@@ -826,90 +827,90 @@ func (f *Formatter) formatFunctionCall(call interpreter.FunctionCallExpr) {
 	f.write(")")
 }
 
-func (f *Formatter) formatExpr(expr interpreter.Expr) {
+func (f *Formatter) formatExpr(expr ast.Expr) {
 	switch v := expr.(type) {
-	case interpreter.LiteralExpr:
+	case ast.LiteralExpr:
 		f.formatLiteral(v.Value)
-	case *interpreter.LiteralExpr:
+	case *ast.LiteralExpr:
 		f.formatLiteral(v.Value)
 
-	case interpreter.VariableExpr:
+	case ast.VariableExpr:
 		f.write(v.Name)
-	case *interpreter.VariableExpr:
+	case *ast.VariableExpr:
 		f.write(v.Name)
 
-	case interpreter.BinaryOpExpr:
+	case ast.BinaryOpExpr:
 		f.formatBinaryOp(v.Op, v.Left, v.Right)
-	case *interpreter.BinaryOpExpr:
+	case *ast.BinaryOpExpr:
 		f.formatBinaryOp(v.Op, v.Left, v.Right)
 
-	case interpreter.UnaryOpExpr:
+	case ast.UnaryOpExpr:
 		f.write(v.Op.String())
 		f.formatExpr(v.Right)
-	case *interpreter.UnaryOpExpr:
+	case *ast.UnaryOpExpr:
 		f.write(v.Op.String())
 		f.formatExpr(v.Right)
 
-	case interpreter.FieldAccessExpr:
+	case ast.FieldAccessExpr:
 		f.formatExpr(v.Object)
 		f.write(".")
 		f.write(v.Field)
-	case *interpreter.FieldAccessExpr:
+	case *ast.FieldAccessExpr:
 		f.formatExpr(v.Object)
 		f.write(".")
 		f.write(v.Field)
 
-	case interpreter.ArrayIndexExpr:
+	case ast.ArrayIndexExpr:
 		f.formatExpr(v.Array)
 		f.write("[")
 		f.formatExpr(v.Index)
 		f.write("]")
-	case *interpreter.ArrayIndexExpr:
+	case *ast.ArrayIndexExpr:
 		f.formatExpr(v.Array)
 		f.write("[")
 		f.formatExpr(v.Index)
 		f.write("]")
 
-	case interpreter.FunctionCallExpr:
+	case ast.FunctionCallExpr:
 		f.formatFunctionCall(v)
-	case *interpreter.FunctionCallExpr:
+	case *ast.FunctionCallExpr:
 		f.formatFunctionCall(*v)
 
-	case interpreter.ObjectExpr:
+	case ast.ObjectExpr:
 		f.formatObject(v.Fields)
-	case *interpreter.ObjectExpr:
+	case *ast.ObjectExpr:
 		f.formatObject(v.Fields)
 
-	case interpreter.ArrayExpr:
+	case ast.ArrayExpr:
 		f.formatArray(v.Elements)
-	case *interpreter.ArrayExpr:
+	case *ast.ArrayExpr:
 		f.formatArray(v.Elements)
 
-	case interpreter.LambdaExpr:
+	case ast.LambdaExpr:
 		f.formatLambda(v.Params, v.Body, v.Block)
-	case *interpreter.LambdaExpr:
+	case *ast.LambdaExpr:
 		f.formatLambda(v.Params, v.Body, v.Block)
 
-	case interpreter.MatchExpr:
+	case ast.MatchExpr:
 		f.formatMatch(v.Value, v.Cases)
-	case *interpreter.MatchExpr:
+	case *ast.MatchExpr:
 		f.formatMatch(v.Value, v.Cases)
 
-	case interpreter.AsyncExpr:
+	case ast.AsyncExpr:
 		f.formatAsync(v.Body)
-	case *interpreter.AsyncExpr:
+	case *ast.AsyncExpr:
 		f.formatAsync(v.Body)
 
-	case interpreter.AwaitExpr:
+	case ast.AwaitExpr:
 		f.write("await ")
 		f.formatExpr(v.Expr)
-	case *interpreter.AwaitExpr:
+	case *ast.AwaitExpr:
 		f.write("await ")
 		f.formatExpr(v.Expr)
 	}
 }
 
-func (f *Formatter) formatBinaryOp(op interpreter.BinOp, left, right interpreter.Expr) {
+func (f *Formatter) formatBinaryOp(op ast.BinOp, left, right ast.Expr) {
 	f.formatExpr(left)
 	f.write(" ")
 	f.write(op.String())
@@ -917,7 +918,7 @@ func (f *Formatter) formatBinaryOp(op interpreter.BinOp, left, right interpreter
 	f.formatExpr(right)
 }
 
-func (f *Formatter) formatObject(fields []interpreter.ObjectField) {
+func (f *Formatter) formatObject(fields []ast.ObjectField) {
 	if len(fields) == 0 {
 		f.write("{}")
 		return
@@ -952,7 +953,7 @@ func (f *Formatter) formatObject(fields []interpreter.ObjectField) {
 	}
 }
 
-func (f *Formatter) formatArray(elements []interpreter.Expr) {
+func (f *Formatter) formatArray(elements []ast.Expr) {
 	if len(elements) == 0 {
 		f.write("[]")
 		return
@@ -967,7 +968,7 @@ func (f *Formatter) formatArray(elements []interpreter.Expr) {
 	f.write("]")
 }
 
-func (f *Formatter) formatLambda(params []interpreter.Field, body interpreter.Expr, block []interpreter.Statement) {
+func (f *Formatter) formatLambda(params []ast.Field, body ast.Expr, block []ast.Statement) {
 	f.write("(")
 	for i, p := range params {
 		if i > 0 {
@@ -994,7 +995,7 @@ func (f *Formatter) formatLambda(params []interpreter.Field, body interpreter.Ex
 	}
 }
 
-func (f *Formatter) formatMatch(value interpreter.Expr, cases []interpreter.MatchCase) {
+func (f *Formatter) formatMatch(value ast.Expr, cases []ast.MatchCase) {
 	f.write("match ")
 	f.formatExpr(value)
 	f.writeln(" {")
@@ -1015,7 +1016,7 @@ func (f *Formatter) formatMatch(value interpreter.Expr, cases []interpreter.Matc
 	f.write("}")
 }
 
-func (f *Formatter) formatAsync(body []interpreter.Statement) {
+func (f *Formatter) formatAsync(body []ast.Statement) {
 	f.writeln("async {")
 	f.indent++
 	for _, s := range body {
@@ -1026,48 +1027,48 @@ func (f *Formatter) formatAsync(body []interpreter.Statement) {
 	f.write("}")
 }
 
-func (f *Formatter) formatLiteral(lit interpreter.Literal) {
+func (f *Formatter) formatLiteral(lit ast.Literal) {
 	switch v := lit.(type) {
-	case interpreter.IntLiteral:
+	case ast.IntLiteral:
 		f.write(fmt.Sprintf("%d", v.Value))
-	case interpreter.FloatLiteral:
+	case ast.FloatLiteral:
 		f.write(fmt.Sprintf("%g", v.Value))
-	case interpreter.StringLiteral:
+	case ast.StringLiteral:
 		f.write("\"")
 		f.write(escapeString(v.Value))
 		f.write("\"")
-	case interpreter.BoolLiteral:
+	case ast.BoolLiteral:
 		if v.Value {
 			f.write("true")
 		} else {
 			f.write("false")
 		}
-	case interpreter.NullLiteral:
+	case ast.NullLiteral:
 		f.write("null")
 	}
 }
 
-func (f *Formatter) formatType(t interpreter.Type) {
+func (f *Formatter) formatType(t ast.Type) {
 	switch v := t.(type) {
-	case interpreter.IntType:
+	case ast.IntType:
 		f.write("int")
-	case interpreter.StringType:
+	case ast.StringType:
 		f.write("str")
-	case interpreter.BoolType:
+	case ast.BoolType:
 		f.write("bool")
-	case interpreter.FloatType:
+	case ast.FloatType:
 		f.write("float")
-	case interpreter.DatabaseType:
+	case ast.DatabaseType:
 		f.write("Database")
-	case interpreter.NamedType:
+	case ast.NamedType:
 		f.write(v.Name)
-	case interpreter.ArrayType:
+	case ast.ArrayType:
 		f.formatType(v.ElementType)
 		f.write("[]")
-	case interpreter.OptionalType:
+	case ast.OptionalType:
 		f.formatType(v.InnerType)
 		f.write("?")
-	case interpreter.GenericType:
+	case ast.GenericType:
 		f.formatType(v.BaseType)
 		f.write("<")
 		for i, arg := range v.TypeArgs {
@@ -1077,9 +1078,9 @@ func (f *Formatter) formatType(t interpreter.Type) {
 			f.formatType(arg)
 		}
 		f.write(">")
-	case interpreter.TypeParameterType:
+	case ast.TypeParameterType:
 		f.write(v.Name)
-	case interpreter.FunctionType:
+	case ast.FunctionType:
 		f.write("(")
 		for i, pt := range v.ParamTypes {
 			if i > 0 {
@@ -1089,29 +1090,29 @@ func (f *Formatter) formatType(t interpreter.Type) {
 		}
 		f.write(") -> ")
 		f.formatType(v.ReturnType)
-	case interpreter.UnionType:
+	case ast.UnionType:
 		for i, ut := range v.Types {
 			if i > 0 {
 				f.write(" | ")
 			}
 			f.formatType(ut)
 		}
-	case interpreter.FutureType:
+	case ast.FutureType:
 		f.write("Future<")
 		f.formatType(v.ResultType)
 		f.write(">")
 	}
 }
 
-func (f *Formatter) formatPattern(p interpreter.Pattern) {
+func (f *Formatter) formatPattern(p ast.Pattern) {
 	switch v := p.(type) {
-	case interpreter.LiteralPattern:
+	case ast.LiteralPattern:
 		f.formatLiteral(v.Value)
-	case interpreter.VariablePattern:
+	case ast.VariablePattern:
 		f.write(v.Name)
-	case interpreter.WildcardPattern:
+	case ast.WildcardPattern:
 		f.write("_")
-	case interpreter.ObjectPattern:
+	case ast.ObjectPattern:
 		f.write("{")
 		for i, field := range v.Fields {
 			if i > 0 {
@@ -1124,7 +1125,7 @@ func (f *Formatter) formatPattern(p interpreter.Pattern) {
 			}
 		}
 		f.write("}")
-	case interpreter.ArrayPattern:
+	case ast.ArrayPattern:
 		f.write("[")
 		for i, elem := range v.Elements {
 			if i > 0 {

@@ -11,6 +11,46 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// MockInterpreter is a simple mock interpreter for testing
+type MockInterpreter struct {
+	Response interface{}
+	Error    error
+}
+
+// Execute implements the Interpreter interface
+func (m *MockInterpreter) Execute(route *Route, ctx *Context) (interface{}, error) {
+	if m.Error != nil {
+		return nil, m.Error
+	}
+
+	if m.Response != nil {
+		return m.Response, nil
+	}
+
+	query := make(map[string]interface{})
+	for k, v := range ctx.QueryParams {
+		if len(v) == 1 {
+			query[k] = v[0]
+		} else {
+			query[k] = v
+		}
+	}
+
+	response := map[string]interface{}{
+		"message":    "Mock response",
+		"path":       ctx.Request.URL.Path,
+		"method":     ctx.Request.Method,
+		"pathParams": ctx.PathParams,
+		"query":      query,
+	}
+
+	if ctx.Body != nil && len(ctx.Body) > 0 {
+		response["body"] = ctx.Body
+	}
+
+	return response, nil
+}
+
 // TestRouterBasic tests basic route registration and matching
 func TestRouterBasic(t *testing.T) {
 	router := NewRouter()
@@ -516,4 +556,3 @@ func BenchmarkHandlerJSON(b *testing.B) {
 		server.GetHandler().ServeHTTP(w, req)
 	}
 }
-

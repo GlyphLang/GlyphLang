@@ -95,15 +95,15 @@ func BenchmarkVMRouteExecution(b *testing.B) {
 		// Constant count (uint32 LE)
 		0x01, 0x00, 0x00, 0x00, // 1 constant
 		// Constant 0: String "Hello"
-		0x04,                         // Type: String
-		0x05, 0x00, 0x00, 0x00,       // Length: 5 (uint32 LE)
+		0x04,                   // Type: String
+		0x05, 0x00, 0x00, 0x00, // Length: 5 (uint32 LE)
 		0x48, 0x65, 0x6c, 0x6c, 0x6f, // "Hello"
 		// Instruction count (uint32 LE)
 		0x06, 0x00, 0x00, 0x00, // 6 bytes of instructions
 		// Instructions
 		0x01,                   // OpPush
 		0x00, 0x00, 0x00, 0x00, // Constant index 0
-		0x61,                   // OpReturn (0x61)
+		0x61, // OpReturn (0x61)
 	}
 
 	b.ResetTimer()
@@ -143,15 +143,15 @@ func BenchmarkVMComplexOperation(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		// Simulate: result = (a + b) * (c - d)
-		vm.Push(IntValue{Val: 10})  // a
-		vm.Push(IntValue{Val: 20})  // b
+		vm.Push(IntValue{Val: 10}) // a
+		vm.Push(IntValue{Val: 20}) // b
 		v2, _ := vm.Pop()
 		v1, _ := vm.Pop()
 		sum := IntValue{Val: v1.(IntValue).Val + v2.(IntValue).Val}
 		vm.Push(sum)
 
-		vm.Push(IntValue{Val: 30})  // c
-		vm.Push(IntValue{Val: 5})   // d
+		vm.Push(IntValue{Val: 30}) // c
+		vm.Push(IntValue{Val: 5})  // d
 		v4, _ := vm.Pop()
 		v3, _ := vm.Pop()
 		diff := IntValue{Val: v3.(IntValue).Val - v4.(IntValue).Val}

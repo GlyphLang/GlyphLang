@@ -1,4 +1,4 @@
-package interpreter
+package ast
 
 // Module represents the top-level AST node
 type Module struct {
@@ -12,13 +12,41 @@ type Item interface {
 
 // TypeDef represents a type definition
 // Example: : Result<T, E> { ok: T?, error: E? }
+// With traits: : User impl Serializable { id: int, name: string, toJson() -> string { ... } }
 type TypeDef struct {
 	Name       string
 	TypeParams []TypeParameter // Generic type parameters (e.g., T, E)
 	Fields     []Field
+	Traits     []string    // Trait names this type implements
+	Methods    []MethodDef // Method implementations (for trait conformance)
 }
 
 func (TypeDef) isItem() {}
+
+// TraitMethodSignature represents a method signature in a trait definition
+type TraitMethodSignature struct {
+	Name       string
+	Params     []Field
+	ReturnType Type
+}
+
+// TraitDef represents a trait/interface definition
+// Example: trait Serializable { toJson() -> string }
+type TraitDef struct {
+	Name       string
+	TypeParams []TypeParameter
+	Methods    []TraitMethodSignature
+}
+
+func (TraitDef) isItem() {}
+
+// MethodDef represents a method implementation on a type
+type MethodDef struct {
+	Name       string
+	Params     []Field
+	ReturnType Type
+	Body       []Statement
+}
 
 // Route represents an HTTP route
 type Route struct {
@@ -47,12 +75,22 @@ type Function struct {
 
 func (Function) isItem() {}
 
+// FieldAnnotation represents a declarative validation annotation on a type
+// field such as @minLen(2), @email, or @pattern("[A-Z]"). Annotations are
+// parsed from type definitions and processed by the validation schema builder
+// in pkg/validation to generate validation rules automatically.
+type FieldAnnotation struct {
+	Name   string        // annotation name, e.g. "minLen", "email"
+	Params []interface{} // typed parameters: string, int64, float64, or []string
+}
+
 // Field represents a struct field
 type Field struct {
 	Name           string
 	TypeAnnotation Type
 	Required       bool
-	Default        Expr // nil if no default value
+	Default        Expr              // nil if no default value
+	Annotations    []FieldAnnotation // nil when no annotations are present
 }
 
 // Type represents a type annotation
@@ -78,6 +116,9 @@ type NamedType struct {
 }
 
 type DatabaseType struct{}
+type RedisType struct{}
+type MongoDBType struct{}
+type LLMType struct{}
 
 type UnionType struct {
 	Types []Type
@@ -118,6 +159,9 @@ func (ArrayType) isType()         {}
 func (OptionalType) isType()      {}
 func (NamedType) isType()         {}
 func (DatabaseType) isType()      {}
+func (RedisType) isType()         {}
+func (MongoDBType) isType()       {}
+func (LLMType) isType()           {}
 func (UnionType) isType()         {}
 func (GenericType) isType()       {}
 func (TypeParameterType) isType() {}
@@ -133,6 +177,7 @@ const (
 	Delete
 	Patch
 	WebSocket // WebSocket upgrade
+	SSE       // Server-Sent Events
 )
 
 func (m HttpMethod) String() string {
@@ -149,6 +194,8 @@ func (m HttpMethod) String() string {
 		return "PATCH"
 	case WebSocket:
 		return "WS"
+	case SSE:
+		return "SSE"
 	default:
 		return "UNKNOWN"
 	}
@@ -202,7 +249,18 @@ type ReassignStatement struct {
 }
 
 func (ReassignStatement) isStatement() {}
-func (ReassignStatement) isNode() {}
+func (ReassignStatement) isNode()      {}
+
+// IndexAssignStatement represents assignment to an indexed or field target.
+// Target must be ArrayIndexExpr or FieldAccessExpr (enforced by the parser).
+// Example: arr[0] = 99, obj.list[0] = "updated", arr[0].name = "new"
+type IndexAssignStatement struct {
+	Target Expr
+	Value  Expr
+}
+
+func (IndexAssignStatement) isStatement() {}
+func (IndexAssignStatement) isNode()      {}
 
 // DbQueryStatement represents a database query
 type DbQueryStatement struct {
@@ -274,8 +332,8 @@ func (WsSendStatement) isStatement() {}
 
 // WsBroadcastStatement represents broadcasting a message to all clients
 type WsBroadcastStatement struct {
-	Message Expr      // Message to broadcast
-	Except  *Expr     // Optional: client ID to exclude
+	Message Expr  // Message to broadcast
+	Except  *Expr // Optional: client ID to exclude
 }
 
 func (WsBroadcastStatement) isStatement() {}
@@ -301,6 +359,23 @@ type ExpressionStatement struct {
 }
 
 func (ExpressionStatement) isStatement() {}
+
+// YieldStatement sends a value as a Server-Sent Event in SSE routes.
+type YieldStatement struct {
+	Value     Expr   // The event data to send
+	EventType string // Optional named event type (empty for default "message")
+}
+
+func (YieldStatement) isStatement() {}
+
+// AssertStatement represents an assertion in a test block
+// Example: assert(condition) or assert(condition, "message")
+type AssertStatement struct {
+	Condition Expr // Expression that must evaluate to true
+	Message   Expr // Optional failure message (nil if not provided)
+}
+
+func (AssertStatement) isStatement() {}
 
 // Expr represents an expression in the AST
 type Expr interface {
@@ -387,8 +462,8 @@ func (ArrayExpr) isExpr() {}
 // LambdaExpr represents an anonymous function (lambda/arrow function)
 // Example: (x) => x * 2, (a, b) => a + b
 type LambdaExpr struct {
-	Params []Field    // Parameter list
-	Body   Expr       // Single expression body (for short lambdas)
+	Params []Field     // Parameter list
+	Body   Expr        // Single expression body (for short lambdas)
 	Block  []Statement // Statement body (for multi-line lambdas), mutually exclusive with Body
 }
 
@@ -585,12 +660,109 @@ type QueueWorker struct {
 
 func (QueueWorker) isItem() {}
 
+// GRPCStreamType indicates the streaming mode for an RPC method
+type GRPCStreamType int
+
+const (
+	GRPCUnary         GRPCStreamType = iota // No streaming
+	GRPCServerStream                        // Server streams responses
+	GRPCClientStream                        // Client streams requests
+	GRPCBidirectional                       // Both directions stream
+)
+
+func (s GRPCStreamType) String() string {
+	switch s {
+	case GRPCUnary:
+		return "unary"
+	case GRPCServerStream:
+		return "server_stream"
+	case GRPCClientStream:
+		return "client_stream"
+	case GRPCBidirectional:
+		return "bidirectional"
+	default:
+		return "unknown"
+	}
+}
+
+// GRPCMethod represents a single method in a gRPC service definition
+type GRPCMethod struct {
+	Name       string
+	InputType  Type
+	ReturnType Type
+	StreamType GRPCStreamType
+}
+
+// GRPCService represents a gRPC service definition
+// Syntax: @ rpc ServiceName { Method(InputType) -> ReturnType ... }
+type GRPCService struct {
+	Name    string
+	Methods []GRPCMethod
+}
+
+func (GRPCService) isItem() {}
+
+// GRPCHandler represents a gRPC method handler implementation
+// Syntax: @ rpc MethodName(param: Type) -> ReturnType { body }
+type GRPCHandler struct {
+	ServiceName string // Optional: service this handler belongs to
+	MethodName  string
+	Params      []Field
+	ReturnType  Type
+	StreamType  GRPCStreamType
+	Auth        *AuthConfig
+	Injections  []Injection
+	Body        []Statement
+}
+
+func (GRPCHandler) isItem() {}
+
+// GraphQLOperationType represents the GraphQL operation type
+type GraphQLOperationType int
+
+const (
+	GraphQLQuery GraphQLOperationType = iota
+	GraphQLMutation
+	GraphQLSubscription
+)
+
+func (op GraphQLOperationType) String() string {
+	switch op {
+	case GraphQLQuery:
+		return "query"
+	case GraphQLMutation:
+		return "mutation"
+	case GraphQLSubscription:
+		return "subscription"
+	default:
+		return "unknown"
+	}
+}
+
+// GraphQLResolver represents a GraphQL resolver definition
+// Syntax: @ query user(id: int) -> User { ... }
+//
+//	@ mutation createUser(input: UserInput) -> User { ... }
+//	@ subscription userCreated -> User { ... }
+type GraphQLResolver struct {
+	Operation  GraphQLOperationType
+	FieldName  string
+	Params     []Field
+	ReturnType Type
+	Auth       *AuthConfig
+	Injections []Injection
+	Body       []Statement
+}
+
+func (GraphQLResolver) isItem() {}
+
 // ImportStatement represents an import declaration
 // Syntax forms:
-//   import "path/to/file"
-//   import "path/to/file" as alias
-//   from "path/to/file" import { name1, name2 }
-//   from "path/to/file" import { name1 as alias1, name2 }
+//
+//	import "path/to/file"
+//	import "path/to/file" as alias
+//	from "path/to/file" import { name1, name2 }
+//	from "path/to/file" import { name1 as alias1, name2 }
 type ImportStatement struct {
 	Path      string       // The import path (relative or package name)
 	Alias     string       // Optional alias for the entire module
@@ -624,6 +796,16 @@ type ConstDecl struct {
 }
 
 func (ConstDecl) isItem() {}
+
+// TestBlock represents a test definition
+// Compact syntax: test "name" { body }
+// Expanded syntax: test "name" { body }
+type TestBlock struct {
+	Name string      // Test name/description
+	Body []Statement // Test body statements including assertions
+}
+
+func (TestBlock) isItem() {}
 
 // AsyncExpr represents an async block expression: async { ... }
 // The block is executed asynchronously and returns a Future
@@ -731,6 +913,22 @@ func (MacroInvocation) isItem()      {}
 func (MacroInvocation) isStatement() {}
 func (MacroInvocation) isExpr()      {}
 
+// ContractEndpoint represents an endpoint declaration in a contract definition
+type ContractEndpoint struct {
+	Method     HttpMethod
+	Path       string
+	ReturnType Type // Expected return type (may be UnionType for multiple outcomes)
+}
+
+// ContractDef represents an API contract definition
+// Example: contract UserService { @ GET /users/:id -> User | NotFound }
+type ContractDef struct {
+	Name      string
+	Endpoints []ContractEndpoint
+}
+
+func (ContractDef) isItem() {}
+
 // QuoteExpr represents an unevaluated AST fragment
 // Example: quote { if x > 0 { return x } }
 type QuoteExpr struct {
@@ -753,49 +951,57 @@ type Node interface {
 }
 
 // Make existing types implement Node
-func (TypeDef) isNode()             {}
-func (Route) isNode()               {}
-func (Function) isNode()            {}
-func (WebSocketRoute) isNode()      {}
-func (Command) isNode()             {}
-func (CronTask) isNode()            {}
-func (EventHandler) isNode()        {}
-func (QueueWorker) isNode()         {}
-func (ImportStatement) isNode()     {}
-func (ModuleDecl) isNode()          {}
-func (ConstDecl) isNode()           {}
-func (MacroDef) isNode()            {}
-func (MacroInvocation) isNode()     {}
-func (AssignStatement) isNode()     {}
-func (DbQueryStatement) isNode()    {}
-func (ReturnStatement) isNode()     {}
-func (IfStatement) isNode()         {}
-func (WhileStatement) isNode()      {}
-func (SwitchStatement) isNode()     {}
-func (ForStatement) isNode()        {}
-func (WsSendStatement) isNode()     {}
-func (WsBroadcastStatement) isNode(){}
-func (WsCloseStatement) isNode()    {}
-func (ValidationStatement) isNode() {}
-func (ExpressionStatement) isNode() {}
-func (WebSocketEvent) isNode()      {}
-func (LiteralExpr) isNode()         {}
-func (VariableExpr) isNode()        {}
-func (BinaryOpExpr) isNode()        {}
-func (UnaryOpExpr) isNode()         {}
-func (FieldAccessExpr) isNode()     {}
-func (ArrayIndexExpr) isNode()      {}
-func (FunctionCallExpr) isNode()    {}
-func (ObjectExpr) isNode()          {}
-func (ArrayExpr) isNode()           {}
-func (QuoteExpr) isNode()           {}
-func (UnquoteExpr) isNode()         {}
-func (MatchExpr) isNode()           {}
-func (LiteralPattern) isNode()      {}
-func (VariablePattern) isNode()     {}
-func (WildcardPattern) isNode()     {}
-func (ObjectPattern) isNode()       {}
-func (ArrayPattern) isNode()        {}
-func (AsyncExpr) isNode()           {}
-func (AwaitExpr) isNode()           {}
-func (LambdaExpr) isNode()          {}
+func (TypeDef) isNode()              {}
+func (ContractDef) isNode()          {}
+func (TraitDef) isNode()             {}
+func (Route) isNode()                {}
+func (Function) isNode()             {}
+func (WebSocketRoute) isNode()       {}
+func (Command) isNode()              {}
+func (CronTask) isNode()             {}
+func (EventHandler) isNode()         {}
+func (QueueWorker) isNode()          {}
+func (GRPCService) isNode()          {}
+func (GRPCHandler) isNode()          {}
+func (GraphQLResolver) isNode()      {}
+func (ImportStatement) isNode()      {}
+func (ModuleDecl) isNode()           {}
+func (ConstDecl) isNode()            {}
+func (MacroDef) isNode()             {}
+func (MacroInvocation) isNode()      {}
+func (AssignStatement) isNode()      {}
+func (DbQueryStatement) isNode()     {}
+func (ReturnStatement) isNode()      {}
+func (IfStatement) isNode()          {}
+func (WhileStatement) isNode()       {}
+func (SwitchStatement) isNode()      {}
+func (ForStatement) isNode()         {}
+func (WsSendStatement) isNode()      {}
+func (WsBroadcastStatement) isNode() {}
+func (WsCloseStatement) isNode()     {}
+func (ValidationStatement) isNode()  {}
+func (ExpressionStatement) isNode()  {}
+func (YieldStatement) isNode()       {}
+func (WebSocketEvent) isNode()       {}
+func (LiteralExpr) isNode()          {}
+func (VariableExpr) isNode()         {}
+func (BinaryOpExpr) isNode()         {}
+func (UnaryOpExpr) isNode()          {}
+func (FieldAccessExpr) isNode()      {}
+func (ArrayIndexExpr) isNode()       {}
+func (FunctionCallExpr) isNode()     {}
+func (ObjectExpr) isNode()           {}
+func (ArrayExpr) isNode()            {}
+func (QuoteExpr) isNode()            {}
+func (UnquoteExpr) isNode()          {}
+func (MatchExpr) isNode()            {}
+func (LiteralPattern) isNode()       {}
+func (VariablePattern) isNode()      {}
+func (WildcardPattern) isNode()      {}
+func (ObjectPattern) isNode()        {}
+func (ArrayPattern) isNode()         {}
+func (AsyncExpr) isNode()            {}
+func (AwaitExpr) isNode()            {}
+func (LambdaExpr) isNode()           {}
+func (TestBlock) isNode()            {}
+func (AssertStatement) isNode()      {}

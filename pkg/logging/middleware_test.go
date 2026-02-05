@@ -206,10 +206,10 @@ func TestStructuredLoggingMiddlewareError(t *testing.T) {
 
 func TestStructuredLoggingMiddlewareStatusCodes(t *testing.T) {
 	tests := []struct {
-		name           string
-		statusCode     int
-		expectedLevel  string
-		expectedMsg    string
+		name          string
+		statusCode    int
+		expectedLevel string
+		expectedMsg   string
 	}{
 		{
 			name:          "success",

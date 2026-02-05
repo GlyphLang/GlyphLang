@@ -1,6 +1,11 @@
 package interpreter
 
-import "fmt"
+import (
+	. "github.com/glyphlang/glyph/pkg/ast"
+
+	"fmt"
+	"strings"
+)
 
 // returnValue is a special error type to handle return statements
 type returnValue struct {
@@ -9,6 +14,21 @@ type returnValue struct {
 
 func (r *returnValue) Error() string {
 	return "return"
+}
+
+// AssertionError represents a failed test assertion
+type AssertionError struct {
+	Message string
+}
+
+func (a *AssertionError) Error() string {
+	return a.Message
+}
+
+// IsAssertionError checks if an error is an assertion error
+func IsAssertionError(err error) bool {
+	_, ok := err.(*AssertionError)
+	return ok
 }
 
 // ValidationError is a special error type for validation failures
@@ -57,6 +77,18 @@ func (i *Interpreter) ExecuteStatement(stmt Statement, env *Environment) (interf
 	case ReassignStatement:
 		return i.executeReassign(s, env)
 
+	case YieldStatement:
+		return i.executeYield(s, env)
+
+	case AssertStatement:
+		return i.executeAssert(s, env)
+
+	case IndexAssignStatement:
+		return i.executeIndexAssign(s, env)
+
+	case ExpressionStatement:
+		return i.EvaluateExpression(s.Expr, env)
+
 	default:
 		return nil, fmt.Errorf("unsupported statement type: %T", stmt)
 	}
@@ -79,6 +111,11 @@ func (i *Interpreter) executeStatements(stmts []Statement, env *Environment) (in
 
 // executeAssign executes a variable assignment
 func (i *Interpreter) executeAssign(stmt AssignStatement, env *Environment) (interface{}, error) {
+	// Handle dot-notation field assignment (e.g., obj.field = value)
+	if parts := strings.SplitN(stmt.Target, ".", 2); len(parts) == 2 {
+		return i.executeFieldAssign(parts[0], parts[1], stmt.Value, env)
+	}
+
 	// Check for redeclaration in current scope (issue #70)
 	// Variables declared with $ cannot be redeclared in the same scope
 	if env.HasLocal(stmt.Target) {
@@ -100,8 +137,49 @@ func (i *Interpreter) executeAssign(stmt AssignStatement, env *Environment) (int
 	return value, nil
 }
 
+// executeFieldAssign handles dot-notation field assignment like obj.field = value
+func (i *Interpreter) executeFieldAssign(objName, fieldPath string, valueExpr Expr, env *Environment) (interface{}, error) {
+	objVal, err := env.Get(objName)
+	if err != nil {
+		return nil, fmt.Errorf("cannot assign to field of undeclared variable '%s'", objName)
+	}
+
+	obj, ok := objVal.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("cannot assign to field of non-object variable '%s' (type %T)", objName, objVal)
+	}
+
+	value, err := i.EvaluateExpression(valueExpr, env)
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle nested field access (e.g., obj.a.b)
+	parts := strings.Split(fieldPath, ".")
+	current := obj
+	for _, part := range parts[:len(parts)-1] {
+		next, exists := current[part]
+		if !exists {
+			return nil, fmt.Errorf("field '%s' does not exist on object", part)
+		}
+		nextObj, ok := next.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("cannot access field on non-object value at '%s'", part)
+		}
+		current = nextObj
+	}
+
+	current[parts[len(parts)-1]] = value
+	return value, nil
+}
+
 // executeReassign executes a variable reassignment (without $ prefix)
 func (i *Interpreter) executeReassign(stmt ReassignStatement, env *Environment) (interface{}, error) {
+	// Handle dot-notation field reassignment (e.g., obj.field = value)
+	if parts := strings.SplitN(stmt.Target, ".", 2); len(parts) == 2 {
+		return i.executeFieldAssign(parts[0], parts[1], stmt.Value, env)
+	}
+
 	// Check that the variable exists (must be previously declared)
 	if !env.Has(stmt.Target) {
 		return nil, fmt.Errorf("cannot assign to undeclared variable '%s'", stmt.Target)
@@ -182,12 +260,19 @@ func (i *Interpreter) executeIf(stmt IfStatement, env *Environment) (interface{}
 	return nil, nil
 }
 
+// maxWhileIterations is the safety limit for while loops to prevent infinite loops.
+const maxWhileIterations = 1_000_000
+
 // executeWhile executes a while loop
 func (i *Interpreter) executeWhile(stmt WhileStatement, env *Environment) (interface{}, error) {
 	var result interface{}
 
 	// Execute the loop until the condition is false
-	for {
+	for iterations := 0; ; iterations++ {
+		if iterations >= maxWhileIterations {
+			return nil, fmt.Errorf("while loop exceeded maximum iterations (%d)", maxWhileIterations)
+		}
+
 		// Evaluate condition in parent environment (can access loop variables from previous iterations)
 		condition, err := i.EvaluateExpression(stmt.Condition, env)
 		if err != nil {
@@ -264,13 +349,11 @@ func (i *Interpreter) executeFor(stmt ForStatement, env *Environment) (interface
 			// Define the loop variables for this iteration
 			if stmt.KeyVar != "" {
 				loopEnv.Define(stmt.KeyVar, key)
+				loopEnv.Define(stmt.ValueVar, value)
 			} else {
-				// If no key variable, use the value variable for the key
-				// This allows "for key in object" syntax
-				loopEnv.Define(stmt.ValueVar, key)
-				continue
+				// If no key variable, iterate over values
+				loopEnv.Define(stmt.ValueVar, value)
 			}
-			loopEnv.Define(stmt.ValueVar, value)
 
 			// Execute loop body
 			result, err = i.executeStatements(stmt.Body, loopEnv)
@@ -409,4 +492,134 @@ func (i *Interpreter) executeValidation(stmt ValidationStatement, env *Environme
 
 	// Unexpected return type
 	return nil, &ValidationError{Message: fmt.Sprintf("validation function %s returned unexpected type %T", stmt.Call.Name, result)}
+}
+
+// SSEWriter is the interface that yield statements use to send events.
+// It is injected into the environment as "__sse_writer" for SSE routes.
+type SSEWriter interface {
+	SendEvent(data interface{}, eventType string) error
+}
+
+// executeYield handles a yield statement by sending an SSE event.
+func (i *Interpreter) executeYield(stmt YieldStatement, env *Environment) (interface{}, error) {
+	value, err := i.EvaluateExpression(stmt.Value, env)
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate yield expression: %w", err)
+	}
+
+	writer, err := env.Get("__sse_writer")
+	if err != nil {
+		return nil, fmt.Errorf("yield can only be used inside an SSE route")
+	}
+
+	sseWriter, ok := writer.(SSEWriter)
+	if !ok {
+		return nil, fmt.Errorf("invalid SSE writer in environment")
+	}
+
+	if err := sseWriter.SendEvent(value, stmt.EventType); err != nil {
+		return nil, fmt.Errorf("failed to send SSE event: %w", err)
+	}
+
+	return nil, nil
+}
+
+// executeAssert executes an assertion statement
+func (i *Interpreter) executeAssert(stmt AssertStatement, env *Environment) (interface{}, error) {
+	result, err := i.EvaluateExpression(stmt.Condition, env)
+	if err != nil {
+		return nil, &AssertionError{
+			Message: fmt.Sprintf("assertion error: %v", err),
+		}
+	}
+
+	boolResult, ok := result.(bool)
+	if !ok {
+		return nil, &AssertionError{
+			Message: fmt.Sprintf("assertion condition must evaluate to boolean, got %T", result),
+		}
+	}
+
+	if !boolResult {
+		message := "assertion failed"
+		if stmt.Message != nil {
+			msg, err := i.EvaluateExpression(stmt.Message, env)
+			if err == nil {
+				if msgStr, ok := msg.(string); ok {
+					message = msgStr
+				}
+			}
+		}
+		return nil, &AssertionError{Message: message}
+	}
+
+	return true, nil
+}
+
+// executeIndexAssign handles assignment to indexed targets: arr[0] = value, obj.field[0] = value
+func (i *Interpreter) executeIndexAssign(stmt IndexAssignStatement, env *Environment) (interface{}, error) {
+	value, err := i.EvaluateExpression(stmt.Value, env)
+	if err != nil {
+		return nil, err
+	}
+	return i.assignToTarget(stmt.Target, value, env)
+}
+
+// assignToTarget recursively resolves the l-value target and performs the mutation
+func (i *Interpreter) assignToTarget(target Expr, value interface{}, env *Environment) (interface{}, error) {
+	switch t := target.(type) {
+	case ArrayIndexExpr:
+		container, err := i.EvaluateExpression(t.Array, env)
+		if err != nil {
+			return nil, err
+		}
+		indexVal, err := i.EvaluateExpression(t.Index, env)
+		if err != nil {
+			return nil, err
+		}
+
+		switch c := container.(type) {
+		case []interface{}:
+			var index int64
+			switch idx := indexVal.(type) {
+			case int64:
+				index = idx
+			case int:
+				index = int64(idx)
+			default:
+				return nil, fmt.Errorf("array index must be an integer, got %T", indexVal)
+			}
+			if index < 0 || int(index) >= len(c) {
+				return nil, fmt.Errorf("array index out of bounds: %d (length: %d)", index, len(c))
+			}
+			c[index] = value
+			return value, nil
+
+		case map[string]interface{}:
+			keyStr, ok := indexVal.(string)
+			if !ok {
+				return nil, fmt.Errorf("map key must be a string, got %T", indexVal)
+			}
+			c[keyStr] = value
+			return value, nil
+
+		default:
+			return nil, fmt.Errorf("cannot index-assign to %T", container)
+		}
+
+	case FieldAccessExpr:
+		obj, err := i.EvaluateExpression(t.Object, env)
+		if err != nil {
+			return nil, err
+		}
+		objMap, ok := obj.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("cannot assign field '%s' on %T", t.Field, obj)
+		}
+		objMap[t.Field] = value
+		return value, nil
+
+	default:
+		return nil, fmt.Errorf("invalid assignment target: %T", target)
+	}
 }

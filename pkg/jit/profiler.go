@@ -17,11 +17,11 @@ type ExecutionProfile struct {
 	LastExecuted   time.Time
 
 	// Type profiling - track actual types seen at runtime
-	TypeProfile    *TypeProfile
+	TypeProfile *TypeProfile
 
 	// Call graph data
-	CalledBy       map[string]int64 // caller -> count
-	Calls          map[string]int64 // callee -> count
+	CalledBy map[string]int64 // caller -> count
+	Calls    map[string]int64 // callee -> count
 }
 
 // TypeProfile tracks runtime type information for adaptive optimization
@@ -35,17 +35,17 @@ type TypeProfile struct {
 
 // CallGraphNode represents a node in the call graph
 type CallGraphNode struct {
-	Name        string
-	Callers     map[string]int64 // caller -> count
-	Callees     map[string]int64 // callee -> count
-	IsHot       bool             // true if this is a hot path
+	Name    string
+	Callers map[string]int64 // caller -> count
+	Callees map[string]int64 // callee -> count
+	IsHot   bool             // true if this is a hot path
 }
 
 // Profiler collects runtime profiling data
 type Profiler struct {
-	profiles   map[string]*ExecutionProfile
-	callGraph  map[string]*CallGraphNode
-	mutex      sync.RWMutex
+	profiles  map[string]*ExecutionProfile
+	callGraph map[string]*CallGraphNode
+	mutex     sync.RWMutex
 
 	// Configuration
 	maxProfiles int // Maximum number of profiles to keep
@@ -68,14 +68,14 @@ func (p *Profiler) RecordExecution(name string, executionTime time.Duration) {
 	profile, exists := p.profiles[name]
 	if !exists {
 		profile = &ExecutionProfile{
-			Name:          name,
+			Name:           name,
 			ExecutionCount: 0,
-			TotalTime:     0,
-			MinTime:       executionTime,
-			MaxTime:       executionTime,
-			TypeProfile:   NewTypeProfile(),
-			CalledBy:      make(map[string]int64),
-			Calls:         make(map[string]int64),
+			TotalTime:      0,
+			MinTime:        executionTime,
+			MaxTime:        executionTime,
+			TypeProfile:    NewTypeProfile(),
+			CalledBy:       make(map[string]int64),
+			Calls:          make(map[string]int64),
 		}
 		p.profiles[name] = profile
 	}
@@ -287,11 +287,18 @@ func (p *Profiler) GetCallGraph() map[string]*CallGraphNode {
 	return graph
 }
 
-// AnalyzeTypeStability analyzes if a variable has stable types (monomorphic)
+// AnalyzeTypeStability analyzes if a variable has stable types (monomorphic).
+// This method acquires its own read lock and is safe for standalone use.
 func (p *Profiler) AnalyzeTypeStability(routeName, variableName string) (isStable bool, dominantType string) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
+	return p.analyzeTypeStabilityUnlocked(routeName, variableName)
+}
+
+// analyzeTypeStabilityUnlocked performs the type stability analysis without
+// acquiring the lock. Callers must hold p.mutex (read or write) before calling.
+func (p *Profiler) analyzeTypeStabilityUnlocked(routeName, variableName string) (isStable bool, dominantType string) {
 	profile, exists := p.profiles[routeName]
 	if !exists {
 		return false, ""
@@ -320,7 +327,9 @@ func (p *Profiler) AnalyzeTypeStability(routeName, variableName string) (isStabl
 	return stability > 0.95, maxType
 }
 
-// GetMonomorphicVariables returns variables that have stable types
+// GetMonomorphicVariables returns variables that have stable types.
+// Uses the unlocked helper to avoid nested RLock calls which can deadlock
+// when a writer is waiting between the two RLock acquisitions.
 func (p *Profiler) GetMonomorphicVariables(routeName string) map[string]string {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
@@ -333,7 +342,7 @@ func (p *Profiler) GetMonomorphicVariables(routeName string) map[string]string {
 	}
 
 	for varName := range profile.TypeProfile.VariableTypes {
-		if isStable, dominantType := p.AnalyzeTypeStability(routeName, varName); isStable {
+		if isStable, dominantType := p.analyzeTypeStabilityUnlocked(routeName, varName); isStable {
 			result[varName] = dominantType
 		}
 	}
@@ -395,11 +404,11 @@ func (p *Profiler) getOrCreateProfile(name string) *ExecutionProfile {
 	profile, exists := p.profiles[name]
 	if !exists {
 		profile = &ExecutionProfile{
-			Name:          name,
+			Name:           name,
 			ExecutionCount: 0,
-			TypeProfile:   NewTypeProfile(),
-			CalledBy:      make(map[string]int64),
-			Calls:         make(map[string]int64),
+			TypeProfile:    NewTypeProfile(),
+			CalledBy:       make(map[string]int64),
+			Calls:          make(map[string]int64),
 		}
 		p.profiles[name] = profile
 	}
@@ -448,11 +457,11 @@ func NewTypeProfile() *TypeProfile {
 
 // ProfilerStats returns statistics about the profiler itself
 type ProfilerStats struct {
-	TotalProfiles     int
-	HotPathCount      int
-	TotalExecutions   int64
+	TotalProfiles      int
+	HotPathCount       int
+	TotalExecutions    int64
 	TotalExecutionTime time.Duration
-	CallGraphSize     int
+	CallGraphSize      int
 }
 
 // GetStats returns profiler statistics

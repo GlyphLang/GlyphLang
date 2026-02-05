@@ -1,9 +1,9 @@
 package parser
 
 import (
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,12 +30,12 @@ func TestParser_WebSocket_ConnectEvent(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	wsRoute, ok := module.Items[0].(*interpreter.WebSocketRoute)
+	wsRoute, ok := module.Items[0].(*ast.WebSocketRoute)
 	require.True(t, ok, "Expected WebSocketRoute, got %T", module.Items[0])
 
 	assert.Equal(t, "/chat", wsRoute.Path)
 	require.Len(t, wsRoute.Events, 1)
-	assert.Equal(t, interpreter.WSEventConnect, wsRoute.Events[0].EventType)
+	assert.Equal(t, ast.WSEventConnect, wsRoute.Events[0].EventType)
 	assert.Greater(t, len(wsRoute.Events[0].Body), 0)
 }
 
@@ -57,12 +57,12 @@ func TestParser_WebSocket_MessageEvent(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	wsRoute, ok := module.Items[0].(*interpreter.WebSocketRoute)
+	wsRoute, ok := module.Items[0].(*ast.WebSocketRoute)
 	require.True(t, ok)
 
 	assert.Equal(t, "/messages", wsRoute.Path)
 	require.Len(t, wsRoute.Events, 1)
-	assert.Equal(t, interpreter.WSEventMessage, wsRoute.Events[0].EventType)
+	assert.Equal(t, ast.WSEventMessage, wsRoute.Events[0].EventType)
 }
 
 // Test 3: WebSocket route with disconnect event
@@ -83,11 +83,11 @@ func TestParser_WebSocket_DisconnectEvent(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	wsRoute, ok := module.Items[0].(*interpreter.WebSocketRoute)
+	wsRoute, ok := module.Items[0].(*ast.WebSocketRoute)
 	require.True(t, ok)
 
 	require.Len(t, wsRoute.Events, 1)
-	assert.Equal(t, interpreter.WSEventDisconnect, wsRoute.Events[0].EventType)
+	assert.Equal(t, ast.WSEventDisconnect, wsRoute.Events[0].EventType)
 }
 
 // Test 4: WebSocket route with error event
@@ -108,11 +108,11 @@ func TestParser_WebSocket_ErrorEvent(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	wsRoute, ok := module.Items[0].(*interpreter.WebSocketRoute)
+	wsRoute, ok := module.Items[0].(*ast.WebSocketRoute)
 	require.True(t, ok)
 
 	require.Len(t, wsRoute.Events, 1)
-	assert.Equal(t, interpreter.WSEventError, wsRoute.Events[0].EventType)
+	assert.Equal(t, ast.WSEventError, wsRoute.Events[0].EventType)
 }
 
 // Test 5: WebSocket route with all event types
@@ -141,22 +141,22 @@ func TestParser_WebSocket_AllEventTypes(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	wsRoute, ok := module.Items[0].(*interpreter.WebSocketRoute)
+	wsRoute, ok := module.Items[0].(*ast.WebSocketRoute)
 	require.True(t, ok)
 
 	assert.Equal(t, "/realtime", wsRoute.Path)
 	require.Len(t, wsRoute.Events, 4)
 
 	// Verify all event types are present
-	eventTypes := make(map[interpreter.WebSocketEventType]bool)
+	eventTypes := make(map[ast.WebSocketEventType]bool)
 	for _, event := range wsRoute.Events {
 		eventTypes[event.EventType] = true
 	}
 
-	assert.True(t, eventTypes[interpreter.WSEventConnect], "missing connect event")
-	assert.True(t, eventTypes[interpreter.WSEventMessage], "missing message event")
-	assert.True(t, eventTypes[interpreter.WSEventDisconnect], "missing disconnect event")
-	assert.True(t, eventTypes[interpreter.WSEventError], "missing error event")
+	assert.True(t, eventTypes[ast.WSEventConnect], "missing connect event")
+	assert.True(t, eventTypes[ast.WSEventMessage], "missing message event")
+	assert.True(t, eventTypes[ast.WSEventDisconnect], "missing disconnect event")
+	assert.True(t, eventTypes[ast.WSEventError], "missing error event")
 }
 
 // Test 6: WebSocket route with path parameter
@@ -177,7 +177,7 @@ func TestParser_WebSocket_PathParameter(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	wsRoute, ok := module.Items[0].(*interpreter.WebSocketRoute)
+	wsRoute, ok := module.Items[0].(*ast.WebSocketRoute)
 	require.True(t, ok)
 
 	assert.Equal(t, "/chat/:room", wsRoute.Path)
@@ -201,7 +201,7 @@ func TestParser_WebSocket_MultiplePathParameters(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	wsRoute, ok := module.Items[0].(*interpreter.WebSocketRoute)
+	wsRoute, ok := module.Items[0].(*ast.WebSocketRoute)
 	require.True(t, ok)
 
 	assert.Equal(t, "/chat/:room/:userId", wsRoute.Path)
@@ -224,7 +224,7 @@ func TestParser_WebSocket_WebsocketKeyword(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	wsRoute, ok := module.Items[0].(*interpreter.WebSocketRoute)
+	wsRoute, ok := module.Items[0].(*ast.WebSocketRoute)
 	require.True(t, ok)
 
 	assert.Equal(t, "/notifications", wsRoute.Path)
@@ -250,7 +250,7 @@ func TestParser_GenericType_ListOfString(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 
 	assert.Equal(t, "UserList", typeDef.Name)
@@ -260,9 +260,9 @@ func TestParser_GenericType_ListOfString(t *testing.T) {
 	assert.Equal(t, "names", typeDef.Fields[0].Name)
 	assert.True(t, typeDef.Fields[0].Required)
 	// The type should be parsed as GenericType with List base and str type argument
-	genericType, ok := typeDef.Fields[0].TypeAnnotation.(interpreter.GenericType)
+	genericType, ok := typeDef.Fields[0].TypeAnnotation.(ast.GenericType)
 	require.True(t, ok, "Expected GenericType, got %T", typeDef.Fields[0].TypeAnnotation)
-	namedType, ok := genericType.BaseType.(interpreter.NamedType)
+	namedType, ok := genericType.BaseType.(ast.NamedType)
 	require.True(t, ok)
 	assert.Equal(t, "List", namedType.Name)
 	require.Len(t, genericType.TypeArgs, 1)
@@ -283,16 +283,16 @@ func TestParser_GenericType_MapOfStringInt(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 
 	assert.Equal(t, "Scores", typeDef.Name)
 	require.Len(t, typeDef.Fields, 1)
 
 	assert.Equal(t, "playerScores", typeDef.Fields[0].Name)
-	genericType, ok := typeDef.Fields[0].TypeAnnotation.(interpreter.GenericType)
+	genericType, ok := typeDef.Fields[0].TypeAnnotation.(ast.GenericType)
 	require.True(t, ok, "Expected GenericType, got %T", typeDef.Fields[0].TypeAnnotation)
-	namedType, ok := genericType.BaseType.(interpreter.NamedType)
+	namedType, ok := genericType.BaseType.(ast.NamedType)
 	require.True(t, ok)
 	assert.Equal(t, "Map", namedType.Name)
 	require.Len(t, genericType.TypeArgs, 2)
@@ -313,7 +313,7 @@ func TestParser_GenericType_NestedGenerics(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 
 	assert.Equal(t, "NestedData", typeDef.Name)
@@ -340,24 +340,24 @@ func TestParser_UnionType_Simple(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 
 	require.Len(t, typeDef.Fields, 1)
 	assert.Equal(t, "result", typeDef.Fields[0].Name)
 
 	// Check union type
-	unionType, ok := typeDef.Fields[0].TypeAnnotation.(interpreter.UnionType)
+	unionType, ok := typeDef.Fields[0].TypeAnnotation.(ast.UnionType)
 	require.True(t, ok, "Expected UnionType, got %T", typeDef.Fields[0].TypeAnnotation)
 	require.Len(t, unionType.Types, 2)
 
 	// First type should be User
-	userType, ok := unionType.Types[0].(interpreter.NamedType)
+	userType, ok := unionType.Types[0].(ast.NamedType)
 	require.True(t, ok)
 	assert.Equal(t, "User", userType.Name)
 
 	// Second type should be Error
-	errorType, ok := unionType.Types[1].(interpreter.NamedType)
+	errorType, ok := unionType.Types[1].(ast.NamedType)
 	require.True(t, ok)
 	assert.Equal(t, "Error", errorType.Name)
 }
@@ -377,10 +377,10 @@ func TestParser_UnionType_Multiple(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 
-	unionType, ok := typeDef.Fields[0].TypeAnnotation.(interpreter.UnionType)
+	unionType, ok := typeDef.Fields[0].TypeAnnotation.(ast.UnionType)
 	require.True(t, ok)
 	require.Len(t, unionType.Types, 3)
 }
@@ -400,21 +400,21 @@ func TestParser_UnionType_PrimitiveTypes(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 
-	unionType, ok := typeDef.Fields[0].TypeAnnotation.(interpreter.UnionType)
+	unionType, ok := typeDef.Fields[0].TypeAnnotation.(ast.UnionType)
 	require.True(t, ok)
 	require.Len(t, unionType.Types, 3)
 
 	// Check primitive types
-	_, isInt := unionType.Types[0].(interpreter.IntType)
+	_, isInt := unionType.Types[0].(ast.IntType)
 	assert.True(t, isInt, "First type should be int")
 
-	_, isString := unionType.Types[1].(interpreter.StringType)
+	_, isString := unionType.Types[1].(ast.StringType)
 	assert.True(t, isString, "Second type should be str")
 
-	_, isBool := unionType.Types[2].(interpreter.BoolType)
+	_, isBool := unionType.Types[2].(ast.BoolType)
 	assert.True(t, isBool, "Third type should be bool")
 }
 
@@ -437,11 +437,11 @@ func TestParser_HTTPMethod_GETShorthand(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 
 	assert.Equal(t, "/users", route.Path)
-	assert.Equal(t, interpreter.Get, route.Method)
+	assert.Equal(t, ast.Get, route.Method)
 }
 
 // Test 16: HTTP POST shorthand
@@ -460,11 +460,11 @@ func TestParser_HTTPMethod_POSTShorthand(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 
 	assert.Equal(t, "/users", route.Path)
-	assert.Equal(t, interpreter.Post, route.Method)
+	assert.Equal(t, ast.Post, route.Method)
 }
 
 // Test 17: HTTP PUT shorthand
@@ -483,11 +483,11 @@ func TestParser_HTTPMethod_PUTShorthand(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 
 	assert.Equal(t, "/users/:id", route.Path)
-	assert.Equal(t, interpreter.Put, route.Method)
+	assert.Equal(t, ast.Put, route.Method)
 }
 
 // Test 18: HTTP DELETE shorthand
@@ -505,11 +505,11 @@ func TestParser_HTTPMethod_DELETEShorthand(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 
 	assert.Equal(t, "/users/:id", route.Path)
-	assert.Equal(t, interpreter.Delete, route.Method)
+	assert.Equal(t, ast.Delete, route.Method)
 }
 
 // Test 19: HTTP PATCH shorthand
@@ -528,11 +528,11 @@ func TestParser_HTTPMethod_PATCHShorthand(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 
 	assert.Equal(t, "/users/:id", route.Path)
-	assert.Equal(t, interpreter.Patch, route.Method)
+	assert.Equal(t, ast.Patch, route.Method)
 }
 
 // ============================================================================
@@ -567,7 +567,7 @@ func TestParser_WebSocket_ComplexEventHandlers(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	wsRoute, ok := module.Items[0].(*interpreter.WebSocketRoute)
+	wsRoute, ok := module.Items[0].(*ast.WebSocketRoute)
 	require.True(t, ok)
 
 	assert.Equal(t, "/game/:gameId", wsRoute.Path)
@@ -575,7 +575,7 @@ func TestParser_WebSocket_ComplexEventHandlers(t *testing.T) {
 
 	// Connect event should have if statement
 	connectEvent := wsRoute.Events[0]
-	assert.Equal(t, interpreter.WSEventConnect, connectEvent.EventType)
+	assert.Equal(t, ast.WSEventConnect, connectEvent.EventType)
 	assert.GreaterOrEqual(t, len(connectEvent.Body), 3) // assignments + if statement
 }
 
@@ -599,14 +599,14 @@ func TestParser_Route_WithUnionReturnType(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	route, ok := module.Items[0].(*interpreter.Route)
+	route, ok := module.Items[0].(*ast.Route)
 	require.True(t, ok)
 
 	assert.Equal(t, "/api/user/:id", route.Path)
-	assert.Equal(t, interpreter.Get, route.Method)
+	assert.Equal(t, ast.Get, route.Method)
 
 	// Check return type is union
-	unionType, ok := route.ReturnType.(interpreter.UnionType)
+	unionType, ok := route.ReturnType.(ast.UnionType)
 	require.True(t, ok, "Expected UnionType return type, got %T", route.ReturnType)
 	require.Len(t, unionType.Types, 2)
 }
@@ -628,7 +628,7 @@ func TestParser_TypeDef_MixedGenericAndUnion(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 
 	assert.Equal(t, "ApiResult", typeDef.Name)
@@ -640,9 +640,9 @@ func TestParser_TypeDef_MixedGenericAndUnion(t *testing.T) {
 
 	// Second field: Map[str, str] (generic)
 	assert.Equal(t, "metadata", typeDef.Fields[1].Name)
-	genericType, ok := typeDef.Fields[1].TypeAnnotation.(interpreter.GenericType)
+	genericType, ok := typeDef.Fields[1].TypeAnnotation.(ast.GenericType)
 	require.True(t, ok, "Expected GenericType, got %T", typeDef.Fields[1].TypeAnnotation)
-	namedType, ok := genericType.BaseType.(interpreter.NamedType)
+	namedType, ok := genericType.BaseType.(ast.NamedType)
 	require.True(t, ok)
 	assert.Equal(t, "Map", namedType.Name)
 	require.Len(t, genericType.TypeArgs, 2)
@@ -683,16 +683,16 @@ func TestParser_MultipleRoutes_AllMethods(t *testing.T) {
 
 	require.Len(t, module.Items, 5)
 
-	methods := []interpreter.HttpMethod{
-		interpreter.Get,
-		interpreter.Post,
-		interpreter.Put,
-		interpreter.Delete,
-		interpreter.Patch,
+	methods := []ast.HttpMethod{
+		ast.Get,
+		ast.Post,
+		ast.Put,
+		ast.Delete,
+		ast.Patch,
 	}
 
 	for i, expectedMethod := range methods {
-		route, ok := module.Items[i].(*interpreter.Route)
+		route, ok := module.Items[i].(*ast.Route)
 		require.True(t, ok, "Item %d should be Route", i)
 		assert.Equal(t, expectedMethod, route.Method, "Route %d method mismatch", i)
 	}
@@ -732,22 +732,22 @@ func TestParser_ArrayType_EmptyBrackets(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, module.Items, 1)
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	require.True(t, ok)
 
 	assert.Equal(t, "ArrayData", typeDef.Name)
 	require.Len(t, typeDef.Fields, 2)
 
 	// First field: int[]
-	arrayType1, ok := typeDef.Fields[0].TypeAnnotation.(interpreter.ArrayType)
+	arrayType1, ok := typeDef.Fields[0].TypeAnnotation.(ast.ArrayType)
 	require.True(t, ok, "Expected ArrayType, got %T", typeDef.Fields[0].TypeAnnotation)
-	_, isInt := arrayType1.ElementType.(interpreter.IntType)
+	_, isInt := arrayType1.ElementType.(ast.IntType)
 	assert.True(t, isInt, "Element type should be int")
 
 	// Second field: str[]!
-	arrayType2, ok := typeDef.Fields[1].TypeAnnotation.(interpreter.ArrayType)
+	arrayType2, ok := typeDef.Fields[1].TypeAnnotation.(ast.ArrayType)
 	require.True(t, ok)
-	_, isString := arrayType2.ElementType.(interpreter.StringType)
+	_, isString := arrayType2.ElementType.(ast.StringType)
 	assert.True(t, isString, "Element type should be str")
 	assert.True(t, typeDef.Fields[1].Required)
 }

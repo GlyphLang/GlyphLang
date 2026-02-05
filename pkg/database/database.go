@@ -63,7 +63,7 @@ func ParseConnectionString(connStr string) (*Config, error) {
 		Driver:          u.Scheme,
 		Host:            u.Hostname(),
 		Database:        u.Path[1:], // Remove leading slash
-		SSLMode:         "disable",
+		SSLMode:         "prefer",
 		MaxOpenConns:    25,
 		MaxIdleConns:    5,
 		ConnMaxLifetime: 5 * time.Minute,
@@ -106,7 +106,27 @@ func ParseConnectionString(connStr string) (*Config, error) {
 	return config, nil
 }
 
-// ConnectionString generates a connection string from config
+// String returns a redacted connection string safe for logging.
+func (c *Config) String() string {
+	password := "****"
+	if c.Password == "" {
+		password = ""
+	}
+	switch c.Driver {
+	case "postgres", "postgresql":
+		return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+			c.Host, c.Port, c.Username, password, c.Database, c.SSLMode)
+	case "mysql":
+		return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
+			c.Username, password, c.Host, c.Port, c.Database)
+	default:
+		return fmt.Sprintf("%s://%s@%s:%d/%s", c.Driver, c.Username, c.Host, c.Port, c.Database)
+	}
+}
+
+// ConnectionString generates a connection string from config.
+// WARNING: The returned string contains the database password in plaintext.
+// Do not log or serialize the output of this function.
 func (c *Config) ConnectionString() string {
 	switch c.Driver {
 	case "postgres", "postgresql":
@@ -120,13 +140,28 @@ func (c *Config) ConnectionString() string {
 	}
 }
 
+// SafeConnectionString returns a connection string with the password masked for safe logging
+func (c *Config) SafeConnectionString() string {
+	switch c.Driver {
+	case "postgres", "postgresql":
+		return fmt.Sprintf("host=%s port=%d user=%s password=**** dbname=%s sslmode=%s",
+			c.Host, c.Port, c.Username, c.Database, c.SSLMode)
+	case "mysql":
+		return fmt.Sprintf("%s:****@tcp(%s:%d)/%s",
+			c.Username, c.Host, c.Port, c.Database)
+	default:
+		return ""
+	}
+}
+
 // NewDatabase creates a new database instance based on the driver
 func NewDatabase(config *Config) (Database, error) {
 	switch config.Driver {
 	case "postgres", "postgresql":
 		return NewPostgresDB(config), nil
 	case "mysql":
-		return nil, fmt.Errorf("MySQL driver not yet implemented")
+		// NewMySQLDB is defined in mysql.go - mirrors NewPostgresDB pattern
+		return NewMySQLDB(config), nil
 	case "sqlite", "sqlite3":
 		return nil, fmt.Errorf("SQLite driver not yet implemented")
 	default:

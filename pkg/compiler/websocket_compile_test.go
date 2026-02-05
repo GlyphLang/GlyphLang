@@ -1,10 +1,10 @@
 package compiler
 
 import (
+	"github.com/glyphlang/glyph/pkg/ast"
 	"strings"
 	"testing"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/vm"
 )
 
@@ -12,28 +12,28 @@ import (
 func TestCompileWebSocketRoute(t *testing.T) {
 	tests := []struct {
 		name        string
-		route       *interpreter.WebSocketRoute
+		route       *ast.WebSocketRoute
 		expectError bool
 	}{
 		{
 			name: "empty WebSocket route",
-			route: &interpreter.WebSocketRoute{
+			route: &ast.WebSocketRoute{
 				Path:   "/ws/empty",
-				Events: []interpreter.WebSocketEvent{},
+				Events: []ast.WebSocketEvent{},
 			},
 			expectError: false,
 		},
 		{
 			name: "WebSocket route with connect event",
-			route: &interpreter.WebSocketRoute{
+			route: &ast.WebSocketRoute{
 				Path: "/ws/chat",
-				Events: []interpreter.WebSocketEvent{
+				Events: []ast.WebSocketEvent{
 					{
-						EventType: interpreter.WSEventConnect,
-						Body: []interpreter.Statement{
-							&interpreter.AssignStatement{
+						EventType: ast.WSEventConnect,
+						Body: []ast.Statement{
+							&ast.AssignStatement{
 								Target: "msg",
-								Value:  &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "connected"}},
+								Value:  &ast.LiteralExpr{Value: ast.StringLiteral{Value: "connected"}},
 							},
 						},
 					},
@@ -43,42 +43,42 @@ func TestCompileWebSocketRoute(t *testing.T) {
 		},
 		{
 			name: "WebSocket route with all event types",
-			route: &interpreter.WebSocketRoute{
+			route: &ast.WebSocketRoute{
 				Path: "/ws/full",
-				Events: []interpreter.WebSocketEvent{
+				Events: []ast.WebSocketEvent{
 					{
-						EventType: interpreter.WSEventConnect,
-						Body: []interpreter.Statement{
-							&interpreter.AssignStatement{
+						EventType: ast.WSEventConnect,
+						Body: []ast.Statement{
+							&ast.AssignStatement{
 								Target: "status",
-								Value:  &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "connected"}},
+								Value:  &ast.LiteralExpr{Value: ast.StringLiteral{Value: "connected"}},
 							},
 						},
 					},
 					{
-						EventType: interpreter.WSEventMessage,
-						Body: []interpreter.Statement{
-							&interpreter.AssignStatement{
+						EventType: ast.WSEventMessage,
+						Body: []ast.Statement{
+							&ast.AssignStatement{
 								Target: "received",
-								Value:  &interpreter.VariableExpr{Name: "input"},
+								Value:  &ast.VariableExpr{Name: "input"},
 							},
 						},
 					},
 					{
-						EventType: interpreter.WSEventDisconnect,
-						Body: []interpreter.Statement{
-							&interpreter.AssignStatement{
+						EventType: ast.WSEventDisconnect,
+						Body: []ast.Statement{
+							&ast.AssignStatement{
 								Target: "status",
-								Value:  &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "disconnected"}},
+								Value:  &ast.LiteralExpr{Value: ast.StringLiteral{Value: "disconnected"}},
 							},
 						},
 					},
 					{
-						EventType: interpreter.WSEventError,
-						Body: []interpreter.Statement{
-							&interpreter.AssignStatement{
+						EventType: ast.WSEventError,
+						Body: []ast.Statement{
+							&ast.AssignStatement{
 								Target: "error",
-								Value:  &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "error occurred"}},
+								Value:  &ast.LiteralExpr{Value: ast.StringLiteral{Value: "error occurred"}},
 							},
 						},
 					},
@@ -116,31 +116,31 @@ func TestCompileWsFunctionCalls(t *testing.T) {
 	tests := []struct {
 		name        string
 		funcName    string
-		args        []interpreter.Expr
+		args        []ast.Expr
 		expectError bool
 		errorMsg    string
 	}{
 		{
 			name:     "ws.send with one argument",
 			funcName: "ws.send",
-			args: []interpreter.Expr{
-				&interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "hello"}},
+			args: []ast.Expr{
+				&ast.LiteralExpr{Value: ast.StringLiteral{Value: "hello"}},
 			},
 			expectError: false,
 		},
 		{
 			name:        "ws.send with no arguments",
 			funcName:    "ws.send",
-			args:        []interpreter.Expr{},
+			args:        []ast.Expr{},
 			expectError: true,
 			errorMsg:    "ws.send requires exactly 1 argument",
 		},
 		{
 			name:     "ws.send with too many arguments",
 			funcName: "ws.send",
-			args: []interpreter.Expr{
-				&interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "arg1"}},
-				&interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "arg2"}},
+			args: []ast.Expr{
+				&ast.LiteralExpr{Value: ast.StringLiteral{Value: "arg1"}},
+				&ast.LiteralExpr{Value: ast.StringLiteral{Value: "arg2"}},
 			},
 			expectError: true,
 			errorMsg:    "ws.send requires exactly 1 argument",
@@ -148,85 +148,85 @@ func TestCompileWsFunctionCalls(t *testing.T) {
 		{
 			name:     "ws.broadcast with one argument",
 			funcName: "ws.broadcast",
-			args: []interpreter.Expr{
-				&interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "broadcast message"}},
+			args: []ast.Expr{
+				&ast.LiteralExpr{Value: ast.StringLiteral{Value: "broadcast message"}},
 			},
 			expectError: false,
 		},
 		{
 			name:     "ws.broadcast with two arguments",
 			funcName: "ws.broadcast",
-			args: []interpreter.Expr{
-				&interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "message"}},
-				&interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "except-client"}},
+			args: []ast.Expr{
+				&ast.LiteralExpr{Value: ast.StringLiteral{Value: "message"}},
+				&ast.LiteralExpr{Value: ast.StringLiteral{Value: "except-client"}},
 			},
 			expectError: false,
 		},
 		{
 			name:        "ws.broadcast with no arguments",
 			funcName:    "ws.broadcast",
-			args:        []interpreter.Expr{},
+			args:        []ast.Expr{},
 			expectError: true,
 			errorMsg:    "ws.broadcast requires 1 or 2 arguments",
 		},
 		{
 			name:     "ws.join with room name",
 			funcName: "ws.join",
-			args: []interpreter.Expr{
-				&interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "room-1"}},
+			args: []ast.Expr{
+				&ast.LiteralExpr{Value: ast.StringLiteral{Value: "room-1"}},
 			},
 			expectError: false,
 		},
 		{
 			name:        "ws.join with no arguments",
 			funcName:    "ws.join",
-			args:        []interpreter.Expr{},
+			args:        []ast.Expr{},
 			expectError: true,
 			errorMsg:    "ws.join requires exactly 1 argument",
 		},
 		{
 			name:     "ws.leave with room name",
 			funcName: "ws.leave",
-			args: []interpreter.Expr{
-				&interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "room-1"}},
+			args: []ast.Expr{
+				&ast.LiteralExpr{Value: ast.StringLiteral{Value: "room-1"}},
 			},
 			expectError: false,
 		},
 		{
 			name:        "ws.leave with no arguments",
 			funcName:    "ws.leave",
-			args:        []interpreter.Expr{},
+			args:        []ast.Expr{},
 			expectError: true,
 			errorMsg:    "ws.leave requires exactly 1 argument",
 		},
 		{
 			name:        "ws.close with no arguments",
 			funcName:    "ws.close",
-			args:        []interpreter.Expr{},
+			args:        []ast.Expr{},
 			expectError: false,
 		},
 		{
 			name:     "ws.close with reason",
 			funcName: "ws.close",
-			args: []interpreter.Expr{
-				&interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "connection timeout"}},
+			args: []ast.Expr{
+				&ast.LiteralExpr{Value: ast.StringLiteral{Value: "connection timeout"}},
 			},
 			expectError: false,
 		},
 		{
 			name:     "ws.broadcast_to_room with room and message",
 			funcName: "ws.broadcast_to_room",
-			args: []interpreter.Expr{
-				&interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "room-1"}},
-				&interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "hello room"}},
+			args: []ast.Expr{
+				&ast.LiteralExpr{Value: ast.StringLiteral{Value: "room-1"}},
+				&ast.LiteralExpr{Value: ast.StringLiteral{Value: "hello room"}},
 			},
 			expectError: false,
 		},
 		{
 			name:     "ws.broadcast_to_room with only one argument",
 			funcName: "ws.broadcast_to_room",
-			args: []interpreter.Expr{
-				&interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "room-1"}},
+			args: []ast.Expr{
+				&ast.LiteralExpr{Value: ast.StringLiteral{Value: "room-1"}},
 			},
 			expectError: true,
 			errorMsg:    "ws.broadcast_to_room requires exactly 2 arguments",
@@ -234,42 +234,42 @@ func TestCompileWsFunctionCalls(t *testing.T) {
 		{
 			name:        "ws.get_rooms with no arguments",
 			funcName:    "ws.get_rooms",
-			args:        []interpreter.Expr{},
+			args:        []ast.Expr{},
 			expectError: false,
 		},
 		{
 			name:     "ws.get_room_users with room argument",
 			funcName: "ws.get_room_users",
-			args: []interpreter.Expr{
-				&interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "room-1"}},
+			args: []ast.Expr{
+				&ast.LiteralExpr{Value: ast.StringLiteral{Value: "room-1"}},
 			},
 			expectError: false,
 		},
 		{
 			name:        "ws.get_room_users with no argument",
 			funcName:    "ws.get_room_users",
-			args:        []interpreter.Expr{},
+			args:        []ast.Expr{},
 			expectError: true,
 			errorMsg:    "ws.get_room_users requires exactly 1 argument",
 		},
 		{
 			name:     "ws.get_room_clients with room argument",
 			funcName: "ws.get_room_clients",
-			args: []interpreter.Expr{
-				&interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "room-1"}},
+			args: []ast.Expr{
+				&ast.LiteralExpr{Value: ast.StringLiteral{Value: "room-1"}},
 			},
 			expectError: false,
 		},
 		{
 			name:        "ws.get_connection_count with no arguments",
 			funcName:    "ws.get_connection_count",
-			args:        []interpreter.Expr{},
+			args:        []ast.Expr{},
 			expectError: false,
 		},
 		{
 			name:        "ws.get_uptime with no arguments",
 			funcName:    "ws.get_uptime",
-			args:        []interpreter.Expr{},
+			args:        []ast.Expr{},
 			expectError: false,
 		},
 	}
@@ -279,7 +279,7 @@ func TestCompileWsFunctionCalls(t *testing.T) {
 			c := NewCompiler()
 			c.symbolTable = c.symbolTable.EnterScope(RouteScope)
 
-			expr := &interpreter.FunctionCallExpr{
+			expr := &ast.FunctionCallExpr{
 				Name: tt.funcName,
 				Args: tt.args,
 			}
@@ -312,30 +312,30 @@ func TestCompileWsFunctionCalls(t *testing.T) {
 func TestCompileWsStatements(t *testing.T) {
 	tests := []struct {
 		name        string
-		stmt        interpreter.Statement
+		stmt        ast.Statement
 		expectError bool
 	}{
 		{
 			name: "ws.send statement",
-			stmt: &interpreter.WsSendStatement{
-				Message: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "hello"}},
+			stmt: &ast.WsSendStatement{
+				Message: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "hello"}},
 			},
 			expectError: false,
 		},
 		{
 			name: "ws.broadcast statement without except",
-			stmt: &interpreter.WsBroadcastStatement{
-				Message: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "broadcast"}},
+			stmt: &ast.WsBroadcastStatement{
+				Message: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "broadcast"}},
 				Except:  nil,
 			},
 			expectError: false,
 		},
 		{
 			name: "ws.broadcast statement with except",
-			stmt: func() *interpreter.WsBroadcastStatement {
-				exceptExpr := interpreter.Expr(&interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "client-1"}})
-				return &interpreter.WsBroadcastStatement{
-					Message: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "broadcast"}},
+			stmt: func() *ast.WsBroadcastStatement {
+				exceptExpr := ast.Expr(&ast.LiteralExpr{Value: ast.StringLiteral{Value: "client-1"}})
+				return &ast.WsBroadcastStatement{
+					Message: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "broadcast"}},
 					Except:  &exceptExpr,
 				}
 			}(),
@@ -343,8 +343,8 @@ func TestCompileWsStatements(t *testing.T) {
 		},
 		{
 			name: "ws.close statement",
-			stmt: &interpreter.WsCloseStatement{
-				Reason: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "goodbye"}},
+			stmt: &ast.WsCloseStatement{
+				Reason: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "goodbye"}},
 			},
 			expectError: false,
 		},
@@ -380,19 +380,19 @@ func TestCompileWsStatements(t *testing.T) {
 func TestCompileModuleTypeDefsOnly(t *testing.T) {
 	tests := []struct {
 		name        string
-		module      *interpreter.Module
+		module      *ast.Module
 		expectError bool
 		errorMsg    string
 	}{
 		{
 			name: "module with single typedef",
-			module: &interpreter.Module{
-				Items: []interpreter.Item{
-					&interpreter.TypeDef{
+			module: &ast.Module{
+				Items: []ast.Item{
+					&ast.TypeDef{
 						Name: "User",
-						Fields: []interpreter.Field{
-							{Name: "id", TypeAnnotation: interpreter.IntType{}},
-							{Name: "name", TypeAnnotation: interpreter.StringType{}},
+						Fields: []ast.Field{
+							{Name: "id", TypeAnnotation: ast.IntType{}},
+							{Name: "name", TypeAnnotation: ast.StringType{}},
 						},
 					},
 				},
@@ -401,21 +401,21 @@ func TestCompileModuleTypeDefsOnly(t *testing.T) {
 		},
 		{
 			name: "module with multiple typedefs",
-			module: &interpreter.Module{
-				Items: []interpreter.Item{
-					&interpreter.TypeDef{
+			module: &ast.Module{
+				Items: []ast.Item{
+					&ast.TypeDef{
 						Name: "User",
-						Fields: []interpreter.Field{
-							{Name: "id", TypeAnnotation: interpreter.IntType{}},
-							{Name: "name", TypeAnnotation: interpreter.StringType{}},
+						Fields: []ast.Field{
+							{Name: "id", TypeAnnotation: ast.IntType{}},
+							{Name: "name", TypeAnnotation: ast.StringType{}},
 						},
 					},
-					&interpreter.TypeDef{
+					&ast.TypeDef{
 						Name: "Post",
-						Fields: []interpreter.Field{
-							{Name: "id", TypeAnnotation: interpreter.IntType{}},
-							{Name: "title", TypeAnnotation: interpreter.StringType{}},
-							{Name: "content", TypeAnnotation: interpreter.StringType{}},
+						Fields: []ast.Field{
+							{Name: "id", TypeAnnotation: ast.IntType{}},
+							{Name: "title", TypeAnnotation: ast.StringType{}},
+							{Name: "content", TypeAnnotation: ast.StringType{}},
 						},
 					},
 				},
@@ -424,12 +424,12 @@ func TestCompileModuleTypeDefsOnly(t *testing.T) {
 		},
 		{
 			name: "module with typedef and no route",
-			module: &interpreter.Module{
-				Items: []interpreter.Item{
-					&interpreter.TypeDef{
+			module: &ast.Module{
+				Items: []ast.Item{
+					&ast.TypeDef{
 						Name: "Config",
-						Fields: []interpreter.Field{
-							{Name: "debug", TypeAnnotation: interpreter.BoolType{}},
+						Fields: []ast.Field{
+							{Name: "debug", TypeAnnotation: ast.BoolType{}},
 						},
 					},
 				},
@@ -470,21 +470,21 @@ func TestCompileModuleTypeDefsOnly(t *testing.T) {
 func TestCompileEmptyModule(t *testing.T) {
 	tests := []struct {
 		name        string
-		module      *interpreter.Module
+		module      *ast.Module
 		expectError bool
 		errorMsg    string
 	}{
 		{
 			name: "completely empty module",
-			module: &interpreter.Module{
-				Items: []interpreter.Item{},
+			module: &ast.Module{
+				Items: []ast.Item{},
 			},
 			expectError: true,
 			errorMsg:    "empty module",
 		},
 		{
 			name: "nil items module",
-			module: &interpreter.Module{
+			module: &ast.Module{
 				Items: nil,
 			},
 			expectError: true,
@@ -520,21 +520,21 @@ func TestCompileEmptyModule(t *testing.T) {
 
 // TestCompileModuleWithMixedItems tests modules with both routes and typedefs
 func TestCompileModuleWithMixedItems(t *testing.T) {
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.TypeDef{
+	module := &ast.Module{
+		Items: []ast.Item{
+			&ast.TypeDef{
 				Name: "User",
-				Fields: []interpreter.Field{
-					{Name: "id", TypeAnnotation: interpreter.IntType{}},
-					{Name: "name", TypeAnnotation: interpreter.StringType{}},
+				Fields: []ast.Field{
+					{Name: "id", TypeAnnotation: ast.IntType{}},
+					{Name: "name", TypeAnnotation: ast.StringType{}},
 				},
 			},
-			&interpreter.Route{
+			&ast.Route{
 				Path:   "/users",
-				Method: interpreter.Get,
-				Body: []interpreter.Statement{
-					&interpreter.ReturnStatement{
-						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "users"}},
+				Method: ast.Get,
+				Body: []ast.Statement{
+					&ast.ReturnStatement{
+						Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "users"}},
 					},
 				},
 			},
@@ -566,50 +566,50 @@ func TestCompileModuleWithMixedItems(t *testing.T) {
 
 // TestCompileModuleMethod tests the CompileModule method for full module compilation
 func TestCompileModuleMethod(t *testing.T) {
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.TypeDef{
+	module := &ast.Module{
+		Items: []ast.Item{
+			&ast.TypeDef{
 				Name: "Message",
-				Fields: []interpreter.Field{
-					{Name: "content", TypeAnnotation: interpreter.StringType{}},
-					{Name: "sender", TypeAnnotation: interpreter.StringType{}},
+				Fields: []ast.Field{
+					{Name: "content", TypeAnnotation: ast.StringType{}},
+					{Name: "sender", TypeAnnotation: ast.StringType{}},
 				},
 			},
-			&interpreter.Route{
+			&ast.Route{
 				Path:   "/api/messages",
-				Method: interpreter.Get,
-				Body: []interpreter.Statement{
-					&interpreter.ReturnStatement{
-						Value: &interpreter.ArrayExpr{
-							Elements: []interpreter.Expr{},
+				Method: ast.Get,
+				Body: []ast.Statement{
+					&ast.ReturnStatement{
+						Value: &ast.ArrayExpr{
+							Elements: []ast.Expr{},
 						},
 					},
 				},
 			},
-			&interpreter.Route{
+			&ast.Route{
 				Path:   "/api/health",
-				Method: interpreter.Get,
-				Body: []interpreter.Statement{
-					&interpreter.ReturnStatement{
-						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "ok"}},
+				Method: ast.Get,
+				Body: []ast.Statement{
+					&ast.ReturnStatement{
+						Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "ok"}},
 					},
 				},
 			},
-			&interpreter.WebSocketRoute{
+			&ast.WebSocketRoute{
 				Path: "/ws/chat",
-				Events: []interpreter.WebSocketEvent{
+				Events: []ast.WebSocketEvent{
 					{
-						EventType: interpreter.WSEventConnect,
-						Body: []interpreter.Statement{
-							&interpreter.AssignStatement{
+						EventType: ast.WSEventConnect,
+						Body: []ast.Statement{
+							&ast.AssignStatement{
 								Target: "connected",
-								Value:  &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
+								Value:  &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
 							},
 						},
 					},
 					{
-						EventType: interpreter.WSEventMessage,
-						Body:      []interpreter.Statement{},
+						EventType: ast.WSEventMessage,
+						Body:      []ast.Statement{},
 					},
 				},
 			},
@@ -665,14 +665,14 @@ func TestCompileModuleMethod(t *testing.T) {
 // TestGetEventName tests the getEventName helper function
 func TestGetEventName(t *testing.T) {
 	tests := []struct {
-		eventType interpreter.WebSocketEventType
+		eventType ast.WebSocketEventType
 		expected  string
 	}{
-		{interpreter.WSEventConnect, "connect"},
-		{interpreter.WSEventMessage, "message"},
-		{interpreter.WSEventDisconnect, "disconnect"},
-		{interpreter.WSEventError, "error"},
-		{interpreter.WebSocketEventType(999), "unknown"},
+		{ast.WSEventConnect, "connect"},
+		{ast.WSEventMessage, "message"},
+		{ast.WSEventDisconnect, "disconnect"},
+		{ast.WSEventError, "error"},
+		{ast.WebSocketEventType(999), "unknown"},
 	}
 
 	for _, tt := range tests {
@@ -688,19 +688,19 @@ func TestGetEventName(t *testing.T) {
 // TestCompileWebSocketEventWithVariables tests WebSocket event compilation with built-in variables
 func TestCompileWebSocketEventWithVariables(t *testing.T) {
 	// Test that ws, input, and client variables are properly accessible
-	route := &interpreter.WebSocketRoute{
+	route := &ast.WebSocketRoute{
 		Path: "/ws/test",
-		Events: []interpreter.WebSocketEvent{
+		Events: []ast.WebSocketEvent{
 			{
-				EventType: interpreter.WSEventMessage,
-				Body: []interpreter.Statement{
-					&interpreter.AssignStatement{
+				EventType: ast.WSEventMessage,
+				Body: []ast.Statement{
+					&ast.AssignStatement{
 						Target: "received",
-						Value:  &interpreter.VariableExpr{Name: "input"},
+						Value:  &ast.VariableExpr{Name: "input"},
 					},
-					&interpreter.AssignStatement{
+					&ast.AssignStatement{
 						Target: "clientId",
-						Value:  &interpreter.VariableExpr{Name: "client"},
+						Value:  &ast.VariableExpr{Name: "client"},
 					},
 				},
 			},
@@ -740,9 +740,9 @@ func TestCompileNonWsFunctionCall(t *testing.T) {
 			c := NewCompiler()
 			c.symbolTable = c.symbolTable.EnterScope(RouteScope)
 
-			expr := &interpreter.FunctionCallExpr{
+			expr := &ast.FunctionCallExpr{
 				Name: tt.funcName,
-				Args: []interpreter.Expr{},
+				Args: []ast.Expr{},
 			}
 
 			handled, err := c.compileFunctionCallForWs(expr)
@@ -763,9 +763,9 @@ func TestCompileWsRoomCount(t *testing.T) {
 	c := NewCompiler()
 	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
 
-	expr := &interpreter.FunctionCallExpr{
+	expr := &ast.FunctionCallExpr{
 		Name: "ws.get_room_count",
-		Args: []interpreter.Expr{},
+		Args: []ast.Expr{},
 	}
 
 	handled, err := c.compileFunctionCallForWs(expr)
@@ -788,20 +788,20 @@ func TestCompileWsRoomCount(t *testing.T) {
 func TestCompileWsRoomUserCount(t *testing.T) {
 	tests := []struct {
 		name        string
-		args        []interpreter.Expr
+		args        []ast.Expr
 		expectError bool
 		errorMsg    string
 	}{
 		{
 			name: "with room argument",
-			args: []interpreter.Expr{
-				&interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "room-1"}},
+			args: []ast.Expr{
+				&ast.LiteralExpr{Value: ast.StringLiteral{Value: "room-1"}},
 			},
 			expectError: false,
 		},
 		{
 			name:        "without argument",
-			args:        []interpreter.Expr{},
+			args:        []ast.Expr{},
 			expectError: true,
 			errorMsg:    "ws.get_room_user_count requires exactly 1 argument",
 		},
@@ -812,7 +812,7 @@ func TestCompileWsRoomUserCount(t *testing.T) {
 			c := NewCompiler()
 			c.symbolTable = c.symbolTable.EnterScope(RouteScope)
 
-			expr := &interpreter.FunctionCallExpr{
+			expr := &ast.FunctionCallExpr{
 				Name: "ws.get_room_user_count",
 				Args: tt.args,
 			}
@@ -853,9 +853,9 @@ func TestWebSocketRouteCompilationPreservesPath(t *testing.T) {
 
 	for _, path := range paths {
 		t.Run(path, func(t *testing.T) {
-			route := &interpreter.WebSocketRoute{
+			route := &ast.WebSocketRoute{
 				Path:   path,
-				Events: []interpreter.WebSocketEvent{},
+				Events: []ast.WebSocketEvent{},
 			}
 
 			c := NewCompiler()
@@ -876,23 +876,23 @@ func TestWebSocketRouteCompilationPreservesPath(t *testing.T) {
 func TestWebSocketRouteWithPathParams(t *testing.T) {
 	tests := []struct {
 		name        string
-		route       *interpreter.WebSocketRoute
+		route       *ast.WebSocketRoute
 		expectError bool
 	}{
 		{
 			name: "single path parameter used in connect handler",
-			route: &interpreter.WebSocketRoute{
+			route: &ast.WebSocketRoute{
 				Path: "/chat/:room",
-				Events: []interpreter.WebSocketEvent{
+				Events: []ast.WebSocketEvent{
 					{
-						EventType: interpreter.WSEventConnect,
-						Body: []interpreter.Statement{
+						EventType: ast.WSEventConnect,
+						Body: []ast.Statement{
 							// ws.join(room) - uses the path parameter 'room'
-							&interpreter.ExpressionStatement{
-								Expr: &interpreter.FunctionCallExpr{
+							&ast.ExpressionStatement{
+								Expr: &ast.FunctionCallExpr{
 									Name: "ws.join",
-									Args: []interpreter.Expr{
-										&interpreter.VariableExpr{Name: "room"},
+									Args: []ast.Expr{
+										&ast.VariableExpr{Name: "room"},
 									},
 								},
 							},
@@ -904,19 +904,19 @@ func TestWebSocketRouteWithPathParams(t *testing.T) {
 		},
 		{
 			name: "single path parameter used in message handler",
-			route: &interpreter.WebSocketRoute{
+			route: &ast.WebSocketRoute{
 				Path: "/chat/:room",
-				Events: []interpreter.WebSocketEvent{
+				Events: []ast.WebSocketEvent{
 					{
-						EventType: interpreter.WSEventMessage,
-						Body: []interpreter.Statement{
+						EventType: ast.WSEventMessage,
+						Body: []ast.Statement{
 							// ws.broadcast_to_room(room, input)
-							&interpreter.ExpressionStatement{
-								Expr: &interpreter.FunctionCallExpr{
+							&ast.ExpressionStatement{
+								Expr: &ast.FunctionCallExpr{
 									Name: "ws.broadcast_to_room",
-									Args: []interpreter.Expr{
-										&interpreter.VariableExpr{Name: "room"},
-										&interpreter.VariableExpr{Name: "input"},
+									Args: []ast.Expr{
+										&ast.VariableExpr{Name: "room"},
+										&ast.VariableExpr{Name: "input"},
 									},
 								},
 							},
@@ -928,20 +928,20 @@ func TestWebSocketRouteWithPathParams(t *testing.T) {
 		},
 		{
 			name: "multiple path parameters",
-			route: &interpreter.WebSocketRoute{
+			route: &ast.WebSocketRoute{
 				Path: "/chat/:room/:user",
-				Events: []interpreter.WebSocketEvent{
+				Events: []ast.WebSocketEvent{
 					{
-						EventType: interpreter.WSEventConnect,
-						Body: []interpreter.Statement{
+						EventType: ast.WSEventConnect,
+						Body: []ast.Statement{
 							// Use both 'room' and 'user' parameters
-							&interpreter.AssignStatement{
+							&ast.AssignStatement{
 								Target: "roomName",
-								Value:  &interpreter.VariableExpr{Name: "room"},
+								Value:  &ast.VariableExpr{Name: "room"},
 							},
-							&interpreter.AssignStatement{
+							&ast.AssignStatement{
 								Target: "userName",
-								Value:  &interpreter.VariableExpr{Name: "user"},
+								Value:  &ast.VariableExpr{Name: "user"},
 							},
 						},
 					},
@@ -951,44 +951,44 @@ func TestWebSocketRouteWithPathParams(t *testing.T) {
 		},
 		{
 			name: "path parameter used in all event types",
-			route: &interpreter.WebSocketRoute{
+			route: &ast.WebSocketRoute{
 				Path: "/notifications/:channel",
-				Events: []interpreter.WebSocketEvent{
+				Events: []ast.WebSocketEvent{
 					{
-						EventType: interpreter.WSEventConnect,
-						Body: []interpreter.Statement{
-							&interpreter.ExpressionStatement{
-								Expr: &interpreter.FunctionCallExpr{
+						EventType: ast.WSEventConnect,
+						Body: []ast.Statement{
+							&ast.ExpressionStatement{
+								Expr: &ast.FunctionCallExpr{
 									Name: "ws.join",
-									Args: []interpreter.Expr{
-										&interpreter.VariableExpr{Name: "channel"},
+									Args: []ast.Expr{
+										&ast.VariableExpr{Name: "channel"},
 									},
 								},
 							},
 						},
 					},
 					{
-						EventType: interpreter.WSEventMessage,
-						Body: []interpreter.Statement{
-							&interpreter.ExpressionStatement{
-								Expr: &interpreter.FunctionCallExpr{
+						EventType: ast.WSEventMessage,
+						Body: []ast.Statement{
+							&ast.ExpressionStatement{
+								Expr: &ast.FunctionCallExpr{
 									Name: "ws.broadcast_to_room",
-									Args: []interpreter.Expr{
-										&interpreter.VariableExpr{Name: "channel"},
-										&interpreter.VariableExpr{Name: "input"},
+									Args: []ast.Expr{
+										&ast.VariableExpr{Name: "channel"},
+										&ast.VariableExpr{Name: "input"},
 									},
 								},
 							},
 						},
 					},
 					{
-						EventType: interpreter.WSEventDisconnect,
-						Body: []interpreter.Statement{
-							&interpreter.ExpressionStatement{
-								Expr: &interpreter.FunctionCallExpr{
+						EventType: ast.WSEventDisconnect,
+						Body: []ast.Statement{
+							&ast.ExpressionStatement{
+								Expr: &ast.FunctionCallExpr{
 									Name: "ws.leave",
-									Args: []interpreter.Expr{
-										&interpreter.VariableExpr{Name: "channel"},
+									Args: []ast.Expr{
+										&ast.VariableExpr{Name: "channel"},
 									},
 								},
 							},
@@ -1024,15 +1024,15 @@ func TestWebSocketRouteWithPathParams(t *testing.T) {
 			// Check that we have bytecode for the event handlers
 			for _, event := range tt.route.Events {
 				switch event.EventType {
-				case interpreter.WSEventConnect:
+				case ast.WSEventConnect:
 					if len(compiled.OnConnect) == 0 {
 						t.Error("Expected OnConnect bytecode to be generated")
 					}
-				case interpreter.WSEventMessage:
+				case ast.WSEventMessage:
 					if len(compiled.OnMessage) == 0 {
 						t.Error("Expected OnMessage bytecode to be generated")
 					}
-				case interpreter.WSEventDisconnect:
+				case ast.WSEventDisconnect:
 					if len(compiled.OnDisconnect) == 0 {
 						t.Error("Expected OnDisconnect bytecode to be generated")
 					}
@@ -1044,18 +1044,18 @@ func TestWebSocketRouteWithPathParams(t *testing.T) {
 
 // TestWebSocketRouteWithUndefinedVariable tests that undefined variables still cause errors
 func TestWebSocketRouteWithUndefinedVariable(t *testing.T) {
-	route := &interpreter.WebSocketRoute{
+	route := &ast.WebSocketRoute{
 		Path: "/chat/:room",
-		Events: []interpreter.WebSocketEvent{
+		Events: []ast.WebSocketEvent{
 			{
-				EventType: interpreter.WSEventConnect,
-				Body: []interpreter.Statement{
+				EventType: ast.WSEventConnect,
+				Body: []ast.Statement{
 					// Use 'undefinedVar' which is NOT a path parameter
-					&interpreter.ExpressionStatement{
-						Expr: &interpreter.FunctionCallExpr{
+					&ast.ExpressionStatement{
+						Expr: &ast.FunctionCallExpr{
 							Name: "ws.join",
-							Args: []interpreter.Expr{
-								&interpreter.VariableExpr{Name: "undefinedVar"},
+							Args: []ast.Expr{
+								&ast.VariableExpr{Name: "undefinedVar"},
 							},
 						},
 					},

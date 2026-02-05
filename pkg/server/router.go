@@ -12,18 +12,18 @@ type Router struct {
 
 // RouteNode represents a node in the route tree
 type RouteNode struct {
-	route       *Route
-	pattern     string
-	segments    []pathSegment
-	paramNames  []string
-	isStatic    bool
+	route      *Route
+	pattern    string
+	segments   []pathSegment
+	paramNames []string
+	isStatic   bool
 }
 
 // pathSegment represents a segment of a path pattern
 type pathSegment struct {
-	value      string
-	isParam    bool
-	paramName  string
+	value     string
+	isParam   bool
+	paramName string
 }
 
 // NewRouter creates a new router instance

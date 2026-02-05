@@ -440,9 +440,9 @@ func TestParserStatements(t *testing.T) {
 				t.Fatalf("Parse failed: %v", err)
 			}
 			bytecode, err := comp.Compile(module)
-			// TODO: Some statement types may not be fully implemented yet
+			// Some statement types may not be fully implemented yet in the compiler.
 			if err != nil {
-				t.Logf("Statement parsing not fully implemented: %v", err)
+				t.Skipf("Skipping: statement compilation not fully implemented: %v", err)
 			} else {
 				helper.AssertNotNil(bytecode, "Bytecode should not be nil")
 			}
@@ -487,8 +487,8 @@ func TestParserErrorCases(t *testing.T) {
 			description: "Missing colon in type field",
 		},
 		{
-			name:        "Empty route body",
-			source:      `@ GET /test {
+			name: "Empty route body",
+			source: `@ GET /test {
 }`,
 			shouldError: true,
 			description: "Route with no body should error",
@@ -744,7 +744,7 @@ func TestParserEdgeCases(t *testing.T) {
 	_ = NewTestHelper(t) // Reserved for future use
 	comp := compiler.NewCompiler()
 
-	tests := []struct{
+	tests := []struct {
 		name   string
 		source string
 	}{

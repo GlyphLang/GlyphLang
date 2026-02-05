@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/glyphlang/glyph/pkg/ast"
 	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/parser"
 	"github.com/stretchr/testify/assert"
@@ -49,7 +50,7 @@ func TestIntegration_HelloWorldFile(t *testing.T) {
 	require.NoError(t, err)
 
 	// Execute first route
-	route1, ok := module.Items[1].(*interpreter.Route)
+	route1, ok := module.Items[1].(*ast.Route)
 	require.True(t, ok)
 	result1, err := interp.ExecuteRouteSimple(route1, nil)
 	require.NoError(t, err)
@@ -60,7 +61,7 @@ func TestIntegration_HelloWorldFile(t *testing.T) {
 	assert.Equal(t, int64(1234567890), obj1["timestamp"])
 
 	// Execute second route with params
-	route2, ok := module.Items[2].(*interpreter.Route)
+	route2, ok := module.Items[2].(*ast.Route)
 	require.True(t, ok)
 	params := map[string]string{"name": "Alice"}
 	result2, err := interp.ExecuteRouteSimple(route2, params)
@@ -105,20 +106,20 @@ func TestIntegration_RestApiFile(t *testing.T) {
 	assert.Len(t, module.Items, 3)
 
 	// Check type def
-	typeDef, ok := module.Items[0].(*interpreter.TypeDef)
+	typeDef, ok := module.Items[0].(*ast.TypeDef)
 	assert.True(t, ok)
 	assert.Equal(t, "User", typeDef.Name)
 	assert.Len(t, typeDef.Fields, 3)
 
 	// Check first route
-	route1, ok := module.Items[1].(*interpreter.Route)
+	route1, ok := module.Items[1].(*ast.Route)
 	assert.True(t, ok)
 	assert.Equal(t, "/api/users/:id", route1.Path)
 	assert.NotNil(t, route1.Auth)
 	assert.Equal(t, "jwt", route1.Auth.AuthType)
 
 	// Check health route
-	route2, ok := module.Items[2].(*interpreter.Route)
+	route2, ok := module.Items[2].(*ast.Route)
 	assert.True(t, ok)
 	assert.Equal(t, "/health", route2.Path)
 }
@@ -188,7 +189,7 @@ func TestIntegration_FullPipeline(t *testing.T) {
 
 			// Execute
 			interp := interpreter.NewInterpreter()
-			route, ok := module.Items[tt.routeIndex].(*interpreter.Route)
+			route, ok := module.Items[tt.routeIndex].(*ast.Route)
 			require.True(t, ok)
 
 			result, err := interp.ExecuteRouteSimple(route, tt.params)
@@ -215,21 +216,21 @@ func TestIntegration_ExampleFiles(t *testing.T) {
 	tests := []struct {
 		name     string
 		filePath string
-		validate func(*testing.T, *interpreter.Module)
+		validate func(*testing.T, *ast.Module)
 	}{
 		{
 			name:     "hello-world example",
 			filePath: filepath.Join(projectRoot, "examples", "hello-world", "main.glyph"),
-			validate: func(t *testing.T, module *interpreter.Module) {
+			validate: func(t *testing.T, module *ast.Module) {
 				assert.GreaterOrEqual(t, len(module.Items), 3, "should have at least 3 items")
 
 				// Find routes - hello-world has 3 routes
 				routeCount := 0
 				for _, item := range module.Items {
 					switch item.(type) {
-					case interpreter.Route:
+					case ast.Route:
 						routeCount++
-					case *interpreter.Route:
+					case *ast.Route:
 						routeCount++
 					}
 				}
@@ -240,7 +241,7 @@ func TestIntegration_ExampleFiles(t *testing.T) {
 		{
 			name:     "rest-api example",
 			filePath: filepath.Join(projectRoot, "examples", "rest-api", "main.glyph"),
-			validate: func(t *testing.T, module *interpreter.Module) {
+			validate: func(t *testing.T, module *ast.Module) {
 				assert.Greater(t, len(module.Items), 0, "should have items")
 
 				// Find routes and types - rest-api has 6 routes and 3 types
@@ -248,13 +249,13 @@ func TestIntegration_ExampleFiles(t *testing.T) {
 				typeCount := 0
 				for _, item := range module.Items {
 					switch item.(type) {
-					case interpreter.Route:
+					case ast.Route:
 						routeCount++
-					case *interpreter.Route:
+					case *ast.Route:
 						routeCount++
-					case interpreter.TypeDef:
+					case ast.TypeDef:
 						typeCount++
-					case *interpreter.TypeDef:
+					case *ast.TypeDef:
 						typeCount++
 					}
 				}
@@ -294,9 +295,9 @@ func TestIntegration_ExampleFiles(t *testing.T) {
 // Test error handling throughout the pipeline
 func TestIntegration_ErrorHandling(t *testing.T) {
 	tests := []struct {
-		name          string
-		source        string
-		expectLexErr  bool
+		name           string
+		source         string
+		expectLexErr   bool
 		expectParseErr bool
 	}{
 		{
@@ -387,9 +388,9 @@ func TestIntegration_MultipleRoutesWithFeatures(t *testing.T) {
 	assert.Len(t, module.Items, 4)
 
 	// Check each route
-	routes := []*interpreter.Route{}
+	routes := []*ast.Route{}
 	for _, item := range module.Items {
-		if route, ok := item.(*interpreter.Route); ok {
+		if route, ok := item.(*ast.Route); ok {
 			routes = append(routes, route)
 		}
 	}
@@ -397,21 +398,21 @@ func TestIntegration_MultipleRoutesWithFeatures(t *testing.T) {
 
 	// First route - public
 	assert.Equal(t, "/public", routes[0].Path)
-	assert.Equal(t, interpreter.Get, routes[0].Method)
+	assert.Equal(t, ast.Get, routes[0].Method)
 	assert.Nil(t, routes[0].Auth)
 	assert.Nil(t, routes[0].RateLimit)
 
 	// Second route - protected with POST
 	assert.Equal(t, "/protected", routes[1].Path)
-	assert.Equal(t, interpreter.Post, routes[1].Method)
+	assert.Equal(t, ast.Post, routes[1].Method)
 	assert.NotNil(t, routes[1].Auth)
 	assert.NotNil(t, routes[1].RateLimit)
 
 	// Third route - with path param and return type
 	assert.Equal(t, "/users/:id", routes[2].Path)
-	assert.Equal(t, interpreter.Get, routes[2].Method)
+	assert.Equal(t, ast.Get, routes[2].Method)
 	assert.NotNil(t, routes[2].Auth)
-	_, ok := routes[2].ReturnType.(interpreter.NamedType)
+	_, ok := routes[2].ReturnType.(ast.NamedType)
 	assert.True(t, ok)
 }
 
@@ -474,7 +475,7 @@ func TestIntegration_Expressions(t *testing.T) {
 			require.NoError(t, err)
 
 			interp := interpreter.NewInterpreter()
-			route, ok := module.Items[0].(*interpreter.Route)
+			route, ok := module.Items[0].(*ast.Route)
 			require.True(t, ok)
 
 			result, err := interp.ExecuteRouteSimple(route, tt.params)
@@ -496,7 +497,7 @@ func BenchmarkIntegration_FullPipeline(b *testing.B) {
 		p := parser.NewParser(tokens)
 		module, _ := p.Parse()
 		interp := interpreter.NewInterpreter()
-		if route, ok := module.Items[0].(*interpreter.Route); ok {
+		if route, ok := module.Items[0].(*ast.Route); ok {
 			_, _ = interp.ExecuteRouteSimple(route, nil)
 		}
 	}
@@ -523,7 +524,7 @@ func BenchmarkIntegration_ComplexRoute(b *testing.B) {
 		interp := interpreter.NewInterpreter()
 		_ = interp.LoadModule(*module)
 		if len(module.Items) >= 2 {
-			if route, ok := module.Items[1].(*interpreter.Route); ok {
+			if route, ok := module.Items[1].(*ast.Route); ok {
 				params := map[string]string{"id": "123"}
 				_, _ = interp.ExecuteRouteSimple(route, params)
 			}

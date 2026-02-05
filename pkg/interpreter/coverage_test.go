@@ -1,6 +1,8 @@
 package interpreter
 
 import (
+	. "github.com/glyphlang/glyph/pkg/ast"
+
 	"testing"
 )
 
@@ -530,260 +532,60 @@ func TestBoolLiteralExpr(t *testing.T) {
 	}
 }
 
-// TestDatabaseType tests database type marker
-func TestDatabaseType(t *testing.T) {
-	dbType := DatabaseType{}
-	dbType.isType() // Just call to ensure it exists
-}
+// Compile-time interface satisfaction checks for AST types.
+// These replace the previous marker method tests which cannot call
+// unexported methods across package boundaries after the AST extraction.
+var (
+	// Type interface
+	_ Type = DatabaseType{}
+	_ Type = ArrayType{}
+	_ Type = OptionalType{}
+	_ Type = NamedType{}
+	_ Type = IntType{}
+	_ Type = FloatType{}
+	_ Type = StringType{}
+	_ Type = BoolType{}
+	_ Type = UnionType{}
 
-// TestArrayType tests array type marker
-func TestArrayType(t *testing.T) {
-	arrType := ArrayType{ElementType: IntType{}}
-	arrType.isType() // Just call to ensure it exists
-}
+	// Item interface
+	_ Item = Route{}
+	_ Item = Function{}
+	_ Item = TypeDef{}
+	_ Item = Command{}
+	_ Item = CronTask{}
+	_ Item = EventHandler{}
+	_ Item = QueueWorker{}
+	_ Item = WebSocketRoute{}
 
-// TestOptionalType tests optional type marker
-func TestOptionalType(t *testing.T) {
-	optType := OptionalType{InnerType: StringType{}}
-	optType.isType() // Just call to ensure it exists
-}
+	// Statement interface
+	_ Statement = AssignStatement{}
+	_ Statement = ReturnStatement{}
+	_ Statement = IfStatement{}
+	_ Statement = WhileStatement{}
+	_ Statement = ForStatement{}
+	_ Statement = SwitchStatement{}
+	_ Statement = DbQueryStatement{}
+	_ Statement = ValidationStatement{}
+	_ Statement = WebSocketEvent{}
+	_ Statement = WsSendStatement{}
+	_ Statement = WsBroadcastStatement{}
+	_ Statement = WsCloseStatement{}
 
-// TestNamedType tests named type marker
-func TestNamedType(t *testing.T) {
-	namedType := NamedType{Name: "User"}
-	namedType.isType() // Just call to ensure it exists
-}
+	// Expr interface
+	_ Expr = LiteralExpr{}
+	_ Expr = VariableExpr{}
+	_ Expr = BinaryOpExpr{}
+	_ Expr = UnaryOpExpr{}
+	_ Expr = FieldAccessExpr{}
+	_ Expr = ArrayIndexExpr{}
+	_ Expr = FunctionCallExpr{}
+	_ Expr = ObjectExpr{}
+	_ Expr = ArrayExpr{}
 
-// TestRouteMarker tests route isItem marker
-func TestRouteMarker(t *testing.T) {
-	route := Route{Path: "/test", Method: Get}
-	route.isItem()
-}
-
-// TestFunctionMarker tests function isItem marker
-func TestFunctionMarker(t *testing.T) {
-	fn := Function{Name: "test"}
-	fn.isItem()
-}
-
-// TestTypeDefMarker tests typedef isItem marker
-func TestTypeDefMarker(t *testing.T) {
-	td := TypeDef{Name: "User"}
-	td.isItem()
-}
-
-// TestCommandMarker tests command isItem marker
-func TestCommandMarker(t *testing.T) {
-	cmd := Command{Name: "hello"}
-	cmd.isItem()
-}
-
-// TestCronTaskMarker tests cron task isItem marker
-func TestCronTaskMarker(t *testing.T) {
-	cron := CronTask{Schedule: "* * * * *"}
-	cron.isItem()
-}
-
-// TestEventHandlerMarker tests event handler isItem marker
-func TestEventHandlerMarker(t *testing.T) {
-	eh := EventHandler{EventType: "test"}
-	eh.isItem()
-}
-
-// TestQueueWorkerMarker tests queue worker isItem marker
-func TestQueueWorkerMarker(t *testing.T) {
-	qw := QueueWorker{QueueName: "test"}
-	qw.isItem()
-}
-
-// TestWebSocketRouteMarker tests websocket route isItem marker
-func TestWebSocketRouteMarker(t *testing.T) {
-	wsr := WebSocketRoute{Path: "/ws"}
-	wsr.isItem()
-}
-
-// TestAssignStatementMarker tests assign statement isStatement marker
-func TestAssignStatementMarker(t *testing.T) {
-	stmt := AssignStatement{Target: "x"}
-	stmt.isStatement()
-}
-
-// TestReturnStatementMarker tests return statement isStatement marker
-func TestReturnStatementMarker(t *testing.T) {
-	stmt := ReturnStatement{}
-	stmt.isStatement()
-}
-
-// TestIfStatementMarker tests if statement isStatement marker
-func TestIfStatementMarker(t *testing.T) {
-	stmt := IfStatement{}
-	stmt.isStatement()
-}
-
-// TestWhileStatementMarker tests while statement isStatement marker
-func TestWhileStatementMarker(t *testing.T) {
-	stmt := WhileStatement{}
-	stmt.isStatement()
-}
-
-// TestForStatementMarker tests for statement isStatement marker
-func TestForStatementMarker(t *testing.T) {
-	stmt := ForStatement{}
-	stmt.isStatement()
-}
-
-// TestSwitchStatementMarker tests switch statement isStatement marker
-func TestSwitchStatementMarker(t *testing.T) {
-	stmt := SwitchStatement{}
-	stmt.isStatement()
-}
-
-// TestDbQueryStatementMarker tests db query statement isStatement marker
-func TestDbQueryStatementMarker(t *testing.T) {
-	stmt := DbQueryStatement{}
-	stmt.isStatement()
-}
-
-// TestValidationStatementMarker tests validation statement isStatement marker
-func TestValidationStatementMarker(t *testing.T) {
-	stmt := ValidationStatement{}
-	stmt.isStatement()
-}
-
-// TestLiteralExprMarker tests literal expr isExpr marker
-func TestLiteralExprMarker(t *testing.T) {
-	expr := LiteralExpr{}
-	expr.isExpr()
-}
-
-// TestVariableExprMarker tests variable expr isExpr marker
-func TestVariableExprMarker(t *testing.T) {
-	expr := VariableExpr{Name: "x"}
-	expr.isExpr()
-}
-
-// TestBinaryOpExprMarker tests binary op expr isExpr marker
-func TestBinaryOpExprMarker(t *testing.T) {
-	expr := BinaryOpExpr{}
-	expr.isExpr()
-}
-
-// TestUnaryOpExprMarker tests unary op expr isExpr marker
-func TestUnaryOpExprMarker(t *testing.T) {
-	expr := UnaryOpExpr{}
-	expr.isExpr()
-}
-
-// TestFieldAccessExprMarker tests field access expr isExpr marker
-func TestFieldAccessExprMarker(t *testing.T) {
-	expr := FieldAccessExpr{}
-	expr.isExpr()
-}
-
-// TestArrayIndexExprMarker tests array index expr isExpr marker
-func TestArrayIndexExprMarker(t *testing.T) {
-	expr := ArrayIndexExpr{}
-	expr.isExpr()
-}
-
-// TestFunctionCallExprMarker tests function call expr isExpr marker
-func TestFunctionCallExprMarker(t *testing.T) {
-	expr := FunctionCallExpr{Name: "test"}
-	expr.isExpr()
-}
-
-// TestObjectExprMarker tests object expr isExpr marker
-func TestObjectExprMarker(t *testing.T) {
-	expr := ObjectExpr{}
-	expr.isExpr()
-}
-
-// TestArrayExprMarker tests array expr isExpr marker
-func TestArrayExprMarker(t *testing.T) {
-	expr := ArrayExpr{}
-	expr.isExpr()
-}
-
-// TestIntLiteralMarker tests int literal isLiteral marker
-func TestIntLiteralMarker(t *testing.T) {
-	lit := IntLiteral{Value: 42}
-	lit.isLiteral()
-}
-
-// TestFloatLiteralMarker tests float literal isLiteral marker
-func TestFloatLiteralMarker(t *testing.T) {
-	lit := FloatLiteral{Value: 3.14}
-	lit.isLiteral()
-}
-
-// TestStringLiteralMarker tests string literal isLiteral marker
-func TestStringLiteralMarker(t *testing.T) {
-	lit := StringLiteral{Value: "hello"}
-	lit.isLiteral()
-}
-
-// TestBoolLiteralMarker tests bool literal isLiteral marker
-func TestBoolLiteralMarker(t *testing.T) {
-	lit := BoolLiteral{Value: true}
-	lit.isLiteral()
-}
-
-// TestNullLiteralMarker tests null literal isLiteral marker
-func TestNullLiteralMarker(t *testing.T) {
-	lit := NullLiteral{}
-	lit.isLiteral()
-}
-
-// TestIntTypeMarker tests int type isType marker
-func TestIntTypeMarker(t *testing.T) {
-	typ := IntType{}
-	typ.isType()
-}
-
-// TestFloatTypeMarker tests float type isType marker
-func TestFloatTypeMarker(t *testing.T) {
-	typ := FloatType{}
-	typ.isType()
-}
-
-// TestStringTypeMarker tests string type isType marker
-func TestStringTypeMarker(t *testing.T) {
-	typ := StringType{}
-	typ.isType()
-}
-
-// TestBoolTypeMarker tests bool type isType marker
-func TestBoolTypeMarker(t *testing.T) {
-	typ := BoolType{}
-	typ.isType()
-}
-
-// TestUnionTypeMarker tests union type isType marker
-func TestUnionTypeMarker(t *testing.T) {
-	typ := UnionType{Types: []Type{IntType{}, StringType{}}}
-	typ.isType()
-}
-
-// TestWebSocketEventMarker tests websocket event isStatement marker
-func TestWebSocketEventMarker(t *testing.T) {
-	event := WebSocketEvent{EventType: WSEventConnect}
-	event.isStatement()
-}
-
-// TestWsSendStatementMarker tests ws send statement isStatement marker
-func TestWsSendStatementMarker(t *testing.T) {
-	stmt := WsSendStatement{}
-	stmt.isStatement()
-}
-
-// TestWsBroadcastStatementMarker tests ws broadcast statement isStatement marker
-func TestWsBroadcastStatementMarker(t *testing.T) {
-	stmt := WsBroadcastStatement{}
-	stmt.isStatement()
-}
-
-// TestWsCloseStatementMarker tests ws close statement isStatement marker
-func TestWsCloseStatementMarker(t *testing.T) {
-	stmt := WsCloseStatement{}
-	stmt.isStatement()
-}
+	// Literal interface
+	_ Literal = IntLiteral{}
+	_ Literal = FloatLiteral{}
+	_ Literal = StringLiteral{}
+	_ Literal = BoolLiteral{}
+	_ Literal = NullLiteral{}
+)

@@ -1,6 +1,8 @@
 package interpreter
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // Environment manages variable scopes and bindings
 type Environment struct {

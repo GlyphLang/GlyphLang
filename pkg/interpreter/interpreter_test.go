@@ -1,7 +1,10 @@
 package interpreter
 
 import (
+	. "github.com/glyphlang/glyph/pkg/ast"
+
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -304,10 +307,14 @@ func TestEvaluateFunctionCall_TimeNow(t *testing.T) {
 		Name: "time.now",
 		Args: []Expr{},
 	}
+	before := time.Now().Unix()
 	result, err := interp.EvaluateExpression(expr, env)
 
 	require.NoError(t, err)
-	assert.Equal(t, int64(1234567890), result)
+	ts, ok := result.(int64)
+	require.True(t, ok, "expected int64 timestamp")
+	// Allow a 2-second window to account for clock granularity
+	assert.InDelta(t, before, ts, 2, "timestamp should be within 2 seconds of current time")
 }
 
 func TestEvaluateObject_Empty(t *testing.T) {
@@ -996,7 +1003,9 @@ func TestExecuteRoute_GreetWithObjectAndParams(t *testing.T) {
 	obj, ok := result.(map[string]interface{})
 	assert.True(t, ok)
 	assert.Equal(t, "Hello, World!", obj["text"])
-	assert.Equal(t, int64(1234567890), obj["timestamp"])
+	ts, ok2 := obj["timestamp"].(int64)
+	require.True(t, ok2, "timestamp should be int64")
+	assert.InDelta(t, time.Now().Unix(), ts, 2, "timestamp should be within 2 seconds of current time")
 }
 
 func TestExecuteRoute_ObjectFieldAccess(t *testing.T) {
@@ -4386,4 +4395,648 @@ func TestMatchExpr_NoMatch_ReturnsNil(t *testing.T) {
 	result, err := interp.EvaluateExpression(expr, env)
 	require.NoError(t, err)
 	assert.Nil(t, result)
+}
+
+// --- Redis injection tests ---
+
+func TestInterpreter_SetRedisHandler(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockRedis := map[string]interface{}{
+		"cached": "hello",
+	}
+	interp.SetRedisHandler(mockRedis)
+
+	// Verify the handler is stored
+	assert.NotNil(t, interp.redisHandler)
+	assert.Equal(t, mockRedis, interp.redisHandler)
+}
+
+func TestInterpreter_RedisInjection_Route(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockRedis := map[string]interface{}{
+		"cached": "cached_value",
+	}
+	interp.SetRedisHandler(mockRedis)
+
+	route := &Route{
+		Path:   "/api/test",
+		Method: Get,
+		Injections: []Injection{
+			{Name: "redis", Type: RedisType{}},
+		},
+		Body: []Statement{
+			AssignStatement{
+				Target: "val",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "redis"},
+					Field:  "cached",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "result", Value: VariableExpr{Name: "val"}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteRouteSimple(route, map[string]string{})
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "cached_value", resultMap["result"])
+}
+
+func TestInterpreter_RedisInjection_NamedType(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockRedis := map[string]interface{}{
+		"value": int64(42),
+	}
+	interp.SetRedisHandler(mockRedis)
+
+	// Test with NamedType{Name: "Redis"} (as produced by the parser)
+	route := &Route{
+		Path:   "/api/test",
+		Method: Get,
+		Injections: []Injection{
+			{Name: "cache", Type: NamedType{Name: "Redis"}},
+		},
+		Body: []Statement{
+			AssignStatement{
+				Target: "v",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "cache"},
+					Field:  "value",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "data", Value: VariableExpr{Name: "v"}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteRouteSimple(route, map[string]string{})
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, int64(42), resultMap["data"])
+}
+
+func TestInterpreter_RedisInjection_CronTask(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockRedis := map[string]interface{}{
+		"status": "ready",
+	}
+	interp.SetRedisHandler(mockRedis)
+
+	task := &CronTask{
+		Name:     "cache_refresh",
+		Schedule: "*/5 * * * *",
+		Injections: []Injection{
+			{Name: "redis", Type: RedisType{}},
+		},
+		Body: []Statement{
+			AssignStatement{
+				Target: "s",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "redis"},
+					Field:  "status",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "cache_status", Value: VariableExpr{Name: "s"}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteCronTask(task)
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "ready", resultMap["cache_status"])
+}
+
+func TestInterpreter_RedisInjection_EventHandler(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockRedis := map[string]interface{}{
+		"key": "event_data",
+	}
+	interp.SetRedisHandler(mockRedis)
+
+	handler := &EventHandler{
+		EventType: "cache.invalidate",
+		Injections: []Injection{
+			{Name: "redis", Type: RedisType{}},
+		},
+		Body: []Statement{
+			AssignStatement{
+				Target: "k",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "redis"},
+					Field:  "key",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "invalidated", Value: VariableExpr{Name: "k"}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteEventHandler(handler, map[string]interface{}{"key": "user:1"})
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "event_data", resultMap["invalidated"])
+}
+
+func TestInterpreter_RedisInjection_QueueWorker(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockRedis := map[string]interface{}{
+		"queue_size": int64(5),
+	}
+	interp.SetRedisHandler(mockRedis)
+
+	worker := &QueueWorker{
+		QueueName: "cache_updates",
+		Injections: []Injection{
+			{Name: "redis", Type: RedisType{}},
+		},
+		Body: []Statement{
+			AssignStatement{
+				Target: "size",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "redis"},
+					Field:  "queue_size",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "remaining", Value: VariableExpr{Name: "size"}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteQueueWorker(worker, map[string]interface{}{"action": "update"})
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, int64(5), resultMap["remaining"])
+}
+
+func TestInterpreter_BothDbAndRedisInjection(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockDB := map[string]interface{}{
+		"users": int64(100),
+	}
+	mockRedis := map[string]interface{}{
+		"cached_count": int64(99),
+	}
+	interp.SetDatabaseHandler(mockDB)
+	interp.SetRedisHandler(mockRedis)
+
+	route := &Route{
+		Path:   "/api/test",
+		Method: Get,
+		Injections: []Injection{
+			{Name: "db", Type: DatabaseType{}},
+			{Name: "redis", Type: RedisType{}},
+		},
+		Body: []Statement{
+			AssignStatement{
+				Target: "db_count",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "db"},
+					Field:  "users",
+				},
+			},
+			AssignStatement{
+				Target: "cache_count",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "redis"},
+					Field:  "cached_count",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "db_users", Value: VariableExpr{Name: "db_count"}},
+						{Key: "cached_users", Value: VariableExpr{Name: "cache_count"}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteRouteSimple(route, map[string]string{})
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, int64(100), resultMap["db_users"])
+	assert.Equal(t, int64(99), resultMap["cached_users"])
+}
+
+func TestInterpreter_RedisInjection_NilHandler(t *testing.T) {
+	interp := NewInterpreter()
+	// Don't set a redis handler
+
+	route := &Route{
+		Path:   "/api/test",
+		Method: Get,
+		Injections: []Injection{
+			{Name: "redis", Type: RedisType{}},
+		},
+		Body: []Statement{
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "ok", Value: LiteralExpr{Value: BoolLiteral{Value: true}}},
+					},
+				},
+			},
+		},
+	}
+
+	// Should not panic, redis just won't be available
+	result, err := interp.ExecuteRouteSimple(route, map[string]string{})
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, true, resultMap["ok"])
+}
+
+// --- SSE / Yield tests ---
+
+// mockSSEWriter implements the SSEWriter interface for testing
+type mockSSEWriter struct {
+	events []mockSSEEvent
+}
+
+type mockSSEEvent struct {
+	Data      interface{}
+	EventType string
+}
+
+func (m *mockSSEWriter) SendEvent(data interface{}, eventType string) error {
+	m.events = append(m.events, mockSSEEvent{Data: data, EventType: eventType})
+	return nil
+}
+
+func TestInterpreter_YieldStatement_WithSSEWriter(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	writer := &mockSSEWriter{}
+	env.Define("__sse_writer", writer)
+
+	stmt := YieldStatement{
+		Value: LiteralExpr{Value: StringLiteral{Value: "hello"}},
+	}
+
+	_, err := interp.ExecuteStatement(stmt, env)
+	require.NoError(t, err)
+	require.Len(t, writer.events, 1)
+	assert.Equal(t, "hello", writer.events[0].Data)
+}
+
+func TestInterpreter_YieldStatement_WithEventType(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	writer := &mockSSEWriter{}
+	env.Define("__sse_writer", writer)
+
+	stmt := YieldStatement{
+		Value:     LiteralExpr{Value: StringLiteral{Value: "update"}},
+		EventType: "notification",
+	}
+
+	_, err := interp.ExecuteStatement(stmt, env)
+	require.NoError(t, err)
+	require.Len(t, writer.events, 1)
+	assert.Equal(t, "notification", writer.events[0].EventType)
+}
+
+func TestInterpreter_YieldStatement_NoWriter(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	stmt := YieldStatement{
+		Value: LiteralExpr{Value: StringLiteral{Value: "hello"}},
+	}
+
+	_, err := interp.ExecuteStatement(stmt, env)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "yield can only be used inside an SSE route")
+}
+
+func TestInterpreter_SSERoute_InjectsWriter(t *testing.T) {
+	interp := NewInterpreter()
+	writer := &mockSSEWriter{}
+
+	route := &Route{
+		Path:   "/events",
+		Method: SSE,
+		Body: []Statement{
+			YieldStatement{
+				Value: LiteralExpr{Value: StringLiteral{Value: "event1"}},
+			},
+			YieldStatement{
+				Value: LiteralExpr{Value: StringLiteral{Value: "event2"}},
+			},
+		},
+	}
+
+	request := &Request{
+		Path:      "/events",
+		Method:    "GET",
+		SSEWriter: writer,
+	}
+
+	resp, err := interp.ExecuteRoute(route, request)
+	require.NoError(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+	assert.Nil(t, resp.Body)
+	require.Len(t, writer.events, 2)
+	assert.Equal(t, "event1", writer.events[0].Data)
+	assert.Equal(t, "event2", writer.events[1].Data)
+}
+
+func TestInterpreter_SSERoute_ObjectYield(t *testing.T) {
+	interp := NewInterpreter()
+	writer := &mockSSEWriter{}
+
+	route := &Route{
+		Path:   "/updates",
+		Method: SSE,
+		Body: []Statement{
+			YieldStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "count", Value: LiteralExpr{Value: IntLiteral{Value: 42}}},
+						{Key: "msg", Value: LiteralExpr{Value: StringLiteral{Value: "update"}}},
+					},
+				},
+			},
+		},
+	}
+
+	request := &Request{
+		Path:      "/updates",
+		Method:    "GET",
+		SSEWriter: writer,
+	}
+
+	resp, err := interp.ExecuteRoute(route, request)
+	require.NoError(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+	require.Len(t, writer.events, 1)
+
+	eventData, ok := writer.events[0].Data.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, int64(42), eventData["count"])
+	assert.Equal(t, "update", eventData["msg"])
+}
+
+func TestInterpreter_SSEMethodString(t *testing.T) {
+	assert.Equal(t, "SSE", SSE.String())
+}
+
+// --- MongoDB injection tests ---
+
+func TestInterpreter_SetMongoDBHandler(t *testing.T) {
+	interp := NewInterpreter()
+	mockMongo := map[string]interface{}{"connected": true}
+	interp.SetMongoDBHandler(mockMongo)
+	assert.Equal(t, mockMongo, interp.mongoDBHandler)
+}
+
+func TestInterpreter_MongoDBInjection_Route(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockMongo := map[string]interface{}{
+		"status": "connected",
+	}
+	interp.SetMongoDBHandler(mockMongo)
+
+	route := &Route{
+		Path:   "/api/test",
+		Method: Get,
+		Injections: []Injection{
+			{Name: "mongo", Type: MongoDBType{}},
+		},
+		Body: []Statement{
+			AssignStatement{
+				Target: "s",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "mongo"},
+					Field:  "status",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "db_status", Value: VariableExpr{Name: "s"}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteRouteSimple(route, map[string]string{})
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "connected", resultMap["db_status"])
+}
+
+func TestInterpreter_MongoDBInjection_NamedType(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockMongo := map[string]interface{}{
+		"value": int64(99),
+	}
+	interp.SetMongoDBHandler(mockMongo)
+
+	route := &Route{
+		Path:   "/api/test",
+		Method: Get,
+		Injections: []Injection{
+			{Name: "db", Type: NamedType{Name: "MongoDB"}},
+		},
+		Body: []Statement{
+			AssignStatement{
+				Target: "v",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "db"},
+					Field:  "value",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "data", Value: VariableExpr{Name: "v"}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteRouteSimple(route, map[string]string{})
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, int64(99), resultMap["data"])
+}
+
+func TestInterpreter_MongoDBInjection_CronTask(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockMongo := map[string]interface{}{
+		"status": "synced",
+	}
+	interp.SetMongoDBHandler(mockMongo)
+
+	task := &CronTask{
+		Name:     "mongo_sync",
+		Schedule: "0 * * * *",
+		Injections: []Injection{
+			{Name: "mongo", Type: MongoDBType{}},
+		},
+		Body: []Statement{
+			AssignStatement{
+				Target: "s",
+				Value: FieldAccessExpr{
+					Object: VariableExpr{Name: "mongo"},
+					Field:  "status",
+				},
+			},
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "sync_status", Value: VariableExpr{Name: "s"}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteCronTask(task)
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "synced", resultMap["sync_status"])
+}
+
+func TestInterpreter_MongoDBInjection_NilHandler(t *testing.T) {
+	interp := NewInterpreter()
+	// Don't set MongoDB handler — should not panic
+
+	route := &Route{
+		Path:   "/api/test",
+		Method: Get,
+		Injections: []Injection{
+			{Name: "mongo", Type: MongoDBType{}},
+		},
+		Body: []Statement{
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "ok", Value: LiteralExpr{Value: BoolLiteral{Value: true}}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteRouteSimple(route, map[string]string{})
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, true, resultMap["ok"])
+}
+
+func TestInterpreter_AllThreeInjections(t *testing.T) {
+	interp := NewInterpreter()
+
+	mockDB := map[string]interface{}{"type": "postgres"}
+	mockRedis := map[string]interface{}{"type": "redis"}
+	mockMongo := map[string]interface{}{"type": "mongodb"}
+
+	interp.SetDatabaseHandler(mockDB)
+	interp.SetRedisHandler(mockRedis)
+	interp.SetMongoDBHandler(mockMongo)
+
+	route := &Route{
+		Path:   "/api/test",
+		Method: Get,
+		Injections: []Injection{
+			{Name: "db", Type: DatabaseType{}},
+			{Name: "cache", Type: RedisType{}},
+			{Name: "docs", Type: MongoDBType{}},
+		},
+		Body: []Statement{
+			ReturnStatement{
+				Value: ObjectExpr{
+					Fields: []ObjectField{
+						{Key: "db_type", Value: FieldAccessExpr{
+							Object: VariableExpr{Name: "db"},
+							Field:  "type",
+						}},
+						{Key: "cache_type", Value: FieldAccessExpr{
+							Object: VariableExpr{Name: "cache"},
+							Field:  "type",
+						}},
+						{Key: "docs_type", Value: FieldAccessExpr{
+							Object: VariableExpr{Name: "docs"},
+							Field:  "type",
+						}},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := interp.ExecuteRouteSimple(route, map[string]string{})
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "postgres", resultMap["db_type"])
+	assert.Equal(t, "redis", resultMap["cache_type"])
+	assert.Equal(t, "mongodb", resultMap["docs_type"])
 }

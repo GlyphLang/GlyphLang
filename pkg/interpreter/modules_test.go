@@ -1,6 +1,8 @@
 package interpreter
 
 import (
+	. "github.com/glyphlang/glyph/pkg/ast"
+
 	"os"
 	"path/filepath"
 	"testing"
@@ -245,7 +247,7 @@ func TestInterpreter_LoadModuleWithPath(t *testing.T) {
 	module := Module{
 		Items: []Item{
 			&Function{
-				Name: "testFunc",
+				Name:   "testFunc",
 				Params: []Field{},
 				Body: []Statement{
 					ReturnStatement{

@@ -5,84 +5,97 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/glyphlang/glyph/pkg/ast"
 	"github.com/glyphlang/glyph/pkg/compiler"
 	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/server"
 	"github.com/glyphlang/glyph/pkg/vm"
 )
 
+// testMockInterpreter implements server.Interpreter for integration tests
+type testMockInterpreter struct {
+	Response interface{}
+}
+
+func (m *testMockInterpreter) Execute(route *server.Route, ctx *server.Context) (interface{}, error) {
+	if m.Response != nil {
+		return m.Response, nil
+	}
+	return map[string]interface{}{"message": "Mock response"}, nil
+}
+
 // TestHelloWorldIntegration tests the hello-world example end-to-end
 func TestHelloWorldIntegration(t *testing.T) {
 	t.Skip("Skipping until AST construction helpers are fixed for pure Go implementation")
 
 	/*
-	helper := NewTestHelper(t)
+		helper := NewTestHelper(t)
 
-	// 1. Load the hello-world example
-	examplePath := filepath.Join("..", "examples", "hello-world", "main.glyph")
-	source, err := os.ReadFile(examplePath)
-	if err != nil {
-		t.Skipf("Skipping - hello-world example not found: %v", err)
-		return
-	}
+		// 1. Load the hello-world example
+		examplePath := filepath.Join("..", "examples", "hello-world", "main.glyph")
+		source, err := os.ReadFile(examplePath)
+		if err != nil {
+			t.Skipf("Skipping - hello-world example not found: %v", err)
+			return
+		}
 
-	// 2. Parse to AST (mock for now - will use real parser when available)
-	module := createHelloWorldModule()
+		// 2. Parse to AST (mock for now - will use real parser when available)
+		module := createHelloWorldModule()
 
-	// 3. Create interpreter and load module
-	interp := interpreter.NewInterpreter()
-	err = interp.LoadModule(*module)
-	helper.AssertNoError(err, "Failed to load module")
+		// 3. Create interpreter and load module
+		interp := interpreter.NewInterpreter()
+		err = interp.LoadModule(*module)
+		helper.AssertNoError(err, "Failed to load module")
 
-	// 4. Find the /hello route
-	helloRoute := findRoute(module, "/hello")
-	helper.AssertNotNil(helloRoute, "Should find /hello route")
+		// 4. Find the /hello route
+		helloRoute := findRoute(module, "/hello")
+		helper.AssertNotNil(helloRoute, "Should find /hello route")
 
-	// 5. Execute /hello route
-	result, err := interp.ExecuteRouteSimple(helloRoute, map[string]string{})
-	helper.AssertNoError(err, "Failed to execute /hello route")
+		// 5. Execute /hello route
+		result, err := interp.ExecuteRouteSimple(helloRoute, map[string]string{})
+		helper.AssertNoError(err, "Failed to execute /hello route")
 
-	// 6. Verify response structure
-	resultMap, ok := result.(map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected map result, got %T", result)
-	}
-	helper.AssertEqual(resultMap["text"], "Hello, World!", "Hello message")
+		// 6. Verify response structure
+		resultMap, ok := result.(map[string]interface{})
+		if !ok {
+			t.Fatalf("Expected map result, got %T", result)
+		}
+		helper.AssertEqual(resultMap["text"], "Hello, World!", "Hello message")
 
-	// 7. Find the /greet/:name route
-	greetRoute := findRoute(module, "/greet/:name")
-	helper.AssertNotNil(greetRoute, "Should find /greet/:name route")
+		// 7. Find the /greet/:name route
+		greetRoute := findRoute(module, "/greet/:name")
+		helper.AssertNotNil(greetRoute, "Should find /greet/:name route")
 
-	// 8. Execute /greet/Alice route
-	result2, err := interp.ExecuteRouteSimple(greetRoute, map[string]string{"name": "Alice"})
-	helper.AssertNoError(err, "Failed to execute /greet/:name route")
+		// 8. Execute /greet/Alice route
+		result2, err := interp.ExecuteRouteSimple(greetRoute, map[string]string{"name": "Alice"})
+		helper.AssertNoError(err, "Failed to execute /greet/:name route")
 
-	// 9. Verify personalized greeting
-	resultMap2, ok := result2.(map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected map result, got %T", result2)
-	}
-	helper.AssertEqual(resultMap2["text"], "Hello, Alice!", "Personalized greeting")
+		// 9. Verify personalized greeting
+		resultMap2, ok := result2.(map[string]interface{})
+		if !ok {
+			t.Fatalf("Expected map result, got %T", result2)
+		}
+		helper.AssertEqual(resultMap2["text"], "Hello, Alice!", "Personalized greeting")
 
-	// 10. Test compilation flow
-	sourceStr := string(source)
-	module, err := parseSource(sourceStr)
-	if err != nil {
-		t.Fatalf("Parse failed: %v", err)
-	}
+		// 10. Test compilation flow
+		sourceStr := string(source)
+		module, err := parseSource(sourceStr)
+		if err != nil {
+			t.Fatalf("Parse failed: %v", err)
+		}
 
-	comp := compiler.NewCompiler()
-	bytecode, err := comp.Compile(module)
-	helper.AssertNoError(err, "Compilation failed")
-	helper.AssertNotNil(bytecode, "Bytecode should not be nil")
+		comp := compiler.NewCompiler()
+		bytecode, err := comp.Compile(module)
+		helper.AssertNoError(err, "Compilation failed")
+		helper.AssertNotNil(bytecode, "Bytecode should not be nil")
 
-	// 11. Test VM execution
-	v := vm.NewVM()
-	vmResult, err := v.Execute(bytecode)
-	helper.AssertNoError(err, "VM execution failed")
-	helper.AssertNotNil(vmResult, "VM result should not be nil")
+		// 11. Test VM execution
+		v := vm.NewVM()
+		vmResult, err := v.Execute(bytecode)
+		helper.AssertNoError(err, "VM execution failed")
+		helper.AssertNotNil(vmResult, "VM result should not be nil")
 
-	t.Log("✓ Hello-world integration test passed")
+		t.Log("✓ Hello-world integration test passed")
 	*/
 }
 
@@ -91,49 +104,49 @@ func TestRestAPIIntegration(t *testing.T) {
 	t.Skip("Skipping until AST construction helpers are fixed for pure Go implementation")
 
 	/*
-	helper := NewTestHelper(t)
+		helper := NewTestHelper(t)
 
-	// Load rest-api example
-	examplePath := filepath.Join("..", "examples", "rest-api", "main.glyph")
-	source, err := os.ReadFile(examplePath)
-	if err != nil {
-		t.Skipf("Skipping - rest-api example not found: %v", err)
-		return
-	}
+		// Load rest-api example
+		examplePath := filepath.Join("..", "examples", "rest-api", "main.glyph")
+		source, err := os.ReadFile(examplePath)
+		if err != nil {
+			t.Skipf("Skipping - rest-api example not found: %v", err)
+			return
+		}
 
-	// Parse to AST (mock module for now)
-	module := createRestAPIModule()
+		// Parse to AST (mock module for now)
+		module := createRestAPIModule()
 
-	// Create interpreter
-	interp := interpreter.NewInterpreter()
-	err = interp.LoadModule(*module)
-	helper.AssertNoError(err, "Failed to load module")
+		// Create interpreter
+		interp := interpreter.NewInterpreter()
+		err = interp.LoadModule(*module)
+		helper.AssertNoError(err, "Failed to load module")
 
-	// Test /health endpoint
-	healthRoute := findRoute(module, "/health")
-	helper.AssertNotNil(healthRoute, "Should find /health route")
+		// Test /health endpoint
+		healthRoute := findRoute(module, "/health")
+		helper.AssertNotNil(healthRoute, "Should find /health route")
 
-	result, err := interp.ExecuteRouteSimple(healthRoute, map[string]string{})
-	helper.AssertNoError(err, "Failed to execute /health")
+		result, err := interp.ExecuteRouteSimple(healthRoute, map[string]string{})
+		helper.AssertNoError(err, "Failed to execute /health")
 
-	resultMap, ok := result.(map[string]interface{})
-	if ok {
-		helper.AssertEqual(resultMap["status"], "ok", "Health status")
-	}
+		resultMap, ok := result.(map[string]interface{})
+		if ok {
+			helper.AssertEqual(resultMap["status"], "ok", "Health status")
+		}
 
-	// Test compilation
-	sourceStr := string(source)
-	module, err := parseSource(sourceStr)
-	if err != nil {
-		t.Fatalf("Parse failed: %v", err)
-	}
+		// Test compilation
+		sourceStr := string(source)
+		module, err := parseSource(sourceStr)
+		if err != nil {
+			t.Fatalf("Parse failed: %v", err)
+		}
 
-	comp := compiler.NewCompiler()
-	bytecode, err := comp.Compile(module)
-	helper.AssertNoError(err, "REST API compilation failed")
-	helper.AssertNotNil(bytecode, "Bytecode should not be nil")
+		comp := compiler.NewCompiler()
+		bytecode, err := comp.Compile(module)
+		helper.AssertNoError(err, "REST API compilation failed")
+		helper.AssertNotNil(bytecode, "Bytecode should not be nil")
 
-	t.Log("✓ REST API integration test passed")
+		t.Log("✓ REST API integration test passed")
 	*/
 }
 
@@ -142,61 +155,61 @@ func TestPathParametersIntegration(t *testing.T) {
 	t.Skip("Skipping until AST construction helpers are fixed for pure Go implementation")
 
 	/*
-	helper := NewTestHelper(t)
+		helper := NewTestHelper(t)
 
-	// Create test module with path parameters
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.Route{
-				Path:   "/users/:id",
-				Method: interpreter.Get,
-				Body: []interpreter.Statement{
-					interpreter.ReturnStatement{
-						Value: interpreter.LiteralExpr{
-							Value: createMapLiteral(map[string]interface{}{
-								"id": interpreter.VariableExpr{Name: "id"},
-							}),
+		// Create test module with path parameters
+		module := &ast.Module{
+			Items: []ast.Item{
+				&ast.Route{
+					Path:   "/users/:id",
+					Method: ast.Get,
+					Body: []ast.Statement{
+						ast.ReturnStatement{
+							Value: ast.LiteralExpr{
+								Value: createMapLiteral(map[string]interface{}{
+									"id": ast.VariableExpr{Name: "id"},
+								}),
+							},
+						},
+					},
+				},
+				&ast.Route{
+					Path:   "/users/:userId/posts/:postId",
+					Method: ast.Get,
+					Body: []ast.Statement{
+						ast.ReturnStatement{
+							Value: ast.LiteralExpr{
+								Value: createMapLiteral(map[string]interface{}{
+									"userId": ast.VariableExpr{Name: "userId"},
+									"postId": ast.VariableExpr{Name: "postId"},
+								}),
+							},
 						},
 					},
 				},
 			},
-			&interpreter.Route{
-				Path:   "/users/:userId/posts/:postId",
-				Method: interpreter.Get,
-				Body: []interpreter.Statement{
-					interpreter.ReturnStatement{
-						Value: interpreter.LiteralExpr{
-							Value: createMapLiteral(map[string]interface{}{
-								"userId": interpreter.VariableExpr{Name: "userId"},
-								"postId": interpreter.VariableExpr{Name: "postId"},
-							}),
-						},
-					},
-				},
-			},
-		},
-	}
+		}
 
-	interp := interpreter.NewInterpreter()
-	err := interp.LoadModule(*module)
-	helper.AssertNoError(err, "Failed to load module")
+		interp := interpreter.NewInterpreter()
+		err := interp.LoadModule(*module)
+		helper.AssertNoError(err, "Failed to load module")
 
-	// Test single parameter
-	route1 := findRoute(module, "/users/:id")
-	result1, err := interp.ExecuteRouteSimple(route1, map[string]string{"id": "123"})
-	helper.AssertNoError(err, "Failed to execute /users/:id")
+		// Test single parameter
+		route1 := findRoute(module, "/users/:id")
+		result1, err := interp.ExecuteRouteSimple(route1, map[string]string{"id": "123"})
+		helper.AssertNoError(err, "Failed to execute /users/:id")
 
-	// Test multiple parameters
-	route2 := findRoute(module, "/users/:userId/posts/:postId")
-	result2, err := interp.ExecuteRouteSimple(route2, map[string]string{
-		"userId": "456",
-		"postId": "789",
-	})
-	helper.AssertNoError(err, "Failed to execute /users/:userId/posts/:postId")
-	_ = result1
-	_ = result2
+		// Test multiple parameters
+		route2 := findRoute(module, "/users/:userId/posts/:postId")
+		result2, err := interp.ExecuteRouteSimple(route2, map[string]string{
+			"userId": "456",
+			"postId": "789",
+		})
+		helper.AssertNoError(err, "Failed to execute /users/:userId/posts/:postId")
+		_ = result1
+		_ = result2
 
-	t.Log("✓ Path parameters integration test passed")
+		t.Log("✓ Path parameters integration test passed")
 	*/
 }
 
@@ -204,61 +217,61 @@ func TestPathParametersIntegration(t *testing.T) {
 func TestHTTPMethodsIntegration(t *testing.T) {
 	t.Skip("Skipping until AST construction helpers are fixed for pure Go implementation")
 	/*
-	helper := NewTestHelper(t)
+		helper := NewTestHelper(t)
 
-	// Create module with different HTTP methods
-	module := &interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.Route{
-				Path:   "/api/users",
-				Method: interpreter.Get,
-				Body: []interpreter.Statement{
-					interpreter.ReturnStatement{
-						Value: createArrayLiteral(),
+		// Create module with different HTTP methods
+		module := &ast.Module{
+			Items: []ast.Item{
+				&ast.Route{
+					Path:   "/api/users",
+					Method: ast.Get,
+					Body: []ast.Statement{
+						ast.ReturnStatement{
+							Value: createArrayLiteral(),
+						},
+					},
+				},
+				&ast.Route{
+					Path:   "/api/users",
+					Method: ast.Post,
+					Body: []ast.Statement{
+						ast.ReturnStatement{
+							Value: createMapLiteralSimple("created", true),
+						},
+					},
+				},
+				&ast.Route{
+					Path:   "/api/users/:id",
+					Method: ast.Put,
+					Body: []ast.Statement{
+						ast.ReturnStatement{
+							Value: createMapLiteralSimple("updated", true),
+						},
+					},
+				},
+				&ast.Route{
+					Path:   "/api/users/:id",
+					Method: ast.Delete,
+					Body: []ast.Statement{
+						ast.ReturnStatement{
+							Value: createMapLiteralSimple("deleted", true),
+						},
 					},
 				},
 			},
-			&interpreter.Route{
-				Path:   "/api/users",
-				Method: interpreter.Post,
-				Body: []interpreter.Statement{
-					interpreter.ReturnStatement{
-						Value: createMapLiteralSimple("created", true),
-					},
-				},
-			},
-			&interpreter.Route{
-				Path:   "/api/users/:id",
-				Method: interpreter.Put,
-				Body: []interpreter.Statement{
-					interpreter.ReturnStatement{
-						Value: createMapLiteralSimple("updated", true),
-					},
-				},
-			},
-			&interpreter.Route{
-				Path:   "/api/users/:id",
-				Method: interpreter.Delete,
-				Body: []interpreter.Statement{
-					interpreter.ReturnStatement{
-						Value: createMapLiteralSimple("deleted", true),
-					},
-				},
-			},
-		},
-	}
+		}
 
-	interp := interpreter.NewInterpreter()
-	err := interp.LoadModule(*module)
-	helper.AssertNoError(err, "Failed to load module")
+		interp := interpreter.NewInterpreter()
+		err := interp.LoadModule(*module)
+		helper.AssertNoError(err, "Failed to load module")
 
-	// Test each HTTP method
-	methods := []string{"GET", "POST", "PUT", "DELETE"}
-	for _, method := range methods {
-		t.Logf("Testing HTTP method: %s", method)
-	}
+		// Test each HTTP method
+		methods := []string{"GET", "POST", "PUT", "DELETE"}
+		for _, method := range methods {
+			t.Logf("Testing HTTP method: %s", method)
+		}
 
-	t.Log("✓ HTTP methods integration test passed")
+		t.Log("✓ HTTP methods integration test passed")
 	*/
 }
 
@@ -267,7 +280,7 @@ func TestServerIntegration(t *testing.T) {
 	helper := NewTestHelper(t)
 
 	// Create mock interpreter
-	mockInterp := &server.MockInterpreter{
+	mockInterp := &testMockInterpreter{
 		Response: map[string]interface{}{
 			"status": "ok",
 			"test":   true,
@@ -362,11 +375,11 @@ func TestJSONSerializationIntegration(t *testing.T) {
 
 	// Test response serialization
 	data := map[string]interface{}{
-		"id":    123,
-		"name":  "Test User",
-		"email": "test@example.com",
+		"id":     123,
+		"name":   "Test User",
+		"email":  "test@example.com",
 		"active": true,
-		"score": 95.5,
+		"score":  95.5,
 	}
 
 	jsonBytes, err := json.Marshal(data)
@@ -391,10 +404,10 @@ func TestExpressionEvaluationIntegration(t *testing.T) {
 	env := interpreter.NewEnvironment()
 
 	// Test string concatenation
-	expr := interpreter.BinaryOpExpr{
-		Op:    interpreter.Add,
-		Left:  interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "Hello, "}},
-		Right: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "World!"}},
+	expr := ast.BinaryOpExpr{
+		Op:    ast.Add,
+		Left:  ast.LiteralExpr{Value: ast.StringLiteral{Value: "Hello, "}},
+		Right: ast.LiteralExpr{Value: ast.StringLiteral{Value: "World!"}},
 	}
 
 	result, err := interp.EvaluateExpression(expr, env)
@@ -402,10 +415,10 @@ func TestExpressionEvaluationIntegration(t *testing.T) {
 	helper.AssertEqual(result, "Hello, World!", "String concatenation")
 
 	// Test integer addition
-	expr2 := interpreter.BinaryOpExpr{
-		Op:    interpreter.Add,
-		Left:  interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
-		Right: interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 20}},
+	expr2 := ast.BinaryOpExpr{
+		Op:    ast.Add,
+		Left:  ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
+		Right: ast.LiteralExpr{Value: ast.IntLiteral{Value: 20}},
 	}
 
 	result2, err := interp.EvaluateExpression(expr2, env)
@@ -414,7 +427,7 @@ func TestExpressionEvaluationIntegration(t *testing.T) {
 
 	// Test variable reference
 	env.Define("name", "Alice")
-	expr3 := interpreter.VariableExpr{Name: "name"}
+	expr3 := ast.VariableExpr{Name: "name"}
 	result3, err := interp.EvaluateExpression(expr3, env)
 	helper.AssertNoError(err, "Failed to evaluate variable")
 	helper.AssertEqual(result3, "Alice", "Variable reference")
@@ -513,53 +526,53 @@ func TestFixturesIntegration(t *testing.T) {
 // They will be reimplemented when proper AST construction is available
 
 /*
-func createHelloWorldModule() *interpreter.Module {
-	return &interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.TypeDef{
+func createHelloWorldModule() *ast.Module {
+	return &ast.Module{
+		Items: []ast.Item{
+			&ast.TypeDef{
 				Name: "Message",
-				Fields: []interpreter.Field{
-					{Name: "text", TypeAnnotation: interpreter.StringType{}, Required: true},
-					{Name: "timestamp", TypeAnnotation: interpreter.IntType{}, Required: true},
+				Fields: []ast.Field{
+					{Name: "text", TypeAnnotation: ast.StringType{}, Required: true},
+					{Name: "timestamp", TypeAnnotation: ast.IntType{}, Required: true},
 				},
 			},
-			&interpreter.Route{
+			&ast.Route{
 				Path:   "/hello",
-				Method: interpreter.Get,
-				Body: []interpreter.Statement{
-					interpreter.ReturnStatement{
-						Value: interpreter.LiteralExpr{
+				Method: ast.Get,
+				Body: []ast.Statement{
+					ast.ReturnStatement{
+						Value: ast.LiteralExpr{
 							Value: createMapLiteral(map[string]interface{}{
-								"text":      interpreter.StringLiteral{Value: "Hello, World!"},
-								"timestamp": interpreter.IntLiteral{Value: 1234567890},
+								"text":      ast.StringLiteral{Value: "Hello, World!"},
+								"timestamp": ast.IntLiteral{Value: 1234567890},
 							}),
 						},
 					},
 				},
 			},
-			&interpreter.Route{
+			&ast.Route{
 				Path:   "/greet/:name",
-				Method: interpreter.Get,
-				Body: []interpreter.Statement{
-					interpreter.AssignStatement{
+				Method: ast.Get,
+				Body: []ast.Statement{
+					ast.AssignStatement{
 						Target: "message",
-						Value: interpreter.LiteralExpr{
+						Value: ast.LiteralExpr{
 							Value: createMapLiteral(map[string]interface{}{
-								"text": interpreter.BinaryOpExpr{
-									Op:    interpreter.Add,
-									Left:  interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "Hello, "}},
-									Right: interpreter.BinaryOpExpr{
-										Op:    interpreter.Add,
-										Left:  interpreter.VariableExpr{Name: "name"},
-										Right: interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "!"}},
+								"text": ast.BinaryOpExpr{
+									Op:    ast.Add,
+									Left:  ast.LiteralExpr{Value: ast.StringLiteral{Value: "Hello, "}},
+									Right: ast.BinaryOpExpr{
+										Op:    ast.Add,
+										Left:  ast.VariableExpr{Name: "name"},
+										Right: ast.LiteralExpr{Value: ast.StringLiteral{Value: "!"}},
 									},
 								},
-								"timestamp": interpreter.FunctionCallExpr{Name: "time.now", Args: []interpreter.Expr{}},
+								"timestamp": ast.FunctionCallExpr{Name: "time.now", Args: []ast.Expr{}},
 							}),
 						},
 					},
-					interpreter.ReturnStatement{
-						Value: interpreter.VariableExpr{Name: "message"},
+					ast.ReturnStatement{
+						Value: ast.VariableExpr{Name: "message"},
 					},
 				},
 			},
@@ -567,26 +580,26 @@ func createHelloWorldModule() *interpreter.Module {
 	}
 }
 
-func createRestAPIModule() *interpreter.Module {
-	return &interpreter.Module{
-		Items: []interpreter.Item{
-			&interpreter.TypeDef{
+func createRestAPIModule() *ast.Module {
+	return &ast.Module{
+		Items: []ast.Item{
+			&ast.TypeDef{
 				Name: "User",
-				Fields: []interpreter.Field{
-					{Name: "id", TypeAnnotation: interpreter.IntType{}, Required: true},
-					{Name: "name", TypeAnnotation: interpreter.StringType{}, Required: true},
-					{Name: "email", TypeAnnotation: interpreter.StringType{}, Required: true},
+				Fields: []ast.Field{
+					{Name: "id", TypeAnnotation: ast.IntType{}, Required: true},
+					{Name: "name", TypeAnnotation: ast.StringType{}, Required: true},
+					{Name: "email", TypeAnnotation: ast.StringType{}, Required: true},
 				},
 			},
-			&interpreter.Route{
+			&ast.Route{
 				Path:   "/health",
-				Method: interpreter.Get,
-				Body: []interpreter.Statement{
-					interpreter.ReturnStatement{
-						Value: interpreter.LiteralExpr{
+				Method: ast.Get,
+				Body: []ast.Statement{
+					ast.ReturnStatement{
+						Value: ast.LiteralExpr{
 							Value: createMapLiteral(map[string]interface{}{
-								"status":    interpreter.StringLiteral{Value: "ok"},
-								"timestamp": interpreter.FunctionCallExpr{Name: "now", Args: []interpreter.Expr{}},
+								"status":    ast.StringLiteral{Value: "ok"},
+								"timestamp": ast.FunctionCallExpr{Name: "now", Args: []ast.Expr{}},
 							}),
 						},
 					},
@@ -596,9 +609,9 @@ func createRestAPIModule() *interpreter.Module {
 	}
 }
 
-func findRoute(module *interpreter.Module, path string) *interpreter.Route {
+func findRoute(module *ast.Module, path string) *ast.Route {
 	for _, item := range module.Items {
-		if route, ok := item.(**interpreter.Route); ok {
+		if route, ok := item.(**ast.Route); ok {
 			if route.Path == path {
 				return route
 			}
@@ -608,7 +621,7 @@ func findRoute(module *interpreter.Module, path string) *interpreter.Route {
 }
 
 /*
-// These helper types are commented out - they don't properly implement interpreter.Literal
+// These helper types are commented out - they don't properly implement ast.Literal
 // in the pure Go implementation and need to be redesigned
 type mapLiteral struct {
 	fields map[string]interface{}
@@ -620,14 +633,14 @@ func createMapLiteral(fields map[string]interface{}) mapLiteral {
 	return mapLiteral{fields: fields}
 }
 
-func createMapLiteralSimple(key string, value interface{}) interpreter.LiteralExpr {
-	return interpreter.LiteralExpr{
+func createMapLiteralSimple(key string, value interface{}) ast.LiteralExpr {
+	return ast.LiteralExpr{
 		Value: mapLiteral{fields: map[string]interface{}{key: value}},
 	}
 }
 
-func createArrayLiteral() interpreter.LiteralExpr {
-	return interpreter.LiteralExpr{
+func createArrayLiteral() ast.LiteralExpr {
+	return ast.LiteralExpr{
 		Value: arrayLiteral{},
 	}
 }

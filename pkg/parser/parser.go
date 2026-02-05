@@ -2,17 +2,20 @@ package parser
 
 import (
 	"fmt"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"strconv"
 	"strings"
-
-	"github.com/glyphlang/glyph/pkg/interpreter"
 )
+
+// maxParseDepth is the maximum nesting depth for recursive parsing to prevent stack overflow.
+const maxParseDepth = 500
 
 // Parser converts tokens to AST
 type Parser struct {
 	tokens   []Token
 	position int
 	source   string // Original source code for error messages
+	depth    int    // Current recursion depth
 }
 
 // NewParser creates a new Parser
@@ -34,8 +37,8 @@ func NewParserWithSource(tokens []Token, source string) *Parser {
 }
 
 // Parse parses tokens into a Module
-func (p *Parser) Parse() (*interpreter.Module, error) {
-	var items []interpreter.Item
+func (p *Parser) Parse() (*ast.Module, error) {
+	var items []ast.Item
 
 	for !p.isAtEnd() {
 		// Skip newlines at top level
@@ -128,10 +131,31 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 			}
 			items = append(items, item)
 		case IDENT:
-			// Check for "type" keyword as alternative syntax
-			if p.current().Literal == "type" {
+			// Check for "test" keyword (test blocks)
+			if p.current().Literal == "test" {
+				item, err := p.parseTestBlock()
+				if err != nil {
+					return nil, err
+				}
+				items = append(items, item)
+			} else if p.current().Literal == "type" {
+				// Check for "type" keyword as alternative syntax
 				p.advance() // consume "type"
 				item, err := p.parseTypeDefWithoutColon()
+				if err != nil {
+					return nil, err
+				}
+				items = append(items, item)
+			} else if p.current().Literal == "contract" {
+				p.advance() // consume "contract"
+				item, err := p.parseContract()
+				if err != nil {
+					return nil, err
+				}
+				items = append(items, item)
+			} else if p.current().Literal == "trait" {
+				p.advance() // consume "trait"
+				item, err := p.parseTrait()
 				if err != nil {
 					return nil, err
 				}
@@ -147,7 +171,7 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 				return nil, p.errorWithHint(
 					fmt.Sprintf("Unexpected token %s", p.current().Type),
 					p.current(),
-					"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'import', 'from', 'module', or 'const'",
+					"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'contract', 'trait', 'import', 'from', 'module', 'const', or 'test'",
 				)
 			}
 		case EOF:
@@ -156,16 +180,16 @@ func (p *Parser) Parse() (*interpreter.Module, error) {
 			return nil, p.errorWithHint(
 				fmt.Sprintf("Unexpected token %s", p.current().Type),
 				p.current(),
-				"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'import', 'from', 'module', or 'const'",
+				"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'contract', 'trait', 'import', 'from', 'module', 'const', or 'test'",
 			)
 		}
 	}
 
-	return &interpreter.Module{Items: items}, nil
+	return &ast.Module{Items: items}, nil
 }
 
-// parseTypeDef parses a type definition: : TypeName { fields } or : TypeName<T, U> { fields }
-func (p *Parser) parseTypeDef() (interpreter.Item, error) {
+// parseTypeDef parses a type definition: : TypeName { fields } or : TypeName impl Trait { fields, methods }
+func (p *Parser) parseTypeDef() (ast.Item, error) {
 	if err := p.expect(COLON); err != nil {
 		return nil, err
 	}
@@ -181,49 +205,27 @@ func (p *Parser) parseTypeDef() (interpreter.Item, error) {
 		return nil, err
 	}
 
-	// Get type parameter names for field parsing context
-	var typeParamNames []string
-	for _, tp := range typeParams {
-		typeParamNames = append(typeParamNames, tp.Name)
-	}
-
-	if err := p.expect(LBRACE); err != nil {
-		return nil, err
-	}
-
-	p.skipNewlines()
-
-	var fields []interpreter.Field
-
-	for !p.check(RBRACE) && !p.isAtEnd() {
-		p.skipNewlines()
-
-		if p.check(RBRACE) {
-			break
+	// Parse optional trait implementations: impl Trait1, Trait2
+	var traits []string
+	if p.check(IDENT) && p.current().Literal == "impl" {
+		p.advance() // consume "impl"
+		for {
+			traitName, err := p.expectIdent()
+			if err != nil {
+				return nil, err
+			}
+			traits = append(traits, traitName)
+			if !p.match(COMMA) {
+				break
+			}
 		}
-
-		field, err := p.parseFieldWithContext(typeParamNames)
-		if err != nil {
-			return nil, err
-		}
-		fields = append(fields, field)
-
-		p.skipNewlines()
 	}
 
-	if err := p.expect(RBRACE); err != nil {
-		return nil, err
-	}
-
-	return &interpreter.TypeDef{
-		Name:       name,
-		TypeParams: typeParams,
-		Fields:     fields,
-	}, nil
+	return p.parseTypeDefBody(name, typeParams, traits)
 }
 
 // parseTypeDefWithoutColon parses a type definition without leading colon: type TypeName { fields }
-func (p *Parser) parseTypeDefWithoutColon() (interpreter.Item, error) {
+func (p *Parser) parseTypeDefWithoutColon() (ast.Item, error) {
 	name, err := p.expectIdent()
 	if err != nil {
 		return nil, err
@@ -235,6 +237,29 @@ func (p *Parser) parseTypeDefWithoutColon() (interpreter.Item, error) {
 		return nil, err
 	}
 
+	// Parse optional trait implementations: impl Trait1, Trait2
+	var traits []string
+	if p.check(IDENT) && p.current().Literal == "impl" {
+		p.advance() // consume "impl"
+		for {
+			traitName, err := p.expectIdent()
+			if err != nil {
+				return nil, err
+			}
+			traits = append(traits, traitName)
+			if !p.match(COMMA) {
+				break
+			}
+		}
+	}
+
+	// Delegate to parseTypeDefBody (line 266) which handles fields, methods, and brace parsing
+	return p.parseTypeDefBody(name, typeParams, traits)
+}
+
+// parseTypeDefBody parses the body of a type definition (shared between parseTypeDef and parseTypeDefWithoutColon).
+// It handles fields, methods, and trait implementations.
+func (p *Parser) parseTypeDefBody(name string, typeParams []ast.TypeParameter, traits []string) (ast.Item, error) {
 	// Get type parameter names for field parsing context
 	var typeParamNames []string
 	for _, tp := range typeParams {
@@ -247,7 +272,8 @@ func (p *Parser) parseTypeDefWithoutColon() (interpreter.Item, error) {
 
 	p.skipNewlines()
 
-	var fields []interpreter.Field
+	var fields []ast.Field
+	var methods []ast.MethodDef
 
 	for !p.check(RBRACE) && !p.isAtEnd() {
 		p.skipNewlines()
@@ -256,11 +282,21 @@ func (p *Parser) parseTypeDefWithoutColon() (interpreter.Item, error) {
 			break
 		}
 
-		field, err := p.parseFieldWithContext(typeParamNames)
-		if err != nil {
-			return nil, err
+		// Check if this is a method definition: name(...) -> type { body }
+		// Methods have an identifier followed by LPAREN
+		if p.check(IDENT) && p.peek(1).Type == LPAREN {
+			method, err := p.parseMethodDef(typeParamNames)
+			if err != nil {
+				return nil, err
+			}
+			methods = append(methods, method)
+		} else {
+			field, err := p.parseFieldWithContext(typeParamNames)
+			if err != nil {
+				return nil, err
+			}
+			fields = append(fields, field)
 		}
-		fields = append(fields, field)
 
 		p.skipNewlines()
 	}
@@ -269,63 +305,306 @@ func (p *Parser) parseTypeDefWithoutColon() (interpreter.Item, error) {
 		return nil, err
 	}
 
-	return &interpreter.TypeDef{
+	return &ast.TypeDef{
 		Name:       name,
 		TypeParams: typeParams,
 		Fields:     fields,
+		Traits:     traits,
+		Methods:    methods,
+	}, nil
+}
+
+// parseMethodDef parses a method definition: name(params) -> returnType { body }
+func (p *Parser) parseMethodDef(typeParamNames []string) (ast.MethodDef, error) {
+	name, err := p.expectIdent()
+	if err != nil {
+		return ast.MethodDef{}, err
+	}
+
+	if err := p.expect(LPAREN); err != nil {
+		return ast.MethodDef{}, err
+	}
+
+	var params []ast.Field
+	for !p.check(RPAREN) && !p.isAtEnd() {
+		if len(params) > 0 {
+			if err := p.expect(COMMA); err != nil {
+				return ast.MethodDef{}, err
+			}
+		}
+		field, err := p.parseFieldWithContext(typeParamNames)
+		if err != nil {
+			return ast.MethodDef{}, err
+		}
+		params = append(params, field)
+	}
+
+	if err := p.expect(RPAREN); err != nil {
+		return ast.MethodDef{}, err
+	}
+
+	// Parse return type: -> type
+	var returnType ast.Type
+	if p.match(ARROW) {
+		returnType, _, err = p.parseTypeWithContext(typeParamNames)
+		if err != nil {
+			return ast.MethodDef{}, err
+		}
+	}
+
+	// Parse body
+	if err := p.expect(LBRACE); err != nil {
+		return ast.MethodDef{}, err
+	}
+	p.skipNewlines()
+
+	var body []ast.Statement
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		stmt, err := p.parseStatement()
+		if err != nil {
+			return ast.MethodDef{}, err
+		}
+		body = append(body, stmt)
+		p.skipNewlines()
+	}
+
+	if err := p.expect(RBRACE); err != nil {
+		return ast.MethodDef{}, err
+	}
+
+	return ast.MethodDef{
+		Name:       name,
+		Params:     params,
+		ReturnType: returnType,
+		Body:       body,
+	}, nil
+}
+
+// parseTrait parses a trait definition: trait Name { method signatures }
+func (p *Parser) parseTrait() (ast.Item, error) {
+	name, err := p.expectIdent()
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse optional generic type parameters
+	typeParams, err := p.parseTypeParameters()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := p.expect(LBRACE); err != nil {
+		return nil, err
+	}
+
+	p.skipNewlines()
+
+	var methods []ast.TraitMethodSignature
+
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		p.skipNewlines()
+
+		if p.check(RBRACE) {
+			break
+		}
+
+		method, err := p.parseTraitMethodSignature()
+		if err != nil {
+			return nil, err
+		}
+		methods = append(methods, method)
+
+		p.skipNewlines()
+	}
+
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
+	}
+
+	return &ast.TraitDef{
+		Name:       name,
+		TypeParams: typeParams,
+		Methods:    methods,
+	}, nil
+}
+
+// parseTraitMethodSignature parses a trait method signature: name(params) -> returnType
+func (p *Parser) parseTraitMethodSignature() (ast.TraitMethodSignature, error) {
+	name, err := p.expectIdent()
+	if err != nil {
+		return ast.TraitMethodSignature{}, err
+	}
+
+	if err := p.expect(LPAREN); err != nil {
+		return ast.TraitMethodSignature{}, err
+	}
+
+	var params []ast.Field
+	for !p.check(RPAREN) && !p.isAtEnd() {
+		if len(params) > 0 {
+			if err := p.expect(COMMA); err != nil {
+				return ast.TraitMethodSignature{}, err
+			}
+		}
+		field, err := p.parseField()
+		if err != nil {
+			return ast.TraitMethodSignature{}, err
+		}
+		params = append(params, field)
+	}
+
+	if err := p.expect(RPAREN); err != nil {
+		return ast.TraitMethodSignature{}, err
+	}
+
+	// Parse return type: -> type
+	var returnType ast.Type
+	if p.match(ARROW) {
+		returnType, _, err = p.parseType()
+		if err != nil {
+			return ast.TraitMethodSignature{}, err
+		}
+	}
+
+	return ast.TraitMethodSignature{
+		Name:       name,
+		Params:     params,
+		ReturnType: returnType,
 	}, nil
 }
 
 // parseField parses a field: name: type!
-func (p *Parser) parseField() (interpreter.Field, error) {
+func (p *Parser) parseField() (ast.Field, error) {
 	return p.parseFieldWithContext(nil)
 }
 
 // parseFieldWithContext parses a field with type parameter context: name: type! [= default]
-func (p *Parser) parseFieldWithContext(typeParamNames []string) (interpreter.Field, error) {
+func (p *Parser) parseFieldWithContext(typeParamNames []string) (ast.Field, error) {
 	name, err := p.expectIdent()
 	if err != nil {
-		return interpreter.Field{}, err
+		return ast.Field{}, err
 	}
 
 	if err := p.expect(COLON); err != nil {
-		return interpreter.Field{}, err
+		return ast.Field{}, err
 	}
 
 	typeAnnotation, required, err := p.parseTypeWithContext(typeParamNames)
 	if err != nil {
-		return interpreter.Field{}, err
+		return ast.Field{}, err
+	}
+
+	// Parse validation annotations: @minLen(2) @email @pattern("[A-Z]")
+	// Annotations are optional and follow the type declaration.
+	// The Annotations field on ast.Field is defined in ast.go.
+	var annotations []ast.FieldAnnotation
+	for p.check(AT) {
+		ann, parseErr := p.parseFieldAnnotation()
+		if parseErr != nil {
+			return ast.Field{}, parseErr
+		}
+		annotations = append(annotations, ann)
 	}
 
 	// Check for default value: = expr
-	var defaultValue interpreter.Expr
+	var defaultValue ast.Expr
 	if p.check(EQUALS) {
 		equalsToken := p.current()
 		p.advance()
 		defaultValue, err = p.parseExpr()
 		if err != nil {
-			return interpreter.Field{}, err
+			return ast.Field{}, err
 		}
 
 		// Validate literal default values against the declared type
 		if err := p.validateDefaultType(name, typeAnnotation, defaultValue, equalsToken); err != nil {
-			return interpreter.Field{}, err
+			return ast.Field{}, err
 		}
 	}
 
-	return interpreter.Field{
+	return ast.Field{
 		Name:           name,
 		TypeAnnotation: typeAnnotation,
 		Required:       required,
 		Default:        defaultValue,
+		Annotations:    annotations,
 	}, nil
+}
+
+// parseFieldAnnotation parses a single validation annotation like @minLen(2)
+// or @email. Returns an error if the annotation has invalid syntax.
+func (p *Parser) parseFieldAnnotation() (ast.FieldAnnotation, error) {
+	p.advance() // consume @
+
+	name, err := p.expectIdent()
+	if err != nil {
+		return ast.FieldAnnotation{}, err
+	}
+
+	ann := ast.FieldAnnotation{Name: name}
+
+	// Parse optional parameters: @minLen(2), @range(0, 150), @oneOf(["a", "b"])
+	if p.check(LPAREN) {
+		p.advance() // consume (
+		for !p.check(RPAREN) && !p.isAtEnd() {
+			tok := p.current()
+			switch tok.Type {
+			case INTEGER:
+				val, parseErr := strconv.ParseInt(tok.Literal, 10, 64)
+				if parseErr != nil {
+					return ast.FieldAnnotation{}, fmt.Errorf("line %d: invalid integer in annotation @%s: %s", tok.Line, name, tok.Literal)
+				}
+				ann.Params = append(ann.Params, val)
+				p.advance()
+			case FLOAT:
+				val, parseErr := strconv.ParseFloat(tok.Literal, 64)
+				if parseErr != nil {
+					return ast.FieldAnnotation{}, fmt.Errorf("line %d: invalid float in annotation @%s: %s", tok.Line, name, tok.Literal)
+				}
+				ann.Params = append(ann.Params, val)
+				p.advance()
+			case STRING:
+				ann.Params = append(ann.Params, tok.Literal)
+				p.advance()
+			case LBRACKET:
+				// Parse string array: ["a", "b", "c"]
+				p.advance() // consume [
+				var items []string
+				for !p.check(RBRACKET) && !p.isAtEnd() {
+					if p.check(COMMA) {
+						p.advance()
+						continue
+					}
+					if p.current().Type == STRING {
+						items = append(items, p.current().Literal)
+						p.advance()
+					} else {
+						return ast.FieldAnnotation{}, fmt.Errorf("line %d: expected string in annotation array, got %s", p.current().Line, p.current().Type.String())
+					}
+				}
+				if p.check(RBRACKET) {
+					p.advance() // consume ]
+				}
+				ann.Params = append(ann.Params, items)
+			case COMMA:
+				p.advance() // skip comma between parameters
+			default:
+				return ast.FieldAnnotation{}, fmt.Errorf("line %d: unexpected token in annotation @%s: %s", tok.Line, name, tok.Literal)
+			}
+		}
+		if err := p.expect(RPAREN); err != nil {
+			return ast.FieldAnnotation{}, err
+		}
+	}
+
+	return ann, nil
 }
 
 // validateDefaultType validates that a literal default value matches the declared type
 // For complex expressions (function calls, binary ops, etc.), validation is deferred to runtime
-func (p *Parser) validateDefaultType(fieldName string, declaredType interpreter.Type, defaultExpr interpreter.Expr, tok Token) error {
+func (p *Parser) validateDefaultType(fieldName string, declaredType ast.Type, defaultExpr ast.Expr, tok Token) error {
 	// Only validate literal expressions at parse time
-	litExpr, ok := defaultExpr.(interpreter.LiteralExpr)
+	litExpr, ok := defaultExpr.(ast.LiteralExpr)
 	if !ok {
 		// Complex expressions (function calls, binary ops, etc.) - defer to runtime
 		return nil
@@ -333,12 +612,12 @@ func (p *Parser) validateDefaultType(fieldName string, declaredType interpreter.
 
 	// Get the actual type from the declared type, unwrapping OptionalType if present
 	actualDeclaredType := declaredType
-	if optType, ok := declaredType.(interpreter.OptionalType); ok {
+	if optType, ok := declaredType.(ast.OptionalType); ok {
 		actualDeclaredType = optType.InnerType
 	}
 
 	// Handle built-in types that are parsed as NamedType
-	if namedType, ok := actualDeclaredType.(interpreter.NamedType); ok {
+	if namedType, ok := actualDeclaredType.(ast.NamedType); ok {
 		switch namedType.Name {
 		case "any", "object":
 			// 'any' and 'object' accept any literal - skip validation
@@ -347,7 +626,7 @@ func (p *Parser) validateDefaultType(fieldName string, declaredType interpreter.
 			// 'timestamp' is semantically an int - allow int literals
 			// Also allow string literals for ISO date parsing at runtime
 			switch litExpr.Value.(type) {
-			case interpreter.IntLiteral, interpreter.StringLiteral:
+			case ast.IntLiteral, ast.StringLiteral:
 				return nil
 			}
 			// Fall through to error for other literal types (bool, float, null)
@@ -358,41 +637,41 @@ func (p *Parser) validateDefaultType(fieldName string, declaredType interpreter.
 
 	// Check the literal type against the declared type
 	switch lit := litExpr.Value.(type) {
-	case interpreter.IntLiteral:
-		if _, ok := actualDeclaredType.(interpreter.IntType); !ok {
+	case ast.IntLiteral:
+		if _, ok := actualDeclaredType.(ast.IntType); !ok {
 			return p.errorWithHint(
 				fmt.Sprintf("default value type mismatch: field '%s' expects %s, got int", fieldName, typeToString(actualDeclaredType)),
 				tok,
 				"Ensure the default value matches the declared type",
 			)
 		}
-	case interpreter.StringLiteral:
-		if _, ok := actualDeclaredType.(interpreter.StringType); !ok {
+	case ast.StringLiteral:
+		if _, ok := actualDeclaredType.(ast.StringType); !ok {
 			return p.errorWithHint(
 				fmt.Sprintf("default value type mismatch: field '%s' expects %s, got string", fieldName, typeToString(actualDeclaredType)),
 				tok,
 				"Ensure the default value matches the declared type",
 			)
 		}
-	case interpreter.BoolLiteral:
-		if _, ok := actualDeclaredType.(interpreter.BoolType); !ok {
+	case ast.BoolLiteral:
+		if _, ok := actualDeclaredType.(ast.BoolType); !ok {
 			return p.errorWithHint(
 				fmt.Sprintf("default value type mismatch: field '%s' expects %s, got bool", fieldName, typeToString(actualDeclaredType)),
 				tok,
 				"Ensure the default value matches the declared type",
 			)
 		}
-	case interpreter.FloatLiteral:
-		if _, ok := actualDeclaredType.(interpreter.FloatType); !ok {
+	case ast.FloatLiteral:
+		if _, ok := actualDeclaredType.(ast.FloatType); !ok {
 			return p.errorWithHint(
 				fmt.Sprintf("default value type mismatch: field '%s' expects %s, got float", fieldName, typeToString(actualDeclaredType)),
 				tok,
 				"Ensure the default value matches the declared type",
 			)
 		}
-	case interpreter.NullLiteral:
+	case ast.NullLiteral:
 		// null is only valid for optional types
-		if _, ok := declaredType.(interpreter.OptionalType); !ok {
+		if _, ok := declaredType.(ast.OptionalType); !ok {
 			return p.errorWithHint(
 				fmt.Sprintf("default value type mismatch: field '%s' expects %s, got null (null is only valid for optional types)", fieldName, typeToString(declaredType)),
 				tok,
@@ -407,23 +686,23 @@ func (p *Parser) validateDefaultType(fieldName string, declaredType interpreter.
 }
 
 // typeToString returns a human-readable string representation of a type
-func typeToString(t interpreter.Type) string {
+func typeToString(t ast.Type) string {
 	switch t := t.(type) {
-	case interpreter.IntType:
+	case ast.IntType:
 		return "int"
-	case interpreter.StringType:
+	case ast.StringType:
 		return "str"
-	case interpreter.BoolType:
+	case ast.BoolType:
 		return "bool"
-	case interpreter.FloatType:
+	case ast.FloatType:
 		return "float"
-	case interpreter.ArrayType:
+	case ast.ArrayType:
 		return "[" + typeToString(t.ElementType) + "]"
-	case interpreter.OptionalType:
+	case ast.OptionalType:
 		return typeToString(t.InnerType) + "?"
-	case interpreter.NamedType:
+	case ast.NamedType:
 		return t.Name
-	case interpreter.GenericType:
+	case ast.GenericType:
 		// Handle generic types like List<int>
 		base := typeToString(t.BaseType)
 		if len(t.TypeArgs) > 0 {
@@ -434,9 +713,9 @@ func typeToString(t interpreter.Type) string {
 			return base + "<" + strings.Join(args, ", ") + ">"
 		}
 		return base
-	case interpreter.TypeParameterType:
+	case ast.TypeParameterType:
 		return t.Name
-	case interpreter.FunctionType:
+	case ast.FunctionType:
 		params := make([]string, len(t.ParamTypes))
 		for i, param := range t.ParamTypes {
 			params[i] = typeToString(param)
@@ -449,7 +728,7 @@ func typeToString(t interpreter.Type) string {
 
 // validateFunctionParams validates that required parameters come before optional ones
 // This ensures positional argument passing works correctly
-func (p *Parser) validateFunctionParams(params []interpreter.Field) error {
+func (p *Parser) validateFunctionParams(params []ast.Field) error {
 	sawOptional := false
 	for _, param := range params {
 		hasDefault := param.Default != nil
@@ -466,14 +745,14 @@ func (p *Parser) validateFunctionParams(params []interpreter.Field) error {
 }
 
 // parseType parses a type annotation
-func (p *Parser) parseType() (interpreter.Type, bool, error) {
+func (p *Parser) parseType() (ast.Type, bool, error) {
 	return p.parseTypeWithContext(nil)
 }
 
 // parseSingleType parses a single type (without union handling) with optional type parameter context
 // This is used within union type parsing to avoid nested unions
-func (p *Parser) parseSingleType(typeParamNames []string) (interpreter.Type, error) {
-	var baseType interpreter.Type
+func (p *Parser) parseSingleType(typeParamNames []string) (ast.Type, error) {
+	var baseType ast.Type
 
 	// Check for function type: (T) -> U or (int, string) -> bool
 	if p.check(LPAREN) {
@@ -492,7 +771,7 @@ func (p *Parser) parseSingleType(typeParamNames []string) (interpreter.Type, err
 		if err := p.expect(RBRACKET); err != nil {
 			return nil, err
 		}
-		baseType = interpreter.ArrayType{ElementType: elemType}
+		baseType = ast.ArrayType{ElementType: elemType}
 	} else if !p.check(IDENT) {
 		return nil, p.typeError(
 			fmt.Sprintf("Expected type name, but found %s", p.current().Type),
@@ -512,19 +791,19 @@ func (p *Parser) parseSingleType(typeParamNames []string) (interpreter.Type, err
 		}
 
 		if isTypeParam {
-			baseType = interpreter.TypeParameterType{Name: typeName}
+			baseType = ast.TypeParameterType{Name: typeName}
 		} else {
 			switch typeName {
 			case "int":
-				baseType = interpreter.IntType{}
+				baseType = ast.IntType{}
 			case "str", "string":
-				baseType = interpreter.StringType{}
+				baseType = ast.StringType{}
 			case "bool":
-				baseType = interpreter.BoolType{}
+				baseType = ast.BoolType{}
 			case "float":
-				baseType = interpreter.FloatType{}
+				baseType = ast.FloatType{}
 			default:
-				baseType = interpreter.NamedType{Name: typeName}
+				baseType = ast.NamedType{Name: typeName}
 			}
 		}
 
@@ -534,7 +813,7 @@ func (p *Parser) parseSingleType(typeParamNames []string) (interpreter.Type, err
 			if err != nil {
 				return nil, err
 			}
-			baseType = interpreter.GenericType{
+			baseType = ast.GenericType{
 				BaseType: baseType,
 				TypeArgs: typeArgs,
 			}
@@ -546,7 +825,7 @@ func (p *Parser) parseSingleType(typeParamNames []string) (interpreter.Type, err
 
 			// If there's a type inside brackets, it's a generic type with parameters
 			if !p.check(RBRACKET) {
-				var typeArgs []interpreter.Type
+				var typeArgs []ast.Type
 				for {
 					argType, _, err := p.parseTypeWithContext(typeParamNames)
 					if err != nil {
@@ -563,14 +842,14 @@ func (p *Parser) parseSingleType(typeParamNames []string) (interpreter.Type, err
 					return nil, err
 				}
 
-				baseType = interpreter.GenericType{
+				baseType = ast.GenericType{
 					BaseType: baseType,
 					TypeArgs: typeArgs,
 				}
 			} else {
 				// Empty brackets like int[] - treat as array type
 				p.advance() // consume ]
-				baseType = interpreter.ArrayType{ElementType: baseType}
+				baseType = ast.ArrayType{ElementType: baseType}
 			}
 		}
 	}
@@ -578,7 +857,7 @@ func (p *Parser) parseSingleType(typeParamNames []string) (interpreter.Type, err
 	// Check for optional marker (?)
 	if p.check(QUESTION) {
 		p.advance()
-		baseType = interpreter.OptionalType{InnerType: baseType}
+		baseType = ast.OptionalType{InnerType: baseType}
 	}
 
 	// Note: No union type handling here - that's handled in parseTypeWithContext
@@ -588,8 +867,8 @@ func (p *Parser) parseSingleType(typeParamNames []string) (interpreter.Type, err
 
 // parseTypeWithContext parses a type annotation with optional type parameter context
 // The typeParamNames parameter contains names of type parameters in scope (for generic definitions)
-func (p *Parser) parseTypeWithContext(typeParamNames []string) (interpreter.Type, bool, error) {
-	var baseType interpreter.Type
+func (p *Parser) parseTypeWithContext(typeParamNames []string) (ast.Type, bool, error) {
+	var baseType ast.Type
 	required := false
 
 	// Check for function type: (T) -> U or (int, string) -> bool
@@ -609,7 +888,7 @@ func (p *Parser) parseTypeWithContext(typeParamNames []string) (interpreter.Type
 		if err := p.expect(RBRACKET); err != nil {
 			return nil, false, err
 		}
-		baseType = interpreter.ArrayType{ElementType: elemType}
+		baseType = ast.ArrayType{ElementType: elemType}
 	} else if !p.check(IDENT) {
 		return nil, false, p.typeError(
 			fmt.Sprintf("Expected type name, but found %s", p.current().Type),
@@ -642,19 +921,19 @@ func (p *Parser) parseTypeWithContext(typeParamNames []string) (interpreter.Type
 		}
 
 		if isTypeParam {
-			baseType = interpreter.TypeParameterType{Name: typeName}
+			baseType = ast.TypeParameterType{Name: typeName}
 		} else {
 			switch typeName {
 			case "int":
-				baseType = interpreter.IntType{}
+				baseType = ast.IntType{}
 			case "str", "string":
-				baseType = interpreter.StringType{}
+				baseType = ast.StringType{}
 			case "bool":
-				baseType = interpreter.BoolType{}
+				baseType = ast.BoolType{}
 			case "float":
-				baseType = interpreter.FloatType{}
+				baseType = ast.FloatType{}
 			default:
-				baseType = interpreter.NamedType{Name: typeName}
+				baseType = ast.NamedType{Name: typeName}
 			}
 		}
 
@@ -664,7 +943,7 @@ func (p *Parser) parseTypeWithContext(typeParamNames []string) (interpreter.Type
 			if err != nil {
 				return nil, false, err
 			}
-			baseType = interpreter.GenericType{
+			baseType = ast.GenericType{
 				BaseType: baseType,
 				TypeArgs: typeArgs,
 			}
@@ -676,7 +955,7 @@ func (p *Parser) parseTypeWithContext(typeParamNames []string) (interpreter.Type
 
 			// If there's a type inside brackets, it's a generic type with parameters
 			if !p.check(RBRACKET) {
-				var typeArgs []interpreter.Type
+				var typeArgs []ast.Type
 				for {
 					argType, _, err := p.parseTypeWithContext(typeParamNames)
 					if err != nil {
@@ -693,14 +972,14 @@ func (p *Parser) parseTypeWithContext(typeParamNames []string) (interpreter.Type
 					return nil, false, err
 				}
 
-				baseType = interpreter.GenericType{
+				baseType = ast.GenericType{
 					BaseType: baseType,
 					TypeArgs: typeArgs,
 				}
 			} else {
 				// Empty brackets like int[] - treat as array type
 				p.advance() // consume ]
-				baseType = interpreter.ArrayType{ElementType: baseType}
+				baseType = ast.ArrayType{ElementType: baseType}
 			}
 		}
 	}
@@ -708,12 +987,12 @@ func (p *Parser) parseTypeWithContext(typeParamNames []string) (interpreter.Type
 	// Check for optional marker (?)
 	if p.check(QUESTION) {
 		p.advance()
-		baseType = interpreter.OptionalType{InnerType: baseType}
+		baseType = ast.OptionalType{InnerType: baseType}
 	}
 
 	// Check for union types (e.g., User | Error)
 	if p.check(PIPE) {
-		types := []interpreter.Type{baseType}
+		types := []ast.Type{baseType}
 		for p.check(PIPE) {
 			p.advance() // consume |
 			// Parse single type without union handling to avoid nested unions
@@ -723,7 +1002,7 @@ func (p *Parser) parseTypeWithContext(typeParamNames []string) (interpreter.Type
 			}
 			types = append(types, nextType)
 		}
-		baseType = interpreter.UnionType{Types: types}
+		baseType = ast.UnionType{Types: types}
 	}
 
 	// Check for required marker
@@ -736,13 +1015,13 @@ func (p *Parser) parseTypeWithContext(typeParamNames []string) (interpreter.Type
 }
 
 // parseTypeArguments parses generic type arguments: <int, string>
-func (p *Parser) parseTypeArguments(typeParamNames []string) ([]interpreter.Type, error) {
+func (p *Parser) parseTypeArguments(typeParamNames []string) ([]ast.Type, error) {
 	if !p.check(LESS) {
 		return nil, nil
 	}
 	p.advance() // consume <
 
-	var typeArgs []interpreter.Type
+	var typeArgs []ast.Type
 	for {
 		argType, _, err := p.parseTypeWithContext(typeParamNames)
 		if err != nil {
@@ -763,13 +1042,13 @@ func (p *Parser) parseTypeArguments(typeParamNames []string) ([]interpreter.Type
 }
 
 // parseTypeParameters parses generic type parameter declarations: <T, U: Constraint>
-func (p *Parser) parseTypeParameters() ([]interpreter.TypeParameter, error) {
+func (p *Parser) parseTypeParameters() ([]ast.TypeParameter, error) {
 	if !p.check(LESS) {
 		return nil, nil
 	}
 	p.advance() // consume <
 
-	var params []interpreter.TypeParameter
+	var params []ast.TypeParameter
 	for {
 		if !p.check(IDENT) {
 			return nil, p.typeError(
@@ -781,7 +1060,7 @@ func (p *Parser) parseTypeParameters() ([]interpreter.TypeParameter, error) {
 		paramName := p.current().Literal
 		p.advance()
 
-		var constraint interpreter.Type
+		var constraint ast.Type
 
 		// Check for constraint: T: Comparable or T extends Comparable
 		if p.check(COLON) {
@@ -814,7 +1093,7 @@ func (p *Parser) parseTypeParameters() ([]interpreter.TypeParameter, error) {
 			constraint = constraintType
 		}
 
-		params = append(params, interpreter.TypeParameter{
+		params = append(params, ast.TypeParameter{
 			Name:       paramName,
 			Constraint: constraint,
 		})
@@ -832,12 +1111,12 @@ func (p *Parser) parseTypeParameters() ([]interpreter.TypeParameter, error) {
 }
 
 // parseFunctionType parses a function type signature: (T) -> U or (int, string) -> bool
-func (p *Parser) parseFunctionType(typeParamNames []string) (interpreter.Type, error) {
+func (p *Parser) parseFunctionType(typeParamNames []string) (ast.Type, error) {
 	if err := p.expect(LPAREN); err != nil {
 		return nil, err
 	}
 
-	var paramTypes []interpreter.Type
+	var paramTypes []ast.Type
 
 	// Parse parameter types
 	if !p.check(RPAREN) {
@@ -869,14 +1148,14 @@ func (p *Parser) parseFunctionType(typeParamNames []string) (interpreter.Type, e
 		return nil, err
 	}
 
-	return interpreter.FunctionType{
+	return ast.FunctionType{
 		ParamTypes: paramTypes,
 		ReturnType: returnType,
 	}, nil
 }
 
 // parseRoute parses a route definition or WebSocket route
-func (p *Parser) parseRoute() (interpreter.Item, error) {
+func (p *Parser) parseRoute() (ast.Item, error) {
 	if err := p.expect(AT); err != nil {
 		return nil, err
 	}
@@ -902,33 +1181,44 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 		return p.parseEventHandler()
 	case "queue", "worker":
 		return p.parseQueueWorker()
+	case "rpc", "grpc":
+		return p.parseGRPC()
+	case "query":
+		return p.parseGraphQLResolver(ast.GraphQLQuery)
+	case "mutation":
+		return p.parseGraphQLResolver(ast.GraphQLMutation)
+	case "subscription":
+		return p.parseGraphQLResolver(ast.GraphQLSubscription)
 	}
 
 	// Check for HTTP method shorthand: @ GET /path
-	var methodFromKeyword interpreter.HttpMethod
+	var methodFromKeyword ast.HttpMethod
 	var hasMethodKeyword bool
 	switch strings.ToUpper(routeKw) {
 	case "GET":
-		methodFromKeyword = interpreter.Get
+		methodFromKeyword = ast.Get
 		hasMethodKeyword = true
 	case "POST":
-		methodFromKeyword = interpreter.Post
+		methodFromKeyword = ast.Post
 		hasMethodKeyword = true
 	case "PUT":
-		methodFromKeyword = interpreter.Put
+		methodFromKeyword = ast.Put
 		hasMethodKeyword = true
 	case "DELETE":
-		methodFromKeyword = interpreter.Delete
+		methodFromKeyword = ast.Delete
 		hasMethodKeyword = true
 	case "PATCH":
-		methodFromKeyword = interpreter.Patch
+		methodFromKeyword = ast.Patch
+		hasMethodKeyword = true
+	case "SSE":
+		methodFromKeyword = ast.SSE
 		hasMethodKeyword = true
 	case "ROUTE":
 		// Standard syntax
 		hasMethodKeyword = false
 	default:
 		return nil, p.routeError(
-			fmt.Sprintf("Expected 'route', 'ws', 'websocket', or HTTP method after '@', but found '%s'", routeKw),
+			fmt.Sprintf("Expected 'route', 'ws', 'websocket', 'sse', 'rpc', 'query', 'mutation', 'subscription', or HTTP method after '@', but found '%s'", routeKw),
 			p.tokens[p.position-1],
 		)
 	}
@@ -997,13 +1287,13 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 	}
 
 	// Parse HTTP method
-	var method interpreter.HttpMethod
+	var method ast.HttpMethod
 	if hasMethodKeyword {
 		// Method was specified as keyword: @ GET /path
 		method = methodFromKeyword
 	} else {
 		// Default or parse from [METHOD] syntax
-		method = interpreter.Get
+		method = ast.Get
 		if p.check(LBRACKET) {
 			p.advance()
 			methodName, err := p.expectIdent()
@@ -1021,7 +1311,7 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 	}
 
 	// Parse optional return type -> Type
-	var returnType interpreter.Type
+	var returnType ast.Type
 	if p.check(ARROW) {
 		p.advance()
 		returnType, _, err = p.parseType()
@@ -1033,12 +1323,12 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 	p.skipNewlines()
 
 	// Parse route body - braces required
-	var auth *interpreter.AuthConfig
-	var rateLimit *interpreter.RateLimit
-	var injections []interpreter.Injection
-	var queryParams []interpreter.QueryParamDecl
-	var body []interpreter.Statement
-	var inputType interpreter.Type
+	var auth *ast.AuthConfig
+	var rateLimit *ast.RateLimit
+	var injections []ast.Injection
+	var queryParams []ast.QueryParamDecl
+	var body []ast.Statement
+	var inputType ast.Type
 
 	if !p.check(LBRACE) {
 		return nil, p.errorWithHint(
@@ -1098,7 +1388,7 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 			if err != nil {
 				return nil, err
 			}
-			injections = append(injections, interpreter.Injection{
+			injections = append(injections, ast.Injection{
 				Name: injName,
 				Type: injType,
 			})
@@ -1195,7 +1485,7 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 		return nil, err
 	}
 
-	return &interpreter.Route{
+	return &ast.Route{
 		Path:        path,
 		Method:      method,
 		InputType:   inputType,
@@ -1210,41 +1500,42 @@ func (p *Parser) parseRoute() (interpreter.Item, error) {
 
 // parseQueryParamDecl parses a query parameter declaration: ? name: type [= default]
 // Examples:
-//   ? page: int = 1
-//   ? q: str!
-//   ? tags: str[]
-func (p *Parser) parseQueryParamDecl() (interpreter.QueryParamDecl, error) {
+//
+//	? page: int = 1
+//	? q: str!
+//	? tags: str[]
+func (p *Parser) parseQueryParamDecl() (ast.QueryParamDecl, error) {
 	name, err := p.expectIdent()
 	if err != nil {
-		return interpreter.QueryParamDecl{}, err
+		return ast.QueryParamDecl{}, err
 	}
 
 	if err := p.expect(COLON); err != nil {
-		return interpreter.QueryParamDecl{}, err
+		return ast.QueryParamDecl{}, err
 	}
 
 	typeAnnotation, required, err := p.parseType()
 	if err != nil {
-		return interpreter.QueryParamDecl{}, err
+		return ast.QueryParamDecl{}, err
 	}
 
 	// Check if it's an array type
 	isArray := false
-	if _, ok := typeAnnotation.(interpreter.ArrayType); ok {
+	if _, ok := typeAnnotation.(ast.ArrayType); ok {
 		isArray = true
 	}
 
 	// Check for default value
-	var defaultValue interpreter.Expr
+	var defaultValue ast.Expr
 	if p.check(EQUALS) {
 		p.advance()
 		defaultValue, err = p.parseExpr()
 		if err != nil {
-			return interpreter.QueryParamDecl{}, err
+			return ast.QueryParamDecl{}, err
 		}
 	}
 
-	return interpreter.QueryParamDecl{
+	return ast.QueryParamDecl{
 		Name:     name,
 		Type:     typeAnnotation,
 		Required: required,
@@ -1255,7 +1546,7 @@ func (p *Parser) parseQueryParamDecl() (interpreter.QueryParamDecl, error) {
 
 // parseWebSocketRoute parses a WebSocket route definition
 // Syntax: @ ws /path { on connect {...} on message {...} on disconnect {...} }
-func (p *Parser) parseWebSocketRoute() (interpreter.Item, error) {
+func (p *Parser) parseWebSocketRoute() (ast.Item, error) {
 	// Parse path
 	var path string
 	if p.check(SLASH) {
@@ -1308,7 +1599,7 @@ func (p *Parser) parseWebSocketRoute() (interpreter.Item, error) {
 
 	p.skipNewlines()
 
-	var events []interpreter.WebSocketEvent
+	var events []ast.WebSocketEvent
 
 	// Parse event handlers: on connect {...}, on message {...}, on disconnect {...}
 	for !p.check(RBRACE) && !p.isAtEnd() {
@@ -1322,16 +1613,16 @@ func (p *Parser) parseWebSocketRoute() (interpreter.Item, error) {
 			}
 
 			// Map event name to type
-			var eventType interpreter.WebSocketEventType
+			var eventType ast.WebSocketEventType
 			switch eventName {
 			case "connect":
-				eventType = interpreter.WSEventConnect
+				eventType = ast.WSEventConnect
 			case "message":
-				eventType = interpreter.WSEventMessage
+				eventType = ast.WSEventMessage
 			case "disconnect":
-				eventType = interpreter.WSEventDisconnect
+				eventType = ast.WSEventDisconnect
 			case "error":
-				eventType = interpreter.WSEventError
+				eventType = ast.WSEventError
 			default:
 				return nil, p.errorWithHint(
 					fmt.Sprintf("Unknown WebSocket event '%s'", eventName),
@@ -1352,7 +1643,7 @@ func (p *Parser) parseWebSocketRoute() (interpreter.Item, error) {
 			p.skipNewlines()
 
 			// Parse handler body
-			var handlerBody []interpreter.Statement
+			var handlerBody []ast.Statement
 			for !p.check(RBRACE) && !p.isAtEnd() {
 				stmt, err := p.parseStatement()
 				if err != nil {
@@ -1367,7 +1658,7 @@ func (p *Parser) parseWebSocketRoute() (interpreter.Item, error) {
 			}
 
 			// Add event handler
-			events = append(events, interpreter.WebSocketEvent{
+			events = append(events, ast.WebSocketEvent{
 				EventType: eventType,
 				Body:      handlerBody,
 			})
@@ -1382,25 +1673,25 @@ func (p *Parser) parseWebSocketRoute() (interpreter.Item, error) {
 		return nil, err
 	}
 
-	return &interpreter.WebSocketRoute{
+	return &ast.WebSocketRoute{
 		Path:   path,
 		Events: events,
 	}, nil
 }
 
 // parseHTTPMethod parses an HTTP method string
-func (p *Parser) parseHTTPMethod(method string) (interpreter.HttpMethod, error) {
+func (p *Parser) parseHTTPMethod(method string) (ast.HttpMethod, error) {
 	switch strings.ToUpper(method) {
 	case "GET":
-		return interpreter.Get, nil
+		return ast.Get, nil
 	case "POST":
-		return interpreter.Post, nil
+		return ast.Post, nil
 	case "PUT":
-		return interpreter.Put, nil
+		return ast.Put, nil
 	case "DELETE":
-		return interpreter.Delete, nil
+		return ast.Delete, nil
 	case "PATCH":
-		return interpreter.Patch, nil
+		return ast.Patch, nil
 	default:
 		return 0, p.errorWithHint(
 			fmt.Sprintf("Unknown HTTP method: %s", method),
@@ -1411,7 +1702,7 @@ func (p *Parser) parseHTTPMethod(method string) (interpreter.HttpMethod, error) 
 }
 
 // parseAuthConfig parses auth middleware: auth(jwt)
-func (p *Parser) parseAuthConfig() (*interpreter.AuthConfig, error) {
+func (p *Parser) parseAuthConfig() (*ast.AuthConfig, error) {
 	if err := p.expect(LPAREN); err != nil {
 		return nil, err
 	}
@@ -1430,14 +1721,14 @@ func (p *Parser) parseAuthConfig() (*interpreter.AuthConfig, error) {
 		return nil, err
 	}
 
-	return &interpreter.AuthConfig{
+	return &ast.AuthConfig{
 		AuthType: authType,
 		Required: true,
 	}, nil
 }
 
 // parseRateLimit parses rate limit middleware: ratelimit(100/min)
-func (p *Parser) parseRateLimit() (*interpreter.RateLimit, error) {
+func (p *Parser) parseRateLimit() (*ast.RateLimit, error) {
 	if err := p.expect(LPAREN); err != nil {
 		return nil, err
 	}
@@ -1486,14 +1777,14 @@ func (p *Parser) parseRateLimit() (*interpreter.RateLimit, error) {
 		return nil, err
 	}
 
-	return &interpreter.RateLimit{
+	return &ast.RateLimit{
 		Requests: requests,
 		Window:   window,
 	}, nil
 }
 
 // parseStatement parses a statement
-func (p *Parser) parseStatement() (interpreter.Statement, error) {
+func (p *Parser) parseStatement() (ast.Statement, error) {
 	switch p.current().Type {
 	case QUESTION:
 		// ? validate_fn(args)
@@ -1509,7 +1800,7 @@ func (p *Parser) parseStatement() (interpreter.Statement, error) {
 			return nil, err
 		}
 
-		var args []interpreter.Expr
+		var args []ast.Expr
 		for !p.check(RPAREN) && !p.isAtEnd() {
 			arg, err := p.parseExpr()
 			if err != nil {
@@ -1526,8 +1817,8 @@ func (p *Parser) parseStatement() (interpreter.Statement, error) {
 			return nil, err
 		}
 
-		return interpreter.ValidationStatement{
-			Call: interpreter.FunctionCallExpr{
+		return ast.ValidationStatement{
+			Call: ast.FunctionCallExpr{
 				Name: funcName,
 				Args: args,
 			},
@@ -1554,11 +1845,28 @@ func (p *Parser) parseStatement() (interpreter.Statement, error) {
 			if !p.check(EQUALS) {
 				// Variable declaration without initialization
 				// Use a default value based on context (for now, use empty string)
-				return interpreter.AssignStatement{
+				return ast.AssignStatement{
 					Target: varName,
-					Value:  interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: ""}},
+					Value:  ast.LiteralExpr{Value: ast.StringLiteral{Value: ""}},
 				}, nil
 			}
+		}
+
+		// Check for index assignment: $ arr[0] = value or $ obj.field[0] = value
+		if p.check(LBRACKET) {
+			base := ast.VariableExpr{Name: varName}
+			lvalue, err := p.parseLValueExpr(base)
+			if err != nil {
+				return nil, err
+			}
+			if err := p.expect(EQUALS); err != nil {
+				return nil, err
+			}
+			value, err := p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+			return ast.IndexAssignStatement{Target: lvalue, Value: value}, nil
 		}
 
 		// Check for field access: obj.field or obj.field.subfield
@@ -1569,6 +1877,27 @@ func (p *Parser) parseStatement() (interpreter.Statement, error) {
 			if err != nil {
 				return nil, err
 			}
+
+			// Check for index assignment after field: $ obj.field[0] = value
+			if p.check(LBRACKET) {
+				base := ast.FieldAccessExpr{
+					Object: ast.VariableExpr{Name: target},
+					Field:  fieldName,
+				}
+				lvalue, err := p.parseLValueExpr(base)
+				if err != nil {
+					return nil, err
+				}
+				if err := p.expect(EQUALS); err != nil {
+					return nil, err
+				}
+				value, err := p.parseExpr()
+				if err != nil {
+					return nil, err
+				}
+				return ast.IndexAssignStatement{Target: lvalue, Value: value}, nil
+			}
+
 			target = target + "." + fieldName
 		}
 
@@ -1581,7 +1910,7 @@ func (p *Parser) parseStatement() (interpreter.Statement, error) {
 			return nil, err
 		}
 
-		return interpreter.AssignStatement{
+		return ast.AssignStatement{
 			Target: target,
 			Value:  value,
 		}, nil
@@ -1594,7 +1923,7 @@ func (p *Parser) parseStatement() (interpreter.Statement, error) {
 			return nil, err
 		}
 
-		return interpreter.ReturnStatement{
+		return ast.ReturnStatement{
 			Value: value,
 		}, nil
 
@@ -1622,9 +1951,9 @@ func (p *Parser) parseStatement() (interpreter.Statement, error) {
 				}
 
 				if !p.check(EQUALS) {
-					return interpreter.AssignStatement{
+					return ast.AssignStatement{
 						Target: varName,
-						Value:  interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: ""}},
+						Value:  ast.LiteralExpr{Value: ast.StringLiteral{Value: ""}},
 					}, nil
 				}
 			}
@@ -1638,7 +1967,7 @@ func (p *Parser) parseStatement() (interpreter.Statement, error) {
 				return nil, err
 			}
 
-			return interpreter.AssignStatement{
+			return ast.AssignStatement{
 				Target: varName,
 				Value:  value,
 			}, nil
@@ -1651,7 +1980,41 @@ func (p *Parser) parseStatement() (interpreter.Statement, error) {
 			if err != nil {
 				return nil, err
 			}
-			return interpreter.ReturnStatement{Value: value}, nil
+			return ast.ReturnStatement{Value: value}, nil
+		}
+
+		// Check for "yield" keyword (SSE event emission)
+		if p.current().Literal == "yield" {
+			p.advance() // consume "yield"
+			value, err := p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+			return ast.YieldStatement{Value: value}, nil
+		}
+
+		// Speculative parse for index assignment: identifier[index] = expr
+		// If the next token is LBRACKET, try to parse an l-value chain followed by "=".
+		// On failure (parse error or no "=" after l-value), restore position and fall
+		// through to other statement paths (bare assignment, expression statement).
+		if p.peek(1).Type == LBRACKET {
+			savedPos := p.position
+			name := p.current().Literal
+			p.advance() // consume identifier
+			base := ast.VariableExpr{Name: name}
+			lvalue, err := p.parseLValueExpr(base)
+			if err != nil {
+				p.position = savedPos
+			} else if p.check(EQUALS) {
+				p.advance() // consume =
+				value, valErr := p.parseExpr()
+				if valErr != nil {
+					return nil, valErr
+				}
+				return ast.IndexAssignStatement{Target: lvalue, Value: value}, nil
+			} else {
+				p.position = savedPos
+			}
 		}
 
 		// Check for bare assignment (reassignment): identifier = expr
@@ -1669,8 +2032,8 @@ func (p *Parser) parseStatement() (interpreter.Statement, error) {
 
 		// Only allow certain expressions as statements (function calls, method calls)
 		switch expr.(type) {
-		case interpreter.FunctionCallExpr, interpreter.FieldAccessExpr:
-			return interpreter.ExpressionStatement{Expr: expr}, nil
+		case ast.FunctionCallExpr, ast.FieldAccessExpr:
+			return ast.ExpressionStatement{Expr: expr}, nil
 		default:
 			return nil, p.errorWithHint(
 				fmt.Sprintf("Unexpected identifier in statement position: %s", p.current().Literal),
@@ -1678,6 +2041,9 @@ func (p *Parser) parseStatement() (interpreter.Statement, error) {
 				"Did you mean to assign a variable? Use '$ varName = value'",
 			)
 		}
+
+	case ASSERT:
+		return p.parseAssertStatement()
 
 	case WHILE:
 		return p.parseWhileStatement()
@@ -1699,7 +2065,7 @@ func (p *Parser) parseStatement() (interpreter.Statement, error) {
 
 // parseReassignment parses a simple variable reassignment: identifier = expr
 // Note: Field reassignment (obj.field = expr) uses the $ syntax: $ obj.field = expr
-func (p *Parser) parseReassignment() (interpreter.Statement, error) {
+func (p *Parser) parseReassignment() (ast.Statement, error) {
 	varName, err := p.expectIdent()
 	if err != nil {
 		return nil, err
@@ -1714,14 +2080,14 @@ func (p *Parser) parseReassignment() (interpreter.Statement, error) {
 		return nil, err
 	}
 
-	return interpreter.ReassignStatement{
+	return ast.ReassignStatement{
 		Target: varName,
 		Value:  value,
 	}, nil
 }
 
 // parseIfStatement parses an if statement: if condition { ... } else { ... }
-func (p *Parser) parseIfStatement() (interpreter.Statement, error) {
+func (p *Parser) parseIfStatement() (ast.Statement, error) {
 	// Consume "if" keyword
 	_, err := p.expectIdent()
 	if err != nil {
@@ -1743,7 +2109,7 @@ func (p *Parser) parseIfStatement() (interpreter.Statement, error) {
 
 	p.skipNewlines()
 
-	var thenBlock []interpreter.Statement
+	var thenBlock []ast.Statement
 	for !p.check(RBRACE) && !p.isAtEnd() {
 		p.skipNewlines()
 		if p.check(RBRACE) {
@@ -1766,7 +2132,7 @@ func (p *Parser) parseIfStatement() (interpreter.Statement, error) {
 	p.skipNewlines()
 
 	// Parse optional else / else if block
-	var elseBlock []interpreter.Statement
+	var elseBlock []ast.Statement
 	if p.check(IDENT) && p.current().Literal == "else" {
 		p.advance() // consume "else"
 		p.skipNewlines()
@@ -1778,7 +2144,7 @@ func (p *Parser) parseIfStatement() (interpreter.Statement, error) {
 			if err != nil {
 				return nil, err
 			}
-			elseBlock = []interpreter.Statement{ifStmt}
+			elseBlock = []ast.Statement{ifStmt}
 		} else {
 			// Regular else block
 			if err := p.expect(LBRACE); err != nil {
@@ -1808,7 +2174,7 @@ func (p *Parser) parseIfStatement() (interpreter.Statement, error) {
 		}
 	}
 
-	return interpreter.IfStatement{
+	return ast.IfStatement{
 		Condition: condition,
 		ThenBlock: thenBlock,
 		ElseBlock: elseBlock,
@@ -1816,7 +2182,7 @@ func (p *Parser) parseIfStatement() (interpreter.Statement, error) {
 }
 
 // parseWhileStatement parses a while loop: while condition { ... }
-func (p *Parser) parseWhileStatement() (interpreter.Statement, error) {
+func (p *Parser) parseWhileStatement() (ast.Statement, error) {
 	// Consume "while" keyword
 	if err := p.expect(WHILE); err != nil {
 		return nil, err
@@ -1837,7 +2203,7 @@ func (p *Parser) parseWhileStatement() (interpreter.Statement, error) {
 
 	p.skipNewlines()
 
-	var body []interpreter.Statement
+	var body []ast.Statement
 	for !p.check(RBRACE) && !p.isAtEnd() {
 		p.skipNewlines()
 		if p.check(RBRACE) {
@@ -1857,14 +2223,14 @@ func (p *Parser) parseWhileStatement() (interpreter.Statement, error) {
 		return nil, err
 	}
 
-	return interpreter.WhileStatement{
+	return ast.WhileStatement{
 		Condition: condition,
 		Body:      body,
 	}, nil
 }
 
 // parseForStatement parses a for loop: for item in array { ... } or for key, value in object { ... }
-func (p *Parser) parseForStatement() (interpreter.Statement, error) {
+func (p *Parser) parseForStatement() (ast.Statement, error) {
 	// Consume "for" keyword
 	if err := p.expect(FOR); err != nil {
 		return nil, err
@@ -1911,7 +2277,7 @@ func (p *Parser) parseForStatement() (interpreter.Statement, error) {
 
 	p.skipNewlines()
 
-	var body []interpreter.Statement
+	var body []ast.Statement
 	for !p.check(RBRACE) && !p.isAtEnd() {
 		p.skipNewlines()
 		if p.check(RBRACE) {
@@ -1931,7 +2297,7 @@ func (p *Parser) parseForStatement() (interpreter.Statement, error) {
 		return nil, err
 	}
 
-	return interpreter.ForStatement{
+	return ast.ForStatement{
 		KeyVar:   keyVar,
 		ValueVar: valueVar,
 		Iterable: iterable,
@@ -1940,7 +2306,7 @@ func (p *Parser) parseForStatement() (interpreter.Statement, error) {
 }
 
 // parseSwitchStatement parses a switch statement: switch value { case val { ... } default { ... } }
-func (p *Parser) parseSwitchStatement() (interpreter.Statement, error) {
+func (p *Parser) parseSwitchStatement() (ast.Statement, error) {
 	// Consume "switch" keyword
 	if err := p.expect(SWITCH); err != nil {
 		return nil, err
@@ -1961,8 +2327,8 @@ func (p *Parser) parseSwitchStatement() (interpreter.Statement, error) {
 
 	p.skipNewlines()
 
-	var cases []interpreter.SwitchCase
-	var defaultBlock []interpreter.Statement
+	var cases []ast.SwitchCase
+	var defaultBlock []ast.Statement
 
 	// Parse cases and default
 	for !p.check(RBRACE) && !p.isAtEnd() {
@@ -1990,7 +2356,7 @@ func (p *Parser) parseSwitchStatement() (interpreter.Statement, error) {
 
 			p.skipNewlines()
 
-			var caseBody []interpreter.Statement
+			var caseBody []ast.Statement
 			for !p.check(RBRACE) && !p.isAtEnd() {
 				p.skipNewlines()
 				if p.check(RBRACE) {
@@ -2010,7 +2376,7 @@ func (p *Parser) parseSwitchStatement() (interpreter.Statement, error) {
 				return nil, err
 			}
 
-			cases = append(cases, interpreter.SwitchCase{
+			cases = append(cases, ast.SwitchCase{
 				Value: caseValue,
 				Body:  caseBody,
 			})
@@ -2065,7 +2431,7 @@ func (p *Parser) parseSwitchStatement() (interpreter.Statement, error) {
 		return nil, err
 	}
 
-	return interpreter.SwitchStatement{
+	return ast.SwitchStatement{
 		Value:   value,
 		Cases:   cases,
 		Default: defaultBlock,
@@ -2073,13 +2439,18 @@ func (p *Parser) parseSwitchStatement() (interpreter.Statement, error) {
 }
 
 // parseExpr parses an expression with operator precedence
-func (p *Parser) parseExpr() (interpreter.Expr, error) {
+func (p *Parser) parseExpr() (ast.Expr, error) {
+	p.depth++
+	if p.depth > maxParseDepth {
+		return nil, fmt.Errorf("maximum nesting depth exceeded (%d levels)", maxParseDepth)
+	}
+	defer func() { p.depth-- }()
 	return p.parsePipeExpr()
 }
 
 // parsePipeExpr parses pipe expressions (|>) with the lowest precedence
 // Pipes are left-associative: a |> b |> c parses as ((a |> b) |> c)
-func (p *Parser) parsePipeExpr() (interpreter.Expr, error) {
+func (p *Parser) parsePipeExpr() (ast.Expr, error) {
 	left, err := p.parseBinaryExpr(0)
 	if err != nil {
 		return nil, err
@@ -2091,7 +2462,7 @@ func (p *Parser) parsePipeExpr() (interpreter.Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		left = interpreter.PipeExpr{
+		left = ast.PipeExpr{
 			Left:  left,
 			Right: right,
 		}
@@ -2101,7 +2472,7 @@ func (p *Parser) parsePipeExpr() (interpreter.Expr, error) {
 }
 
 // parseBinaryExpr parses binary expressions with precedence climbing
-func (p *Parser) parseBinaryExpr(minPrecedence int) (interpreter.Expr, error) {
+func (p *Parser) parseBinaryExpr(minPrecedence int) (ast.Expr, error) {
 	left, err := p.parseUnary()
 	if err != nil {
 		return nil, err
@@ -2120,7 +2491,7 @@ func (p *Parser) parseBinaryExpr(minPrecedence int) (interpreter.Expr, error) {
 			return nil, err
 		}
 
-		left = interpreter.BinaryOpExpr{
+		left = ast.BinaryOpExpr{
 			Op:    op,
 			Left:  left,
 			Right: right,
@@ -2131,48 +2502,48 @@ func (p *Parser) parseBinaryExpr(minPrecedence int) (interpreter.Expr, error) {
 }
 
 // currentBinaryOp returns the current token as a binary operator with precedence
-func (p *Parser) currentBinaryOp() (interpreter.BinOp, int) {
+func (p *Parser) currentBinaryOp() (ast.BinOp, int) {
 	switch p.current().Type {
 	case PLUS:
-		return interpreter.Add, 10
+		return ast.Add, 10
 	case MINUS:
-		return interpreter.Sub, 10
+		return ast.Sub, 10
 	case STAR:
-		return interpreter.Mul, 20
+		return ast.Mul, 20
 	case SLASH:
-		return interpreter.Div, 20
+		return ast.Div, 20
 	case EQ_EQ:
-		return interpreter.Eq, 5
+		return ast.Eq, 5
 	case NOT_EQ:
-		return interpreter.Ne, 5
+		return ast.Ne, 5
 	case LESS:
-		return interpreter.Lt, 5
+		return ast.Lt, 5
 	case LESS_EQ:
-		return interpreter.Le, 5
+		return ast.Le, 5
 	case GREATER:
-		return interpreter.Gt, 5
+		return ast.Gt, 5
 	case GREATER_EQ:
-		return interpreter.Ge, 5
+		return ast.Ge, 5
 	case AND:
-		return interpreter.And, 3
+		return ast.And, 3
 	case OR:
-		return interpreter.Or, 2
+		return ast.Or, 2
 	default:
-		return interpreter.BinOp(-1), -1
+		return ast.BinOp(-1), -1
 	}
 }
 
 // parseCommandDefaultExpr parses a default value expression for CLI command parameters.
 // This is a specialized version that stops when it encounters what looks like the next flag
 // (--name or -name pattern), avoiding the ambiguity between binary minus and flag prefix.
-func (p *Parser) parseCommandDefaultExpr() (interpreter.Expr, error) {
+func (p *Parser) parseCommandDefaultExpr() (ast.Expr, error) {
 	return p.parseCommandDefaultBinaryExpr(0)
 }
 
 // parseCommandDefaultBinaryExpr parses binary expressions for command defaults,
 // but treats MINUS as a binary operator only if not followed by MINUS or IDENT
 // (which would indicate a new flag parameter like --host or -h).
-func (p *Parser) parseCommandDefaultBinaryExpr(minPrecedence int) (interpreter.Expr, error) {
+func (p *Parser) parseCommandDefaultBinaryExpr(minPrecedence int) (ast.Expr, error) {
 	left, err := p.parseUnary()
 	if err != nil {
 		return nil, err
@@ -2191,7 +2562,7 @@ func (p *Parser) parseCommandDefaultBinaryExpr(minPrecedence int) (interpreter.E
 			return nil, err
 		}
 
-		left = interpreter.BinaryOpExpr{
+		left = ast.BinaryOpExpr{
 			Op:    op,
 			Left:  left,
 			Right: right,
@@ -2204,55 +2575,55 @@ func (p *Parser) parseCommandDefaultBinaryExpr(minPrecedence int) (interpreter.E
 // currentCommandDefaultBinaryOp returns the current token as a binary operator,
 // but returns -1 precedence for MINUS when followed by MINUS or IDENT
 // (indicating start of a new flag parameter).
-func (p *Parser) currentCommandDefaultBinaryOp() (interpreter.BinOp, int) {
+func (p *Parser) currentCommandDefaultBinaryOp() (ast.BinOp, int) {
 	switch p.current().Type {
 	case PLUS:
-		return interpreter.Add, 10
+		return ast.Add, 10
 	case MINUS:
 		// Check if this MINUS is part of a flag prefix (--flag or -flag)
 		// If the next token is MINUS or IDENT, this is likely a new flag, not binary minus
 		nextTok := p.peek(1)
 		if nextTok.Type == MINUS || nextTok.Type == IDENT {
 			// Stop parsing - this is the start of a new flag parameter
-			return interpreter.BinOp(-1), -1
+			return ast.BinOp(-1), -1
 		}
-		return interpreter.Sub, 10
+		return ast.Sub, 10
 	case STAR:
-		return interpreter.Mul, 20
+		return ast.Mul, 20
 	case SLASH:
-		return interpreter.Div, 20
+		return ast.Div, 20
 	case EQ_EQ:
-		return interpreter.Eq, 5
+		return ast.Eq, 5
 	case NOT_EQ:
-		return interpreter.Ne, 5
+		return ast.Ne, 5
 	case LESS:
-		return interpreter.Lt, 5
+		return ast.Lt, 5
 	case LESS_EQ:
-		return interpreter.Le, 5
+		return ast.Le, 5
 	case GREATER:
-		return interpreter.Gt, 5
+		return ast.Gt, 5
 	case GREATER_EQ:
-		return interpreter.Ge, 5
+		return ast.Ge, 5
 	case AND:
-		return interpreter.And, 3
+		return ast.And, 3
 	case OR:
-		return interpreter.Or, 2
+		return ast.Or, 2
 	default:
-		return interpreter.BinOp(-1), -1
+		return ast.BinOp(-1), -1
 	}
 }
 
 // parseUnary parses unary expressions (!, -)
-func (p *Parser) parseUnary() (interpreter.Expr, error) {
+func (p *Parser) parseUnary() (ast.Expr, error) {
 	// Check for unary NOT operator
 	if p.check(BANG) {
-		p.advance() // consume !
+		p.advance()                  // consume !
 		right, err := p.parseUnary() // recursively parse for chained unary ops
 		if err != nil {
 			return nil, err
 		}
-		return interpreter.UnaryOpExpr{
-			Op:    interpreter.Not,
+		return ast.UnaryOpExpr{
+			Op:    ast.Not,
 			Right: right,
 		}, nil
 	}
@@ -2266,8 +2637,8 @@ func (p *Parser) parseUnary() (interpreter.Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		return interpreter.UnaryOpExpr{
-			Op:    interpreter.Neg,
+		return ast.UnaryOpExpr{
+			Op:    ast.Neg,
 			Right: right,
 		}, nil
 	}
@@ -2276,7 +2647,7 @@ func (p *Parser) parseUnary() (interpreter.Expr, error) {
 }
 
 // parsePrimary parses a primary expression
-func (p *Parser) parsePrimary() (interpreter.Expr, error) {
+func (p *Parser) parsePrimary() (ast.Expr, error) {
 	switch p.current().Type {
 	case INTEGER:
 		n, err := strconv.ParseInt(p.current().Literal, 10, 64)
@@ -2284,7 +2655,7 @@ func (p *Parser) parsePrimary() (interpreter.Expr, error) {
 			return nil, err
 		}
 		p.advance()
-		return interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: n}}, nil
+		return ast.LiteralExpr{Value: ast.IntLiteral{Value: n}}, nil
 
 	case FLOAT:
 		f, err := strconv.ParseFloat(p.current().Literal, 64)
@@ -2292,24 +2663,24 @@ func (p *Parser) parsePrimary() (interpreter.Expr, error) {
 			return nil, err
 		}
 		p.advance()
-		return interpreter.LiteralExpr{Value: interpreter.FloatLiteral{Value: f}}, nil
+		return ast.LiteralExpr{Value: ast.FloatLiteral{Value: f}}, nil
 
 	case STRING:
 		s := p.current().Literal
 		p.advance()
-		return interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: s}}, nil
+		return ast.LiteralExpr{Value: ast.StringLiteral{Value: s}}, nil
 
 	case TRUE:
 		p.advance()
-		return interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}}, nil
+		return ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}}, nil
 
 	case FALSE:
 		p.advance()
-		return interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: false}}, nil
+		return ast.LiteralExpr{Value: ast.BoolLiteral{Value: false}}, nil
 
 	case NULL:
 		p.advance()
-		return interpreter.LiteralExpr{Value: interpreter.NullLiteral{}}, nil
+		return ast.LiteralExpr{Value: ast.NullLiteral{}}, nil
 
 	case IDENT:
 		name := p.current().Literal
@@ -2322,13 +2693,13 @@ func (p *Parser) parsePrimary() (interpreter.Expr, error) {
 
 		// Check for array indexing: a[0]
 		if p.check(LBRACKET) {
-			return p.parseArrayIndex(interpreter.VariableExpr{Name: name})
+			return p.parseArrayIndex(ast.VariableExpr{Name: name})
 		}
 
 		// Check for function call: f(...)
 		if p.check(LPAREN) {
 			p.advance()
-			var args []interpreter.Expr
+			var args []ast.Expr
 
 			for !p.check(RPAREN) && !p.isAtEnd() {
 				arg, err := p.parseExpr()
@@ -2346,20 +2717,20 @@ func (p *Parser) parsePrimary() (interpreter.Expr, error) {
 				return nil, err
 			}
 
-			return interpreter.FunctionCallExpr{
+			return ast.FunctionCallExpr{
 				Name: name,
 				Args: args,
 			}, nil
 		}
 
-		return interpreter.VariableExpr{Name: name}, nil
+		return ast.VariableExpr{Name: name}, nil
 
 	case LBRACE:
 		// Object literal: {key: value} or {:key = value}
 		p.advance()
 		p.skipNewlines()
 
-		var fields []interpreter.ObjectField
+		var fields []ast.ObjectField
 
 		for !p.check(RBRACE) && !p.isAtEnd() {
 			p.skipNewlines()
@@ -2397,7 +2768,7 @@ func (p *Parser) parsePrimary() (interpreter.Expr, error) {
 				return nil, err
 			}
 
-			fields = append(fields, interpreter.ObjectField{
+			fields = append(fields, ast.ObjectField{
 				Key:   fieldName,
 				Value: fieldValue,
 			})
@@ -2414,7 +2785,7 @@ func (p *Parser) parsePrimary() (interpreter.Expr, error) {
 			return nil, err
 		}
 
-		return interpreter.ObjectExpr{Fields: fields}, nil
+		return ast.ObjectExpr{Fields: fields}, nil
 
 	case LPAREN:
 		// Grouped expression
@@ -2433,7 +2804,7 @@ func (p *Parser) parsePrimary() (interpreter.Expr, error) {
 		p.advance()
 		p.skipNewlines()
 
-		var elements []interpreter.Expr
+		var elements []ast.Expr
 
 		for !p.check(RBRACKET) && !p.isAtEnd() {
 			p.skipNewlines()
@@ -2460,7 +2831,7 @@ func (p *Parser) parsePrimary() (interpreter.Expr, error) {
 			return nil, err
 		}
 
-		return interpreter.ArrayExpr{Elements: elements}, nil
+		return ast.ArrayExpr{Elements: elements}, nil
 
 	case MATCH:
 		return p.parseMatchExpr()
@@ -2480,7 +2851,7 @@ func (p *Parser) parsePrimary() (interpreter.Expr, error) {
 }
 
 // parseAsyncExpr parses an async block: async { statements }
-func (p *Parser) parseAsyncExpr() (interpreter.Expr, error) {
+func (p *Parser) parseAsyncExpr() (ast.Expr, error) {
 	// Consume "async" keyword
 	if err := p.expect(ASYNC); err != nil {
 		return nil, err
@@ -2500,7 +2871,7 @@ func (p *Parser) parseAsyncExpr() (interpreter.Expr, error) {
 	p.skipNewlines()
 
 	// Parse statements in the async block
-	var body []interpreter.Statement
+	var body []ast.Statement
 	for !p.check(RBRACE) && !p.isAtEnd() {
 		stmt, err := p.parseStatement()
 		if err != nil {
@@ -2515,11 +2886,11 @@ func (p *Parser) parseAsyncExpr() (interpreter.Expr, error) {
 		return nil, err
 	}
 
-	return interpreter.AsyncExpr{Body: body}, nil
+	return ast.AsyncExpr{Body: body}, nil
 }
 
 // parseAwaitExpr parses an await expression: await expr
-func (p *Parser) parseAwaitExpr() (interpreter.Expr, error) {
+func (p *Parser) parseAwaitExpr() (ast.Expr, error) {
 	// Consume "await" keyword
 	if err := p.expect(AWAIT); err != nil {
 		return nil, err
@@ -2531,12 +2902,12 @@ func (p *Parser) parseAwaitExpr() (interpreter.Expr, error) {
 		return nil, err
 	}
 
-	return interpreter.AwaitExpr{Expr: expr}, nil
+	return ast.AwaitExpr{Expr: expr}, nil
 }
 
 // parseFieldAccess parses field access: obj.field or obj.field.subfield
-func (p *Parser) parseFieldAccess(base string) (interpreter.Expr, error) {
-	var object interpreter.Expr = interpreter.VariableExpr{Name: base}
+func (p *Parser) parseFieldAccess(base string) (ast.Expr, error) {
+	var object ast.Expr = ast.VariableExpr{Name: base}
 
 	for p.match(DOT) {
 		field, err := p.expectIdent()
@@ -2544,11 +2915,11 @@ func (p *Parser) parseFieldAccess(base string) (interpreter.Expr, error) {
 			return nil, err
 		}
 
-		// For now, treat method calls as function calls
-		// TODO: Add proper method call support
+		// Method calls are currently treated as function calls on the field.
+		// Proper method dispatch with receiver binding is not yet implemented.
 		if p.check(LPAREN) {
 			p.advance()
-			var args []interpreter.Expr
+			var args []ast.Expr
 
 			// Parse actual arguments (not including the object)
 			for !p.check(RPAREN) && !p.isAtEnd() {
@@ -2570,24 +2941,24 @@ func (p *Parser) parseFieldAccess(base string) (interpreter.Expr, error) {
 			// Check if the object is a simple variable (like "ws")
 			// If so, create a qualified function name (ws.method_name)
 			// This is needed for built-in namespaced functions
-			if varExpr, ok := object.(interpreter.VariableExpr); ok {
-				return interpreter.FunctionCallExpr{
+			if varExpr, ok := object.(ast.VariableExpr); ok {
+				return ast.FunctionCallExpr{
 					Name: varExpr.Name + "." + field,
 					Args: args,
 				}, nil
 			}
 
 			// For complex objects, add object as first arg
-			allArgs := make([]interpreter.Expr, 0, len(args)+1)
+			allArgs := make([]ast.Expr, 0, len(args)+1)
 			allArgs = append(allArgs, object)
 			allArgs = append(allArgs, args...)
 
-			return interpreter.FunctionCallExpr{
+			return ast.FunctionCallExpr{
 				Name: field,
 				Args: allArgs,
 			}, nil
 		} else {
-			object = interpreter.FieldAccessExpr{
+			object = ast.FieldAccessExpr{
 				Object: object,
 				Field:  field,
 			}
@@ -2605,8 +2976,36 @@ func (p *Parser) parseFieldAccess(base string) (interpreter.Expr, error) {
 	return object, nil
 }
 
+// parseLValueExpr parses a chain of [index] and .field postfix operations on a base expression
+// for use in index assignment l-values. Returns the full l-value expression chain.
+func (p *Parser) parseLValueExpr(base ast.Expr) (ast.Expr, error) {
+	expr := base
+	for {
+		if p.match(LBRACKET) {
+			index, err := p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+			if err := p.expect(RBRACKET); err != nil {
+				return nil, err
+			}
+			expr = ast.ArrayIndexExpr{Array: expr, Index: index}
+		} else if p.check(DOT) {
+			p.advance()
+			field, err := p.expectIdent()
+			if err != nil {
+				return nil, err
+			}
+			expr = ast.FieldAccessExpr{Object: expr, Field: field}
+		} else {
+			break
+		}
+	}
+	return expr, nil
+}
+
 // parseArrayIndex parses array indexing: array[index] or array[index][index2]
-func (p *Parser) parseArrayIndex(array interpreter.Expr) (interpreter.Expr, error) {
+func (p *Parser) parseArrayIndex(array ast.Expr) (ast.Expr, error) {
 	for p.match(LBRACKET) {
 		index, err := p.parseExpr()
 		if err != nil {
@@ -2617,7 +3016,7 @@ func (p *Parser) parseArrayIndex(array interpreter.Expr) (interpreter.Expr, erro
 			return nil, err
 		}
 
-		array = interpreter.ArrayIndexExpr{
+		array = ast.ArrayIndexExpr{
 			Array: array,
 			Index: index,
 		}
@@ -2711,10 +3110,11 @@ func (p *Parser) skipNewlines() {
 // parseCommand parses a CLI command or generic function: ! name<T>(params): ReturnType { body }
 // If generic type parameters or parentheses are present, it's a function. Otherwise, it's a CLI command.
 // Examples:
-//   ! hello name: str! --greeting: str = "Hello"  (command)
-//   ! map<T, U>(arr: [T], fn: (T) -> U): [U] { body }  (generic function)
-//   ! double(x: int): int { ... }  (regular function)
-func (p *Parser) parseCommand() (interpreter.Item, error) {
+//
+//	! hello name: str! --greeting: str = "Hello"  (command)
+//	! map<T, U>(arr: [T], fn: (T) -> U): [U] { body }  (generic function)
+//	! double(x: int): int { ... }  (regular function)
+func (p *Parser) parseCommand() (ast.Item, error) {
 	// Get name
 	cmdName, err := p.expectIdent()
 	if err != nil {
@@ -2741,7 +3141,7 @@ func (p *Parser) parseCommand() (interpreter.Item, error) {
 	p.skipNewlines()
 
 	// Parse parameters
-	var params []interpreter.CommandParam
+	var params []ast.CommandParam
 
 	// Parameters can be positional (name: type) or flags (--name: type)
 	for !p.check(LBRACE) && !p.check(ARROW) && !p.isAtEnd() {
@@ -2750,7 +3150,7 @@ func (p *Parser) parseCommand() (interpreter.Item, error) {
 			break
 		}
 
-		var param interpreter.CommandParam
+		var param ast.CommandParam
 
 		// Check for flag syntax: --name or -n
 		if p.check(MINUS) {
@@ -2796,7 +3196,7 @@ func (p *Parser) parseCommand() (interpreter.Item, error) {
 	}
 
 	// Parse optional return type -> Type
-	var returnType interpreter.Type
+	var returnType ast.Type
 	if p.check(ARROW) {
 		p.advance()
 		returnType, _, err = p.parseType()
@@ -2808,7 +3208,7 @@ func (p *Parser) parseCommand() (interpreter.Item, error) {
 	p.skipNewlines()
 
 	// Parse body - braces required
-	var body []interpreter.Statement
+	var body []ast.Statement
 	if !p.check(LBRACE) {
 		return nil, p.errorWithHint(
 			"Expected '{' to start function body",
@@ -2832,7 +3232,7 @@ func (p *Parser) parseCommand() (interpreter.Item, error) {
 		return nil, err
 	}
 
-	return &interpreter.Command{
+	return &ast.Command{
 		Name:        cmdName,
 		Description: description,
 		Params:      params,
@@ -2842,7 +3242,7 @@ func (p *Parser) parseCommand() (interpreter.Item, error) {
 }
 
 // parseGenericFunction parses a generic function: ! name<T, U>(params): ReturnType { body }
-func (p *Parser) parseGenericFunction(name string) (interpreter.Item, error) {
+func (p *Parser) parseGenericFunction(name string) (ast.Item, error) {
 	// Parse type parameters
 	typeParams, err := p.parseTypeParameters()
 	if err != nil {
@@ -2860,7 +3260,7 @@ func (p *Parser) parseGenericFunction(name string) (interpreter.Item, error) {
 		return nil, err
 	}
 
-	var params []interpreter.Field
+	var params []ast.Field
 	if !p.check(RPAREN) {
 		for {
 			field, err := p.parseFieldWithContext(typeParamNames)
@@ -2885,7 +3285,7 @@ func (p *Parser) parseGenericFunction(name string) (interpreter.Item, error) {
 	}
 
 	// Parse optional return type : Type or -> Type
-	var returnType interpreter.Type
+	var returnType ast.Type
 	if p.check(COLON) || p.check(ARROW) {
 		p.advance()
 		returnType, _, err = p.parseTypeWithContext(typeParamNames)
@@ -2897,7 +3297,7 @@ func (p *Parser) parseGenericFunction(name string) (interpreter.Item, error) {
 	p.skipNewlines()
 
 	// Parse body - braces required
-	var body []interpreter.Statement
+	var body []ast.Statement
 	if !p.check(LBRACE) {
 		return nil, p.errorWithHint(
 			"Expected '{' to start function body",
@@ -2921,7 +3321,7 @@ func (p *Parser) parseGenericFunction(name string) (interpreter.Item, error) {
 		return nil, err
 	}
 
-	return &interpreter.Function{
+	return &ast.Function{
 		Name:       name,
 		TypeParams: typeParams,
 		Params:     params,
@@ -2931,13 +3331,13 @@ func (p *Parser) parseGenericFunction(name string) (interpreter.Item, error) {
 }
 
 // parseRegularFunction parses a non-generic function: ! name(params): ReturnType { body }
-func (p *Parser) parseRegularFunction(name string) (interpreter.Item, error) {
+func (p *Parser) parseRegularFunction(name string) (ast.Item, error) {
 	// Parse parameter list
 	if err := p.expect(LPAREN); err != nil {
 		return nil, err
 	}
 
-	var params []interpreter.Field
+	var params []ast.Field
 	if !p.check(RPAREN) {
 		for {
 			field, err := p.parseField()
@@ -2962,7 +3362,7 @@ func (p *Parser) parseRegularFunction(name string) (interpreter.Item, error) {
 	}
 
 	// Parse optional return type : Type or -> Type
-	var returnType interpreter.Type
+	var returnType ast.Type
 	var err error
 	if p.check(COLON) || p.check(ARROW) {
 		p.advance()
@@ -2975,7 +3375,7 @@ func (p *Parser) parseRegularFunction(name string) (interpreter.Item, error) {
 	p.skipNewlines()
 
 	// Parse body - braces required
-	var body []interpreter.Statement
+	var body []ast.Statement
 	if !p.check(LBRACE) {
 		return nil, p.errorWithHint(
 			"Expected '{' to start function body",
@@ -2999,7 +3399,7 @@ func (p *Parser) parseRegularFunction(name string) (interpreter.Item, error) {
 		return nil, err
 	}
 
-	return &interpreter.Function{
+	return &ast.Function{
 		Name:       name,
 		Params:     params,
 		ReturnType: returnType,
@@ -3009,7 +3409,7 @@ func (p *Parser) parseRegularFunction(name string) (interpreter.Item, error) {
 
 // parseCronTask parses a cron scheduled task: @ cron "schedule" [name] { body }
 // Example: @ cron "0 0 * * *" daily_cleanup { ... }
-func (p *Parser) parseCronTask() (interpreter.Item, error) {
+func (p *Parser) parseCronTask() (ast.Item, error) {
 	// Get cron schedule (required)
 	if !p.check(STRING) {
 		return nil, p.errorWithHint(
@@ -3041,8 +3441,8 @@ func (p *Parser) parseCronTask() (interpreter.Item, error) {
 	p.skipNewlines()
 
 	// Parse injections and body
-	var injections []interpreter.Injection
-	var body []interpreter.Statement
+	var injections []ast.Injection
+	var body []ast.Statement
 	var retries int
 
 	if p.check(LBRACE) {
@@ -3065,7 +3465,7 @@ func (p *Parser) parseCronTask() (interpreter.Item, error) {
 				if err != nil {
 					return nil, err
 				}
-				injections = append(injections, interpreter.Injection{
+				injections = append(injections, ast.Injection{
 					Name: injName,
 					Type: injType,
 				})
@@ -3114,7 +3514,7 @@ func (p *Parser) parseCronTask() (interpreter.Item, error) {
 		}
 	}
 
-	return &interpreter.CronTask{
+	return &ast.CronTask{
 		Name:       name,
 		Schedule:   schedule,
 		Timezone:   timezone,
@@ -3126,7 +3526,7 @@ func (p *Parser) parseCronTask() (interpreter.Item, error) {
 
 // parseEventHandler parses an event handler: @ event "event.type" { body }
 // Example: @ event "user.created" { ... }
-func (p *Parser) parseEventHandler() (interpreter.Item, error) {
+func (p *Parser) parseEventHandler() (ast.Item, error) {
 	// Get event type (required)
 	var eventType string
 	if p.check(STRING) {
@@ -3164,8 +3564,8 @@ func (p *Parser) parseEventHandler() (interpreter.Item, error) {
 	p.skipNewlines()
 
 	// Parse injections and body
-	var injections []interpreter.Injection
-	var body []interpreter.Statement
+	var injections []ast.Injection
+	var body []ast.Statement
 
 	if p.check(LBRACE) {
 		p.advance()
@@ -3187,7 +3587,7 @@ func (p *Parser) parseEventHandler() (interpreter.Item, error) {
 				if err != nil {
 					return nil, err
 				}
-				injections = append(injections, interpreter.Injection{
+				injections = append(injections, ast.Injection{
 					Name: injName,
 					Type: injType,
 				})
@@ -3222,7 +3622,7 @@ func (p *Parser) parseEventHandler() (interpreter.Item, error) {
 		}
 	}
 
-	return &interpreter.EventHandler{
+	return &ast.EventHandler{
 		EventType:  eventType,
 		Async:      async,
 		Injections: injections,
@@ -3232,7 +3632,7 @@ func (p *Parser) parseEventHandler() (interpreter.Item, error) {
 
 // parseQueueWorker parses a queue worker: @ queue "queue.name" { body }
 // Example: @ queue "email.send" { ... }
-func (p *Parser) parseQueueWorker() (interpreter.Item, error) {
+func (p *Parser) parseQueueWorker() (ast.Item, error) {
 	// Get queue name (required)
 	var queueName string
 	if p.check(STRING) {
@@ -3263,8 +3663,8 @@ func (p *Parser) parseQueueWorker() (interpreter.Item, error) {
 	p.skipNewlines()
 
 	// Parse configuration and body
-	var injections []interpreter.Injection
-	var body []interpreter.Statement
+	var injections []ast.Injection
+	var body []ast.Statement
 	var concurrency, maxRetries, timeout int
 
 	if p.check(LBRACE) {
@@ -3287,7 +3687,7 @@ func (p *Parser) parseQueueWorker() (interpreter.Item, error) {
 				if err != nil {
 					return nil, err
 				}
-				injections = append(injections, interpreter.Injection{
+				injections = append(injections, ast.Injection{
 					Name: injName,
 					Type: injType,
 				})
@@ -3343,7 +3743,7 @@ func (p *Parser) parseQueueWorker() (interpreter.Item, error) {
 		}
 	}
 
-	return &interpreter.QueueWorker{
+	return &ast.QueueWorker{
 		QueueName:   queueName,
 		Concurrency: concurrency,
 		MaxRetries:  maxRetries,
@@ -3353,12 +3753,511 @@ func (p *Parser) parseQueueWorker() (interpreter.Item, error) {
 	}, nil
 }
 
+// parseContract parses a contract definition: contract Name { @ METHOD /path -> Type }
+func (p *Parser) parseContract() (ast.Item, error) {
+	name, err := p.expectIdent()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := p.expect(LBRACE); err != nil {
+		return nil, err
+	}
+
+	p.skipNewlines()
+
+	var endpoints []ast.ContractEndpoint
+
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		p.skipNewlines()
+		if p.check(RBRACE) {
+			break
+		}
+
+		// Expect @ METHOD /path -> ReturnType
+		if err := p.expect(AT); err != nil {
+			return nil, err
+		}
+
+		methodKw, err := p.expectIdent()
+		if err != nil {
+			return nil, err
+		}
+
+		var method ast.HttpMethod
+		switch strings.ToUpper(methodKw) {
+		case "GET":
+			method = ast.Get
+		case "POST":
+			method = ast.Post
+		case "PUT":
+			method = ast.Put
+		case "DELETE":
+			method = ast.Delete
+		case "PATCH":
+			method = ast.Patch
+		default:
+			return nil, p.routeError(
+				fmt.Sprintf("Expected HTTP method in contract endpoint, found '%s'", methodKw),
+				p.tokens[p.position-1],
+			)
+		}
+
+		// Parse path
+		var pathBuilder strings.Builder
+		for p.check(SLASH) || p.check(IDENT) || p.check(COLON) {
+			if p.check(SLASH) {
+				pathBuilder.WriteByte('/')
+				p.advance()
+				if p.check(COLON) {
+					pathBuilder.WriteByte(':')
+					p.advance()
+				}
+				if p.check(IDENT) {
+					pathBuilder.WriteString(p.current().Literal)
+					p.advance()
+				}
+			} else if p.check(IDENT) {
+				pathBuilder.WriteString(p.current().Literal)
+				p.advance()
+			} else {
+				break
+			}
+		}
+		path := pathBuilder.String()
+
+		// Parse return type: -> Type
+		var returnType ast.Type
+		if p.match(ARROW) {
+			returnType, _, err = p.parseType()
+			if err != nil {
+				return nil, err
+			}
+			// Check for union types: Type | Type
+			for p.match(PIPE) {
+				nextType, _, err := p.parseType()
+				if err != nil {
+					return nil, err
+				}
+				if ut, ok := returnType.(ast.UnionType); ok {
+					ut.Types = append(ut.Types, nextType)
+					returnType = ut
+				} else {
+					returnType = ast.UnionType{Types: []ast.Type{returnType, nextType}}
+				}
+			}
+		}
+
+		endpoints = append(endpoints, ast.ContractEndpoint{
+			Method:     method,
+			Path:       path,
+			ReturnType: returnType,
+		})
+
+		p.skipNewlines()
+	}
+
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
+	}
+
+	return &ast.ContractDef{
+		Name:      name,
+		Endpoints: endpoints,
+	}, nil
+}
+
+// parseGRPC parses a gRPC definition. Two forms:
+// Service definition: @ rpc ServiceName { MethodName(InputType) -> ReturnType ... }
+// Handler implementation: @ rpc MethodName(param: Type) -> ReturnType { body }
+func (p *Parser) parseGRPC() (ast.Item, error) {
+	name, err := p.expectIdent()
+	if err != nil {
+		return nil, p.errorWithHint(
+			"Expected service or method name after 'rpc'",
+			p.current(),
+			"Example: @ rpc UserService { ... } or @ rpc GetUser(req: Request) -> Response { ... }",
+		)
+	}
+
+	p.skipNewlines()
+
+	// If next is '(' it's a handler; if '{' check if it's a service definition
+	if p.check(LPAREN) {
+		return p.parseGRPCHandler(name)
+	}
+
+	p.skipNewlines()
+
+	if !p.check(LBRACE) {
+		return nil, p.errorWithHint(
+			"Expected '{' for service definition or '(' for handler parameters",
+			p.current(),
+			fmt.Sprintf("Example: @ rpc %s { ... } or @ rpc %s(req: Type) -> Type { ... }", name, name),
+		)
+	}
+	p.advance() // consume '{'
+	p.skipNewlines()
+
+	var methods []ast.GRPCMethod
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		method, parseErr := p.parseGRPCMethodDecl()
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		methods = append(methods, method)
+		p.skipNewlines()
+	}
+
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
+	}
+
+	return &ast.GRPCService{
+		Name:    name,
+		Methods: methods,
+	}, nil
+}
+
+// parseGRPCMethodDecl parses a method declaration inside a gRPC service definition.
+// Syntax: MethodName(InputType) -> ReturnType
+//
+//	MethodName(InputType) -> stream ReturnType
+func (p *Parser) parseGRPCMethodDecl() (ast.GRPCMethod, error) {
+	methodName, err := p.expectIdent()
+	if err != nil {
+		return ast.GRPCMethod{}, err
+	}
+
+	if err := p.expect(LPAREN); err != nil {
+		return ast.GRPCMethod{}, err
+	}
+
+	streamType := ast.GRPCUnary
+	if p.check(IDENT) && p.current().Literal == "stream" {
+		streamType = ast.GRPCClientStream
+		p.advance()
+		p.skipNewlines()
+	}
+
+	inputType, _, err := p.parseType()
+	if err != nil {
+		return ast.GRPCMethod{}, err
+	}
+
+	if err := p.expect(RPAREN); err != nil {
+		return ast.GRPCMethod{}, err
+	}
+
+	if err := p.expect(ARROW); err != nil {
+		return ast.GRPCMethod{}, err
+	}
+
+	if p.check(IDENT) && p.current().Literal == "stream" {
+		if streamType == ast.GRPCClientStream {
+			streamType = ast.GRPCBidirectional
+		} else {
+			streamType = ast.GRPCServerStream
+		}
+		p.advance()
+		p.skipNewlines()
+	}
+
+	returnType, _, err := p.parseType()
+	if err != nil {
+		return ast.GRPCMethod{}, err
+	}
+
+	return ast.GRPCMethod{
+		Name:       methodName,
+		InputType:  inputType,
+		ReturnType: returnType,
+		StreamType: streamType,
+	}, nil
+}
+
+// parseGRPCHandler parses a gRPC handler: @ rpc MethodName(param: Type) -> ReturnType { body }
+func (p *Parser) parseGRPCHandler(methodName string) (ast.Item, error) {
+	if err := p.expect(LPAREN); err != nil {
+		return nil, err
+	}
+
+	var params []ast.Field
+	for !p.check(RPAREN) && !p.isAtEnd() {
+		paramName, err := p.expectIdent()
+		if err != nil {
+			return nil, err
+		}
+		if err := p.expect(COLON); err != nil {
+			return nil, err
+		}
+		paramType, required, err := p.parseType()
+		if err != nil {
+			return nil, err
+		}
+		params = append(params, ast.Field{
+			Name:           paramName,
+			TypeAnnotation: paramType,
+			Required:       required,
+		})
+		if !p.check(RPAREN) {
+			if err := p.expect(COMMA); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if err := p.expect(RPAREN); err != nil {
+		return nil, err
+	}
+
+	streamType := ast.GRPCUnary
+	var returnType ast.Type
+	var err error
+	if p.check(ARROW) {
+		p.advance()
+		if p.check(IDENT) && p.current().Literal == "stream" {
+			streamType = ast.GRPCServerStream
+			p.advance()
+			p.skipNewlines()
+		}
+		returnType, _, err = p.parseType()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	p.skipNewlines()
+
+	var auth *ast.AuthConfig
+	var injections []ast.Injection
+	var body []ast.Statement
+
+	if !p.check(LBRACE) {
+		return nil, p.errorWithHint(
+			"Expected '{' to start gRPC handler body",
+			p.current(),
+			fmt.Sprintf("Example: @ rpc %s(req: Type) -> Type { ... }", methodName),
+		)
+	}
+	p.advance()
+	p.skipNewlines()
+
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		switch p.current().Type {
+		case PLUS:
+			p.advance()
+			mwName, mwErr := p.expectIdent()
+			if mwErr != nil {
+				return nil, mwErr
+			}
+			if mwName == "auth" {
+				auth, err = p.parseAuthConfig()
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				if p.check(LPAREN) {
+					p.advance()
+					for !p.check(RPAREN) && !p.isAtEnd() {
+						p.advance()
+					}
+					if pErr := p.expect(RPAREN); pErr != nil {
+						return nil, pErr
+					}
+				}
+			}
+		case PERCENT:
+			p.advance()
+			injName, injErr := p.expectIdent()
+			if injErr != nil {
+				return nil, injErr
+			}
+			if err := p.expect(COLON); err != nil {
+				return nil, err
+			}
+			injType, _, typeErr := p.parseType()
+			if typeErr != nil {
+				return nil, typeErr
+			}
+			injections = append(injections, ast.Injection{
+				Name: injName,
+				Type: injType,
+			})
+		default:
+			stmt, stmtErr := p.parseStatement()
+			if stmtErr != nil {
+				return nil, stmtErr
+			}
+			body = append(body, stmt)
+		}
+		p.skipNewlines()
+	}
+
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
+	}
+
+	return &ast.GRPCHandler{
+		MethodName: methodName,
+		Params:     params,
+		ReturnType: returnType,
+		StreamType: streamType,
+		Auth:       auth,
+		Injections: injections,
+		Body:       body,
+	}, nil
+}
+
+// parseGraphQLResolver parses a GraphQL resolver definition.
+// Syntax: @ query fieldName(param: Type) -> ReturnType { body }
+//
+//	@ mutation fieldName(param: Type) -> ReturnType { body }
+//	@ subscription fieldName -> ReturnType { body }
+func (p *Parser) parseGraphQLResolver(opType ast.GraphQLOperationType) (ast.Item, error) {
+	// Parse field name (required)
+	fieldName, err := p.expectIdent()
+	if err != nil {
+		return nil, p.errorWithHint(
+			"Expected field name for GraphQL resolver",
+			p.current(),
+			fmt.Sprintf("Example: @ %s user(id: int) -> User { ... }", opType),
+		)
+	}
+
+	// Parse optional parameters: (param: Type, param2: Type)
+	var params []ast.Field
+	if p.check(LPAREN) {
+		p.advance() // consume '('
+		for !p.check(RPAREN) && !p.isAtEnd() {
+			paramName, err := p.expectIdent()
+			if err != nil {
+				return nil, err
+			}
+			if err := p.expect(COLON); err != nil {
+				return nil, err
+			}
+			paramType, required, err := p.parseType()
+			if err != nil {
+				return nil, err
+			}
+			params = append(params, ast.Field{
+				Name:           paramName,
+				TypeAnnotation: paramType,
+				Required:       required,
+			})
+			if !p.check(RPAREN) {
+				if err := p.expect(COMMA); err != nil {
+					return nil, err
+				}
+			}
+		}
+		if err := p.expect(RPAREN); err != nil {
+			return nil, err
+		}
+	}
+
+	// Parse optional return type: -> Type
+	var returnType ast.Type
+	if p.check(ARROW) {
+		p.advance()
+		returnType, _, err = p.parseType()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	p.skipNewlines()
+
+	// Parse body block with optional auth and injections
+	var auth *ast.AuthConfig
+	var injections []ast.Injection
+	var body []ast.Statement
+
+	if !p.check(LBRACE) {
+		return nil, p.errorWithHint(
+			"Expected '{' to start resolver body",
+			p.current(),
+			fmt.Sprintf("Example: @ %s %s { ... }", opType, fieldName),
+		)
+	}
+	p.advance() // consume '{'
+	p.skipNewlines()
+
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		switch p.current().Type {
+		case PLUS:
+			// Middleware: + auth(jwt)
+			p.advance()
+			middlewareName, err := p.expectIdent()
+			if err != nil {
+				return nil, err
+			}
+			if middlewareName == "auth" {
+				auth, err = p.parseAuthConfig()
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				if p.check(LPAREN) {
+					p.advance()
+					for !p.check(RPAREN) && !p.isAtEnd() {
+						p.advance()
+					}
+					p.expect(RPAREN)
+				}
+			}
+
+		case PERCENT:
+			// Dependency injection: % db: Database
+			p.advance()
+			injName, err := p.expectIdent()
+			if err != nil {
+				return nil, err
+			}
+			if err := p.expect(COLON); err != nil {
+				return nil, err
+			}
+			injType, _, err := p.parseType()
+			if err != nil {
+				return nil, err
+			}
+			injections = append(injections, ast.Injection{
+				Name: injName,
+				Type: injType,
+			})
+
+		default:
+			stmt, err := p.parseStatement()
+			if err != nil {
+				return nil, err
+			}
+			body = append(body, stmt)
+		}
+		p.skipNewlines()
+	}
+
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
+	}
+
+	return &ast.GraphQLResolver{
+		Operation:  opType,
+		FieldName:  fieldName,
+		Params:     params,
+		ReturnType: returnType,
+		Auth:       auth,
+		Injections: injections,
+		Body:       body,
+	}, nil
+}
+
 // parseImport parses an import statement: import "path" or import "path" as alias
 // Examples:
-//   import "./utils"
-//   import "./models" as m
-//   import "github.com/some/package"
-func (p *Parser) parseImport() (interpreter.Item, error) {
+//
+//	import "./utils"
+//	import "./models" as m
+//	import "github.com/some/package"
+func (p *Parser) parseImport() (ast.Item, error) {
 	// Consume "import" keyword
 	if err := p.expect(IMPORT); err != nil {
 		return nil, err
@@ -3390,7 +4289,7 @@ func (p *Parser) parseImport() (interpreter.Item, error) {
 		alias = aliasName
 	}
 
-	return &interpreter.ImportStatement{
+	return &ast.ImportStatement{
 		Path:      path,
 		Alias:     alias,
 		Selective: false,
@@ -3400,9 +4299,10 @@ func (p *Parser) parseImport() (interpreter.Item, error) {
 
 // parseFromImport parses a selective import: from "path" import { name1, name2 as alias, ... }
 // Examples:
-//   from "./utils" import { getAllUsers }
-//   from "./models" import { User, Order as Ord }
-func (p *Parser) parseFromImport() (interpreter.Item, error) {
+//
+//	from "./utils" import { getAllUsers }
+//	from "./models" import { User, Order as Ord }
+func (p *Parser) parseFromImport() (ast.Item, error) {
 	// Consume "from" keyword
 	if err := p.expect(FROM); err != nil {
 		return nil, err
@@ -3440,7 +4340,7 @@ func (p *Parser) parseFromImport() (interpreter.Item, error) {
 	p.skipNewlines()
 
 	// Parse import names
-	var names []interpreter.ImportName
+	var names []ast.ImportName
 
 	for !p.check(RBRACE) && !p.isAtEnd() {
 		p.skipNewlines()
@@ -3455,7 +4355,7 @@ func (p *Parser) parseFromImport() (interpreter.Item, error) {
 			return nil, err
 		}
 
-		importName := interpreter.ImportName{
+		importName := ast.ImportName{
 			Name:  name,
 			Alias: "",
 		}
@@ -3491,7 +4391,7 @@ func (p *Parser) parseFromImport() (interpreter.Item, error) {
 		return nil, err
 	}
 
-	return &interpreter.ImportStatement{
+	return &ast.ImportStatement{
 		Path:      path,
 		Alias:     "",
 		Selective: true,
@@ -3501,7 +4401,7 @@ func (p *Parser) parseFromImport() (interpreter.Item, error) {
 
 // parseModuleDecl parses a module declaration: module "name"
 // Example: module "myapp/utils"
-func (p *Parser) parseModuleDecl() (interpreter.Item, error) {
+func (p *Parser) parseModuleDecl() (ast.Item, error) {
 	// Consume "module" keyword
 	if err := p.expect(MODULE); err != nil {
 		return nil, err
@@ -3518,13 +4418,13 @@ func (p *Parser) parseModuleDecl() (interpreter.Item, error) {
 	name := p.current().Literal
 	p.advance()
 
-	return &interpreter.ModuleDecl{
+	return &ast.ModuleDecl{
 		Name: name,
 	}, nil
 }
 
 // parseConstDecl parses a constant declaration: const NAME = value or const NAME: Type = value
-func (p *Parser) parseConstDecl() (interpreter.Item, error) {
+func (p *Parser) parseConstDecl() (ast.Item, error) {
 	// Consume "const" keyword
 	if err := p.expect(CONST); err != nil {
 		return nil, err
@@ -3541,7 +4441,7 @@ func (p *Parser) parseConstDecl() (interpreter.Item, error) {
 	}
 
 	// Check for optional type annotation
-	var constType interpreter.Type
+	var constType ast.Type
 	if p.match(COLON) {
 		constType, _, err = p.parseType()
 		if err != nil {
@@ -3564,7 +4464,7 @@ func (p *Parser) parseConstDecl() (interpreter.Item, error) {
 		return nil, err
 	}
 
-	return &interpreter.ConstDecl{
+	return &ast.ConstDecl{
 		Name:  name,
 		Value: value,
 		Type:  constType,
@@ -3573,7 +4473,7 @@ func (p *Parser) parseConstDecl() (interpreter.Item, error) {
 
 // parseMacroDef parses a macro definition: macro! name(params) { body }
 // Example: macro! log(level, msg) { if level >= logLevel { print(msg) } }
-func (p *Parser) parseMacroDef() (interpreter.Item, error) {
+func (p *Parser) parseMacroDef() (ast.Item, error) {
 	// Consume "macro" keyword
 	if err := p.expect(MACRO); err != nil {
 		return nil, err
@@ -3634,7 +4534,7 @@ func (p *Parser) parseMacroDef() (interpreter.Item, error) {
 	p.skipNewlines()
 
 	// Parse macro body as a list of nodes (statements and items)
-	var body []interpreter.Node
+	var body []ast.Node
 	for !p.check(RBRACE) && !p.isAtEnd() {
 		node, err := p.parseMacroBodyNode()
 		if err != nil {
@@ -3650,7 +4550,7 @@ func (p *Parser) parseMacroDef() (interpreter.Item, error) {
 		return nil, err
 	}
 
-	return &interpreter.MacroDef{
+	return &ast.MacroDef{
 		Name:   name,
 		Params: params,
 		Body:   body,
@@ -3658,7 +4558,7 @@ func (p *Parser) parseMacroDef() (interpreter.Item, error) {
 }
 
 // parseMacroBodyNode parses a single node in a macro body
-func (p *Parser) parseMacroBodyNode() (interpreter.Node, error) {
+func (p *Parser) parseMacroBodyNode() (ast.Node, error) {
 	switch p.current().Type {
 	case AT:
 		// Route definition inside macro
@@ -3666,7 +4566,7 @@ func (p *Parser) parseMacroBodyNode() (interpreter.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		return item.(*interpreter.Route), nil
+		return item.(*ast.Route), nil
 
 	case COLON:
 		// Type definition inside macro
@@ -3674,7 +4574,7 @@ func (p *Parser) parseMacroBodyNode() (interpreter.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		return item.(*interpreter.TypeDef), nil
+		return item.(*ast.TypeDef), nil
 
 	case DOLLAR, GREATER, QUESTION:
 		// Statement
@@ -3700,7 +4600,7 @@ func (p *Parser) parseMacroBodyNode() (interpreter.Node, error) {
 				if err != nil {
 					return nil, err
 				}
-				return inv.(*interpreter.MacroInvocation), nil
+				return inv.(*ast.MacroInvocation), nil
 			}
 			// Try as expression statement
 			stmt, err := p.parseStatement()
@@ -3732,47 +4632,47 @@ func (p *Parser) parseMacroBodyNode() (interpreter.Node, error) {
 
 // statementToNode converts a Statement interface to a Node interface
 // This is needed because Statement and Node are separate interfaces
-func statementToNode(stmt interpreter.Statement) interpreter.Node {
+func statementToNode(stmt ast.Statement) ast.Node {
 	switch s := stmt.(type) {
-	case interpreter.AssignStatement:
+	case ast.AssignStatement:
 		return s
-	case interpreter.ReassignStatement:
+	case ast.ReassignStatement:
 		return s
-	case interpreter.ReturnStatement:
+	case ast.ReturnStatement:
 		return s
-	case interpreter.IfStatement:
+	case ast.IfStatement:
 		return s
-	case interpreter.WhileStatement:
+	case ast.WhileStatement:
 		return s
-	case interpreter.ForStatement:
+	case ast.ForStatement:
 		return s
-	case interpreter.SwitchStatement:
+	case ast.SwitchStatement:
 		return s
-	case interpreter.ExpressionStatement:
+	case ast.ExpressionStatement:
 		return s
-	case interpreter.ValidationStatement:
+	case ast.ValidationStatement:
 		return s
-	case interpreter.DbQueryStatement:
+	case ast.DbQueryStatement:
 		return s
-	case interpreter.WsSendStatement:
+	case ast.WsSendStatement:
 		return s
-	case interpreter.WsBroadcastStatement:
+	case ast.WsBroadcastStatement:
 		return s
-	case interpreter.WsCloseStatement:
+	case ast.WsCloseStatement:
 		return s
-	case interpreter.WebSocketEvent:
+	case ast.WebSocketEvent:
 		return s
-	case interpreter.MacroInvocation:
+	case ast.MacroInvocation:
 		return s
 	default:
 		// Return the statement as-is, concrete types implement Node
-		return stmt.(interpreter.Node)
+		return stmt.(ast.Node)
 	}
 }
 
 // parseMacroInvocation parses a macro invocation: name!(args)
 // Example: log!("INFO", "Server starting")
-func (p *Parser) parseMacroInvocation() (interpreter.Item, error) {
+func (p *Parser) parseMacroInvocation() (ast.Item, error) {
 	// Get macro name
 	name, err := p.expectIdent()
 	if err != nil {
@@ -3793,7 +4693,7 @@ func (p *Parser) parseMacroInvocation() (interpreter.Item, error) {
 		)
 	}
 
-	var args []interpreter.Expr
+	var args []ast.Expr
 	for !p.check(RPAREN) && !p.isAtEnd() {
 		arg, err := p.parseExpr()
 		if err != nil {
@@ -3810,7 +4710,7 @@ func (p *Parser) parseMacroInvocation() (interpreter.Item, error) {
 		return nil, err
 	}
 
-	return &interpreter.MacroInvocation{
+	return &ast.MacroInvocation{
 		Name: name,
 		Args: args,
 	}, nil
@@ -3818,7 +4718,7 @@ func (p *Parser) parseMacroInvocation() (interpreter.Item, error) {
 
 // parseQuoteExpr parses a quote expression: quote { ... }
 // Example: quote { if x > 0 { return x } }
-func (p *Parser) parseQuoteExpr() (interpreter.Expr, error) {
+func (p *Parser) parseQuoteExpr() (ast.Expr, error) {
 	// Consume "quote" keyword
 	if err := p.expect(QUOTE); err != nil {
 		return nil, err
@@ -3836,7 +4736,7 @@ func (p *Parser) parseQuoteExpr() (interpreter.Expr, error) {
 	p.skipNewlines()
 
 	// Parse quoted body
-	var body []interpreter.Node
+	var body []ast.Node
 	for !p.check(RBRACE) && !p.isAtEnd() {
 		node, err := p.parseMacroBodyNode()
 		if err != nil {
@@ -3852,12 +4752,12 @@ func (p *Parser) parseQuoteExpr() (interpreter.Expr, error) {
 		return nil, err
 	}
 
-	return interpreter.QuoteExpr{Body: body}, nil
+	return ast.QuoteExpr{Body: body}, nil
 }
 
 // parseMatchExpr parses a match expression
 // Syntax: match value { pattern => result, pattern when guard => result, _ => default }
-func (p *Parser) parseMatchExpr() (interpreter.Expr, error) {
+func (p *Parser) parseMatchExpr() (ast.Expr, error) {
 	if err := p.expect(MATCH); err != nil {
 		return nil, err
 	}
@@ -3881,7 +4781,7 @@ func (p *Parser) parseMatchExpr() (interpreter.Expr, error) {
 
 	p.skipNewlines()
 
-	var cases []interpreter.MatchCase
+	var cases []ast.MatchCase
 	hasWildcard := false
 
 	// Parse cases
@@ -3899,12 +4799,12 @@ func (p *Parser) parseMatchExpr() (interpreter.Expr, error) {
 		}
 
 		// Check if this is a wildcard pattern for exhaustiveness
-		if _, ok := pattern.(interpreter.WildcardPattern); ok {
+		if _, ok := pattern.(ast.WildcardPattern); ok {
 			hasWildcard = true
 		}
 
 		// Parse optional guard: when condition
-		var guard interpreter.Expr
+		var guard ast.Expr
 		if p.check(WHEN) {
 			p.advance()
 			guard, err = p.parseExpr()
@@ -3928,7 +4828,7 @@ func (p *Parser) parseMatchExpr() (interpreter.Expr, error) {
 			return nil, err
 		}
 
-		cases = append(cases, interpreter.MatchCase{
+		cases = append(cases, ast.MatchCase{
 			Pattern: pattern,
 			Guard:   guard,
 			Body:    body,
@@ -3949,14 +4849,14 @@ func (p *Parser) parseMatchExpr() (interpreter.Expr, error) {
 		return nil, err
 	}
 
-	return interpreter.MatchExpr{
+	return ast.MatchExpr{
 		Value: value,
 		Cases: cases,
 	}, nil
 }
 
 // parsePattern parses a pattern for match expressions
-func (p *Parser) parsePattern() (interpreter.Pattern, error) {
+func (p *Parser) parsePattern() (ast.Pattern, error) {
 	switch p.current().Type {
 	case INTEGER:
 		// Literal integer pattern
@@ -3965,7 +4865,7 @@ func (p *Parser) parsePattern() (interpreter.Pattern, error) {
 			return nil, err
 		}
 		p.advance()
-		return interpreter.LiteralPattern{Value: interpreter.IntLiteral{Value: n}}, nil
+		return ast.LiteralPattern{Value: ast.IntLiteral{Value: n}}, nil
 
 	case FLOAT:
 		// Literal float pattern
@@ -3974,36 +4874,36 @@ func (p *Parser) parsePattern() (interpreter.Pattern, error) {
 			return nil, err
 		}
 		p.advance()
-		return interpreter.LiteralPattern{Value: interpreter.FloatLiteral{Value: f}}, nil
+		return ast.LiteralPattern{Value: ast.FloatLiteral{Value: f}}, nil
 
 	case STRING:
 		// Literal string pattern
 		s := p.current().Literal
 		p.advance()
-		return interpreter.LiteralPattern{Value: interpreter.StringLiteral{Value: s}}, nil
+		return ast.LiteralPattern{Value: ast.StringLiteral{Value: s}}, nil
 
 	case TRUE:
 		p.advance()
-		return interpreter.LiteralPattern{Value: interpreter.BoolLiteral{Value: true}}, nil
+		return ast.LiteralPattern{Value: ast.BoolLiteral{Value: true}}, nil
 
 	case FALSE:
 		p.advance()
-		return interpreter.LiteralPattern{Value: interpreter.BoolLiteral{Value: false}}, nil
+		return ast.LiteralPattern{Value: ast.BoolLiteral{Value: false}}, nil
 
 	case NULL:
 		p.advance()
-		return interpreter.LiteralPattern{Value: interpreter.NullLiteral{}}, nil
+		return ast.LiteralPattern{Value: ast.NullLiteral{}}, nil
 
 	case IDENT:
 		name := p.current().Literal
 		// Check for underscore wildcard
 		if name == "_" {
 			p.advance()
-			return interpreter.WildcardPattern{}, nil
+			return ast.WildcardPattern{}, nil
 		}
 		// Variable binding pattern
 		p.advance()
-		return interpreter.VariablePattern{Name: name}, nil
+		return ast.VariablePattern{Name: name}, nil
 
 	case LBRACE:
 		// Object destructuring pattern: {name, age} or {name: n, age: a}
@@ -4023,14 +4923,14 @@ func (p *Parser) parsePattern() (interpreter.Pattern, error) {
 }
 
 // parseObjectPattern parses an object destructuring pattern: {name, age} or {name: n}
-func (p *Parser) parseObjectPattern() (interpreter.Pattern, error) {
+func (p *Parser) parseObjectPattern() (ast.Pattern, error) {
 	if err := p.expect(LBRACE); err != nil {
 		return nil, err
 	}
 
 	p.skipNewlines()
 
-	var fields []interpreter.ObjectPatternField
+	var fields []ast.ObjectPatternField
 
 	for !p.check(RBRACE) && !p.isAtEnd() {
 		p.skipNewlines()
@@ -4045,7 +4945,7 @@ func (p *Parser) parseObjectPattern() (interpreter.Pattern, error) {
 			return nil, err
 		}
 
-		var fieldPattern interpreter.Pattern
+		var fieldPattern ast.Pattern
 
 		// Check for binding: fieldName: bindingName
 		if p.check(COLON) {
@@ -4057,7 +4957,7 @@ func (p *Parser) parseObjectPattern() (interpreter.Pattern, error) {
 		}
 		// If no colon, fieldPattern stays nil and the field name is used as variable
 
-		fields = append(fields, interpreter.ObjectPatternField{
+		fields = append(fields, ast.ObjectPatternField{
 			Key:     fieldName,
 			Pattern: fieldPattern,
 		})
@@ -4074,18 +4974,18 @@ func (p *Parser) parseObjectPattern() (interpreter.Pattern, error) {
 		return nil, err
 	}
 
-	return interpreter.ObjectPattern{Fields: fields}, nil
+	return ast.ObjectPattern{Fields: fields}, nil
 }
 
 // parseArrayPattern parses an array destructuring pattern: [first, second] or [head, ...rest]
-func (p *Parser) parseArrayPattern() (interpreter.Pattern, error) {
+func (p *Parser) parseArrayPattern() (ast.Pattern, error) {
 	if err := p.expect(LBRACKET); err != nil {
 		return nil, err
 	}
 
 	p.skipNewlines()
 
-	var elements []interpreter.Pattern
+	var elements []ast.Pattern
 	var rest *string
 
 	for !p.check(RBRACKET) && !p.isAtEnd() {
@@ -4131,7 +5031,7 @@ func (p *Parser) parseArrayPattern() (interpreter.Pattern, error) {
 		return nil, err
 	}
 
-	return interpreter.ArrayPattern{
+	return ast.ArrayPattern{
 		Elements: elements,
 		Rest:     rest,
 	}, nil
@@ -4139,7 +5039,7 @@ func (p *Parser) parseArrayPattern() (interpreter.Pattern, error) {
 
 // ParseExpression parses a single expression from the token stream.
 // This is used by the REPL and other tools that need to parse expressions directly.
-func (p *Parser) ParseExpression() (interpreter.Expr, error) {
+func (p *Parser) ParseExpression() (ast.Expr, error) {
 	// Skip leading newlines
 	p.skipNewlines()
 
@@ -4158,9 +5058,93 @@ func (p *Parser) ParseExpression() (interpreter.Expr, error) {
 	return expr, nil
 }
 
+// parseTestBlock parses a test block: test "name" { body }
+// "test" is parsed as an IDENT (not a dedicated token) to avoid conflicts with
+// identifiers like /test in route paths.
+func (p *Parser) parseTestBlock() (ast.Item, error) {
+	// Consume "test" identifier
+	p.advance()
+
+	// Parse test name (string literal)
+	if !p.check(STRING) {
+		return nil, p.errorWithHint(
+			fmt.Sprintf("Expected test name (string), got %s", p.current().Type),
+			p.current(),
+			"Test blocks must have a name: test \"description\" { ... }",
+		)
+	}
+	name := p.current().Literal
+	p.advance()
+
+	p.skipNewlines()
+
+	// Parse body
+	if err := p.expect(LBRACE); err != nil {
+		return nil, err
+	}
+
+	p.skipNewlines()
+
+	var body []ast.Statement
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		stmt, err := p.parseStatement()
+		if err != nil {
+			return nil, err
+		}
+		body = append(body, stmt)
+		p.skipNewlines()
+	}
+
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
+	}
+
+	return &ast.TestBlock{
+		Name: name,
+		Body: body,
+	}, nil
+}
+
+// parseAssertStatement parses an assert statement: assert(condition) or assert(condition, "message")
+func (p *Parser) parseAssertStatement() (ast.Statement, error) {
+	if err := p.expect(ASSERT); err != nil {
+		return nil, err
+	}
+
+	if err := p.expect(LPAREN); err != nil {
+		return nil, p.errorWithHint(
+			fmt.Sprintf("Expected '(' after assert, got %s", p.current().Type),
+			p.current(),
+			"Assert syntax: assert(condition) or assert(condition, \"message\")",
+		)
+	}
+
+	condition, err := p.parseExpr()
+	if err != nil {
+		return nil, err
+	}
+
+	var message ast.Expr
+	if p.match(COMMA) {
+		message, err = p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if err := p.expect(RPAREN); err != nil {
+		return nil, err
+	}
+
+	return ast.AssertStatement{
+		Condition: condition,
+		Message:   message,
+	}, nil
+}
+
 // ParseStatement parses a single statement from the token stream.
 // This is used by the REPL and other tools that need to parse statements directly.
-func (p *Parser) ParseStatement() (interpreter.Statement, error) {
+func (p *Parser) ParseStatement() (ast.Statement, error) {
 	// Skip leading newlines
 	p.skipNewlines()
 
