@@ -1,8 +1,8 @@
 # GlyphLang™
 
-[![AI Token Savings](https://img.shields.io/badge/AI%20tokens-23%25%20fewer%20than%20FastAPI-blueviolet)]()
+[![AI Token Savings](https://img.shields.io/badge/AI%20tokens-23%25%20fewer%20than%20FastAPI-blueviolet)](#ai-token-efficiency)
 [![CI](https://img.shields.io/github/actions/workflow/status/GlyphLang/GlyphLang/ci.yml?branch=main&label=CI)](https://github.com/GlyphLang/GlyphLang/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-78%25-green)]()
+[![Coverage](https://img.shields.io/badge/coverage-78%25-green)](#performance)
 [![Version](https://img.shields.io/github/v/release/GlyphLang/GlyphLang?label=version&color=blue)](https://github.com/GlyphLang/GlyphLang/releases/latest)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![CLA](https://cla-assistant.io/readme/badge/GlyphLang/GlyphLang)](https://cla-assistant.io/GlyphLang/GlyphLang)
@@ -70,17 +70,17 @@ GlyphLang uses a small set of symbols for consistent, scannable syntax:
 | `@` | Route | HTTP endpoint definition | `@ GET /users` |
 | `:` | Type | Type definition | `: User { id: int }` |
 | `$` | Variable | Variable declaration | `$ name = "Alice"` |
-| `!` | Function | Function/CLI command definition | `! greet(name: string)` |
+| `!` | Function | Function/CLI command definition | `! greet(name: str)` |
 | `>` | Return | Return statement | `> {message: "ok"}` |
 | `+` | Middleware | Apply middleware | `+ auth(jwt)` |
 | `%` | Inject | Dependency injection | `% db: Database` |
-| `?` | Optional | Optional type modifier | `email: string?` |
+| `?` | Optional | Optional type modifier | `email: str?` |
 | `*` | Cron | Scheduled task definition | `* "0 * * * *" cleanup` |
 | `~` | Event | Event handler definition | `~ user.created` |
 | `&` | Queue | Queue worker definition | `& emails processEmail` |
 | `#` | Comment | Single-line comment | `# This is a comment` |
 | `->` | Arrow | Return type annotation | `-> User` |
-| `\|` | Union | Union type separator | `string \| int` |
+| `\|` | Union | Union type separator | `str \| int` |
 
 **Type Modifiers:**
 - `T!` - Required (non-null)
@@ -172,14 +172,14 @@ Visit http://localhost:3000/hello
 ```glyph
 : User {
   id: int!
-  name: string!
-  email: string?
-  roles: [string]!
+  name: str!
+  email: str?
+  roles: [str]!
 }
 
 : ApiResponse<T> {
   data: T?
-  error: string?
+  error: str?
   success: bool!
 }
 ```
@@ -270,7 +270,7 @@ Visit http://localhost:3000/hello
 
 ```glyph
 # utils.glyph
-! formatName(first: string, last: string): string {
+! formatName(first: str, last: str): str {
   > first + " " + last
 }
 
