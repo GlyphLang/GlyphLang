@@ -4,7 +4,9 @@ import (
 	. "github.com/glyphlang/glyph/pkg/ast"
 
 	"fmt"
+	"math"
 	"strings"
+	"sync/atomic"
 	"unicode"
 )
 
@@ -21,12 +23,12 @@ func capitalizeFirst(s string) string {
 
 // EvaluateExpression evaluates an expression and returns its value
 func (i *Interpreter) EvaluateExpression(expr Expr, env *Environment) (interface{}, error) {
-	i.evalDepth++
-	if i.evalDepth > maxEvalDepth {
-		i.evalDepth--
+	depth := atomic.AddInt64(&i.evalDepth, 1)
+	if depth > maxEvalDepth {
+		atomic.AddInt64(&i.evalDepth, -1)
 		return nil, fmt.Errorf("maximum evaluation depth exceeded (%d levels)", maxEvalDepth)
 	}
-	defer func() { i.evalDepth-- }()
+	defer atomic.AddInt64(&i.evalDepth, -1)
 	switch e := expr.(type) {
 	case LiteralExpr:
 		return i.evaluateLiteral(e.Value)
@@ -69,6 +71,9 @@ func (i *Interpreter) EvaluateExpression(expr Expr, env *Environment) (interface
 
 	case PipeExpr:
 		return i.evaluatePipeExpr(e, env)
+
+	case MacroInvocation:
+		return i.evaluateMacroInvocation(e, env)
 
 	default:
 		return nil, fmt.Errorf("unsupported expression type: %T", expr)
@@ -258,6 +263,8 @@ func (i *Interpreter) evaluateBinaryOp(expr BinaryOpExpr, env *Environment) (int
 		return i.evaluateMul(left, right)
 	case Div:
 		return i.evaluateDiv(left, right)
+	case Mod:
+		return i.evaluateMod(left, right)
 	case Eq:
 		return i.evaluateEq(left, right)
 	case Ne:
@@ -349,13 +356,8 @@ func (i *Interpreter) evaluateAdd(left, right interface{}) (interface{}, error) 
 
 // evaluateSub handles subtraction
 func (i *Interpreter) evaluateSub(left, right interface{}) (interface{}, error) {
-	// Numeric subtraction - do not allow automatic coercion
-	coercedLeft, coercedRight, coerced := CoerceNumeric(left, right)
-
-	// If coercion happened, return error (strict type checking for subtraction)
-	if coerced {
-		return nil, fmt.Errorf("cannot subtract %T and %T", left, right)
-	}
+	// Numeric subtraction with automatic coercion (int->float promotion)
+	coercedLeft, coercedRight, _ := CoerceNumeric(left, right)
 
 	// Integer subtraction
 	if leftInt, ok := coercedLeft.(int64); ok {
@@ -376,13 +378,8 @@ func (i *Interpreter) evaluateSub(left, right interface{}) (interface{}, error) 
 
 // evaluateMul handles multiplication
 func (i *Interpreter) evaluateMul(left, right interface{}) (interface{}, error) {
-	// Numeric multiplication - do not allow automatic coercion
-	coercedLeft, coercedRight, coerced := CoerceNumeric(left, right)
-
-	// If coercion happened, return error (strict type checking for multiplication)
-	if coerced {
-		return nil, fmt.Errorf("cannot multiply %T and %T", left, right)
-	}
+	// Numeric multiplication with automatic coercion (int->float promotion)
+	coercedLeft, coercedRight, _ := CoerceNumeric(left, right)
 
 	// Integer multiplication
 	if leftInt, ok := coercedLeft.(int64); ok {
@@ -403,13 +400,8 @@ func (i *Interpreter) evaluateMul(left, right interface{}) (interface{}, error) 
 
 // evaluateDiv handles division
 func (i *Interpreter) evaluateDiv(left, right interface{}) (interface{}, error) {
-	// Numeric division - do not allow automatic coercion
-	coercedLeft, coercedRight, coerced := CoerceNumeric(left, right)
-
-	// If coercion happened, return error (strict type checking for division)
-	if coerced {
-		return nil, fmt.Errorf("cannot divide %T and %T", left, right)
-	}
+	// Numeric division - allow int/float coercion for consistency with Add/Eq (#122)
+	coercedLeft, coercedRight, _ := CoerceNumeric(left, right)
 
 	// Integer division
 	if leftInt, ok := coercedLeft.(int64); ok {
@@ -432,6 +424,34 @@ func (i *Interpreter) evaluateDiv(left, right interface{}) (interface{}, error) 
 	}
 
 	return nil, fmt.Errorf("cannot divide %T and %T", left, right)
+}
+
+// evaluateMod handles modulo/remainder operation
+func (i *Interpreter) evaluateMod(left, right interface{}) (interface{}, error) {
+	// Numeric modulo with automatic coercion (int->float promotion)
+	coercedLeft, coercedRight, _ := CoerceNumeric(left, right)
+
+	// Integer modulo
+	if leftInt, ok := coercedLeft.(int64); ok {
+		if rightInt, ok := coercedRight.(int64); ok {
+			if rightInt == 0 {
+				return nil, fmt.Errorf("modulo by zero")
+			}
+			return leftInt % rightInt, nil
+		}
+	}
+
+	// Float modulo
+	if leftFloat, ok := coercedLeft.(float64); ok {
+		if rightFloat, ok := coercedRight.(float64); ok {
+			if rightFloat == 0 {
+				return nil, fmt.Errorf("modulo by zero")
+			}
+			return math.Mod(leftFloat, rightFloat), nil
+		}
+	}
+
+	return nil, fmt.Errorf("cannot compute modulo of %T and %T", left, right)
 }
 
 // evaluateEq handles equality comparison
@@ -462,13 +482,8 @@ func (i *Interpreter) evaluateNe(left, right interface{}) (interface{}, error) {
 
 // evaluateLt handles less than comparison
 func (i *Interpreter) evaluateLt(left, right interface{}) (interface{}, error) {
-	// Numeric comparison - do not allow automatic coercion
-	coercedLeft, coercedRight, coerced := CoerceNumeric(left, right)
-
-	// If coercion happened, return error (strict type checking)
-	if coerced {
-		return nil, fmt.Errorf("cannot compare %T and %T", left, right)
-	}
+	// Numeric comparison - allow int/float coercion for consistency with Add/Eq (#122)
+	coercedLeft, coercedRight, _ := CoerceNumeric(left, right)
 
 	// Integer comparison
 	if leftInt, ok := coercedLeft.(int64); ok {
@@ -489,13 +504,8 @@ func (i *Interpreter) evaluateLt(left, right interface{}) (interface{}, error) {
 
 // evaluateLe handles less than or equal comparison
 func (i *Interpreter) evaluateLe(left, right interface{}) (interface{}, error) {
-	// Numeric comparison - do not allow automatic coercion
-	coercedLeft, coercedRight, coerced := CoerceNumeric(left, right)
-
-	// If coercion happened, return error (strict type checking)
-	if coerced {
-		return nil, fmt.Errorf("cannot compare %T and %T", left, right)
-	}
+	// Numeric comparison - allow int/float coercion for consistency with Add/Eq (#122)
+	coercedLeft, coercedRight, _ := CoerceNumeric(left, right)
 
 	// Integer comparison
 	if leftInt, ok := coercedLeft.(int64); ok {
@@ -516,13 +526,8 @@ func (i *Interpreter) evaluateLe(left, right interface{}) (interface{}, error) {
 
 // evaluateGt handles greater than comparison
 func (i *Interpreter) evaluateGt(left, right interface{}) (interface{}, error) {
-	// Numeric comparison - do not allow automatic coercion
-	coercedLeft, coercedRight, coerced := CoerceNumeric(left, right)
-
-	// If coercion happened, return error (strict type checking)
-	if coerced {
-		return nil, fmt.Errorf("cannot compare %T and %T", left, right)
-	}
+	// Allow int/float coercion for consistency with evaluateAdd, evaluateEq, evaluateLt, evaluateLe (#122)
+	coercedLeft, coercedRight, _ := CoerceNumeric(left, right)
 
 	// Integer comparison
 	if leftInt, ok := coercedLeft.(int64); ok {
@@ -543,13 +548,8 @@ func (i *Interpreter) evaluateGt(left, right interface{}) (interface{}, error) {
 
 // evaluateGe handles greater than or equal comparison
 func (i *Interpreter) evaluateGe(left, right interface{}) (interface{}, error) {
-	// Numeric comparison - do not allow automatic coercion
-	coercedLeft, coercedRight, coerced := CoerceNumeric(left, right)
-
-	// If coercion happened, return error (strict type checking)
-	if coerced {
-		return nil, fmt.Errorf("cannot compare %T and %T", left, right)
-	}
+	// Allow int/float coercion for consistency with evaluateAdd, evaluateEq, evaluateLt, evaluateLe (#122)
+	coercedLeft, coercedRight, _ := CoerceNumeric(left, right)
 
 	// Integer comparison
 	if leftInt, ok := coercedLeft.(int64); ok {
