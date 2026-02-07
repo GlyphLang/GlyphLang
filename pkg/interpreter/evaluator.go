@@ -10,6 +10,14 @@ import (
 	"unicode"
 )
 
+// posError wraps an error with source position information when available.
+func posError(pos Pos, err error) error {
+	if err == nil || !pos.HasPos() {
+		return err
+	}
+	return fmt.Errorf("at %s: %w", pos, err)
+}
+
 // capitalizeFirst capitalizes only the first letter of a string, preserving the rest.
 // This properly handles camelCase: "countWhere" -> "CountWhere", "nextId" -> "NextId"
 func capitalizeFirst(s string) string {
@@ -34,19 +42,39 @@ func (i *Interpreter) EvaluateExpression(expr Expr, env *Environment) (interface
 		return i.evaluateLiteral(e.Value)
 
 	case VariableExpr:
-		return env.Get(e.Name)
+		val, err := env.Get(e.Name)
+		if err != nil {
+			return nil, posError(e.Pos, err)
+		}
+		return val, nil
 
 	case BinaryOpExpr:
-		return i.evaluateBinaryOp(e, env)
+		val, err := i.evaluateBinaryOp(e, env)
+		if err != nil {
+			return nil, posError(e.Pos, err)
+		}
+		return val, nil
 
 	case UnaryOpExpr:
-		return i.evaluateUnaryOp(e, env)
+		val, err := i.evaluateUnaryOp(e, env)
+		if err != nil {
+			return nil, posError(e.Pos, err)
+		}
+		return val, nil
 
 	case FieldAccessExpr:
-		return i.evaluateFieldAccess(e, env)
+		val, err := i.evaluateFieldAccess(e, env)
+		if err != nil {
+			return nil, posError(e.Pos, err)
+		}
+		return val, nil
 
 	case FunctionCallExpr:
-		return i.evaluateFunctionCall(e, env)
+		val, err := i.evaluateFunctionCall(e, env)
+		if err != nil {
+			return nil, posError(e.Pos, err)
+		}
+		return val, nil
 
 	case ObjectExpr:
 		return i.evaluateObjectExpr(e, env)
@@ -61,7 +89,11 @@ func (i *Interpreter) EvaluateExpression(expr Expr, env *Environment) (interface
 		return i.evaluateAwaitExpr(e, env)
 
 	case ArrayIndexExpr:
-		return i.evaluateArrayIndexExpr(e, env)
+		val, err := i.evaluateArrayIndexExpr(e, env)
+		if err != nil {
+			return nil, posError(e.Pos, err)
+		}
+		return val, nil
 
 	case MatchExpr:
 		return i.evaluateMatchExpr(e, env)

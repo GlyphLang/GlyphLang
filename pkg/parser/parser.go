@@ -2492,6 +2492,7 @@ func (p *Parser) parseBinaryExpr(minPrecedence int) (ast.Expr, error) {
 			break
 		}
 
+		opTok := p.current()
 		p.advance() // consume operator
 
 		right, err := p.parseBinaryExpr(precedence + 1)
@@ -2503,6 +2504,7 @@ func (p *Parser) parseBinaryExpr(minPrecedence int) (ast.Expr, error) {
 			Op:    op,
 			Left:  left,
 			Right: right,
+			Pos:   ast.Pos{Line: opTok.Line, Column: opTok.Column},
 		}
 	}
 
@@ -2629,6 +2631,7 @@ func (p *Parser) currentCommandDefaultBinaryOp() (ast.BinOp, int) {
 func (p *Parser) parseUnary() (ast.Expr, error) {
 	// Check for unary NOT operator
 	if p.check(BANG) {
+		tok := p.current()
 		p.advance()                  // consume !
 		right, err := p.parseUnary() // recursively parse for chained unary ops
 		if err != nil {
@@ -2637,11 +2640,13 @@ func (p *Parser) parseUnary() (ast.Expr, error) {
 		return ast.UnaryOpExpr{
 			Op:    ast.Not,
 			Right: right,
+			Pos:   ast.Pos{Line: tok.Line, Column: tok.Column},
 		}, nil
 	}
 
 	// Check for unary minus (negation)
 	if p.check(MINUS) {
+		tok := p.current()
 		// Only treat as unary minus if it's at the start of an expression
 		// or after an operator (not after an identifier or literal)
 		p.advance() // consume -
@@ -2652,6 +2657,7 @@ func (p *Parser) parseUnary() (ast.Expr, error) {
 		return ast.UnaryOpExpr{
 			Op:    ast.Neg,
 			Right: right,
+			Pos:   ast.Pos{Line: tok.Line, Column: tok.Column},
 		}, nil
 	}
 
@@ -2695,7 +2701,9 @@ func (p *Parser) parsePrimary() (ast.Expr, error) {
 		return ast.LiteralExpr{Value: ast.NullLiteral{}}, nil
 
 	case IDENT:
-		name := p.current().Literal
+		identTok := p.current()
+		name := identTok.Literal
+		identPos := ast.Pos{Line: identTok.Line, Column: identTok.Column}
 		p.advance()
 
 		// Check for field access: a.b.c
@@ -2705,7 +2713,7 @@ func (p *Parser) parsePrimary() (ast.Expr, error) {
 
 		// Check for array indexing: a[0]
 		if p.check(LBRACKET) {
-			return p.parseArrayIndex(ast.VariableExpr{Name: name})
+			return p.parseArrayIndex(ast.VariableExpr{Name: name, Pos: identPos})
 		}
 
 		// Check for function call: f(...)
@@ -2732,10 +2740,11 @@ func (p *Parser) parsePrimary() (ast.Expr, error) {
 			return ast.FunctionCallExpr{
 				Name: name,
 				Args: args,
+				Pos:  identPos,
 			}, nil
 		}
 
-		return ast.VariableExpr{Name: name}, nil
+		return ast.VariableExpr{Name: name, Pos: identPos}, nil
 
 	case LBRACE:
 		// Object literal: {key: value} or {:key = value}
@@ -2922,6 +2931,10 @@ func (p *Parser) parseFieldAccess(base string) (ast.Expr, error) {
 	var object ast.Expr = ast.VariableExpr{Name: base}
 
 	for p.match(DOT) {
+		// The dot token was just consumed by match; retrieve it for position info
+		dotTok := p.tokens[p.position-1]
+		dotPos := ast.Pos{Line: dotTok.Line, Column: dotTok.Column}
+
 		field, err := p.expectIdent()
 		if err != nil {
 			return nil, err
@@ -2957,6 +2970,7 @@ func (p *Parser) parseFieldAccess(base string) (ast.Expr, error) {
 				return ast.FunctionCallExpr{
 					Name: varExpr.Name + "." + field,
 					Args: args,
+					Pos:  dotPos,
 				}, nil
 			}
 
@@ -2968,11 +2982,13 @@ func (p *Parser) parseFieldAccess(base string) (ast.Expr, error) {
 			return ast.FunctionCallExpr{
 				Name: field,
 				Args: allArgs,
+				Pos:  dotPos,
 			}, nil
 		} else {
 			object = ast.FieldAccessExpr{
 				Object: object,
 				Field:  field,
+				Pos:    dotPos,
 			}
 		}
 
@@ -3019,6 +3035,9 @@ func (p *Parser) parseLValueExpr(base ast.Expr) (ast.Expr, error) {
 // parseArrayIndex parses array indexing: array[index] or array[index][index2]
 func (p *Parser) parseArrayIndex(array ast.Expr) (ast.Expr, error) {
 	for p.match(LBRACKET) {
+		// The bracket token was just consumed by match; retrieve it for position info
+		bracketTok := p.tokens[p.position-1]
+
 		index, err := p.parseExpr()
 		if err != nil {
 			return nil, err
@@ -3031,6 +3050,7 @@ func (p *Parser) parseArrayIndex(array ast.Expr) (ast.Expr, error) {
 		array = ast.ArrayIndexExpr{
 			Array: array,
 			Index: index,
+			Pos:   ast.Pos{Line: bracketTok.Line, Column: bracketTok.Column},
 		}
 	}
 
