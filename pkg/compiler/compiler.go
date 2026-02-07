@@ -802,6 +802,8 @@ func (c *Compiler) compileBinaryOp(expr *ast.BinaryOpExpr) error {
 		c.emit(vm.OpMul)
 	case ast.Div:
 		c.emit(vm.OpDiv)
+	case ast.Mod:
+		c.emit(vm.OpMod)
 	case ast.Eq:
 		c.emit(vm.OpEq)
 	case ast.Ne:

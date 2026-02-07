@@ -1510,15 +1510,16 @@ func TestEvaluateSub_TypeMismatch(t *testing.T) {
 	interp := NewInterpreter()
 	env := NewEnvironment()
 
+	// int - float now coerces int to float (consistent with Add)
 	expr := BinaryOpExpr{
 		Left:  LiteralExpr{Value: IntLiteral{Value: 10}},
 		Op:    Sub,
 		Right: LiteralExpr{Value: FloatLiteral{Value: 3.2}},
 	}
 
-	_, err := interp.EvaluateExpression(expr, env)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot subtract")
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.InDelta(t, 6.8, result.(float64), 0.001)
 }
 
 func TestEvaluateSub_UnsupportedType(t *testing.T) {
@@ -1554,14 +1555,16 @@ func TestEvaluateMul_TypeMismatch(t *testing.T) {
 	interp := NewInterpreter()
 	env := NewEnvironment()
 
+	// int * float now coerces int to float (consistent with Add)
 	expr := BinaryOpExpr{
 		Left:  LiteralExpr{Value: IntLiteral{Value: 5}},
 		Op:    Mul,
 		Right: LiteralExpr{Value: FloatLiteral{Value: 2.0}},
 	}
 
-	_, err := interp.EvaluateExpression(expr, env)
-	assert.Error(t, err)
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, float64(10.0), result)
 }
 
 func TestEvaluateMul_UnsupportedType(t *testing.T) {
@@ -1612,14 +1615,16 @@ func TestEvaluateDiv_TypeMismatch(t *testing.T) {
 	interp := NewInterpreter()
 	env := NewEnvironment()
 
+	// int / float now coerces int to float (consistent with Add)
 	expr := BinaryOpExpr{
 		Left:  LiteralExpr{Value: IntLiteral{Value: 10}},
 		Op:    Div,
 		Right: LiteralExpr{Value: FloatLiteral{Value: 2.0}},
 	}
 
-	_, err := interp.EvaluateExpression(expr, env)
-	assert.Error(t, err)
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, float64(5.0), result)
 }
 
 // Comparison operators with floats
@@ -1643,14 +1648,16 @@ func TestEvaluateLt_TypeMismatch(t *testing.T) {
 	interp := NewInterpreter()
 	env := NewEnvironment()
 
+	// int < float now coerces int to float (consistent with Eq)
 	expr := BinaryOpExpr{
 		Left:  LiteralExpr{Value: IntLiteral{Value: 5}},
 		Op:    Lt,
 		Right: LiteralExpr{Value: FloatLiteral{Value: 3.0}},
 	}
 
-	_, err := interp.EvaluateExpression(expr, env)
-	assert.Error(t, err)
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, false, result) // 5.0 < 3.0 is false
 }
 
 func TestEvaluateLt_UnsupportedType(t *testing.T) {
@@ -1686,14 +1693,16 @@ func TestEvaluateLe_TypeMismatch(t *testing.T) {
 	interp := NewInterpreter()
 	env := NewEnvironment()
 
+	// float <= int now coerces int to float (consistent with Eq)
 	expr := BinaryOpExpr{
 		Left:  LiteralExpr{Value: FloatLiteral{Value: 5.0}},
 		Op:    Le,
 		Right: LiteralExpr{Value: IntLiteral{Value: 5}},
 	}
 
-	_, err := interp.EvaluateExpression(expr, env)
-	assert.Error(t, err)
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, true, result) // 5.0 <= 5.0 is true
 }
 
 func TestEvaluateGt_Float(t *testing.T) {
