@@ -43,42 +43,42 @@ func TestCoercion_Sub_IntAndFloat(t *testing.T) {
 	interp := NewInterpreter()
 	env := NewEnvironment()
 
-	// 10 - 3.5 should error (strict type checking for subtraction)
+	// 10 - 3.5 should coerce int to float (consistent with Add)
 	left := LiteralExpr{Value: IntLiteral{Value: 10}}
 	right := LiteralExpr{Value: FloatLiteral{Value: 3.5}}
 	expr := BinaryOpExpr{Left: left, Op: Sub, Right: right}
 
-	_, err := interp.EvaluateExpression(expr, env)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot subtract")
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, float64(6.5), result)
 }
 
 func TestCoercion_Mul_IntAndFloat(t *testing.T) {
 	interp := NewInterpreter()
 	env := NewEnvironment()
 
-	// 4 * 2.5 should error (strict type checking for multiplication)
+	// 4 * 2.5 should coerce int to float (consistent with Add)
 	left := LiteralExpr{Value: IntLiteral{Value: 4}}
 	right := LiteralExpr{Value: FloatLiteral{Value: 2.5}}
 	expr := BinaryOpExpr{Left: left, Op: Mul, Right: right}
 
-	_, err := interp.EvaluateExpression(expr, env)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot multiply")
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, float64(10.0), result)
 }
 
 func TestCoercion_Div_IntAndFloat(t *testing.T) {
 	interp := NewInterpreter()
 	env := NewEnvironment()
 
-	// 10 / 2.5 should error (strict type checking for division)
+	// 10 / 2.5 should coerce int to float (consistent with Add)
 	left := LiteralExpr{Value: IntLiteral{Value: 10}}
 	right := LiteralExpr{Value: FloatLiteral{Value: 2.5}}
 	expr := BinaryOpExpr{Left: left, Op: Div, Right: right}
 
-	_, err := interp.EvaluateExpression(expr, env)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot divide")
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, float64(4.0), result)
 }
 
 // Test numeric coercion in comparison operations
@@ -129,56 +129,56 @@ func TestCoercion_Lt_IntAndFloat(t *testing.T) {
 	interp := NewInterpreter()
 	env := NewEnvironment()
 
-	// 5 < 5.5 should error (strict type checking for comparisons)
+	// 5 < 5.5 should coerce int to float and return true
 	left := LiteralExpr{Value: IntLiteral{Value: 5}}
 	right := LiteralExpr{Value: FloatLiteral{Value: 5.5}}
 	expr := BinaryOpExpr{Left: left, Op: Lt, Right: right}
 
-	_, err := interp.EvaluateExpression(expr, env)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot compare")
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, true, result)
 }
 
 func TestCoercion_Le_FloatAndInt(t *testing.T) {
 	interp := NewInterpreter()
 	env := NewEnvironment()
 
-	// 5.0 <= 5 should error (strict type checking for comparisons)
+	// 5.0 <= 5 should coerce int to float and return true
 	left := LiteralExpr{Value: FloatLiteral{Value: 5.0}}
 	right := LiteralExpr{Value: IntLiteral{Value: 5}}
 	expr := BinaryOpExpr{Left: left, Op: Le, Right: right}
 
-	_, err := interp.EvaluateExpression(expr, env)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot compare")
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, true, result)
 }
 
 func TestCoercion_Gt_FloatAndInt(t *testing.T) {
 	interp := NewInterpreter()
 	env := NewEnvironment()
 
-	// 5.5 > 5 should error (strict type checking for comparisons)
+	// 5.5 > 5 should coerce int to float and return true
 	left := LiteralExpr{Value: FloatLiteral{Value: 5.5}}
 	right := LiteralExpr{Value: IntLiteral{Value: 5}}
 	expr := BinaryOpExpr{Left: left, Op: Gt, Right: right}
 
-	_, err := interp.EvaluateExpression(expr, env)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot compare")
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, true, result)
 }
 
 func TestCoercion_Ge_IntAndFloat(t *testing.T) {
 	interp := NewInterpreter()
 	env := NewEnvironment()
 
-	// 5 >= 4.9 should error (strict type checking for comparisons)
+	// 5 >= 4.9 should coerce int to float and return true
 	left := LiteralExpr{Value: IntLiteral{Value: 5}}
 	right := LiteralExpr{Value: FloatLiteral{Value: 4.9}}
 	expr := BinaryOpExpr{Left: left, Op: Ge, Right: right}
 
-	_, err := interp.EvaluateExpression(expr, env)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot compare")
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, true, result)
 }
 
 // Test that same-type operations still work
@@ -217,9 +217,9 @@ func TestCoercion_ChainedOperations(t *testing.T) {
 	interp := NewInterpreter()
 	env := NewEnvironment()
 
-	// (5 + 2.5) * 3 should work with Add coercion, but then fail on Mul
-	// First: 5 + 2.5 = 7.5 (float) - Add allows coercion
-	// Then: 7.5 * 3 should error - Mul does not allow type mixing
+	// (5 + 2.5) * 3 should work: both Add and Mul now allow coercion
+	// First: 5 + 2.5 = 7.5 (float)
+	// Then: 7.5 * 3 = 22.5 (int coerced to float)
 	inner := BinaryOpExpr{
 		Left:  LiteralExpr{Value: IntLiteral{Value: 5}},
 		Op:    Add,
@@ -231,23 +231,23 @@ func TestCoercion_ChainedOperations(t *testing.T) {
 		Right: LiteralExpr{Value: IntLiteral{Value: 3}},
 	}
 
-	_, err := interp.EvaluateExpression(expr, env)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot multiply")
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Equal(t, float64(22.5), result)
 }
 
 func TestCoercion_DivisionByZero_Float(t *testing.T) {
 	interp := NewInterpreter()
 	env := NewEnvironment()
 
-	// 5 / 0.0 should error due to type mismatch (not division by zero)
+	// 5 / 0.0 should coerce and then error with division by zero
 	left := LiteralExpr{Value: IntLiteral{Value: 5}}
 	right := LiteralExpr{Value: FloatLiteral{Value: 0.0}}
 	expr := BinaryOpExpr{Left: left, Op: Div, Right: right}
 
 	_, err := interp.EvaluateExpression(expr, env)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot divide")
+	assert.Contains(t, err.Error(), "division by zero")
 }
 
 func TestCoercion_NoCoercionForString(t *testing.T) {
