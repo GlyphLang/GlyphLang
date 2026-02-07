@@ -1,6 +1,7 @@
 package interpreter
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -22,6 +23,7 @@ type Future struct {
 	value    interface{}
 	err      error
 	done     chan struct{}
+	cancel   chan struct{}
 	mu       sync.RWMutex
 	resolved bool // Double-resolve protection
 }
@@ -29,8 +31,9 @@ type Future struct {
 // NewFuture creates a new pending Future
 func NewFuture() *Future {
 	return &Future{
-		state: FuturePending,
-		done:  make(chan struct{}),
+		state:  FuturePending,
+		done:   make(chan struct{}),
+		cancel: make(chan struct{}),
 	}
 }
 
@@ -96,6 +99,53 @@ func (f *Future) AwaitWithTimeout(timeout time.Duration) (interface{}, error) {
 	}
 }
 
+// Cancel signals the goroutine associated with this Future to stop.
+// If the Future is still pending, it will be rejected with a cancellation error.
+func (f *Future) Cancel() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if f.resolved {
+		return
+	}
+
+	// Signal cancellation to the goroutine
+	select {
+	case <-f.cancel:
+		// Already cancelled
+	default:
+		close(f.cancel)
+	}
+
+	f.resolved = true
+	f.state = FutureRejected
+	f.err = fmt.Errorf("future cancelled")
+	close(f.done)
+}
+
+// Cancelled returns a channel that is closed when the Future is cancelled.
+// Goroutines should select on this to detect cancellation.
+func (f *Future) Cancelled() <-chan struct{} {
+	return f.cancel
+}
+
+// AwaitWithContext blocks until the Future completes or the context is cancelled.
+func (f *Future) AwaitWithContext(ctx context.Context) (interface{}, error) {
+	select {
+	case <-f.done:
+		f.mu.RLock()
+		defer f.mu.RUnlock()
+
+		if f.state == FutureRejected {
+			return nil, f.err
+		}
+		return f.value, nil
+	case <-ctx.Done():
+		f.Cancel()
+		return nil, ctx.Err()
+	}
+}
+
 // IsResolved returns true if the Future has completed successfully
 func (f *Future) IsResolved() bool {
 	f.mu.RLock()
@@ -157,7 +207,22 @@ func RunAsync(fn func() (interface{}, error)) *Future {
 	future := NewFuture()
 
 	go func() {
+		// Check for cancellation before running
+		select {
+		case <-future.Cancelled():
+			return
+		default:
+		}
+
 		value, err := fn()
+
+		// Check for cancellation after running
+		select {
+		case <-future.Cancelled():
+			return
+		default:
+		}
+
 		if err != nil {
 			future.Reject(err)
 		} else {
@@ -170,20 +235,24 @@ func RunAsync(fn func() (interface{}, error)) *Future {
 
 // All waits for all Futures to complete and returns a Future containing
 // a slice of all values. If any Future rejects, the returned Future rejects
-// with that error.
+// with that error and remaining futures are cancelled.
 func All(futures ...*Future) *Future {
 	result := NewFuture()
 
 	go func() {
 		values := make([]interface{}, len(futures))
 
-		for i, f := range futures {
+		for idx, f := range futures {
 			value, err := f.Await()
 			if err != nil {
+				// Cancel remaining futures
+				for _, remaining := range futures[idx+1:] {
+					remaining.Cancel()
+				}
 				result.Reject(err)
 				return
 			}
-			values[i] = value
+			values[idx] = value
 		}
 
 		result.Resolve(values)
@@ -193,7 +262,7 @@ func All(futures ...*Future) *Future {
 }
 
 // Race returns a Future that completes with the first Future to complete,
-// whether it resolves or rejects.
+// whether it resolves or rejects. Losing futures are cancelled.
 func Race(futures ...*Future) *Future {
 	if len(futures) == 0 {
 		result := NewFuture()
@@ -213,6 +282,16 @@ func Race(futures ...*Future) *Future {
 			}
 		}(f)
 	}
+
+	// Cancel losing futures once the race is decided
+	go func() {
+		<-result.Done()
+		for _, f := range futures {
+			if f.IsPending() {
+				f.Cancel()
+			}
+		}
+	}()
 
 	return result
 }
