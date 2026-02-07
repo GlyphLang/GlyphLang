@@ -2054,6 +2054,14 @@ func (p *Parser) parseStatement() (ast.Statement, error) {
 	case FOR:
 		return p.parseForStatement()
 
+	case BREAK:
+		p.advance() // consume "break"
+		return ast.BreakStatement{}, nil
+
+	case CONTINUE:
+		p.advance() // consume "continue"
+		return ast.ContinueStatement{}, nil
+
 	default:
 		return nil, p.errorWithHint(
 			fmt.Sprintf("Expected statement, but found %s", p.current().Type),
