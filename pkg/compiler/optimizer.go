@@ -2,6 +2,8 @@ package compiler
 
 import (
 	"fmt"
+	"math"
+
 	"github.com/glyphlang/glyph/pkg/ast"
 )
 
@@ -551,6 +553,11 @@ func (o *Optimizer) foldLiteralBinaryOp(op ast.BinOp, left, right *ast.LiteralEx
 				result = leftInt.Value / rightInt.Value
 				return &ast.LiteralExpr{Value: ast.IntLiteral{Value: result}}
 			}
+		case ast.Mod:
+			if rightInt.Value != 0 {
+				result = leftInt.Value % rightInt.Value
+				return &ast.LiteralExpr{Value: ast.IntLiteral{Value: result}}
+			}
 		}
 
 		// Comparison operations on integers
@@ -590,6 +597,11 @@ func (o *Optimizer) foldLiteralBinaryOp(op ast.BinOp, left, right *ast.LiteralEx
 		case ast.Div:
 			if rightFloat.Value != 0 {
 				result = leftFloat.Value / rightFloat.Value
+				return &ast.LiteralExpr{Value: ast.FloatLiteral{Value: result}}
+			}
+		case ast.Mod:
+			if rightFloat.Value != 0 {
+				result = math.Mod(leftFloat.Value, rightFloat.Value)
 				return &ast.LiteralExpr{Value: ast.FloatLiteral{Value: result}}
 			}
 		}

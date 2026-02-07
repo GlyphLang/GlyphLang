@@ -2512,6 +2512,8 @@ func (p *Parser) currentBinaryOp() (ast.BinOp, int) {
 		return ast.Mul, 20
 	case SLASH:
 		return ast.Div, 20
+	case PERCENT:
+		return ast.Mod, 20
 	case EQ_EQ:
 		return ast.Eq, 5
 	case NOT_EQ:
@@ -2592,6 +2594,8 @@ func (p *Parser) currentCommandDefaultBinaryOp() (ast.BinOp, int) {
 		return ast.Mul, 20
 	case SLASH:
 		return ast.Div, 20
+	case PERCENT:
+		return ast.Mod, 20
 	case EQ_EQ:
 		return ast.Eq, 5
 	case NOT_EQ:

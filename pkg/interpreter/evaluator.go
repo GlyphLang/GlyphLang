@@ -4,6 +4,7 @@ import (
 	. "github.com/glyphlang/glyph/pkg/ast"
 
 	"fmt"
+	"math"
 	"strings"
 	"unicode"
 )
@@ -258,6 +259,8 @@ func (i *Interpreter) evaluateBinaryOp(expr BinaryOpExpr, env *Environment) (int
 		return i.evaluateMul(left, right)
 	case Div:
 		return i.evaluateDiv(left, right)
+	case Mod:
+		return i.evaluateMod(left, right)
 	case Eq:
 		return i.evaluateEq(left, right)
 	case Ne:
@@ -432,6 +435,34 @@ func (i *Interpreter) evaluateDiv(left, right interface{}) (interface{}, error) 
 	}
 
 	return nil, fmt.Errorf("cannot divide %T and %T", left, right)
+}
+
+// evaluateMod handles modulo/remainder operation
+func (i *Interpreter) evaluateMod(left, right interface{}) (interface{}, error) {
+	// Numeric modulo with automatic coercion (int->float promotion)
+	coercedLeft, coercedRight, _ := CoerceNumeric(left, right)
+
+	// Integer modulo
+	if leftInt, ok := coercedLeft.(int64); ok {
+		if rightInt, ok := coercedRight.(int64); ok {
+			if rightInt == 0 {
+				return nil, fmt.Errorf("modulo by zero")
+			}
+			return leftInt % rightInt, nil
+		}
+	}
+
+	// Float modulo
+	if leftFloat, ok := coercedLeft.(float64); ok {
+		if rightFloat, ok := coercedRight.(float64); ok {
+			if rightFloat == 0 {
+				return nil, fmt.Errorf("modulo by zero")
+			}
+			return math.Mod(leftFloat, rightFloat), nil
+		}
+	}
+
+	return nil, fmt.Errorf("cannot compute modulo of %T and %T", left, right)
 }
 
 // evaluateEq handles equality comparison
