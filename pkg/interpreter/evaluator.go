@@ -5,6 +5,7 @@ import (
 
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"unicode"
 )
 
@@ -21,12 +22,12 @@ func capitalizeFirst(s string) string {
 
 // EvaluateExpression evaluates an expression and returns its value
 func (i *Interpreter) EvaluateExpression(expr Expr, env *Environment) (interface{}, error) {
-	i.evalDepth++
-	if i.evalDepth > maxEvalDepth {
-		i.evalDepth--
+	depth := atomic.AddInt64(&i.evalDepth, 1)
+	if depth > maxEvalDepth {
+		atomic.AddInt64(&i.evalDepth, -1)
 		return nil, fmt.Errorf("maximum evaluation depth exceeded (%d levels)", maxEvalDepth)
 	}
-	defer func() { i.evalDepth-- }()
+	defer atomic.AddInt64(&i.evalDepth, -1)
 	switch e := expr.(type) {
 	case LiteralExpr:
 		return i.evaluateLiteral(e.Value)
