@@ -2054,6 +2054,14 @@ func (p *Parser) parseStatement() (ast.Statement, error) {
 	case FOR:
 		return p.parseForStatement()
 
+	case BREAK:
+		p.advance() // consume "break"
+		return ast.BreakStatement{}, nil
+
+	case CONTINUE:
+		p.advance() // consume "continue"
+		return ast.ContinueStatement{}, nil
+
 	default:
 		return nil, p.errorWithHint(
 			fmt.Sprintf("Expected statement, but found %s", p.current().Type),
@@ -2512,6 +2520,8 @@ func (p *Parser) currentBinaryOp() (ast.BinOp, int) {
 		return ast.Mul, 20
 	case SLASH:
 		return ast.Div, 20
+	case PERCENT:
+		return ast.Mod, 20
 	case EQ_EQ:
 		return ast.Eq, 5
 	case NOT_EQ:
@@ -2592,6 +2602,8 @@ func (p *Parser) currentCommandDefaultBinaryOp() (ast.BinOp, int) {
 		return ast.Mul, 20
 	case SLASH:
 		return ast.Div, 20
+	case PERCENT:
+		return ast.Mod, 20
 	case EQ_EQ:
 		return ast.Eq, 5
 	case NOT_EQ:
