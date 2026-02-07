@@ -37,7 +37,7 @@ type Interpreter struct {
 	constants        map[string]struct{}      // Tracks names that are constants (immutable)
 	contracts        map[string]ContractDef   // Contract definitions by name
 	traitDefs        map[string]TraitDef      // Trait definitions by name
-	evalDepth        int                      // Current recursion depth for evaluation
+	evalDepth        int64                    // Current recursion depth for evaluation (atomic)
 }
 
 // NewInterpreter creates a new interpreter instance
