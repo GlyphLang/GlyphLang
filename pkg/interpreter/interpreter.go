@@ -37,6 +37,7 @@ type Interpreter struct {
 	constants        map[string]struct{}      // Tracks names that are constants (immutable)
 	contracts        map[string]ContractDef   // Contract definitions by name
 	traitDefs        map[string]TraitDef      // Trait definitions by name
+	macros           map[string]*MacroDef     // Macro definitions by name
 	evalDepth        int64                    // Current recursion depth for evaluation (atomic)
 }
 
@@ -61,6 +62,7 @@ func NewInterpreter() *Interpreter {
 		constants:        make(map[string]struct{}),
 		contracts:        make(map[string]ContractDef),
 		traitDefs:        make(map[string]TraitDef),
+		macros:           make(map[string]*MacroDef),
 	}
 }
 
@@ -165,6 +167,22 @@ func (i *Interpreter) LoadModuleWithPath(module Module, basePath string) error {
 
 		case *TestBlock:
 			i.testBlocks = append(i.testBlocks, *it)
+
+		case *MacroDef:
+			i.macros[it.Name] = it
+
+		case *MacroInvocation:
+			expanded, err := i.expandMacro(it)
+			if err != nil {
+				return err
+			}
+			for _, node := range expanded {
+				if stmt, ok := node.(Statement); ok {
+					if _, err := i.ExecuteStatement(stmt, i.globalEnv); err != nil {
+						return err
+					}
+				}
+			}
 
 		case *ConstDecl:
 			// Evaluate and store constant at module load time

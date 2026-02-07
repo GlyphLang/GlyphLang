@@ -103,6 +103,9 @@ func (i *Interpreter) ExecuteStatement(stmt Statement, env *Environment) (interf
 	case ExpressionStatement:
 		return i.EvaluateExpression(s.Expr, env)
 
+	case MacroInvocation:
+		return i.executeMacroInvocation(s, env)
+
 	case BreakStatement:
 		return nil, &breakValue{}
 
