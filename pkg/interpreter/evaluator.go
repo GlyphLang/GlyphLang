@@ -86,8 +86,22 @@ func (i *Interpreter) evaluateAsyncExpr(expr AsyncExpr, env *Environment) (inter
 
 	// Execute the async block in a separate goroutine
 	go func() {
+		// Check for cancellation before starting
+		select {
+		case <-future.Cancelled():
+			return
+		default:
+		}
+
 		// Execute the statements in the async block
 		result, err := i.executeStatements(expr.Body, asyncEnv)
+
+		// Check for cancellation after execution
+		select {
+		case <-future.Cancelled():
+			return
+		default:
+		}
 
 		if err != nil {
 			// Check if it's a return value (which is normal for returning from async blocks)
