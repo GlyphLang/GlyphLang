@@ -89,6 +89,9 @@ func (i *Interpreter) ExecuteStatement(stmt Statement, env *Environment) (interf
 	case ExpressionStatement:
 		return i.EvaluateExpression(s.Expr, env)
 
+	case MacroInvocation:
+		return i.executeMacroInvocation(s, env)
+
 	default:
 		return nil, fmt.Errorf("unsupported statement type: %T", stmt)
 	}

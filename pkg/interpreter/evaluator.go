@@ -70,6 +70,9 @@ func (i *Interpreter) EvaluateExpression(expr Expr, env *Environment) (interface
 	case PipeExpr:
 		return i.evaluatePipeExpr(e, env)
 
+	case MacroInvocation:
+		return i.evaluateMacroInvocation(e, env)
+
 	default:
 		return nil, fmt.Errorf("unsupported expression type: %T", expr)
 	}
