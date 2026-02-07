@@ -278,6 +278,16 @@ type ReturnStatement struct {
 
 func (ReturnStatement) isStatement() {}
 
+// BreakStatement represents a break statement to exit a loop
+type BreakStatement struct{}
+
+func (BreakStatement) isStatement() {}
+
+// ContinueStatement represents a continue statement to skip to next loop iteration
+type ContinueStatement struct{}
+
+func (ContinueStatement) isStatement() {}
+
 // IfStatement represents an if statement
 type IfStatement struct {
 	Condition Expr
@@ -975,6 +985,8 @@ func (MacroInvocation) isNode()      {}
 func (AssignStatement) isNode()      {}
 func (DbQueryStatement) isNode()     {}
 func (ReturnStatement) isNode()      {}
+func (BreakStatement) isNode()       {}
+func (ContinueStatement) isNode()    {}
 func (IfStatement) isNode()          {}
 func (WhileStatement) isNode()       {}
 func (SwitchStatement) isNode()      {}
