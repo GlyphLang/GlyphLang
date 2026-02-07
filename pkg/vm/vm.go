@@ -18,6 +18,7 @@ const (
 	OpSub         Opcode = 0x11
 	OpMul         Opcode = 0x12
 	OpDiv         Opcode = 0x13
+	OpMod         Opcode = 0x14
 	OpEq          Opcode = 0x20
 	OpNe          Opcode = 0x21
 	OpLt          Opcode = 0x22
@@ -298,6 +299,8 @@ func (vm *VM) executeInstruction(opcode Opcode) error {
 		return vm.execMul()
 	case OpDiv:
 		return vm.execDiv()
+	case OpMod:
+		return vm.execMod()
 	case OpEq:
 		return vm.execEq()
 	case OpNe:
@@ -560,6 +563,53 @@ func (vm *VM) execDiv() error {
 	}
 
 	return fmt.Errorf("type error: cannot divide %s and %s", a.Type(), b.Type())
+}
+
+// execMod performs modulo/remainder operation
+func (vm *VM) execMod() error {
+	b, err := vm.Pop()
+	if err != nil {
+		return err
+	}
+	a, err := vm.Pop()
+	if err != nil {
+		return err
+	}
+
+	switch av := a.(type) {
+	case IntValue:
+		if bv, ok := b.(IntValue); ok {
+			if bv.Val == 0 {
+				return fmt.Errorf("modulo by zero")
+			}
+			vm.Push(IntValue{Val: av.Val % bv.Val})
+			return nil
+		}
+		if bv, ok := b.(FloatValue); ok {
+			if bv.Val == 0 {
+				return fmt.Errorf("modulo by zero")
+			}
+			vm.Push(FloatValue{Val: math.Mod(float64(av.Val), bv.Val)})
+			return nil
+		}
+	case FloatValue:
+		if bv, ok := b.(FloatValue); ok {
+			if bv.Val == 0 {
+				return fmt.Errorf("modulo by zero")
+			}
+			vm.Push(FloatValue{Val: math.Mod(av.Val, bv.Val)})
+			return nil
+		}
+		if bv, ok := b.(IntValue); ok {
+			if bv.Val == 0 {
+				return fmt.Errorf("modulo by zero")
+			}
+			vm.Push(FloatValue{Val: math.Mod(av.Val, float64(bv.Val))})
+			return nil
+		}
+	}
+
+	return fmt.Errorf("type error: cannot compute modulo of %s and %s", a.Type(), b.Type())
 }
 
 // execEq checks equality

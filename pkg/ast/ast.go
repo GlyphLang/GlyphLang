@@ -1,5 +1,7 @@
 package ast
 
+import "fmt"
+
 // Module represents the top-level AST node
 type Module struct {
 	Items []Item
@@ -278,6 +280,16 @@ type ReturnStatement struct {
 
 func (ReturnStatement) isStatement() {}
 
+// BreakStatement represents a break statement to exit a loop
+type BreakStatement struct{}
+
+func (BreakStatement) isStatement() {}
+
+// ContinueStatement represents a continue statement to skip to next loop iteration
+type ContinueStatement struct{}
+
+func (ContinueStatement) isStatement() {}
+
 // IfStatement represents an if statement
 type IfStatement struct {
 	Condition Expr
@@ -377,6 +389,25 @@ type AssertStatement struct {
 
 func (AssertStatement) isStatement() {}
 
+// Pos represents a source position for error reporting.
+type Pos struct {
+	Line   int
+	Column int
+}
+
+// HasPos returns true if the position has been set (non-zero).
+func (p Pos) HasPos() bool {
+	return p.Line > 0
+}
+
+// String formats the position as "line:column".
+func (p Pos) String() string {
+	if p.Line > 0 {
+		return fmt.Sprintf("%d:%d", p.Line, p.Column)
+	}
+	return ""
+}
+
 // Expr represents an expression in the AST
 type Expr interface {
 	isExpr()
@@ -392,6 +423,7 @@ func (LiteralExpr) isExpr() {}
 // VariableExpr represents a variable reference
 type VariableExpr struct {
 	Name string
+	Pos  Pos
 }
 
 func (VariableExpr) isExpr() {}
@@ -401,6 +433,7 @@ type BinaryOpExpr struct {
 	Op    BinOp
 	Left  Expr
 	Right Expr
+	Pos   Pos
 }
 
 func (BinaryOpExpr) isExpr() {}
@@ -409,6 +442,7 @@ func (BinaryOpExpr) isExpr() {}
 type UnaryOpExpr struct {
 	Op    UnOp
 	Right Expr
+	Pos   Pos
 }
 
 func (UnaryOpExpr) isExpr() {}
@@ -417,6 +451,7 @@ func (UnaryOpExpr) isExpr() {}
 type FieldAccessExpr struct {
 	Object Expr
 	Field  string
+	Pos    Pos
 }
 
 func (FieldAccessExpr) isExpr() {}
@@ -425,6 +460,7 @@ func (FieldAccessExpr) isExpr() {}
 type ArrayIndexExpr struct {
 	Array Expr
 	Index Expr
+	Pos   Pos
 }
 
 func (ArrayIndexExpr) isExpr() {}
@@ -435,6 +471,7 @@ type FunctionCallExpr struct {
 	Name     string
 	TypeArgs []Type // Type arguments for generic function calls (e.g., <int, string>)
 	Args     []Expr
+	Pos      Pos
 }
 
 func (FunctionCallExpr) isExpr() {}
@@ -524,6 +561,7 @@ const (
 	Ge
 	And
 	Or
+	Mod
 )
 
 func (op BinOp) String() string {
@@ -552,6 +590,8 @@ func (op BinOp) String() string {
 		return "&&"
 	case Or:
 		return "||"
+	case Mod:
+		return "%"
 	default:
 		return "UNKNOWN"
 	}
@@ -972,6 +1012,8 @@ func (MacroInvocation) isNode()      {}
 func (AssignStatement) isNode()      {}
 func (DbQueryStatement) isNode()     {}
 func (ReturnStatement) isNode()      {}
+func (BreakStatement) isNode()       {}
+func (ContinueStatement) isNode()    {}
 func (IfStatement) isNode()          {}
 func (WhileStatement) isNode()       {}
 func (SwitchStatement) isNode()      {}

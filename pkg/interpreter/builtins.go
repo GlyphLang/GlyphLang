@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"sort"
 	"strings"
 	"time"
 
@@ -49,6 +50,16 @@ func init() {
 		"set":        builtinSet,
 		"remove":     builtinRemove,
 		"keys":       builtinKeys,
+		"map":        builtinMap,
+		"filter":     builtinFilter,
+		"reduce":     builtinReduce,
+		"find":       builtinFind,
+		"some":       builtinSome,
+		"every":      builtinEvery,
+		"sort":       builtinSort,
+		"reverse":    builtinReverse,
+		"flat":       builtinFlat,
+		"slice":      builtinSlice,
 	}
 }
 
@@ -702,4 +713,363 @@ func builtinKeys(i *Interpreter, args []Expr, env *Environment) (interface{}, er
 		keys = append(keys, k)
 	}
 	return keys, nil
+}
+
+// callCallable invokes a callable (LambdaClosure or Function) with the given arguments.
+func (i *Interpreter) callCallable(fn interface{}, args []interface{}) (interface{}, error) {
+	switch f := fn.(type) {
+	case *LambdaClosure:
+		return i.callLambdaClosure(f, args)
+	case Function:
+		fnEnv := NewChildEnvironment(NewEnvironment())
+		for idx, param := range f.Params {
+			if idx < len(args) {
+				fnEnv.Define(param.Name, args[idx])
+			}
+		}
+		result, err := i.executeStatements(f.Body, fnEnv)
+		if err != nil {
+			if retErr, ok := err.(*returnValue); ok {
+				return retErr.value, nil
+			}
+			return nil, err
+		}
+		return result, nil
+	case *Function:
+		return i.callCallable(*f, args)
+	default:
+		return nil, fmt.Errorf("expected a function, got %T", fn)
+	}
+}
+
+func builtinMap(i *Interpreter, args []Expr, env *Environment) (interface{}, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("map() expects 2 arguments (array, function), got %d", len(args))
+	}
+	arrArg, err := i.EvaluateExpression(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	arr, ok := arrArg.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("map() expects first argument to be an array, got %T", arrArg)
+	}
+	fnArg, err := i.EvaluateExpression(args[1], env)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]interface{}, len(arr))
+	for idx, elem := range arr {
+		val, err := i.callCallable(fnArg, []interface{}{elem})
+		if err != nil {
+			return nil, fmt.Errorf("map() callback error at index %d: %v", idx, err)
+		}
+		result[idx] = val
+	}
+	return result, nil
+}
+
+func builtinFilter(i *Interpreter, args []Expr, env *Environment) (interface{}, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("filter() expects 2 arguments (array, function), got %d", len(args))
+	}
+	arrArg, err := i.EvaluateExpression(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	arr, ok := arrArg.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("filter() expects first argument to be an array, got %T", arrArg)
+	}
+	fnArg, err := i.EvaluateExpression(args[1], env)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]interface{}, 0)
+	for idx, elem := range arr {
+		val, err := i.callCallable(fnArg, []interface{}{elem})
+		if err != nil {
+			return nil, fmt.Errorf("filter() callback error at index %d: %v", idx, err)
+		}
+		if truthy, ok := val.(bool); ok && truthy {
+			result = append(result, elem)
+		}
+	}
+	return result, nil
+}
+
+func builtinReduce(i *Interpreter, args []Expr, env *Environment) (interface{}, error) {
+	if len(args) != 3 {
+		return nil, fmt.Errorf("reduce() expects 3 arguments (array, function, initial), got %d", len(args))
+	}
+	arrArg, err := i.EvaluateExpression(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	arr, ok := arrArg.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("reduce() expects first argument to be an array, got %T", arrArg)
+	}
+	fnArg, err := i.EvaluateExpression(args[1], env)
+	if err != nil {
+		return nil, err
+	}
+	acc, err := i.EvaluateExpression(args[2], env)
+	if err != nil {
+		return nil, err
+	}
+	for idx, elem := range arr {
+		acc, err = i.callCallable(fnArg, []interface{}{acc, elem})
+		if err != nil {
+			return nil, fmt.Errorf("reduce() callback error at index %d: %v", idx, err)
+		}
+	}
+	return acc, nil
+}
+
+func builtinFind(i *Interpreter, args []Expr, env *Environment) (interface{}, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("find() expects 2 arguments (array, function), got %d", len(args))
+	}
+	arrArg, err := i.EvaluateExpression(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	arr, ok := arrArg.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("find() expects first argument to be an array, got %T", arrArg)
+	}
+	fnArg, err := i.EvaluateExpression(args[1], env)
+	if err != nil {
+		return nil, err
+	}
+	for idx, elem := range arr {
+		val, err := i.callCallable(fnArg, []interface{}{elem})
+		if err != nil {
+			return nil, fmt.Errorf("find() callback error at index %d: %v", idx, err)
+		}
+		if truthy, ok := val.(bool); ok && truthy {
+			return elem, nil
+		}
+	}
+	return nil, nil
+}
+
+func builtinSome(i *Interpreter, args []Expr, env *Environment) (interface{}, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("some() expects 2 arguments (array, function), got %d", len(args))
+	}
+	arrArg, err := i.EvaluateExpression(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	arr, ok := arrArg.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("some() expects first argument to be an array, got %T", arrArg)
+	}
+	fnArg, err := i.EvaluateExpression(args[1], env)
+	if err != nil {
+		return nil, err
+	}
+	for idx, elem := range arr {
+		val, err := i.callCallable(fnArg, []interface{}{elem})
+		if err != nil {
+			return nil, fmt.Errorf("some() callback error at index %d: %v", idx, err)
+		}
+		if truthy, ok := val.(bool); ok && truthy {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func builtinEvery(i *Interpreter, args []Expr, env *Environment) (interface{}, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("every() expects 2 arguments (array, function), got %d", len(args))
+	}
+	arrArg, err := i.EvaluateExpression(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	arr, ok := arrArg.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("every() expects first argument to be an array, got %T", arrArg)
+	}
+	fnArg, err := i.EvaluateExpression(args[1], env)
+	if err != nil {
+		return nil, err
+	}
+	for idx, elem := range arr {
+		val, err := i.callCallable(fnArg, []interface{}{elem})
+		if err != nil {
+			return nil, fmt.Errorf("every() callback error at index %d: %v", idx, err)
+		}
+		if truthy, ok := val.(bool); !ok || !truthy {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func builtinSort(i *Interpreter, args []Expr, env *Environment) (interface{}, error) {
+	if len(args) < 1 || len(args) > 2 {
+		return nil, fmt.Errorf("sort() expects 1-2 arguments (array[, comparator]), got %d", len(args))
+	}
+	arrArg, err := i.EvaluateExpression(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	arr, ok := arrArg.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("sort() expects first argument to be an array, got %T", arrArg)
+	}
+	result := make([]interface{}, len(arr))
+	copy(result, arr)
+
+	if len(args) == 2 {
+		fnArg, err := i.EvaluateExpression(args[1], env)
+		if err != nil {
+			return nil, err
+		}
+		var sortErr error
+		sort.SliceStable(result, func(a, b int) bool {
+			if sortErr != nil {
+				return false
+			}
+			val, err := i.callCallable(fnArg, []interface{}{result[a], result[b]})
+			if err != nil {
+				sortErr = err
+				return false
+			}
+			switch v := val.(type) {
+			case int64:
+				return v < 0
+			case float64:
+				return v < 0
+			case bool:
+				return v
+			default:
+				sortErr = fmt.Errorf("sort() comparator must return a number or boolean, got %T", val)
+				return false
+			}
+		})
+		if sortErr != nil {
+			return nil, sortErr
+		}
+	} else {
+		var sortErr error
+		sort.SliceStable(result, func(a, b int) bool {
+			if sortErr != nil {
+				return false
+			}
+			return defaultLess(result[a], result[b], &sortErr)
+		})
+		if sortErr != nil {
+			return nil, sortErr
+		}
+	}
+	return result, nil
+}
+
+func defaultLess(a, b interface{}, errOut *error) bool {
+	switch av := a.(type) {
+	case int64:
+		if bv, ok := b.(int64); ok {
+			return av < bv
+		}
+	case float64:
+		if bv, ok := b.(float64); ok {
+			return av < bv
+		}
+	case string:
+		if bv, ok := b.(string); ok {
+			return av < bv
+		}
+	}
+	*errOut = fmt.Errorf("sort() cannot compare %T and %T", a, b)
+	return false
+}
+
+func builtinReverse(i *Interpreter, args []Expr, env *Environment) (interface{}, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("reverse() expects 1 argument (array), got %d", len(args))
+	}
+	arrArg, err := i.EvaluateExpression(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	arr, ok := arrArg.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("reverse() expects an array argument, got %T", arrArg)
+	}
+	result := make([]interface{}, len(arr))
+	for idx, elem := range arr {
+		result[len(arr)-1-idx] = elem
+	}
+	return result, nil
+}
+
+func builtinFlat(i *Interpreter, args []Expr, env *Environment) (interface{}, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("flat() expects 1 argument (array), got %d", len(args))
+	}
+	arrArg, err := i.EvaluateExpression(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	arr, ok := arrArg.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("flat() expects an array argument, got %T", arrArg)
+	}
+	result := make([]interface{}, 0)
+	for _, elem := range arr {
+		if inner, ok := elem.([]interface{}); ok {
+			result = append(result, inner...)
+		} else {
+			result = append(result, elem)
+		}
+	}
+	return result, nil
+}
+
+func builtinSlice(i *Interpreter, args []Expr, env *Environment) (interface{}, error) {
+	if len(args) != 3 {
+		return nil, fmt.Errorf("slice() expects 3 arguments (array, start, end), got %d", len(args))
+	}
+	arrArg, err := i.EvaluateExpression(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	arr, ok := arrArg.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("slice() expects first argument to be an array, got %T", arrArg)
+	}
+	startArg, err := i.EvaluateExpression(args[1], env)
+	if err != nil {
+		return nil, err
+	}
+	start, ok := startArg.(int64)
+	if !ok {
+		return nil, fmt.Errorf("slice() expects second argument to be an integer, got %T", startArg)
+	}
+	endArg, err := i.EvaluateExpression(args[2], env)
+	if err != nil {
+		return nil, err
+	}
+	end, ok := endArg.(int64)
+	if !ok {
+		return nil, fmt.Errorf("slice() expects third argument to be an integer, got %T", endArg)
+	}
+	if start < 0 {
+		start = 0
+	}
+	if end > int64(len(arr)) {
+		end = int64(len(arr))
+	}
+	if start > end {
+		return make([]interface{}, 0), nil
+	}
+	result := make([]interface{}, end-start)
+	copy(result, arr[start:end])
+	return result, nil
 }

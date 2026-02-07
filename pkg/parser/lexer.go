@@ -401,6 +401,10 @@ func (l *Lexer) readIdentifier() Token {
 		tok.Type = CONST
 	case "assert":
 		tok.Type = ASSERT
+	case "break":
+		tok.Type = BREAK
+	case "continue":
+		tok.Type = CONTINUE
 	default:
 		tok.Type = IDENT
 	}

@@ -16,6 +16,20 @@ func (r *returnValue) Error() string {
 	return "return"
 }
 
+// breakValue is a special error type to handle break statements (same pattern as returnValue above)
+type breakValue struct{}
+
+func (b *breakValue) Error() string {
+	return "break"
+}
+
+// continueValue is a special error type to handle continue statements (same pattern as returnValue above)
+type continueValue struct{}
+
+func (c *continueValue) Error() string {
+	return "continue"
+}
+
 // AssertionError represents a failed test assertion
 type AssertionError struct {
 	Message string
@@ -88,6 +102,15 @@ func (i *Interpreter) ExecuteStatement(stmt Statement, env *Environment) (interf
 
 	case ExpressionStatement:
 		return i.EvaluateExpression(s.Expr, env)
+
+	case MacroInvocation:
+		return i.executeMacroInvocation(s, env)
+
+	case BreakStatement:
+		return nil, &breakValue{}
+
+	case ContinueStatement:
+		return nil, &continueValue{}
 
 	default:
 		return nil, fmt.Errorf("unsupported statement type: %T", stmt)
@@ -296,6 +319,12 @@ func (i *Interpreter) executeWhile(stmt WhileStatement, env *Environment) (inter
 		// Execute loop body
 		result, err = i.executeStatements(stmt.Body, loopEnv)
 		if err != nil {
+			if _, isBreak := err.(*breakValue); isBreak {
+				break
+			}
+			if _, isContinue := err.(*continueValue); isContinue {
+				continue
+			}
 			// Check if it's a return statement
 			if _, isReturn := err.(*returnValue); isReturn {
 				return result, err
@@ -333,6 +362,12 @@ func (i *Interpreter) executeFor(stmt ForStatement, env *Environment) (interface
 			// Execute loop body
 			result, err = i.executeStatements(stmt.Body, loopEnv)
 			if err != nil {
+				if _, isBreak := err.(*breakValue); isBreak {
+					return result, nil
+				}
+				if _, isContinue := err.(*continueValue); isContinue {
+					continue
+				}
 				// Check if it's a return statement
 				if _, isReturn := err.(*returnValue); isReturn {
 					return result, err
@@ -358,6 +393,12 @@ func (i *Interpreter) executeFor(stmt ForStatement, env *Environment) (interface
 			// Execute loop body
 			result, err = i.executeStatements(stmt.Body, loopEnv)
 			if err != nil {
+				if _, isBreak := err.(*breakValue); isBreak {
+					return result, nil
+				}
+				if _, isContinue := err.(*continueValue); isContinue {
+					continue
+				}
 				// Check if it's a return statement
 				if _, isReturn := err.(*returnValue); isReturn {
 					return result, err

@@ -76,6 +76,8 @@ const (
 	CONST     // const
 	TEST      // test
 	ASSERT    // assert
+	BREAK     // break
+	CONTINUE  // continue
 )
 
 // Token represents a lexical token
@@ -215,6 +217,10 @@ func (t TokenType) String() string {
 		return "TEST"
 	case ASSERT:
 		return "ASSERT"
+	case BREAK:
+		return "BREAK"
+	case CONTINUE:
+		return "CONTINUE"
 	default:
 		return "UNKNOWN"
 	}
