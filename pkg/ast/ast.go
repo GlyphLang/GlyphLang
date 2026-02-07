@@ -524,6 +524,7 @@ const (
 	Ge
 	And
 	Or
+	Mod
 )
 
 func (op BinOp) String() string {
@@ -552,6 +553,8 @@ func (op BinOp) String() string {
 		return "&&"
 	case Or:
 		return "||"
+	case Mod:
+		return "%"
 	default:
 		return "UNKNOWN"
 	}
