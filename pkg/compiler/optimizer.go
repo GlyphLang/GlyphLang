@@ -869,6 +869,15 @@ func getUsedVariablesInExpr(expr ast.Expr, used map[string]bool) {
 		}
 	case *ast.FieldAccessExpr:
 		getUsedVariablesInExpr(e.Object, used)
+	case *ast.UnaryOpExpr:
+		getUsedVariablesInExpr(e.Right, used)
+	case *ast.ArrayIndexExpr:
+		getUsedVariablesInExpr(e.Array, used)
+		getUsedVariablesInExpr(e.Index, used)
+	case *ast.FunctionCallExpr:
+		for _, arg := range e.Args {
+			getUsedVariablesInExpr(arg, used)
+		}
 	}
 }
 
