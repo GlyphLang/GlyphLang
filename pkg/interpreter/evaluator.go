@@ -614,42 +614,6 @@ func (i *Interpreter) evaluateGe(left, right interface{}) (interface{}, error) {
 	return nil, fmt.Errorf("cannot compare %T and %T", left, right)
 }
 
-// evaluateAnd handles logical AND operation
-func (i *Interpreter) evaluateAnd(left, right interface{}) (interface{}, error) {
-	// Check that left is a boolean
-	leftBool, ok := left.(bool)
-	if !ok {
-		return nil, fmt.Errorf("logical AND operator requires boolean operands, got %T", left)
-	}
-
-	// Check that right is a boolean
-	rightBool, ok := right.(bool)
-	if !ok {
-		return nil, fmt.Errorf("logical AND operator requires boolean operands, got %T", right)
-	}
-
-	// Both operands must be true for AND to return true
-	return leftBool && rightBool, nil
-}
-
-// evaluateOr handles logical OR operation
-func (i *Interpreter) evaluateOr(left, right interface{}) (interface{}, error) {
-	// Check that left is a boolean
-	leftBool, ok := left.(bool)
-	if !ok {
-		return nil, fmt.Errorf("logical OR operator requires boolean operands, got %T", left)
-	}
-
-	// Check that right is a boolean
-	rightBool, ok := right.(bool)
-	if !ok {
-		return nil, fmt.Errorf("logical OR operator requires boolean operands, got %T", right)
-	}
-
-	// At least one operand must be true for OR to return true
-	return leftBool || rightBool, nil
-}
-
 // evaluateFieldAccess handles field access on objects (maps) and database handlers
 func (i *Interpreter) evaluateFieldAccess(expr FieldAccessExpr, env *Environment) (interface{}, error) {
 	obj, err := i.EvaluateExpression(expr.Object, env)
