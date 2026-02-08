@@ -558,8 +558,8 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 	result, err := i.executeStatements(route.Body, routeEnv)
 	if err != nil {
 		// Check if it's a return value
-		if retErr, ok := err.(*returnValue); ok {
-			result = retErr.value
+		if val, isReturn := unwrapReturn(err); isReturn {
+			result = val
 		} else {
 			return &Response{
 				StatusCode: 500,
@@ -635,8 +635,8 @@ func (i *Interpreter) ExecuteRouteSimple(route *Route, pathParams map[string]str
 	result, err := i.executeStatements(route.Body, routeEnv)
 	if err != nil {
 		// Check if it's a return value
-		if retErr, ok := err.(*returnValue); ok {
-			result = retErr.value
+		if val, isReturn := unwrapReturn(err); isReturn {
+			result = val
 		} else {
 			return nil, err
 		}
@@ -770,8 +770,8 @@ func (i *Interpreter) ExecuteCommand(cmd *Command, args map[string]interface{}) 
 	// Execute command body
 	result, err := i.executeStatements(cmd.Body, cmdEnv)
 	if err != nil {
-		if retErr, ok := err.(*returnValue); ok {
-			result = retErr.value
+		if val, isReturn := unwrapReturn(err); isReturn {
+			result = val
 		} else {
 			return nil, err
 		}
@@ -800,8 +800,8 @@ func (i *Interpreter) ExecuteCronTask(task *CronTask) (interface{}, error) {
 	// Execute task body
 	result, err := i.executeStatements(task.Body, taskEnv)
 	if err != nil {
-		if retErr, ok := err.(*returnValue); ok {
-			result = retErr.value
+		if val, isReturn := unwrapReturn(err); isReturn {
+			result = val
 		} else {
 			return nil, err
 		}
@@ -827,8 +827,8 @@ func (i *Interpreter) ExecuteEventHandler(handler *EventHandler, eventData inter
 	// Execute handler body
 	result, err := i.executeStatements(handler.Body, handlerEnv)
 	if err != nil {
-		if retErr, ok := err.(*returnValue); ok {
-			result = retErr.value
+		if val, isReturn := unwrapReturn(err); isReturn {
+			result = val
 		} else {
 			return nil, err
 		}
@@ -877,8 +877,8 @@ func (i *Interpreter) ExecuteQueueWorker(worker *QueueWorker, message interface{
 	// Execute worker body
 	result, err := i.executeStatements(worker.Body, workerEnv)
 	if err != nil {
-		if retErr, ok := err.(*returnValue); ok {
-			result = retErr.value
+		if val, isReturn := unwrapReturn(err); isReturn {
+			result = val
 		} else {
 			return nil, err
 		}
@@ -957,8 +957,8 @@ func (i *Interpreter) ExecuteGRPCHandler(handler *GRPCHandler, args map[string]i
 
 	result, err := i.executeStatements(handler.Body, handlerEnv)
 	if err != nil {
-		if retErr, ok := err.(*returnValue); ok {
-			result = retErr.value
+		if val, isReturn := unwrapReturn(err); isReturn {
+			result = val
 		} else {
 			return nil, err
 		}
@@ -1002,8 +1002,8 @@ func (i *Interpreter) ExecuteGraphQLResolver(resolver *GraphQLResolver, args map
 
 	result, err := i.executeStatements(resolver.Body, resolverEnv)
 	if err != nil {
-		if retErr, ok := err.(*returnValue); ok {
-			result = retErr.value
+		if val, isReturn := unwrapReturn(err); isReturn {
+			result = val
 		} else {
 			return nil, err
 		}
@@ -1048,7 +1048,7 @@ func (i *Interpreter) runSingleTest(test TestBlock) TestResult {
 	duration := time.Since(start)
 
 	if err != nil {
-		if _, ok := err.(*returnValue); ok {
+		if _, isReturn := unwrapReturn(err); isReturn {
 			return TestResult{Name: test.Name, Passed: true, Duration: duration}
 		}
 		return TestResult{Name: test.Name, Passed: false, Error: err.Error(), Duration: duration}

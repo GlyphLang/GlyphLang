@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -461,8 +462,38 @@ func (l *Lexer) readString() Token {
 				builder.WriteByte('\'')
 			case '\\':
 				builder.WriteByte('\\')
+			case '0':
+				builder.WriteByte(0)
+			case 'a':
+				builder.WriteByte('\a')
+			case 'b':
+				builder.WriteByte('\b')
+			case 'f':
+				builder.WriteByte('\f')
+			case 'v':
+				builder.WriteByte('\v')
+			case 'x':
+				hex := l.readHexDigits(2)
+				if len(hex) != 2 {
+					return Token{Type: ILLEGAL, Literal: "invalid \\x escape: expected 2 hex digits", Line: startLine, Column: startColumn}
+				}
+				val, err := strconv.ParseUint(hex, 16, 8)
+				if err != nil {
+					return Token{Type: ILLEGAL, Literal: fmt.Sprintf("invalid \\x escape: %v", err), Line: startLine, Column: startColumn}
+				}
+				builder.WriteByte(byte(val))
+			case 'u':
+				hex := l.readHexDigits(4)
+				if len(hex) != 4 {
+					return Token{Type: ILLEGAL, Literal: "invalid \\u escape: expected 4 hex digits", Line: startLine, Column: startColumn}
+				}
+				val, err := strconv.ParseUint(hex, 16, 32)
+				if err != nil {
+					return Token{Type: ILLEGAL, Literal: fmt.Sprintf("invalid \\u escape: %v", err), Line: startLine, Column: startColumn}
+				}
+				builder.WriteRune(rune(val))
 			default:
-				builder.WriteByte(l.ch)
+				return Token{Type: ILLEGAL, Literal: fmt.Sprintf("unknown escape sequence: \\%c", l.ch), Line: startLine, Column: startColumn}
 			}
 			l.readChar()
 		} else {
@@ -490,6 +521,25 @@ func (l *Lexer) readString() Token {
 		Line:    startLine,
 		Column:  startColumn,
 	}
+}
+
+// readHexDigits reads up to n hex digits from the input without consuming the
+// final character (the caller's readChar handles that). Returns the hex string.
+func (l *Lexer) readHexDigits(n int) string {
+	var hex strings.Builder
+	for range n {
+		next := l.peekChar()
+		if !isHexDigit(next) {
+			break
+		}
+		l.readChar()
+		hex.WriteByte(l.ch)
+	}
+	return hex.String()
+}
+
+func isHexDigit(ch byte) bool {
+	return (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')
 }
 
 // skipWhitespaceExceptNewlines skips spaces and tabs but not newlines

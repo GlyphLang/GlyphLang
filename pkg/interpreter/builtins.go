@@ -5,6 +5,7 @@ import (
 	"math"
 	"math/rand"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -300,11 +301,11 @@ func builtinSubstring(i *Interpreter, args []Expr, env *Environment) (interface{
 		return nil, fmt.Errorf("substring() start index must be less than or equal to end index")
 	}
 	runes := []rune(str)
-	if int(end) > len(runes) {
-		end = int64(len(runes))
-	}
 	if int(start) > len(runes) {
-		start = int64(len(runes))
+		return nil, fmt.Errorf("substring() start index out of bounds: %d (length %d)", start, len(runes))
+	}
+	if int(end) > len(runes) {
+		return nil, fmt.Errorf("substring() end index out of bounds: %d (length %d)", end, len(runes))
 	}
 	return string(runes[start:end]), nil
 }
@@ -450,8 +451,7 @@ func builtinParseInt(i *Interpreter, args []Expr, env *Environment) (interface{}
 		return nil, fmt.Errorf("parseInt() expects a string argument, got %T", arg)
 	}
 	str = strings.TrimSpace(str)
-	var result int64
-	_, err = fmt.Sscanf(str, "%d", &result)
+	result, err := strconv.ParseInt(str, 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("parseInt() failed to parse '%s': %v", str, err)
 	}
@@ -472,8 +472,7 @@ func builtinParseFloat(i *Interpreter, args []Expr, env *Environment) (interface
 		return nil, fmt.Errorf("parseFloat() expects a string argument, got %T", arg)
 	}
 	str = strings.TrimSpace(str)
-	var result float64
-	_, err = fmt.Sscanf(str, "%f", &result)
+	result, err := strconv.ParseFloat(str, 64)
 	if err != nil {
 		return nil, fmt.Errorf("parseFloat() failed to parse '%s': %v", str, err)
 	}
@@ -729,8 +728,8 @@ func (i *Interpreter) callCallable(fn interface{}, args []interface{}) (interfac
 		}
 		result, err := i.executeStatements(f.Body, fnEnv)
 		if err != nil {
-			if retErr, ok := err.(*returnValue); ok {
-				return retErr.value, nil
+			if val, isReturn := unwrapReturn(err); isReturn {
+				return val, nil
 			}
 			return nil, err
 		}

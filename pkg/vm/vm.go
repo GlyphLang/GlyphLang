@@ -1546,11 +1546,11 @@ func (vm *VM) registerBuiltins() {
 		}
 		runes := []rune(str.Val)
 		strLen := int64(len(runes))
-		if end.Val > strLen {
-			end.Val = strLen
-		}
 		if start.Val > strLen {
-			start.Val = strLen
+			return nil, fmt.Errorf("substring() start index out of bounds: %d (length %d)", start.Val, strLen)
+		}
+		if end.Val > strLen {
+			return nil, fmt.Errorf("substring() end index out of bounds: %d (length %d)", end.Val, strLen)
 		}
 		return StringValue{Val: string(runes[start.Val:end.Val])}, nil
 	}
