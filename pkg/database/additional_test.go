@@ -164,20 +164,23 @@ func TestNewDatabase_MySQL(t *testing.T) {
 	assert.Equal(t, "mysql", db.Driver())
 }
 
-// TestNewDatabase_SQLite tests SQLite driver error
+// TestNewDatabase_SQLite tests SQLite driver creation
 func TestNewDatabase_SQLite(t *testing.T) {
 	config := &Config{
 		Driver: "sqlite",
 	}
 
-	_, err := NewDatabase(config)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "SQLite driver not yet implemented")
+	db, err := NewDatabase(config)
+	require.NoError(t, err)
+	assert.NotNil(t, db)
+	assert.Equal(t, "sqlite", db.Driver())
 
 	// Test sqlite3 variant
 	config.Driver = "sqlite3"
-	_, err = NewDatabase(config)
-	assert.Error(t, err)
+	db, err = NewDatabase(config)
+	require.NoError(t, err)
+	assert.NotNil(t, db)
+	assert.Equal(t, "sqlite", db.Driver())
 }
 
 // TestParseConnectionString_EmptyScheme tests empty scheme error
@@ -1758,12 +1761,13 @@ func TestNewDatabase_MySQLImplemented(t *testing.T) {
 	assert.Equal(t, "mysql", db.Driver())
 }
 
-// TestNewDatabase_SQLiteNotImplemented tests NewDatabase with SQLite driver
-func TestNewDatabase_SQLiteNotImplemented(t *testing.T) {
+// TestNewDatabase_SQLiteImplemented tests NewDatabase with SQLite driver
+func TestNewDatabase_SQLiteImplemented(t *testing.T) {
 	config := &Config{Driver: "sqlite"}
-	_, err := NewDatabase(config)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "SQLite driver not yet implemented")
+	db, err := NewDatabase(config)
+	require.NoError(t, err)
+	assert.NotNil(t, db)
+	assert.Equal(t, "sqlite", db.Driver())
 }
 
 // TestConfig_ConnectionStringEmpty tests Config ConnectionString with unknown driver
