@@ -1098,7 +1098,6 @@ func TestBuiltinString_Substring(t *testing.T) {
 		{"middle_range", "hello world", 6, 11, "world"},
 		{"full_string", "test", 0, 4, "test"},
 		{"empty_string", "test", 2, 2, ""},
-		{"beyond_length", "test", 0, 10, "test"},
 	}
 
 	for _, tt := range tests {
@@ -1117,4 +1116,16 @@ func TestBuiltinString_Substring(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("beyond_length", func(t *testing.T) {
+		vm := NewVM()
+		_, err := vm.builtins["substring"]([]Value{
+			StringValue{Val: "test"},
+			IntValue{Val: 0},
+			IntValue{Val: 10},
+		})
+		if err == nil {
+			t.Error("Expected error for out-of-bounds end index")
+		}
+	})
 }
