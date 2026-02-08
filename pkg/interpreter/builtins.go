@@ -5,6 +5,7 @@ import (
 	"math"
 	"math/rand"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -450,8 +451,7 @@ func builtinParseInt(i *Interpreter, args []Expr, env *Environment) (interface{}
 		return nil, fmt.Errorf("parseInt() expects a string argument, got %T", arg)
 	}
 	str = strings.TrimSpace(str)
-	var result int64
-	_, err = fmt.Sscanf(str, "%d", &result)
+	result, err := strconv.ParseInt(str, 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("parseInt() failed to parse '%s': %v", str, err)
 	}
@@ -472,8 +472,7 @@ func builtinParseFloat(i *Interpreter, args []Expr, env *Environment) (interface
 		return nil, fmt.Errorf("parseFloat() expects a string argument, got %T", arg)
 	}
 	str = strings.TrimSpace(str)
-	var result float64
-	_, err = fmt.Sscanf(str, "%f", &result)
+	result, err := strconv.ParseFloat(str, 64)
 	if err != nil {
 		return nil, fmt.Errorf("parseFloat() failed to parse '%s': %v", str, err)
 	}
