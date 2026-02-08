@@ -142,22 +142,23 @@ func (c *Compiler) CompileRoute(route *ast.Route) ([]byte, error) {
 	}
 
 	// Add built-in request variables that are auto-injected at runtime
+	// These use DefineBuiltin so user code can shadow them with typed parameters
 	// query - URL query parameters (always available)
 	queryIdx := c.addConstant(vm.StringValue{Val: "query"})
-	c.symbolTable.Define("query", queryIdx)
+	c.symbolTable.DefineBuiltin("query", queryIdx)
 
 	// input - Request body (always available, may be nil)
 	inputIdx := c.addConstant(vm.StringValue{Val: "input"})
-	c.symbolTable.Define("input", inputIdx)
+	c.symbolTable.DefineBuiltin("input", inputIdx)
 
 	// ws - WebSocket manager (for accessing WebSocket state from REST routes)
 	wsIdx := c.addConstant(vm.StringValue{Val: "ws"})
-	c.symbolTable.Define("ws", wsIdx)
+	c.symbolTable.DefineBuiltin("ws", wsIdx)
 
 	// auth - Authenticated user info (available when route has + auth middleware)
 	if route.Auth != nil {
 		authIdx := c.addConstant(vm.StringValue{Val: "auth"})
-		c.symbolTable.Define("auth", authIdx)
+		c.symbolTable.DefineBuiltin("auth", authIdx)
 	}
 
 	// Optimize route body before compilation
@@ -373,7 +374,8 @@ func (c *Compiler) compileStatement(stmt ast.Statement) error {
 func (c *Compiler) compileAssignStatement(stmt *ast.AssignStatement) error {
 	// Check for redeclaration in current scope (issue #70)
 	// Variables declared with $ cannot be redeclared in the same scope
-	if _, exists := c.symbolTable.ResolveLocal(stmt.Target); exists {
+	// Built-in variables (query, input, ws, auth) can be shadowed by user declarations
+	if existing, exists := c.symbolTable.ResolveLocal(stmt.Target); exists && !existing.IsBuiltin {
 		return &SemanticError{Message: fmt.Sprintf("cannot redeclare variable '%s' in the same scope", stmt.Target)}
 	}
 
