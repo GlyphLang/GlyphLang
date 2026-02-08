@@ -728,8 +728,8 @@ func (i *Interpreter) callCallable(fn interface{}, args []interface{}) (interfac
 		}
 		result, err := i.executeStatements(f.Body, fnEnv)
 		if err != nil {
-			if retErr, ok := err.(*returnValue); ok {
-				return retErr.value, nil
+			if val, isReturn := unwrapReturn(err); isReturn {
+				return val, nil
 			}
 			return nil, err
 		}

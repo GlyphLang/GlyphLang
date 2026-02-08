@@ -16,6 +16,15 @@ func (r *returnValue) Error() string {
 	return "return"
 }
 
+// unwrapReturn checks if an error is a return value signal.
+// Returns the return value and true if it is, nil and false otherwise.
+func unwrapReturn(err error) (interface{}, bool) {
+	if retErr, ok := err.(*returnValue); ok {
+		return retErr.value, true
+	}
+	return nil, false
+}
+
 // breakValue is a special error type to handle break statements (same pattern as returnValue above)
 type breakValue struct{}
 
@@ -326,7 +335,7 @@ func (i *Interpreter) executeWhile(stmt WhileStatement, env *Environment) (inter
 				continue
 			}
 			// Check if it's a return statement
-			if _, isReturn := err.(*returnValue); isReturn {
+			if _, isReturn := unwrapReturn(err); isReturn {
 				return result, err
 			}
 			return nil, err
@@ -369,7 +378,7 @@ func (i *Interpreter) executeFor(stmt ForStatement, env *Environment) (interface
 					continue
 				}
 				// Check if it's a return statement
-				if _, isReturn := err.(*returnValue); isReturn {
+				if _, isReturn := unwrapReturn(err); isReturn {
 					return result, err
 				}
 				return nil, err
@@ -400,7 +409,7 @@ func (i *Interpreter) executeFor(stmt ForStatement, env *Environment) (interface
 					continue
 				}
 				// Check if it's a return statement
-				if _, isReturn := err.(*returnValue); isReturn {
+				if _, isReturn := unwrapReturn(err); isReturn {
 					return result, err
 				}
 				return nil, err

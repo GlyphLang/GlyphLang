@@ -142,8 +142,8 @@ func (i *Interpreter) evaluateAsyncExpr(expr AsyncExpr, env *Environment) (inter
 
 		if err != nil {
 			// Check if it's a return value (which is normal for returning from async blocks)
-			if retErr, ok := err.(*returnValue); ok {
-				future.Resolve(retErr.value)
+			if val, isReturn := unwrapReturn(err); isReturn {
+				future.Resolve(val)
 			} else {
 				future.Reject(err)
 			}
@@ -908,8 +908,8 @@ func (i *Interpreter) executeFunction(fn Function, args []Expr, env *Environment
 	// Execute function body
 	result, err := i.executeStatements(fn.Body, fnEnv)
 	if err != nil {
-		if retErr, ok := err.(*returnValue); ok {
-			result = retErr.value
+		if val, isReturn := unwrapReturn(err); isReturn {
+			result = val
 		} else {
 			return nil, err
 		}
@@ -1006,8 +1006,8 @@ func (i *Interpreter) executeGenericFunction(fn Function, typeArgs []Type, args 
 	// Execute function body
 	result, err := i.executeStatements(fn.Body, fnEnv)
 	if err != nil {
-		if retErr, ok := err.(*returnValue); ok {
-			result = retErr.value
+		if val, isReturn := unwrapReturn(err); isReturn {
+			result = val
 		} else {
 			return nil, err
 		}
@@ -1399,8 +1399,8 @@ func (i *Interpreter) executeFunctionWithValues(fn Function, argVals []interface
 	// Execute function body
 	result, err := i.executeStatements(fn.Body, fnEnv)
 	if err != nil {
-		if retErr, ok := err.(*returnValue); ok {
-			result = retErr.value
+		if val, isReturn := unwrapReturn(err); isReturn {
+			result = val
 		} else {
 			return nil, err
 		}
@@ -1448,8 +1448,8 @@ func (i *Interpreter) callLambdaClosure(closure *LambdaClosure, args []interface
 	if len(closure.Lambda.Block) > 0 {
 		result, err := i.executeStatements(closure.Lambda.Block, lambdaEnv)
 		if err != nil {
-			if retErr, ok := err.(*returnValue); ok {
-				return retErr.value, nil
+			if val, isReturn := unwrapReturn(err); isReturn {
+				return val, nil
 			}
 			return nil, err
 		}
@@ -1554,8 +1554,8 @@ func (i *Interpreter) callFnArg(fn interface{}, arg interface{}, env *Environmen
 		}
 		result, err := i.executeStatements(f.Body, fnEnv)
 		if err != nil {
-			if retErr, ok := err.(*returnValue); ok {
-				return retErr.value, nil
+			if val, isReturn := unwrapReturn(err); isReturn {
+				return val, nil
 			}
 			return nil, err
 		}
@@ -1573,8 +1573,8 @@ func (i *Interpreter) callFnArg(fn interface{}, arg interface{}, env *Environmen
 		if len(f.Lambda.Block) > 0 {
 			result, err := i.executeStatements(f.Lambda.Block, fnEnv)
 			if err != nil {
-				if retErr, ok := err.(*returnValue); ok {
-					return retErr.value, nil
+				if val, isReturn := unwrapReturn(err); isReturn {
+					return val, nil
 				}
 				return nil, err
 			}
