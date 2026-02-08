@@ -62,12 +62,26 @@ func ParseConnectionString(connStr string) (*Config, error) {
 	config := &Config{
 		Driver:          u.Scheme,
 		Host:            u.Hostname(),
-		Database:        u.Path[1:], // Remove leading slash
 		SSLMode:         "prefer",
 		MaxOpenConns:    25,
 		MaxIdleConns:    5,
 		ConnMaxLifetime: 5 * time.Minute,
 		ConnMaxIdleTime: 5 * time.Minute,
+	}
+
+	// Handle SQLite file-based paths
+	switch config.Driver {
+	case "sqlite", "sqlite3":
+		// SQLite uses file paths: sqlite:///path/to/db.sqlite or sqlite://:memory:
+		config.Database = u.Path
+		if config.Database == "" {
+			config.Database = u.Host // Handle sqlite://:memory:
+		}
+		return config, nil
+	default:
+		if len(u.Path) > 1 {
+			config.Database = u.Path[1:] // Remove leading slash
+		}
 	}
 
 	// Parse port
@@ -119,6 +133,8 @@ func (c *Config) String() string {
 	case "mysql":
 		return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
 			c.Username, password, c.Host, c.Port, c.Database)
+	case "sqlite", "sqlite3":
+		return fmt.Sprintf("sqlite://%s", c.Database)
 	default:
 		return fmt.Sprintf("%s://%s@%s:%d/%s", c.Driver, c.Username, c.Host, c.Port, c.Database)
 	}
@@ -135,6 +151,11 @@ func (c *Config) ConnectionString() string {
 	case "mysql":
 		return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
 			c.Username, c.Password, c.Host, c.Port, c.Database)
+	case "sqlite", "sqlite3":
+		if c.Database == "" {
+			return ":memory:"
+		}
+		return c.Database
 	default:
 		return ""
 	}
@@ -149,6 +170,11 @@ func (c *Config) SafeConnectionString() string {
 	case "mysql":
 		return fmt.Sprintf("%s:****@tcp(%s:%d)/%s",
 			c.Username, c.Host, c.Port, c.Database)
+	case "sqlite", "sqlite3":
+		if c.Database == "" {
+			return "sqlite://:memory:"
+		}
+		return fmt.Sprintf("sqlite://%s", c.Database)
 	default:
 		return ""
 	}
@@ -163,7 +189,7 @@ func NewDatabase(config *Config) (Database, error) {
 		// NewMySQLDB is defined in mysql.go - mirrors NewPostgresDB pattern
 		return NewMySQLDB(config), nil
 	case "sqlite", "sqlite3":
-		return nil, fmt.Errorf("SQLite driver not yet implemented")
+		return NewSQLiteDB(config), nil
 	default:
 		return nil, fmt.Errorf("unsupported database driver: %s", config.Driver)
 	}
