@@ -3725,7 +3725,6 @@ func TestBuiltinFunction_Substring(t *testing.T) {
 		{"middle_range", "hello world", 6, 11, "world"},
 		{"full_string", "test", 0, 4, "test"},
 		{"empty_string", "test", 2, 2, ""},
-		{"beyond_length", "test", 0, 10, "test"},
 	}
 
 	for _, tt := range tests {
@@ -3744,6 +3743,21 @@ func TestBuiltinFunction_Substring(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+
+	t.Run("beyond_length", func(t *testing.T) {
+		expr := FunctionCallExpr{
+			Name: "substring",
+			Args: []Expr{
+				LiteralExpr{Value: StringLiteral{Value: "test"}},
+				LiteralExpr{Value: IntLiteral{Value: 0}},
+				LiteralExpr{Value: IntLiteral{Value: 10}},
+			},
+		}
+
+		_, err := interp.evaluateFunctionCall(expr, env)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "out of bounds")
+	})
 }
 
 func TestBuiltinFunction_Length(t *testing.T) {
