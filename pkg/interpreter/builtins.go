@@ -301,11 +301,11 @@ func builtinSubstring(i *Interpreter, args []Expr, env *Environment) (interface{
 		return nil, fmt.Errorf("substring() start index must be less than or equal to end index")
 	}
 	runes := []rune(str)
-	if int(end) > len(runes) {
-		end = int64(len(runes))
-	}
 	if int(start) > len(runes) {
-		start = int64(len(runes))
+		return nil, fmt.Errorf("substring() start index out of bounds: %d (length %d)", start, len(runes))
+	}
+	if int(end) > len(runes) {
+		return nil, fmt.Errorf("substring() end index out of bounds: %d (length %d)", end, len(runes))
 	}
 	return string(runes[start:end]), nil
 }
