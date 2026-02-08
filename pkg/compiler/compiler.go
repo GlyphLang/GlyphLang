@@ -26,6 +26,13 @@ func IsSemanticError(err error) bool {
 	return ok
 }
 
+// loopContext tracks the compiler state for the current loop, used for
+// break and continue statement compilation.
+type loopContext struct {
+	continueTarget int   // code offset to jump to on continue (loop start)
+	breakJumps     []int // code offsets of break jumps to patch when loop ends
+}
+
 // Compiler compiles AST to bytecode
 type Compiler struct {
 	constants     []vm.Value
@@ -34,6 +41,7 @@ type Compiler struct {
 	labelCounter  int
 	optimizer     *Optimizer
 	macroExpander *MacroExpander
+	loopStack     []loopContext
 }
 
 // NewCompiler creates a new compiler instance
@@ -66,6 +74,7 @@ func (c *Compiler) Reset() {
 	c.code = make([]byte, 0)
 	c.symbolTable = NewGlobalSymbolTable()
 	c.labelCounter = 0
+	c.loopStack = nil
 	// Keep the optimizer with its current settings
 }
 
@@ -318,6 +327,10 @@ func normalizeStatement(stmt ast.Statement) ast.Statement {
 		return *s
 	case *ast.ReassignStatement:
 		return *s
+	case *ast.BreakStatement:
+		return *s
+	case *ast.ContinueStatement:
+		return *s
 	default:
 		return stmt
 	}
@@ -345,6 +358,12 @@ func (c *Compiler) compileStatement(stmt ast.Statement) error {
 		return c.compileExpressionStatement(&s)
 	case ast.ReassignStatement:
 		return c.compileReassignStatement(&s)
+	case ast.BreakStatement:
+		_ = s
+		return c.compileBreakStatement()
+	case ast.ContinueStatement:
+		_ = s
+		return c.compileContinueStatement()
 	default:
 		return fmt.Errorf("unsupported statement type: %T", stmt)
 	}
@@ -480,6 +499,9 @@ func (c *Compiler) compileWhileStatement(stmt *ast.WhileStatement) error {
 	jumpToEnd := len(c.code)
 	c.emitWithOperand(vm.OpJumpIfFalse, 0) // Placeholder
 
+	// Push loop context for break/continue
+	c.pushLoop(loopStart)
+
 	// Enter block scope for the loop body
 	c.symbolTable = c.symbolTable.EnterScope(BlockScope)
 
@@ -499,6 +521,9 @@ func (c *Compiler) compileWhileStatement(stmt *ast.WhileStatement) error {
 	// Patch jump to end
 	endOffset := len(c.code)
 	c.patchJump(jumpToEnd, uint32(endOffset))
+
+	// Pop loop context and patch all break jumps to end
+	c.popLoop(endOffset)
 
 	return nil
 }
@@ -588,6 +613,9 @@ func (c *Compiler) compileForStatement(stmt *ast.ForStatement) error {
 		c.emitWithOperand(vm.OpStoreVar, uint32(keyNameIdx))
 	}
 
+	// Push loop context for break/continue
+	c.pushLoop(loopStart)
+
 	// Compile loop body
 	for _, bodyStmt := range stmt.Body {
 		if err := c.compileStatement(bodyStmt); err != nil {
@@ -601,6 +629,9 @@ func (c *Compiler) compileForStatement(stmt *ast.ForStatement) error {
 	// Patch jump to end
 	endOffset := len(c.code)
 	c.patchJump(jumpToEnd, uint32(endOffset))
+
+	// Pop loop context and patch all break jumps to end
+	c.popLoop(endOffset)
 
 	return nil
 }
@@ -946,6 +977,60 @@ func (c *Compiler) compileFunctionCall(expr *ast.FunctionCallExpr) error {
 	// Emit call instruction with argument count
 	c.emitWithOperand(vm.OpCall, uint32(len(expr.Args)))
 
+	return nil
+}
+
+// Loop context helpers
+
+// pushLoop pushes a new loop context onto the loop stack.
+func (c *Compiler) pushLoop(continueTarget int) {
+	c.loopStack = append(c.loopStack, loopContext{
+		continueTarget: continueTarget,
+	})
+}
+
+// popLoop pops the current loop context and patches all break jumps to endOffset.
+func (c *Compiler) popLoop(endOffset int) {
+	if len(c.loopStack) == 0 {
+		return
+	}
+	loop := c.loopStack[len(c.loopStack)-1]
+	c.loopStack = c.loopStack[:len(c.loopStack)-1]
+	for _, jumpOffset := range loop.breakJumps {
+		c.patchJump(jumpOffset, uint32(endOffset))
+	}
+}
+
+// currentLoop returns the innermost loop context, or nil if not inside a loop.
+func (c *Compiler) currentLoop() *loopContext {
+	if len(c.loopStack) == 0 {
+		return nil
+	}
+	return &c.loopStack[len(c.loopStack)-1]
+}
+
+// compileBreakStatement compiles a break statement as an OpJump with a
+// placeholder target that is patched when the enclosing loop ends.
+func (c *Compiler) compileBreakStatement() error {
+	loop := c.currentLoop()
+	if loop == nil {
+		return &SemanticError{Message: "break statement outside of loop"}
+	}
+	// Emit OpJump with placeholder; record offset for later patching
+	jumpOffset := len(c.code)
+	c.emitWithOperand(vm.OpJump, 0)
+	loop.breakJumps = append(loop.breakJumps, jumpOffset)
+	return nil
+}
+
+// compileContinueStatement compiles a continue statement as an OpJump
+// back to the loop's continue target (the beginning of the loop condition).
+func (c *Compiler) compileContinueStatement() error {
+	loop := c.currentLoop()
+	if loop == nil {
+		return &SemanticError{Message: "continue statement outside of loop"}
+	}
+	c.emitWithOperand(vm.OpJump, uint32(loop.continueTarget))
 	return nil
 }
 
