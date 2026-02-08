@@ -218,7 +218,7 @@ func (i *Interpreter) evaluateArrayIndexExpr(expr ArrayIndexExpr, env *Environme
 		if val, exists := obj[keyStr]; exists {
 			return val, nil
 		}
-		return nil, nil
+		return nil, fmt.Errorf("key %q not found in object", keyStr)
 	}
 
 	return nil, fmt.Errorf("cannot index %T", arrayVal)
