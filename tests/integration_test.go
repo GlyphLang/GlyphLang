@@ -795,46 +795,108 @@ func TestBytecodeFormat(t *testing.T) {
 
 // TestCompilerErrorMessages tests compiler error reporting
 func TestCompilerErrorMessages(t *testing.T) {
-	t.Skip("Skipping until error reporting is implemented")
-
 	tests := []struct {
-		name     string
-		source   string
-		errorMsg string // Expected error message substring
+		name          string
+		source        string
+		errorMsg      string   // Expected error message substring
+		isParseError  bool     // true if error should occur during parsing
+		shouldContain []string // Additional substrings to check (e.g., line number)
 	}{
+		// Parser errors - include line/column information
 		{
-			name:     "Syntax error",
-			source:   "@ route",
-			errorMsg: "syntax error",
+			name:          "Syntax error - invalid route definition",
+			source:        "@ route",
+			errorMsg:      "line",
+			isParseError:  true,
+			shouldContain: []string{"line"},
 		},
 		{
-			name:     "Type error",
-			source:   ": User { id: int! }\n@ GET /user -> User\n  > {id: \"string\"}",
-			errorMsg: "type mismatch",
+			name:          "Syntax error - missing path",
+			source:        "@ GET",
+			errorMsg:      "line",
+			isParseError:  true,
+			shouldContain: []string{"line"},
 		},
 		{
-			name:     "Unknown type",
-			source:   "@ GET /test -> UnknownType",
-			errorMsg: "undefined type",
+			name:          "Syntax error - unterminated string",
+			source:        "@ GET /test {\n  > {message: \"hello}\n}",
+			errorMsg:      "Unterminated",
+			isParseError:  true,
+			shouldContain: []string{"line"},
+		},
+		{
+			name:          "Syntax error - missing closing brace",
+			source:        "@ GET /test {\n  > {status: \"ok\"}",
+			errorMsg:      "line",
+			isParseError:  true,
+			shouldContain: []string{"line"},
+		},
+		{
+			name:          "Syntax error - invalid expression",
+			source:        "@ GET /test {\n  $ x = @@@\n  > x\n}",
+			errorMsg:      "line",
+			isParseError:  true,
+			shouldContain: []string{"line"},
+		},
+		// Compiler errors - semantic errors
+		{
+			name:         "Undefined variable usage",
+			source:       "@ GET /test {\n  > undefinedVar\n}",
+			errorMsg:     "undefined variable",
+			isParseError: false,
+		},
+		{
+			name:         "Variable redeclaration in same scope",
+			source:       "@ GET /test {\n  $ x = 1\n  $ x = 2\n  > x\n}",
+			errorMsg:     "cannot redeclare variable",
+			isParseError: false,
+		},
+		{
+			name:         "Empty module error",
+			source:       "",
+			errorMsg:     "empty module",
+			isParseError: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			helper := NewTestHelper(t)
-			comp := compiler.NewCompiler()
-			module, err := parseSource(tt.source)
-			if err != nil {
-				t.Fatalf("Parse failed: %v", err)
-			}
-			_, err = comp.Compile(module)
 
-			// TODO: When error reporting is implemented
-			if err != nil {
-				helper.AssertContains(err.Error(), tt.errorMsg, "Error message")
-			} else {
-				t.Logf("Error reporting not yet implemented for: %s", tt.name)
+			// Try to parse
+			module, parseErr := parseSource(tt.source)
+
+			if tt.isParseError {
+				// Expect parse error
+				if parseErr == nil {
+					t.Fatalf("Expected parse error for '%s', but parsing succeeded", tt.name)
+				}
+				errMsg := parseErr.Error()
+				helper.AssertContains(errMsg, tt.errorMsg, "Error message")
+
+				// Check for line number information
+				for _, substr := range tt.shouldContain {
+					helper.AssertContains(errMsg, substr, "Error context")
+				}
+				t.Logf("Parse error message: %s", errMsg)
+				return
 			}
+
+			// Parse should succeed, compile should fail
+			if parseErr != nil {
+				t.Fatalf("Unexpected parse error: %v", parseErr)
+			}
+
+			comp := compiler.NewCompiler()
+			_, compileErr := comp.Compile(module)
+
+			if compileErr == nil {
+				t.Fatalf("Expected compile error for '%s', but compilation succeeded", tt.name)
+			}
+
+			errMsg := compileErr.Error()
+			helper.AssertContains(errMsg, tt.errorMsg, "Error message")
+			t.Logf("Compile error message: %s", errMsg)
 		})
 	}
 }
