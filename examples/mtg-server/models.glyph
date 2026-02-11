@@ -1,0 +1,130 @@
+# models.glyph - Type definitions and game rule constants for MTG life tracker
+module "models"
+
+# Format constants
+const FORMAT_MODERN = "modern"
+const FORMAT_EDH = "edh"
+
+# Starting life totals
+const MODERN_STARTING_LIFE = 20
+const EDH_STARTING_LIFE = 40
+
+# Loss thresholds
+const POISON_THRESHOLD = 10
+const COMMANDER_DAMAGE_THRESHOLD = 21
+
+# Player in a game
+: Player {
+  id: str!
+  name: str!
+  life: int!
+  poison: int! = 0
+  is_lost: bool! = false
+  loss_reason: str
+}
+
+# Tracks commander damage from one player to another
+: CommanderDamageEntry {
+  source_player_id: str!
+  target_player_id: str!
+  commander_name: str!
+  damage: int! = 0
+}
+
+# A game instance
+: Game {
+  id: str!
+  room_code: str!
+  format: str!
+  players: object
+  commander_damage: [CommanderDamageEntry]
+  started: bool! = false
+  finished: bool! = false
+  created_at: int
+}
+
+# Request types
+: CreateGameRequest {
+  format: str!
+  host_name: str!
+}
+
+: JoinGameRequest {
+  player_name: str!
+}
+
+: LifeChangeRequest {
+  player_id: str!
+  amount: int!
+}
+
+: PoisonChangeRequest {
+  player_id: str!
+  amount: int!
+}
+
+: CommanderDamageRequest {
+  source_player_id: str!
+  target_player_id: str!
+  commander_name: str!
+  amount: int!
+}
+
+# Response types
+: GameResponse {
+  success: bool!
+  message: str
+  game: object
+}
+
+: ErrorResponse {
+  success: bool! = false
+  error: str!
+}
+
+# Authentication types
+: AuthUser {
+  id: int!
+  username: str!
+  email: str!
+  display_name: str
+  created_at: int
+}
+
+: UserStats {
+  user_id: int!
+  games_played: int!
+  modern_played: int!
+  modern_won: int!
+  edh_played: int!
+  edh_won: int!
+}
+
+: GameHistoryEntry {
+  id: int!
+  room_code: str!
+  format: str!
+  winner_name: str
+  player_count: int!
+  finished_at: int
+}
+
+# Auth request types
+: RegisterRequest {
+  username: str!
+  email: str!
+  password: str!
+  display_name: str
+}
+
+: LoginRequest {
+  username: str!
+  password: str!
+}
+
+: AuthResponse {
+  success: bool!
+  message: str!
+  token: str
+  user: AuthUser
+}

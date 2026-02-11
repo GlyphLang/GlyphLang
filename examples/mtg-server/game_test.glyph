@@ -1,0 +1,387 @@
+# game_test.glyph - Tests for MTG life tracker game logic
+
+from "./session" import { createGame, addPlayer, findPlayer, isValidFormat, getStartingLife }
+from "./game" import {
+  changeLife,
+  changePoison,
+  applyCommanderDamage,
+  getCommanderDamage,
+  isDeadByLife,
+  isDeadByPoison,
+  isDeadByCommander,
+  checkAllPlayers,
+  countActivePlayers,
+  getWinner,
+  buildGameState
+}
+
+# --- Format Validation ---
+
+test "isValidFormat accepts modern" {
+  assert(isValidFormat("modern") == true)
+}
+
+test "isValidFormat accepts edh" {
+  assert(isValidFormat("edh") == true)
+}
+
+test "isValidFormat rejects invalid format" {
+  assert(isValidFormat("legacy") == false)
+  assert(isValidFormat("") == false)
+  assert(isValidFormat("standard") == false)
+}
+
+# --- Starting Life ---
+
+test "modern starting life is 20" {
+  assert(getStartingLife("modern") == 20)
+}
+
+test "edh starting life is 40" {
+  assert(getStartingLife("edh") == 40)
+}
+
+test "unknown format defaults to 20 life" {
+  assert(getStartingLife("other") == 20)
+}
+
+# --- Game Creation ---
+
+test "createGame creates a modern game with correct defaults" {
+  $ game = createGame("modern", "Alice")
+  assert(game.format == "modern")
+  assert(game.started == false)
+  assert(game.finished == false)
+  assert(length(game.room_code) == 4, "Room code should be 4 characters")
+  assert(length(game.commander_damage) == 0)
+}
+
+test "createGame creates an edh game" {
+  $ game = createGame("edh", "Alice")
+  assert(game.format == "edh")
+}
+
+test "createGame adds host player with correct life" {
+  $ game = createGame("modern", "Alice")
+  assert(length(game.players) == 1, "Should have 1 player (host)")
+  $ hostFound = false
+  for id, player in game.players {
+    if player.name == "Alice" {
+      assert(player.life == 20, "Modern host should start with 20 life")
+      assert(player.poison == 0)
+      assert(player.is_lost == false)
+      hostFound = true
+    }
+  }
+  assert(hostFound, "Host player should be in game")
+}
+
+test "createGame EDH host has 40 life" {
+  $ game = createGame("edh", "Bob")
+  for id, player in game.players {
+    if player.name == "Bob" {
+      assert(player.life == 40, "EDH host should start with 40 life")
+    }
+  }
+}
+
+# --- Player Management ---
+
+test "addPlayer adds a player to the game" {
+  $ game = createGame("modern", "Alice")
+  $ bobId = addPlayer(game, "Bob")
+  assert(length(game.players) == 2)
+  $ bob = findPlayer(game, bobId)
+  assert(bob != null, "Should find Bob by ID")
+  assert(bob.name == "Bob")
+  assert(bob.life == 20)
+}
+
+test "findPlayer returns null for unknown ID" {
+  $ game = createGame("modern", "Alice")
+  $ result = findPlayer(game, "nonexistent-id")
+  assert(result == null)
+}
+
+test "countActivePlayers counts non-lost players" {
+  $ game = createGame("modern", "Alice")
+  $ bobId = addPlayer(game, "Bob")
+  assert(countActivePlayers(game) == 2)
+}
+
+# --- Life Changes ---
+
+test "changeLife increases life total" {
+  $ game = createGame("modern", "Alice")
+  $ aliceId = ""
+  for id, player in game.players {
+    aliceId = id
+  }
+  changeLife(game, aliceId, 5)
+  $ alice = findPlayer(game, aliceId)
+  assert(alice.life == 25, "Life should be 25 after gaining 5")
+}
+
+test "changeLife decreases life total" {
+  $ game = createGame("modern", "Alice")
+  $ aliceId = ""
+  for id, player in game.players {
+    aliceId = id
+  }
+  changeLife(game, aliceId, -7)
+  $ alice = findPlayer(game, aliceId)
+  assert(alice.life == 13, "Life should be 13 after losing 7")
+}
+
+test "changeLife to zero triggers loss" {
+  $ game = createGame("modern", "Alice")
+  $ bobId = addPlayer(game, "Bob")
+  $ aliceId = ""
+  for id, player in game.players {
+    if player.name == "Alice" {
+      aliceId = id
+    }
+  }
+  changeLife(game, aliceId, -20)
+  $ alice = findPlayer(game, aliceId)
+  assert(alice.is_lost == true, "Alice should be marked as lost")
+  assert(alice.life <= 0)
+}
+
+test "changeLife below zero triggers loss" {
+  $ game = createGame("modern", "Alice")
+  $ bobId = addPlayer(game, "Bob")
+  $ aliceId = ""
+  for id, player in game.players {
+    if player.name == "Alice" {
+      aliceId = id
+    }
+  }
+  changeLife(game, aliceId, -25)
+  $ alice = findPlayer(game, aliceId)
+  assert(alice.is_lost == true)
+  assert(alice.life == -5)
+}
+
+# --- Poison Counters ---
+
+test "changePoison adds poison counters" {
+  $ game = createGame("modern", "Alice")
+  $ aliceId = ""
+  for id, player in game.players {
+    aliceId = id
+  }
+  changePoison(game, aliceId, 3)
+  $ alice = findPlayer(game, aliceId)
+  assert(alice.poison == 3)
+}
+
+test "changePoison reaching 10 triggers loss" {
+  $ game = createGame("modern", "Alice")
+  $ bobId = addPlayer(game, "Bob")
+  $ aliceId = ""
+  for id, player in game.players {
+    if player.name == "Alice" {
+      aliceId = id
+    }
+  }
+  changePoison(game, aliceId, 10)
+  $ alice = findPlayer(game, aliceId)
+  assert(alice.is_lost == true, "10 poison should trigger loss")
+}
+
+test "changePoison floors at zero" {
+  $ game = createGame("modern", "Alice")
+  $ aliceId = ""
+  for id, player in game.players {
+    aliceId = id
+  }
+  changePoison(game, aliceId, -5)
+  $ alice = findPlayer(game, aliceId)
+  assert(alice.poison == 0, "Poison should not go below 0")
+}
+
+# --- Commander Damage ---
+
+test "applyCommanderDamage only works in EDH" {
+  $ game = createGame("modern", "Alice")
+  $ bobId = addPlayer(game, "Bob")
+  $ aliceId = ""
+  for id, player in game.players {
+    if player.name == "Alice" {
+      aliceId = id
+    }
+  }
+  $ result = applyCommanderDamage(game, aliceId, bobId, "Atraxa", 5)
+  assert(result.success == false, "Commander damage should fail in Modern")
+}
+
+test "applyCommanderDamage tracks damage in EDH" {
+  $ game = createGame("edh", "Alice")
+  $ bobId = addPlayer(game, "Bob")
+  $ charlieId = addPlayer(game, "Charlie")
+  $ aliceId = ""
+  for id, player in game.players {
+    if player.name == "Alice" {
+      aliceId = id
+    }
+  }
+  applyCommanderDamage(game, aliceId, bobId, "Atraxa", 5)
+  $ dmg = getCommanderDamage(game, aliceId, bobId, "Atraxa")
+  assert(dmg == 5, "Should track 5 commander damage")
+}
+
+test "applyCommanderDamage accumulates damage" {
+  $ game = createGame("edh", "Alice")
+  $ bobId = addPlayer(game, "Bob")
+  $ charlieId = addPlayer(game, "Charlie")
+  $ aliceId = ""
+  for id, player in game.players {
+    if player.name == "Alice" {
+      aliceId = id
+    }
+  }
+  applyCommanderDamage(game, aliceId, bobId, "Atraxa", 5)
+  applyCommanderDamage(game, aliceId, bobId, "Atraxa", 8)
+  $ dmg = getCommanderDamage(game, aliceId, bobId, "Atraxa")
+  assert(dmg == 13, "Commander damage should accumulate to 13")
+}
+
+test "applyCommanderDamage at 21 triggers loss" {
+  $ game = createGame("edh", "Alice")
+  $ bobId = addPlayer(game, "Bob")
+  $ charlieId = addPlayer(game, "Charlie")
+  $ aliceId = ""
+  for id, player in game.players {
+    if player.name == "Alice" {
+      aliceId = id
+    }
+  }
+  applyCommanderDamage(game, aliceId, bobId, "Atraxa", 21)
+  $ bob = findPlayer(game, bobId)
+  assert(bob.is_lost == true, "21 commander damage should trigger loss")
+}
+
+test "applyCommanderDamage also reduces life" {
+  $ game = createGame("edh", "Alice")
+  $ bobId = addPlayer(game, "Bob")
+  $ charlieId = addPlayer(game, "Charlie")
+  $ aliceId = ""
+  for id, player in game.players {
+    if player.name == "Alice" {
+      aliceId = id
+    }
+  }
+  applyCommanderDamage(game, aliceId, bobId, "Atraxa", 10)
+  $ bob = findPlayer(game, bobId)
+  assert(bob.life == 30, "Life should be reduced by commander damage")
+}
+
+# --- Loss Condition Helpers ---
+
+test "isDeadByLife returns true when life is 0" {
+  $ player = {id: "p1", name: "Test", life: 0, poison: 0, is_lost: false, loss_reason: ""}
+  assert(isDeadByLife(player) == true)
+}
+
+test "isDeadByLife returns true when life is negative" {
+  $ player = {id: "p1", name: "Test", life: -5, poison: 0, is_lost: false, loss_reason: ""}
+  assert(isDeadByLife(player) == true)
+}
+
+test "isDeadByLife returns false when life is positive" {
+  $ player = {id: "p1", name: "Test", life: 10, poison: 0, is_lost: false, loss_reason: ""}
+  assert(isDeadByLife(player) == false)
+}
+
+test "isDeadByPoison returns true at threshold" {
+  $ player = {id: "p1", name: "Test", life: 20, poison: 10, is_lost: false, loss_reason: ""}
+  assert(isDeadByPoison(player) == true)
+}
+
+test "isDeadByPoison returns false below threshold" {
+  $ player = {id: "p1", name: "Test", life: 20, poison: 9, is_lost: false, loss_reason: ""}
+  assert(isDeadByPoison(player) == false)
+}
+
+# --- Game End Conditions ---
+
+test "game finishes when only 1 player remains active" {
+  $ game = createGame("modern", "Alice")
+  $ bobId = addPlayer(game, "Bob")
+  $ aliceId = ""
+  for id, player in game.players {
+    if player.name == "Alice" {
+      aliceId = id
+    }
+  }
+  changeLife(game, aliceId, -20)
+  assert(game.finished == true, "Game should be finished")
+}
+
+test "getWinner returns last active player" {
+  $ game = createGame("modern", "Alice")
+  $ bobId = addPlayer(game, "Bob")
+  $ aliceId = ""
+  for id, player in game.players {
+    if player.name == "Alice" {
+      aliceId = id
+    }
+  }
+  changeLife(game, aliceId, -20)
+  $ winner = getWinner(game)
+  assert(winner != null, "Should have a winner")
+  assert(winner.name == "Bob", "Bob should be the winner")
+}
+
+test "getWinner returns null if game not finished" {
+  $ game = createGame("modern", "Alice")
+  $ bobId = addPlayer(game, "Bob")
+  $ winner = getWinner(game)
+  assert(winner == null, "No winner if game not finished")
+}
+
+# --- State Builder ---
+
+test "buildGameState returns structured response" {
+  $ game = createGame("edh", "Alice")
+  $ bobId = addPlayer(game, "Bob")
+  $ charlieId = addPlayer(game, "Charlie")
+  $ state = buildGameState(game)
+  assert(state.format == "edh")
+  assert(state.started == false)
+  assert(state.finished == false)
+  assert(state.player_count == 3)
+  assert(length(state.players) == 3)
+  assert(length(state.commander_damage) == 0)
+}
+
+test "buildGameState includes commander damage summary" {
+  $ game = createGame("edh", "Alice")
+  $ bobId = addPlayer(game, "Bob")
+  $ charlieId = addPlayer(game, "Charlie")
+  $ aliceId = ""
+  for id, player in game.players {
+    if player.name == "Alice" {
+      aliceId = id
+    }
+  }
+  applyCommanderDamage(game, aliceId, bobId, "Atraxa", 5)
+  $ state = buildGameState(game)
+  assert(length(state.commander_damage) == 1)
+}
+
+test "buildGameState shows winner name when game finished" {
+  $ game = createGame("modern", "Alice")
+  $ bobId = addPlayer(game, "Bob")
+  $ aliceId = ""
+  for id, player in game.players {
+    if player.name == "Alice" {
+      aliceId = id
+    }
+  }
+  changeLife(game, aliceId, -20)
+  $ state = buildGameState(game)
+  assert(state.finished == true)
+  assert(state.winner == "Bob")
+}
