@@ -198,6 +198,10 @@ func (i *Interpreter) LoadModuleWithPath(module Module, basePath string) error {
 			i.globalEnv.Define(it.Name, value)
 			i.constants[it.Name] = struct{}{}
 
+		case *StaticRoute:
+			// Static routes are handled at the server/mux level, not by the interpreter.
+			continue
+
 		default:
 			return fmt.Errorf("unsupported item type: %T", item)
 		}

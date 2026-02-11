@@ -336,6 +336,24 @@ func TestLoadModuleWithQueueWorker(t *testing.T) {
 	}
 }
 
+func TestLoadModuleWithStaticRoute(t *testing.T) {
+	interp := NewInterpreter()
+
+	module := Module{
+		Items: []Item{
+			&StaticRoute{
+				Path:    "/assets",
+				RootDir: "./public",
+			},
+		},
+	}
+
+	err := interp.LoadModule(module)
+	if err != nil {
+		t.Errorf("LoadModule with static route failed: %v", err)
+	}
+}
+
 // TestDbQueryStatement tests db query statement execution
 func TestDbQueryStatement(t *testing.T) {
 	interp := NewInterpreter()
