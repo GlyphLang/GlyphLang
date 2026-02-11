@@ -1181,6 +1181,8 @@ func (p *Parser) parseRoute() (ast.Item, error) {
 		return p.parseEventHandler()
 	case "queue", "worker":
 		return p.parseQueueWorker()
+	case "static":
+		return p.parseStaticRoute()
 	case "rpc", "grpc":
 		return p.parseGRPC()
 	case "query":
@@ -1218,7 +1220,7 @@ func (p *Parser) parseRoute() (ast.Item, error) {
 		hasMethodKeyword = false
 	default:
 		return nil, p.routeError(
-			fmt.Sprintf("Expected 'route', 'ws', 'websocket', 'sse', 'rpc', 'query', 'mutation', 'subscription', or HTTP method after '@', but found '%s'", routeKw),
+			fmt.Sprintf("Expected 'route', 'ws', 'websocket', 'sse', 'static', 'rpc', 'query', 'mutation', 'subscription', or HTTP method after '@', but found '%s'", routeKw),
 			p.tokens[p.position-1],
 		)
 	}
@@ -1676,6 +1678,56 @@ func (p *Parser) parseWebSocketRoute() (ast.Item, error) {
 	return &ast.WebSocketRoute{
 		Path:   path,
 		Events: events,
+	}, nil
+}
+
+// parseStaticRoute parses a static file serving directive: @ static /prefix "dir"
+func (p *Parser) parseStaticRoute() (ast.Item, error) {
+	// Parse URL prefix path
+	if !p.check(SLASH) {
+		return nil, p.errorWithHint(
+			fmt.Sprintf("Expected static route path, but found %s", p.current().Type),
+			p.current(),
+			"Static paths must start with '/' (e.g., @ static /assets \"./public\")",
+		)
+	}
+
+	var pathBuilder strings.Builder
+	for p.check(SLASH) {
+		pathBuilder.WriteByte('/')
+		p.advance()
+
+		if p.check(IDENT) {
+			pathBuilder.WriteString(p.current().Literal)
+			p.advance()
+		} else {
+			break
+		}
+	}
+
+	path := pathBuilder.String()
+	if path == "" || path == "/" {
+		return nil, p.errorWithHint(
+			"Static route requires a non-root URL prefix",
+			p.current(),
+			"Example: @ static /assets \"./public\"",
+		)
+	}
+
+	// Parse root directory (string literal)
+	if !p.check(STRING) {
+		return nil, p.errorWithHint(
+			"Expected directory path string after static route prefix",
+			p.current(),
+			"Example: @ static /assets \"./public\"",
+		)
+	}
+	rootDir := p.current().Literal
+	p.advance()
+
+	return &ast.StaticRoute{
+		Path:    path,
+		RootDir: rootDir,
 	}, nil
 }
 

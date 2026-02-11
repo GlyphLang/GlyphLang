@@ -642,6 +642,15 @@ type WebSocketRoute struct {
 
 func (WebSocketRoute) isItem() {}
 
+// StaticRoute represents a static file serving directive
+// Example: @ static /assets "./public"
+type StaticRoute struct {
+	Path    string // URL prefix, e.g. "/assets"
+	RootDir string // Local directory to serve, e.g. "./public"
+}
+
+func (StaticRoute) isItem() {}
+
 // Command represents a CLI command definition
 // Example: @ command hello name: str! greeting: str = "Hello"
 type Command struct {
