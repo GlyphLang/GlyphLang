@@ -2,14 +2,15 @@ package main
 
 import (
 	"fmt"
-	"github.com/glyphlang/glyph/pkg/ast"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/glyphlang/glyph/pkg/ast"
 	"github.com/glyphlang/glyph/pkg/compiler"
 	"github.com/glyphlang/glyph/pkg/server"
+	"github.com/glyphlang/glyph/pkg/web"
 	"github.com/glyphlang/glyph/pkg/websocket"
 )
 
@@ -160,6 +161,11 @@ func startServer(filePath string, port int, forceInterpreter bool) (*http.Server
 		}
 	}
 
+	// Register static file routes
+	if err := registerStaticRoutes(mux, module, filePath, port); err != nil {
+		return nil, err
+	}
+
 	srv := &http.Server{
 		Addr:           fmt.Sprintf(":%d", port),
 		Handler:        loggingMiddleware(mux),
@@ -186,4 +192,38 @@ func startServer(filePath string, port int, forceInterpreter bool) (*http.Server
 	time.Sleep(100 * time.Millisecond)
 
 	return srv, nil
+}
+
+// registerStaticRoutes registers any @ static directives from the module on the mux.
+// The rootDir in each StaticRoute is resolved relative to the source file's directory.
+func registerStaticRoutes(mux *http.ServeMux, module *ast.Module, sourceFile string, port int) error {
+	baseDir := filepath.Dir(sourceFile)
+
+	for _, item := range module.Items {
+		sr, ok := item.(*ast.StaticRoute)
+		if !ok {
+			continue
+		}
+
+		// Resolve rootDir relative to the source file
+		rootDir := sr.RootDir
+		if !filepath.IsAbs(rootDir) {
+			rootDir = filepath.Join(baseDir, rootDir)
+		}
+
+		staticServer, err := web.NewStaticFileServer(rootDir, web.WithPrefix(sr.Path))
+		if err != nil {
+			return fmt.Errorf("static route %s: %w", sr.Path, err)
+		}
+
+		// Register with trailing slash so the mux matches all sub-paths
+		pattern := sr.Path
+		if pattern[len(pattern)-1] != '/' {
+			pattern += "/"
+		}
+		mux.Handle(pattern, staticServer)
+		printInfo(fmt.Sprintf("Static files: http://localhost:%d%s -> %s", port, sr.Path, rootDir))
+	}
+
+	return nil
 }

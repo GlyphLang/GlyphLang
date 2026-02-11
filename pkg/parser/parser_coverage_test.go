@@ -2755,3 +2755,106 @@ func TestParseSubtractionExpression(t *testing.T) {
 		t.Errorf("expected Sub op, got %v", binExpr.Op)
 	}
 }
+
+func TestParseStaticRoute(t *testing.T) {
+	source := `@ static /assets "./public"`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		t.Fatalf("lexer error: %v", err)
+	}
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("parser error: %v", err)
+	}
+
+	if len(module.Items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(module.Items))
+	}
+
+	sr, ok := module.Items[0].(*ast.StaticRoute)
+	if !ok {
+		t.Fatalf("expected *ast.StaticRoute, got %T", module.Items[0])
+	}
+
+	if sr.Path != "/assets" {
+		t.Errorf("expected path '/assets', got %s", sr.Path)
+	}
+	if sr.RootDir != "./public" {
+		t.Errorf("expected rootDir './public', got %s", sr.RootDir)
+	}
+}
+
+func TestParseStaticRouteNestedPath(t *testing.T) {
+	source := `@ static /static/files "./dist/assets"`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		t.Fatalf("lexer error: %v", err)
+	}
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("parser error: %v", err)
+	}
+
+	sr := module.Items[0].(*ast.StaticRoute)
+	if sr.Path != "/static/files" {
+		t.Errorf("expected path '/static/files', got %s", sr.Path)
+	}
+	if sr.RootDir != "./dist/assets" {
+		t.Errorf("expected rootDir './dist/assets', got %s", sr.RootDir)
+	}
+}
+
+func TestParseStaticRouteMissingDir(t *testing.T) {
+	source := `@ static /assets`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		t.Fatalf("lexer error: %v", err)
+	}
+
+	parser := NewParser(tokens)
+	_, err = parser.Parse()
+	if err == nil {
+		t.Fatal("expected error for static route without directory")
+	}
+}
+
+func TestParseStaticRouteWithOtherRoutes(t *testing.T) {
+	source := `@ static /assets "./public"
+
+@ GET /api/health {
+  > { status: "ok" }
+}`
+
+	lexer := NewLexer(source)
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		t.Fatalf("lexer error: %v", err)
+	}
+
+	parser := NewParser(tokens)
+	module, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("parser error: %v", err)
+	}
+
+	if len(module.Items) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(module.Items))
+	}
+
+	if _, ok := module.Items[0].(*ast.StaticRoute); !ok {
+		t.Errorf("expected first item to be StaticRoute, got %T", module.Items[0])
+	}
+	if _, ok := module.Items[1].(*ast.Route); !ok {
+		t.Errorf("expected second item to be Route, got %T", module.Items[1])
+	}
+}

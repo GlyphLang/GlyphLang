@@ -101,6 +101,11 @@ func (m *hotReloadManager) startDevServerInternal() (*http.Server, error) {
 		}
 	}
 
+	// Register static file routes
+	if err := registerStaticRoutes(mux, module, m.filePath, m.port); err != nil {
+		return nil, err
+	}
+
 	srv := &http.Server{
 		Addr:           fmt.Sprintf(":%d", m.port),
 		Handler:        loggingMiddleware(mux),
