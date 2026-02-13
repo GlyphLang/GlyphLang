@@ -155,7 +155,7 @@ func SendError(ctx *Context, statusCode int, message string) error {
 // Full error details are logged server-side but never exposed to clients.
 func (h *Handler) handleError(w http.ResponseWriter, r *http.Request, statusCode int, message string, err error) {
 	// Log the full error detail server-side
-	log.Printf("[ERROR] %s %s: %s - %v", r.Method, r.URL.Path, message, err)
+	log.Printf("[ERROR] %s %s: %s - %v", sanitizeLog(r.Method), sanitizeLog(r.URL.Path), message, err) // #nosec G706 -- sanitized
 
 	// Send JSON error response without internal details
 	w.Header().Set("Content-Type", "application/json")

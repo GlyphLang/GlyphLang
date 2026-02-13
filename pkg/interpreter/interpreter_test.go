@@ -1878,9 +1878,10 @@ func TestEvaluateFieldAccess_MissingField(t *testing.T) {
 		Field:  "age",
 	}
 
-	_, err := interp.EvaluateExpression(expr, env)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "field age not found")
+	// Missing fields on maps return nil (null), enabling optional field access
+	result, err := interp.EvaluateExpression(expr, env)
+	assert.NoError(t, err)
+	assert.Nil(t, result)
 }
 
 func TestEvaluateFunctionCall_NonCallable(t *testing.T) {

@@ -13,6 +13,14 @@ import (
 	"time"
 )
 
+// sanitizeLog replaces newlines and carriage returns in user-controlled values
+// to prevent log injection attacks (gosec G706).
+func sanitizeLog(s string) string {
+	s = strings.ReplaceAll(s, "\n", "")
+	s = strings.ReplaceAll(s, "\r", "")
+	return s
+}
+
 // LoggingMiddleware logs request details
 func LoggingMiddleware() Middleware {
 	return func(next RouteHandler) RouteHandler {
@@ -20,7 +28,7 @@ func LoggingMiddleware() Middleware {
 			start := time.Now()
 
 			// Log request
-			log.Printf("[REQUEST] %s %s", ctx.Request.Method, ctx.Request.URL.Path)
+			log.Printf("[REQUEST] %s %s", sanitizeLog(ctx.Request.Method), sanitizeLog(ctx.Request.URL.Path)) // #nosec G706 -- sanitized
 
 			// Call next handler
 			err := next(ctx)
@@ -32,9 +40,9 @@ func LoggingMiddleware() Middleware {
 				status = 500
 			}
 
-			log.Printf("[RESPONSE] %s %s - %d (%v)",
-				ctx.Request.Method,
-				ctx.Request.URL.Path,
+			log.Printf("[RESPONSE] %s %s - %d (%v)", // #nosec G706 -- sanitized
+				sanitizeLog(ctx.Request.Method),
+				sanitizeLog(ctx.Request.URL.Path),
 				status,
 				duration,
 			)
@@ -55,7 +63,7 @@ func RecoveryMiddleware() Middleware {
 					method := ctx.Request.Method
 					path := ctx.Request.URL.Path
 					// Log full panic details including stack trace to server logs
-					log.Printf("[PANIC] %s %s: %v\n%s", method, path, r, debug.Stack())
+					log.Printf("[PANIC] %s %s: %v\n%s", sanitizeLog(method), sanitizeLog(path), r, debug.Stack()) // #nosec G706 -- sanitized
 					// Return generic error to client - don't expose panic details
 					SendError(ctx, 500, "Internal Server Error")
 					// Return error to indicate a panic was recovered
@@ -296,7 +304,7 @@ func BasicAuthMiddlewareWithConfig(validTokens map[string]bool, config AuthRateL
 			if now.Before(tracker.lockedUntil) {
 				mu.Unlock()
 				remaining := tracker.lockedUntil.Sub(now).Round(time.Second)
-				log.Printf("[AUTH] IP %s is locked out for %v due to too many failed attempts", clientIP, remaining)
+				log.Printf("[AUTH] IP %s is locked out for %v due to too many failed attempts", sanitizeLog(clientIP), remaining) // #nosec G706 -- sanitized
 				return SendError(ctx, 429, "too many failed authentication attempts, try again later")
 			}
 
@@ -351,8 +359,8 @@ func recordAuthFailure(clientIP string, trackers map[string]*authFailureTracker,
 			lockoutDuration = config.MaxLockout
 		}
 		tracker.lockedUntil = time.Now().Add(lockoutDuration)
-		log.Printf("[AUTH] IP %s locked out for %v after %d failed attempts",
-			clientIP, lockoutDuration, tracker.failures)
+		log.Printf("[AUTH] IP %s locked out for %v after %d failed attempts", // #nosec G706 -- sanitized
+			sanitizeLog(clientIP), lockoutDuration, tracker.failures)
 	}
 }
 
@@ -493,7 +501,7 @@ func RateLimitMiddleware(config RateLimiterConfig) Middleware {
 
 			if limit.tokens <= 0 {
 				mu.Unlock()
-				log.Printf("[RATE_LIMIT] Rate limit exceeded for %s", clientIP)
+				log.Printf("[RATE_LIMIT] Rate limit exceeded for %s", sanitizeLog(clientIP)) // #nosec G706 -- sanitized
 				return SendError(ctx, 429, "rate limit exceeded")
 			}
 
@@ -539,8 +547,8 @@ func TimeoutMiddleware(timeout time.Duration) Middleware {
 			case <-timer.C:
 				// Only send timeout error if handler hasn't started writing
 				if tw.tryClaimResponse() {
-					log.Printf("[TIMEOUT] Request timeout after %v: %s %s",
-						timeout, ctx.Request.Method, ctx.Request.URL.Path)
+					log.Printf("[TIMEOUT] Request timeout after %v: %s %s", // #nosec G706 -- sanitized
+						timeout, sanitizeLog(ctx.Request.Method), sanitizeLog(ctx.Request.URL.Path))
 					// Set status directly on wrapped writer to avoid race
 					// Don't set ctx.StatusCode to avoid race with handler goroutine
 					tw.mu.Lock()

@@ -141,9 +141,9 @@ func HTTPTracingMiddleware(config *MiddlewareConfig) func(next http.Handler) htt
 			}
 
 			// Log completion
-			log.Printf("[TRACE] %s %s - %d (%v) [trace_id=%s span_id=%s]",
-				r.Method,
-				r.URL.Path,
+			log.Printf("[TRACE] %s %s - %d (%v) [trace_id=%s span_id=%s]", // #nosec G706 -- sanitized
+				sanitizeLog(r.Method),
+				sanitizeLog(r.URL.Path),
 				wrapped.statusCode,
 				duration,
 				GetTraceID(ctx),

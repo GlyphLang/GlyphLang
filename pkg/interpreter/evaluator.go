@@ -653,7 +653,8 @@ func (i *Interpreter) evaluateFieldAccess(expr FieldAccessExpr, env *Environment
 		if val, exists := objMap[expr.Field]; exists {
 			return val, nil
 		}
-		return nil, fmt.Errorf("field %s not found on object", expr.Field)
+		// Missing fields return null, allowing optional field access (e.g., input.user_id)
+		return nil, nil
 	}
 
 	return nil, fmt.Errorf("cannot access field %s on %T", expr.Field, obj)

@@ -87,8 +87,10 @@ func TestSourcePos_UnaryOpTypeError(t *testing.T) {
 	assert.Contains(t, err.Error(), "unary negation")
 }
 
-// TestSourcePos_FieldAccessError verifies that field access errors include position info.
-func TestSourcePos_FieldAccessError(t *testing.T) {
+// TestSourcePos_FieldAccessMissingReturnsNil verifies that missing fields return nil (null).
+// This is intentional: API routes need input.optional_field to return null when absent,
+// rather than crashing the route with an error.
+func TestSourcePos_FieldAccessMissingReturnsNil(t *testing.T) {
 	interp := NewInterpreter()
 	env := NewEnvironment()
 	env.Define("obj", map[string]interface{}{"name": "test"})
@@ -99,10 +101,9 @@ func TestSourcePos_FieldAccessError(t *testing.T) {
 		Pos:    Pos{Line: 10, Column: 5},
 	}
 
-	_, err := interp.EvaluateExpression(expr, env)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "at 10:5")
-	assert.Contains(t, err.Error(), "not found")
+	result, err := interp.EvaluateExpression(expr, env)
+	require.NoError(t, err)
+	assert.Nil(t, result)
 }
 
 // TestSourcePos_ArrayIndexOutOfBounds verifies that array index errors include position info.
