@@ -1,0 +1,16 @@
+Natural Language Description (for comparison with glyph notation):
+
+Build a REST API for managing Todo items with the following endpoints:
+
+1. GET /api/todos - List all todos from the database
+2. GET /api/todos/:id - Get a single todo by ID, return 404 if not found
+3. POST /api/todos - Create a new todo with a title (required) and completed status (defaults to false)
+4. PUT /api/todos/:id - Update an existing todo's title and/or completed status, return 404 if not found
+5. DELETE /api/todos/:id - Delete a todo by ID, return 404 if not found
+
+Data model:
+- Todo has: id (int, required), title (string, required), completed (boolean, required), created_at (string, optional)
+- CreateTodoInput has: title (string, required), completed (boolean, default false)
+- UpdateTodoInput has: title (string, optional), completed (boolean, optional)
+
+All endpoints use a database connection for persistence.

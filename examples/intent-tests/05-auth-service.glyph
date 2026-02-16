@@ -1,0 +1,137 @@
+# Intent Test: Authentication service with registration, login, and token management
+
+: User {
+  id: str!
+  email: str!
+  name: str!
+  password_hash: str!
+  role: str!
+  created_at: int!
+  last_login: int?
+}
+
+: RegisterInput {
+  email: str!
+  name: str!
+  password: str!
+}
+
+: LoginInput {
+  email: str!
+  password: str!
+}
+
+: AuthResponse {
+  token: str!
+  refresh_token: str!
+  expires_in: int!
+  user: User!
+}
+
+: TokenRefreshInput {
+  refresh_token: str!
+}
+
+# Public: Register a new user
+@ POST /auth/register {
+  + ratelimit(10/min)
+  < RegisterInput
+  % db: Database
+
+  $ existing = db.users.Where({email: input.email})
+  if length(existing) > 0 {
+    > {error: "Email already registered"} :: 409
+  }
+
+  $ user = db.users.Create({
+    id: generateId(),
+    email: input.email,
+    name: input.name,
+    password_hash: input.password,
+    role: "user",
+    created_at: time.now()
+  })
+
+  > {
+    token: generateId(),
+    refresh_token: generateId(),
+    expires_in: 3600,
+    user: user
+  } :: 201
+}
+
+# Public: Login with email and password
+@ POST /auth/login {
+  + ratelimit(20/min)
+  < LoginInput
+  % db: Database
+
+  $ users = db.users.Where({email: input.email})
+  if length(users) == 0 {
+    > {error: "Invalid credentials"} :: 401
+  }
+
+  $ user = users[0]
+  db.users.Update(user.id, {last_login: time.now()})
+
+  > {
+    token: generateId(),
+    refresh_token: generateId(),
+    expires_in: 3600,
+    user: user
+  }
+}
+
+# Authenticated: Refresh an access token
+@ POST /auth/refresh {
+  < TokenRefreshInput
+  % db: Database
+
+  $ session = db.sessions.Where({refresh_token: input.refresh_token})
+  if length(session) == 0 {
+    > {error: "Invalid refresh token"} :: 401
+  }
+
+  > {
+    token: generateId(),
+    refresh_token: generateId(),
+    expires_in: 3600,
+    user: session[0].user
+  }
+}
+
+# Authenticated: Get current user profile
+@ GET /auth/me {
+  + auth(jwt)
+  % db: Database
+  $ user = db.users.Get(auth.user.id)
+  ? user != null :: 404 "User not found"
+  > user
+}
+
+# Authenticated: Logout
+@ POST /auth/logout {
+  + auth(jwt)
+  % db: Database
+  db.sessions.Delete(auth.user.id)
+  > {logged_out: true}
+}
+
+# Admin: List all users
+@ GET /auth/admin/users {
+  + auth(jwt, role: admin)
+  + ratelimit(50/min)
+  % db: Database
+  $ users = db.users.Find()
+  > users
+}
+
+# Cron: Clean up expired sessions daily
+* "0 3 * * *" session_cleanup {
+  % db: Database
+  $ expired = db.sessions.Where({expired: true})
+  for session in expired {
+    db.sessions.Delete(session.id)
+  }
+  > {cleaned: length(expired)}
+}

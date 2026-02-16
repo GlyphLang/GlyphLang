@@ -1,0 +1,65 @@
+# Intent Test: Real-time chat server with WebSocket, rooms, and message history
+
+: Message {
+  id: str!
+  room: str!
+  sender: str!
+  content: str!
+  timestamp: int!
+}
+
+: Room {
+  id: str!
+  name: str!
+  created_by: str!
+  created_at: int!
+}
+
+# REST endpoints for room management
+@ POST /api/rooms {
+  + auth(jwt)
+  < { name: str! }
+  % db: Database
+  $ room = db.rooms.Create({
+    id: generateId(),
+    name: input.name,
+    created_by: auth.user.id,
+    created_at: time.now()
+  })
+  > room :: 201
+}
+
+@ GET /api/rooms {
+  + auth(jwt)
+  % db: Database
+  $ rooms = db.rooms.Find()
+  > rooms
+}
+
+@ GET /api/rooms/:room_id/messages {
+  + auth(jwt)
+  % db: Database
+  $ messages = db.messages.Where({room: room_id})
+  > messages
+}
+
+# WebSocket for real-time messaging
+@ ws /chat {
+  on connect {
+    broadcast({type: "system", content: "User joined"})
+  }
+
+  on message {
+    send(client, {type: "ack", id: message.id})
+    broadcast({
+      type: "message",
+      sender: message.sender,
+      content: message.content,
+      timestamp: time.now()
+    })
+  }
+
+  on disconnect {
+    broadcast({type: "system", content: "User left"})
+  }
+}

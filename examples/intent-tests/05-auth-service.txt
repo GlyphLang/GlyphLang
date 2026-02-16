@@ -1,0 +1,43 @@
+Natural Language Description (for comparison with glyph notation):
+
+Build an authentication service with registration, login, token refresh, profile management, and admin controls.
+
+Public Endpoints (no auth required):
+1. POST /auth/register - Register a new user (rate limited to 10/min)
+   - Takes email, name, and password
+   - Checks for existing email (409 if duplicate)
+   - Creates user with generated ID, hashed password, "user" role, and timestamp
+   - Returns access token, refresh token, expiry, and user object
+
+2. POST /auth/login - Login with email and password (rate limited to 20/min)
+   - Validates credentials against database
+   - Returns 401 if invalid
+   - Updates last_login timestamp on success
+   - Returns access token, refresh token, expiry, and user object
+
+3. POST /auth/refresh - Refresh an expired access token
+   - Takes a refresh_token
+   - Looks up the session in the database
+   - Returns 401 if invalid refresh token
+   - Returns new access token, refresh token, and expiry
+
+Authenticated Endpoints:
+4. GET /auth/me - Get current user profile (requires JWT)
+   - Returns the authenticated user's profile, 404 if not found
+
+5. POST /auth/logout - Invalidate current session (requires JWT)
+   - Deletes the session from the database
+   - Returns logged_out: true
+
+Admin Endpoints:
+6. GET /auth/admin/users - List all users (requires JWT with admin role, rate limited to 50/min)
+
+Background Tasks:
+7. Daily at 3 AM - Clean up expired sessions, delete each one, return count cleaned
+
+Data model:
+- User: id, email, name, password_hash, role, created_at, last_login (optional)
+- RegisterInput: email, name, password
+- LoginInput: email, password
+- AuthResponse: token, refresh_token, expires_in, user
+- TokenRefreshInput: refresh_token

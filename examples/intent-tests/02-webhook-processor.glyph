@@ -1,0 +1,60 @@
+# Intent Test: Webhook processor with signature verification and async handling
+
+: WebhookPayload {
+  event: str!
+  data: any!
+  timestamp: int!
+  signature: str!
+}
+
+: WebhookResult {
+  processed: bool!
+  event_id: str
+}
+
+@ POST /webhooks/stripe {
+  + auth(apikey)
+  + ratelimit(1000/min)
+  < WebhookPayload
+  % db: Database
+  % queue: Database
+
+  # Log the incoming webhook
+  $ event_id = generateId()
+  db.webhook_logs.Create({
+    id: event_id,
+    event: input.event,
+    received_at: time.now()
+  })
+
+  # Route by event type
+  if input.event == "payment.succeeded" {
+    db.payments.Update(input.data.id, {status: "completed"})
+  }
+
+  if input.event == "payment.failed" {
+    db.payments.Update(input.data.id, {status: "failed"})
+  }
+
+  if input.event == "customer.created" {
+    db.customers.Create(input.data)
+  }
+
+  > {processed: true, event_id: event_id}
+}
+
+@ POST /webhooks/github {
+  + auth(apikey)
+  < WebhookPayload
+  % db: Database
+
+  $ event_id = generateId()
+  db.webhook_logs.Create({
+    id: event_id,
+    source: "github",
+    event: input.event,
+    received_at: time.now()
+  })
+
+  > {processed: true, event_id: event_id}
+}

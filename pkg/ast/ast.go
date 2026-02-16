@@ -962,6 +962,28 @@ func (MacroInvocation) isItem()      {}
 func (MacroInvocation) isStatement() {}
 func (MacroInvocation) isExpr()      {}
 
+// ProviderDef represents a provider contract definition.
+// A provider declares an abstract service interface that can be injected
+// into routes, commands, cron tasks, etc. via the % (use) syntax.
+// Providers are the generalized form of Database, Redis, MongoDB, and LLM.
+//
+// Compact syntax:  provider ImageProcessor { thumbnail(file: file!, w: int!, h: int!) -> file }
+// Expanded syntax: provider ImageProcessor { thumbnail(file: file!, w: int!, h: int!) -> file }
+type ProviderDef struct {
+	Name       string
+	TypeParams []TypeParameter
+	Methods    []ProviderMethod
+}
+
+func (ProviderDef) isItem() {}
+
+// ProviderMethod represents a method declared in a provider contract.
+type ProviderMethod struct {
+	Name       string
+	Params     []Field
+	ReturnType Type
+}
+
 // ContractEndpoint represents an endpoint declaration in a contract definition
 type ContractEndpoint struct {
 	Method     HttpMethod
@@ -1056,3 +1078,4 @@ func (AwaitExpr) isNode()            {}
 func (LambdaExpr) isNode()           {}
 func (TestBlock) isNode()            {}
 func (AssertStatement) isNode()      {}
+func (ProviderDef) isNode()          {}
