@@ -1,0 +1,217 @@
+# game.glyph - Core game logic: life, poison, commander damage, loss checks
+module "game"
+
+from "./models" import {
+  FORMAT_EDH,
+  POISON_THRESHOLD,
+  COMMANDER_DAMAGE_THRESHOLD
+}
+from "./session" import { findPlayer }
+
+# Change a player's life total by the given amount (positive or negative)
+! changeLife(game: object, playerId: str, amount: int) {
+  $ player = findPlayer(game, playerId)
+  if player == null {
+    > {success: false, error: "Player not found"}
+  }
+  $ player.life = player.life + amount
+  checkAllPlayers(game)
+  > {success: true, player_id: playerId, life: player.life}
+}
+
+# Change a player's poison counter by the given amount (floors at 0)
+! changePoison(game: object, playerId: str, amount: int): object {
+  $ player = findPlayer(game, playerId)
+  if player == null {
+    > {success: false, error: "Player not found"}
+  }
+  $ newPoison = player.poison + amount
+  if newPoison < 0 {
+    newPoison = 0
+  }
+  $ player.poison = newPoison
+  checkAllPlayers(game)
+  > {success: true, player_id: playerId, poison: player.poison}
+}
+
+# Apply commander damage (EDH only). Also reduces target's life.
+! applyCommanderDamage(game: object, srcId: str, tgtId: str, cmdName: str, amount: int): object {
+  if game.format != FORMAT_EDH {
+    > {success: false, error: "Commander damage is only tracked in EDH format"}
+  }
+
+  $ target = findPlayer(game, tgtId)
+  if target == null {
+    > {success: false, error: "Target player not found"}
+  }
+
+  $ source = findPlayer(game, srcId)
+  if source == null {
+    > {success: false, error: "Source player not found"}
+  }
+
+  # Reduce target's life
+  $ target.life = target.life - amount
+
+  # Find existing entry or create new one
+  $ found = false
+  for entry in game.commander_damage {
+    if entry.source_player_id == srcId && entry.target_player_id == tgtId && entry.commander_name == cmdName {
+      $ entry.damage = entry.damage + amount
+      found = true
+    }
+  }
+
+  if found == false {
+    $ newEntry = {
+      source_player_id: srcId,
+      target_player_id: tgtId,
+      commander_name: cmdName,
+      damage: amount
+    }
+    $ game.commander_damage = append(game.commander_damage, newEntry)
+  }
+
+  checkAllPlayers(game)
+  > {success: true, source_id: srcId, target_id: tgtId, commander: cmdName, damage: getCommanderDamage(game, srcId, tgtId, cmdName)}
+}
+
+# Get the total commander damage dealt from source to target with a specific commander
+! getCommanderDamage(game: object, srcId: str, tgtId: str, cmdName: str): int {
+  for entry in game.commander_damage {
+    if entry.source_player_id == srcId && entry.target_player_id == tgtId && entry.commander_name == cmdName {
+      > entry.damage
+    }
+  }
+  > 0
+}
+
+# Check if a player has lost due to life total
+! isDeadByLife(player: object): bool {
+  > player.life <= 0
+}
+
+# Check if a player has lost due to poison counters
+! isDeadByPoison(player: object): bool {
+  > player.poison >= POISON_THRESHOLD
+}
+
+# Check if a player has lost due to commander damage
+! isDeadByCommander(game: object, playerId: str): bool {
+  for entry in game.commander_damage {
+    if entry.target_player_id == playerId && entry.damage >= COMMANDER_DAMAGE_THRESHOLD {
+      > true
+    }
+  }
+  > false
+}
+
+# Determine why a player lost (if they did)
+! checkLossReason(game: object, player: object): str {
+  $ reason = match player {
+    p when p.life <= 0 => "Life total reached 0 or below"
+    p when p.poison >= POISON_THRESHOLD => "Received " + toString(POISON_THRESHOLD) + " or more poison counters"
+    _ => ""
+  }
+  if reason != "" {
+    > reason
+  }
+
+  # Check commander damage separately since it needs game context
+  if isDeadByCommander(game, player.id) {
+    > "Received 21 or more commander damage from a single commander"
+  }
+
+  > ""
+}
+
+# Check all players for loss conditions and update game finished state
+! checkAllPlayers(game: object): object {
+  for id, player in game.players {
+    if player.is_lost == false {
+      $ reason = checkLossReason(game, player)
+      if reason != "" {
+        $ player.is_lost = true
+        $ player.loss_reason = reason
+      }
+    }
+  }
+
+  $ active = countActivePlayers(game)
+  if active <= 1 && length(game.players) > 1 {
+    $ game.finished = true
+  }
+
+  > game
+}
+
+# Count the number of players who have not lost
+! countActivePlayers(game: object): int {
+  $ count = 0
+  for id, player in game.players {
+    if player.is_lost == false {
+      count = count + 1
+    }
+  }
+  > count
+}
+
+# Get the winning player (last one standing) if the game is finished
+! getWinner(game: object) {
+  if game.finished == false {
+    > null
+  }
+  for id, player in game.players {
+    if player.is_lost == false {
+      > player
+    }
+  }
+  > null
+}
+
+# Build a full game state response object
+! buildGameState(game: object): object {
+  $ playerList = []
+  for id, player in game.players {
+    $ playerInfo = {
+      id: player.id,
+      name: player.name,
+      life: player.life,
+      poison: player.poison,
+      is_lost: player.is_lost,
+      loss_reason: player.loss_reason,
+      join_order: player.join_order
+    }
+    playerList = append(playerList, playerInfo)
+  }
+
+  $ cmdDamageSummary = []
+  for entry in game.commander_damage {
+    $ summary = {
+      source_player_id: entry.source_player_id,
+      target_player_id: entry.target_player_id,
+      commander_name: entry.commander_name,
+      damage: entry.damage
+    }
+    cmdDamageSummary = append(cmdDamageSummary, summary)
+  }
+
+  $ winner = getWinner(game)
+  $ winnerName = ""
+  if winner != null {
+    winnerName = winner.name
+  }
+
+  > {
+    id: game.id,
+    room_code: game.room_code,
+    format: game.format,
+    host_id: game.host_id,
+    players: playerList,
+    commander_damage: cmdDamageSummary,
+    started: game.started,
+    finished: game.finished,
+    winner: winnerName,
+    player_count: length(game.players)
+  }
+}

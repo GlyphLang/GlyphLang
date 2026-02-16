@@ -1,0 +1,205 @@
+# storage.glyph - Database storage for game history and user statistics
+module "storage"
+
+# Save a completed game to history
+# Returns: the created game_history record
+! saveGameToHistory(db: Database, game: object): object {
+  $ winnerName = ""
+  $ winner = null
+  for id, player in game.players {
+    if player.is_lost == false {
+      winner = player
+      winnerName = player.name
+    }
+  }
+
+  $ record = {
+    id: db.game_history.nextId(),
+    room_code: game.room_code,
+    format: game.format,
+    started_at: game.created_at,
+    finished_at: now(),
+    winner_name: winnerName,
+    player_count: length(game.players)
+  }
+
+  $ saved = db.game_history.create(record)
+  > saved
+}
+
+# Save all participants for a game
+# Expects players from game.players with optional user_id field
+! saveParticipants(db: Database, gameHistoryId: int, players: object): object {
+  $ savedParticipants = []
+
+  for id, player in players {
+    $ isWinner = player.is_lost == false
+
+    $ participant = {
+      id: db.game_participants.nextId(),
+      game_history_id: gameHistoryId,
+      user_id: player.user_id,
+      guest_name: "",
+      final_life: player.life,
+      final_poison: player.poison,
+      is_winner: isWinner,
+      loss_reason: player.loss_reason
+    }
+
+    # If no user_id, use guest_name
+    if player.user_id == null {
+      $ participant.guest_name = player.name
+    }
+
+    $ saved = db.game_participants.create(participant)
+    savedParticipants = append(savedParticipants, saved)
+  }
+
+  > savedParticipants
+}
+
+# Get game history for a user
+# Returns: list of game history entries
+! getGameHistory(db: Database, userId: int, limit: int): object {
+  $ allHistory = db.game_participants.filter("user_id", userId)
+  $ results = []
+  $ count = 0
+
+  for participant in allHistory {
+    if count >= limit {
+      > results
+    }
+
+    $ gameRecord = db.game_history.get(participant.game_history_id)
+    if gameRecord != null {
+      $ entry = {
+        id: gameRecord.id,
+        room_code: gameRecord.room_code,
+        format: gameRecord.format,
+        winner_name: gameRecord.winner_name,
+        player_count: gameRecord.player_count,
+        finished_at: gameRecord.finished_at,
+        was_winner: participant.is_winner,
+        final_life: participant.final_life,
+        final_poison: participant.final_poison
+      }
+      results = append(results, entry)
+      count = count + 1
+    }
+  }
+
+  > results
+}
+
+# Get user statistics
+# Returns: user stats object or null
+! getUserStats(db: Database, userId: int): object {
+  $ stats = db.user_stats.findOne("user_id", userId)
+  if stats == null {
+    # Return default stats if none exist
+    > {
+      user_id: userId,
+      games_played: 0,
+      modern_played: 0,
+      modern_won: 0,
+      edh_played: 0,
+      edh_won: 0
+    }
+  }
+  > stats
+}
+
+# Update user stats after a game
+# won: true if user won, format: "modern" or "edh"
+! updateUserStats(db: Database, userId: int, won: bool, format: str): object {
+  $ stats = db.user_stats.findOne("user_id", userId)
+
+  if stats == null {
+    # Create new stats record
+    $ stats = {
+      user_id: userId,
+      games_played: 0,
+      modern_played: 0,
+      modern_won: 0,
+      edh_played: 0,
+      edh_won: 0
+    }
+    stats = db.user_stats.create(stats)
+  }
+
+  # Increment games played
+  $ stats.games_played = stats.games_played + 1
+
+  # Increment format-specific stats
+  if format == "modern" {
+    $ stats.modern_played = stats.modern_played + 1
+    if won {
+      $ stats.modern_won = stats.modern_won + 1
+    }
+  } else if format == "edh" {
+    $ stats.edh_played = stats.edh_played + 1
+    if won {
+      $ stats.edh_won = stats.edh_won + 1
+    }
+  }
+
+  $ updated = db.user_stats.update(stats.user_id, stats)
+  > updated
+}
+
+# Get leaderboard (top players by total wins)
+# Returns: list of {user_id, username, display_name, total_wins, games_played}
+! getLeaderboard(db: Database, limit: int): object {
+  $ allStats = db.user_stats.all()
+  $ leaderboard = []
+
+  for stats in allStats {
+    $ totalWins = stats.modern_won + stats.edh_won
+    $ user = db.users.get(stats.user_id)
+
+    if user != null {
+      $ entry = {
+        user_id: stats.user_id,
+        username: user.username,
+        display_name: user.name,
+        total_wins: totalWins,
+        games_played: stats.games_played,
+        modern_played: stats.modern_played,
+        modern_won: stats.modern_won,
+        edh_played: stats.edh_played,
+        edh_won: stats.edh_won
+      }
+      leaderboard = append(leaderboard, entry)
+    }
+  }
+
+  # Sort by total wins (descending) - simple bubble sort
+  $ n = length(leaderboard)
+  $ i = 0
+  while i < n - 1 {
+    $ j = 0
+    while j < n - i - 1 {
+      $ jIdx = j + 1
+      $ entryJ = leaderboard[j]
+      $ entryJPlus1 = leaderboard[jIdx]
+      if entryJ.total_wins < entryJPlus1.total_wins {
+        $ temp = leaderboard[j]
+        leaderboard[j] = entryJPlus1
+        leaderboard[jIdx] = temp
+      }
+      j = j + 1
+    }
+    i = i + 1
+  }
+
+  # Return top 'limit' entries
+  $ result = []
+  $ k = 0
+  while k < limit && k < length(leaderboard) {
+    $ entryK = leaderboard[k]
+    result = append(result, entryK)
+    k = k + 1
+  }
+
+  > result
+}

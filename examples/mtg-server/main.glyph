@@ -1,0 +1,606 @@
+# main.glyph - MTG Life Tracker Server
+# REST API and WebSocket handler for Magic: The Gathering life tracking
+# Supports Modern (2-player, 20 life) and EDH/Commander (2-6 player, 40 life)
+
+import "./models" as m
+from "./session" import { createGame, addPlayer, findPlayer, isValidFormat, getStartingLife }
+from "./game" import {
+  changeLife,
+  changePoison,
+  applyCommanderDamage,
+  getCommanderDamage,
+  checkAllPlayers,
+  countActivePlayers,
+  getWinner,
+  buildGameState
+}
+from "./auth" import { registerUser, loginUser, getUserById }
+from "./storage" import { saveGameToHistory, saveParticipants, getGameHistory, getUserStats, updateUserStats, getLeaderboard }
+
+# Serve the web UI from ./public
+@ static /public "./public"
+
+# In-memory game storage: roomCode -> Game
+const games = {}
+
+# Track games that have already been saved to history
+const savedGames = {}
+
+# Helper function to save game history when a game finishes
+# NOTE: Game history saving is disabled until interpreter supports passing db to functions
+! saveFinishedGame(db: Database, game: object) {
+  # TODO: Implement inline when interpreter supports this
+  > null
+}
+
+# Health check endpoint
+@ GET /health {
+  > {
+    status: "ok",
+    service: "mtg-life-tracker",
+    supported_formats: ["modern", "edh"]
+  }
+}
+
+# Register a new user
+@ POST /api/auth/register {
+  + ratelimit(10/min)
+  % db: Database
+
+  # Validate input
+  if input.username == null || input.username == "" {
+    > {success: false, message: "Username is required"}
+  }
+  if input.email == null || input.email == "" {
+    > {success: false, message: "Email is required"}
+  }
+  if input.password == null || length(input.password) < 8 {
+    > {success: false, message: "Password must be at least 8 characters"}
+  }
+
+  # Check if username already exists
+  $ allUsers = db.users.all()
+  for u in allUsers {
+    if u.username == input.username {
+      > {success: false, message: "Username already taken"}
+    }
+    if u.email == input.email {
+      > {success: false, message: "Email already registered"}
+    }
+  }
+
+  # Store password (NOTE: In production, use crypto.hash for password hashing)
+  $ hashedPassword = input.password
+  $ timestamp = now()
+  $ displayName = input.display_name
+  if displayName == null || displayName == "" {
+    displayName = input.username
+  }
+
+  $ newUser = {
+    id: db.users.nextId(),
+    username: input.username,
+    email: input.email,
+    password: hashedPassword,
+    name: displayName,
+    created_at: timestamp
+  }
+
+  $ saved = db.users.create(newUser)
+
+  # Initialize user stats
+  $ stats = {
+    user_id: saved.id,
+    games_played: 0,
+    modern_played: 0,
+    modern_won: 0,
+    edh_played: 0,
+    edh_won: 0
+  }
+  db.user_stats.create(stats)
+
+  # DEMO WORKAROUND: jwt module not available in interpreter mode
+  # In compiled mode, use: jwt.sign({user_id, username}, "7d")
+  $ token = "demo-token-" + toString(saved.id) + "-" + saved.username
+
+  # Build response without password
+  $ userResponse = {
+    id: saved.id,
+    username: saved.username,
+    email: saved.email,
+    display_name: saved.name,
+    created_at: saved.created_at
+  }
+
+  > {
+    success: true,
+    message: "User registered successfully",
+    token: token,
+    user: userResponse
+  }
+}
+
+# Login with username and password
+@ POST /api/auth/login {
+  + ratelimit(20/min)
+  % db: Database
+
+  # Validate input
+  if input.username == null || input.username == "" {
+    > {success: false, message: "Username is required"}
+  }
+  if input.password == null || input.password == "" {
+    > {success: false, message: "Password is required"}
+  }
+
+  # Find user by username
+  $ allUsers = db.users.all()
+  $ user = null
+  for u in allUsers {
+    if u.username == input.username {
+      user = u
+    }
+  }
+  if user == null {
+    > {success: false, message: "Invalid username or password"}
+  }
+
+  # DEMO WORKAROUND: crypto module not available in interpreter mode
+  # In compiled mode or production, use: crypto.verify(input.password, user.password)
+  if input.password != user.password {
+    > {success: false, message: "Invalid username or password"}
+  }
+
+  # DEMO WORKAROUND: jwt module not available in interpreter mode
+  # In compiled mode, use: jwt.sign({user_id, username}, "7d")
+  $ token = "demo-token-" + toString(user.id) + "-" + user.username
+
+  # Build response without password
+  $ userResponse = {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    display_name: user.name,
+    created_at: user.created_at
+  }
+
+  > {
+    success: true,
+    message: "Login successful",
+    token: token,
+    user: userResponse
+  }
+}
+
+# Get current user profile and stats
+@ GET /api/auth/me {
+  + auth(jwt)
+  + ratelimit(100/min)
+  % db: Database
+
+  $ userId = auth.user.id
+  $ user = db.users.get(userId)
+
+  if user == null {
+    > {success: false, error: "User not found"}
+  }
+
+  $ userResponse = {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    display_name: user.name,
+    created_at: user.created_at
+  }
+
+  # Workaround: filter() has name collision with built-in, use all() + loop
+  $ allStats = db.user_stats.all()
+  $ stats = null
+  for s in allStats {
+    if s.user_id == userId {
+      stats = s
+    }
+  }
+  if stats == null {
+    stats = {
+      user_id: userId,
+      games_played: 0,
+      modern_played: 0,
+      modern_won: 0,
+      edh_played: 0,
+      edh_won: 0
+    }
+  }
+
+  > {
+    success: true,
+    user: userResponse,
+    stats: stats
+  }
+}
+
+# Get leaderboard (returns all users with stats - frontend can sort/limit)
+@ GET /api/leaderboard {
+  + ratelimit(50/min)
+  % db: Database
+
+  $ allStats = db.user_stats.all()
+  $ results = []
+
+  for stats in allStats {
+    $ user = db.users.get(stats.user_id)
+    if user != null {
+      $ totalWins = stats.modern_won + stats.edh_won
+      $ entry = {
+        user_id: stats.user_id,
+        username: user.username,
+        display_name: user.name,
+        total_wins: totalWins,
+        games_played: stats.games_played
+      }
+      results = append(results, entry)
+    }
+  }
+
+  > {
+    success: true,
+    leaderboard: results,
+    count: length(results)
+  }
+}
+
+# Get user's game history
+@ GET /api/users/:userId/history {
+  + auth(jwt)
+  + ratelimit(50/min)
+  % db: Database
+
+  $ requestedUserId = parseInt(userId)
+  if requestedUserId != auth.user.id {
+    > {success: false, error: "Unauthorized"}
+  }
+
+  # Workaround: filter() has name collision, use all() + loop
+  $ allParticipants = db.game_participants.all()
+  $ results = []
+  $ count = 0
+
+  for participant in allParticipants {
+    if participant.user_id != requestedUserId {
+      # Skip participants that don't match
+    } else if count >= 20 {
+      > {success: true, history: results, count: length(results)}
+    } else {
+      $ gameRecord = db.game_history.get(participant.game_history_id)
+      if gameRecord != null {
+        $ entry = {
+          id: gameRecord.id,
+          room_code: gameRecord.room_code,
+          format: gameRecord.format,
+          winner_name: gameRecord.winner_name,
+          player_count: gameRecord.player_count,
+          finished_at: gameRecord.finished_at,
+          was_winner: participant.is_winner
+        }
+        results = append(results, entry)
+        count = count + 1
+      }
+    }
+  }
+
+  > {
+    success: true,
+    history: results,
+    count: length(results)
+  }
+}
+
+# Create a new game
+# Accepts optional auth token to link game to user account
+@ POST /api/games {
+  $ format = input.format
+  $ hostName = input.host_name
+  $ hostUserId = null
+  if input.user_id != null {
+    hostUserId = parseInt(toString(input.user_id))
+  }
+
+  if format == null || hostName == null {
+    > {success: false, error: "format and host_name are required"}
+  } else if isValidFormat(format) == false {
+    > {success: false, error: "Invalid format. Supported formats: modern, edh"}
+  } else if length(hostName) == 0 {
+    > {success: false, error: "host_name cannot be empty"}
+  } else {
+    $ game = createGame(format, hostName, hostUserId)
+    $ roomCode = game.room_code
+    set(games, roomCode, game)
+
+    > {
+      success: true,
+      message: "Game created. Share the room code with other players.",
+      room_code: roomCode,
+      game: buildGameState(game)
+    }
+  }
+}
+
+# List active (non-finished) games
+@ GET /api/games {
+  $ activeGames = []
+  for code, game in games {
+    if game.finished == false {
+      $ state = buildGameState(game)
+      activeGames = append(activeGames, state)
+    }
+  }
+  > {success: true, games: activeGames, count: length(activeGames)}
+}
+
+# Get a specific game by room code
+@ GET /api/games/:roomCode {
+  $ game = games[upper(roomCode)]
+  if game == null {
+    > {success: false, error: "Game not found with room code: " + upper(roomCode)}
+  } else {
+    > {success: true, game: buildGameState(game)}
+  }
+}
+
+# Join an existing game
+@ POST /api/games/:roomCode/join {
+  $ game = games[upper(roomCode)]
+  if game == null {
+    > {success: false, error: "Game not found with room code: " + upper(roomCode)}
+  } else if game.started {
+    > {success: false, error: "Game has already started"}
+  } else if game.finished {
+    > {success: false, error: "Game has already finished"}
+  } else {
+    $ playerName = input.player_name
+    if playerName == null || length(playerName) == 0 {
+      > {success: false, error: "player_name is required"}
+    } else {
+      # Check max player count based on format
+      $ playerCount = length(game.players)
+      if game.format == "edh" && playerCount >= 6 {
+        > {success: false, error: "EDH games support a maximum of 6 players"}
+      } else if game.format == "modern" && playerCount >= 2 {
+        > {success: false, error: "Modern games support exactly 2 players"}
+      } else {
+        $ userId = null
+        if input.user_id != null {
+          userId = parseInt(toString(input.user_id))
+        }
+        $ playerId = addPlayer(game, playerName, userId)
+
+        > {
+          success: true,
+          message: playerName + " joined the game",
+          player_id: playerId,
+          game: buildGameState(game)
+        }
+      }
+    }
+  }
+}
+
+# Start a game (host only)
+@ POST /api/games/:roomCode/start {
+  $ game = games[upper(roomCode)]
+  if game == null {
+    > {success: false, error: "Game not found with room code: " + upper(roomCode)}
+  } else if game.started {
+    > {success: false, error: "Game has already started"}
+  } else if game.finished {
+    > {success: false, error: "Game has already finished"}
+  } else {
+    # Verify the requester is the host
+    $ requesterId = input.player_id
+    if requesterId == null {
+      > {success: false, error: "player_id is required"}
+    } else if requesterId != game.host_id {
+      > {success: false, error: "Only the host can start the game"}
+    } else {
+      $ playerCount = length(game.players)
+
+      # Validate player counts for each format
+      if game.format == "modern" && playerCount != 2 {
+        > {success: false, error: "Modern games require exactly 2 players. Currently: " + toString(playerCount)}
+      } else if game.format == "edh" && (playerCount < 2 || playerCount > 6) {
+        > {success: false, error: "EDH games require 2-6 players. Currently: " + toString(playerCount)}
+      } else {
+        $ game.started = true
+
+        > {
+          success: true,
+          message: "Game started with " + toString(playerCount) + " players",
+          game: buildGameState(game)
+        }
+      }
+    }
+  }
+}
+
+# Change a player's life total
+@ PATCH /api/games/:roomCode/life {
+  % db: Database
+
+  $ game = games[upper(roomCode)]
+  if game == null {
+    > {success: false, error: "Game not found with room code: " + upper(roomCode)}
+  } else if game.started == false {
+    > {success: false, error: "Game has not started yet"}
+  } else if game.finished {
+    > {success: false, error: "Game has already finished"}
+  } else {
+    $ playerId = input.player_id
+    $ amount = input.amount
+
+    if playerId == null || amount == null {
+      > {success: false, error: "player_id and amount are required"}
+    } else {
+      $ player = findPlayer(game, playerId)
+      if player == null {
+        > {success: false, error: "Player not found"}
+      } else if player.is_lost {
+        > {success: false, error: "Player has already lost the game"}
+      } else {
+        $ result = changeLife(game, playerId, amount)
+
+        # Save history if game just finished
+        saveFinishedGame(db, game)
+
+        > {
+          success: true,
+          message: player.name + " life changed by " + toString(amount),
+          game: buildGameState(game)
+        }
+      }
+    }
+  }
+}
+
+# Change a player's poison counters
+@ PATCH /api/games/:roomCode/poison {
+  % db: Database
+
+  $ game = games[upper(roomCode)]
+  if game == null {
+    > {success: false, error: "Game not found with room code: " + upper(roomCode)}
+  } else if game.started == false {
+    > {success: false, error: "Game has not started yet"}
+  } else if game.finished {
+    > {success: false, error: "Game has already finished"}
+  } else {
+    $ playerId = input.player_id
+    $ amount = input.amount
+
+    if playerId == null || amount == null {
+      > {success: false, error: "player_id and amount are required"}
+    } else {
+      $ player = findPlayer(game, playerId)
+      if player == null {
+        > {success: false, error: "Player not found"}
+      } else if player.is_lost {
+        > {success: false, error: "Player has already lost the game"}
+      } else {
+        $ result = changePoison(game, playerId, amount)
+
+        # Save history if game just finished
+        saveFinishedGame(db, game)
+
+        > {
+          success: true,
+          message: player.name + " poison changed by " + toString(amount),
+          game: buildGameState(game)
+        }
+      }
+    }
+  }
+}
+
+# Apply commander damage (EDH only)
+@ PATCH /api/games/:roomCode/commander-damage {
+  % db: Database
+
+  $ game = games[upper(roomCode)]
+  if game == null {
+    > {success: false, error: "Game not found with room code: " + upper(roomCode)}
+  } else if game.started == false {
+    > {success: false, error: "Game has not started yet"}
+  } else if game.finished {
+    > {success: false, error: "Game has already finished"}
+  } else {
+    $ srcId = input.source_player_id
+    $ tgtId = input.target_player_id
+    $ amount = input.amount
+
+    # Commander name defaults to "Commander" if not provided
+    $ cmdName = input.commander_name
+    if cmdName == null || length(cmdName) == 0 {
+      cmdName = "Commander"
+    }
+
+    if srcId == null || tgtId == null || amount == null {
+      > {success: false, error: "source_player_id, target_player_id, and amount are required"}
+    } else {
+      $ target = findPlayer(game, tgtId)
+      if target == null {
+        > {success: false, error: "Target player not found"}
+      } else if target.is_lost {
+        > {success: false, error: "Target player has already lost the game"}
+      } else {
+        $ result = applyCommanderDamage(game, srcId, tgtId, cmdName, amount)
+
+        # Save history if game just finished
+        saveFinishedGame(db, game)
+
+        > {
+          success: true,
+          message: cmdName + " dealt " + toString(amount) + " commander damage to " + target.name,
+          game: buildGameState(game)
+        }
+      }
+    }
+  }
+}
+
+# Kick a player from the game (host only)
+@ POST /api/games/:roomCode/kick {
+  $ game = games[upper(roomCode)]
+  if game == null {
+    > {success: false, error: "Game not found with room code: " + upper(roomCode)}
+  } else {
+    $ requesterId = input.requester_id
+    $ targetId = input.player_id
+    if requesterId == null || targetId == null {
+      > {success: false, error: "requester_id and player_id are required"}
+    } else if requesterId != game.host_id {
+      > {success: false, error: "Only the host can kick players"}
+    } else if targetId == game.host_id {
+      > {success: false, error: "The host cannot kick themselves"}
+    } else {
+      $ player = findPlayer(game, targetId)
+      if player == null {
+        > {success: false, error: "Player not found"}
+      } else {
+        remove(game.players, targetId)
+        > {
+          success: true,
+          message: player.name + " has been removed from the game",
+          game: buildGameState(game)
+        }
+      }
+    }
+  }
+}
+
+# End and remove a game
+@ DELETE /api/games/:roomCode {
+  $ code = upper(roomCode)
+  $ game = games[code]
+  if game == null {
+    > {success: false, error: "Game not found with room code: " + code}
+  } else {
+    remove(games, code)
+    > {success: true, message: "Game " + code + " has been removed"}
+  }
+}
+
+# WebSocket handler for real-time game updates
+@ ws /game/:roomCode {
+  on connect {
+    ws.join(roomCode)
+    ws.send({type: "connected", room: roomCode})
+  }
+
+  on message {
+    ws.broadcast_to_room(roomCode, input)
+  }
+
+  on disconnect {
+    ws.broadcast_to_room(roomCode, {type: "player_disconnected"})
+    ws.leave(roomCode)
+  }
+}

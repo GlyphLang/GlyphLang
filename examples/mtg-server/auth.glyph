@@ -1,0 +1,140 @@
+# auth.glyph - User authentication: registration, login, and user lookup
+module "auth"
+
+# Register a new user
+# Returns: {success: bool, message: str, user: object, token: str}
+! registerUser(db: Database, username: str, email: str, password: str, displayName: str): object {
+  # Validate input
+  if username == null || username == "" {
+    > {success: false, message: "Username is required"}
+  }
+  if email == null || email == "" {
+    > {success: false, message: "Email is required"}
+  }
+  if password == null || length(password) < 8 {
+    > {success: false, message: "Password must be at least 8 characters"}
+  }
+
+  # Check if username already exists
+  $ existingUser = db.users.findOne("username", username)
+  if existingUser != null {
+    > {success: false, message: "Username already taken"}
+  }
+
+  # Check if email already exists
+  $ existingEmail = db.users.findOne("email", email)
+  if existingEmail != null {
+    > {success: false, message: "Email already registered"}
+  }
+
+  # Hash password and create user
+  $ hashedPassword = crypto.hash(password)
+  $ timestamp = now()
+
+  $ newUser = {
+    id: db.users.nextId(),
+    username: username,
+    email: email,
+    password: hashedPassword,
+    name: displayName,
+    created_at: timestamp
+  }
+
+  $ saved = db.users.create(newUser)
+
+  # Initialize user stats
+  $ stats = {
+    user_id: saved.id,
+    games_played: 0,
+    modern_played: 0,
+    modern_won: 0,
+    edh_played: 0,
+    edh_won: 0
+  }
+  db.user_stats.create(stats)
+
+  # Generate JWT token
+  $ token = jwt.sign({
+    user_id: saved.id,
+    username: saved.username
+  }, "7d")
+
+  # Build response without password
+  $ userResponse = {
+    id: saved.id,
+    username: saved.username,
+    email: saved.email,
+    display_name: saved.name,
+    created_at: saved.created_at
+  }
+
+  > {
+    success: true,
+    message: "User registered successfully",
+    token: token,
+    user: userResponse
+  }
+}
+
+# Login with username and password
+# Returns: {success: bool, message: str, user: object, token: str}
+! loginUser(db: Database, username: str, password: str): object {
+  # Validate input
+  if username == null || username == "" {
+    > {success: false, message: "Username is required"}
+  }
+  if password == null || password == "" {
+    > {success: false, message: "Password is required"}
+  }
+
+  # Find user by username
+  $ user = db.users.findOne("username", username)
+  if user == null {
+    > {success: false, message: "Invalid username or password"}
+  }
+
+  # Verify password
+  $ passwordValid = crypto.verify(password, user.password)
+  if passwordValid == false {
+    > {success: false, message: "Invalid username or password"}
+  }
+
+  # Generate JWT token
+  $ token = jwt.sign({
+    user_id: user.id,
+    username: user.username
+  }, "7d")
+
+  # Build response without password
+  $ userResponse = {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    display_name: user.name,
+    created_at: user.created_at
+  }
+
+  > {
+    success: true,
+    message: "Login successful",
+    token: token,
+    user: userResponse
+  }
+}
+
+# Get user by ID (excludes password)
+# Returns: user object or null
+! getUserById(db: Database, userId: int): object {
+  $ user = db.users.get(userId)
+  if user == null {
+    > null
+  }
+
+  > {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    display_name: user.name,
+    created_at: user.created_at
+  }
+}

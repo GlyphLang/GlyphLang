@@ -1,0 +1,104 @@
+# session.glyph - Session management: room codes, game creation, player joining
+module "session"
+
+from "./models" import { FORMAT_MODERN, FORMAT_EDH, MODERN_STARTING_LIFE, EDH_STARTING_LIFE }
+
+# Characters used for room code generation
+const ROOM_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+# Generate a 4-character room code using random characters
+! generateRoomCode(): str {
+  $ code = ""
+  $ i = 0
+  while i < 4 {
+    $ idx = randomInt(0, length(ROOM_CHARS) - 1)
+    $ ch = charAt(ROOM_CHARS, idx)
+    code = code + ch
+    i = i + 1
+  }
+  > code
+}
+
+# Get the starting life total for a given format
+! getStartingLife(format: str): int {
+  $ life = match format {
+    "modern" => 20
+    "edh" => 40
+    _ => 20
+  }
+  > life
+}
+
+# Check if a format string is valid
+! isValidFormat(format: str): bool {
+  > format == "modern" || format == "edh"
+}
+
+# Create a new game with a host player
+# hostUserId is optional - pass null for guest play
+! createGame(format: str, hostName: str, hostUserId: int?): object {
+  $ gameId = generateId()
+  $ roomCode = generateRoomCode()
+  $ startingLife = getStartingLife(format)
+  $ hostId = generateId()
+
+  $ host = {
+    id: hostId,
+    name: hostName,
+    user_id: hostUserId,
+    life: startingLife,
+    poison: 0,
+    is_lost: false,
+    loss_reason: "",
+    join_order: 0
+  }
+
+  $ game = {
+    id: gameId,
+    room_code: roomCode,
+    format: format,
+    host_id: hostId,
+    players: {},
+    commander_damage: [],
+    started: false,
+    finished: false,
+    created_at: now()
+  }
+
+  set(game.players, hostId, host)
+
+  > game
+}
+
+# Add a new player to an existing game
+# userId is optional - pass null for guest play
+! addPlayer(game: object, playerName: str, userId: int?): str {
+  $ playerId = generateId()
+  $ startingLife = getStartingLife(game.format)
+  $ order = length(game.players)
+
+  $ player = {
+    id: playerId,
+    name: playerName,
+    user_id: userId,
+    life: startingLife,
+    poison: 0,
+    is_lost: false,
+    loss_reason: "",
+    join_order: order
+  }
+
+  set(game.players, playerId, player)
+
+  > playerId
+}
+
+# Find a player in a game by ID (returns null if not found)
+! findPlayer(game: object, playerId: str) {
+  for id, player in game.players {
+    if id == playerId {
+      > player
+    }
+  }
+  > null
+}

@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MTG Life Tracker</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#121215;--bg2:#1a1a1f;--bg3:#222228;--bg4:#2a2a32;
+    --text:#e8e8ec;--text-dim:#8888a0;--text-bright:#ffffff;
+    --green:#22c55e;--green-dim:#16a34a;
+    --red:#ef4444;--red-dim:#dc2626;
+    --purple:#a855f7;--purple-dim:#9333ea;
+    --orange:#f97316;--orange-dim:#ea580c;
+    --blue:#3b82f6;--blue-dim:#2563eb;
+    --gold:#eab308;
+    --radius:10px;--radius-sm:6px;
+  }
+  html{font-size:16px}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    background:var(--bg);color:var(--text);
+    min-height:100vh;display:flex;flex-direction:column;align-items:center;
+  }
+  button{
+    font-family:inherit;font-size:0.95rem;cursor:pointer;
+    border:none;border-radius:var(--radius-sm);padding:0.6rem 1.2rem;
+    transition:background 0.15s,transform 0.1s,opacity 0.15s;
+  }
+  button:active{transform:scale(0.96)}
+  button:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+  input,select{
+    font-family:inherit;font-size:1rem;
+    background:var(--bg3);color:var(--text);
+    border:1px solid var(--bg4);border-radius:var(--radius-sm);
+    padding:0.6rem 0.8rem;outline:none;width:100%;
+    transition:border-color 0.15s;
+  }
+  input:focus,select:focus{border-color:var(--blue)}
+  label{font-size:0.85rem;color:var(--text-dim);margin-bottom:0.3rem;display:block}
+
+  /* Layout */
+  .container{width:100%;max-width:480px;padding:1rem}
+  .screen{display:none;width:100%}
+  .screen.active{display:flex;flex-direction:column;align-items:center}
+
+  /* Header */
+  .header{
+    text-align:center;padding:1.5rem 0 1rem;width:100%;
+  }
+  .header h1{
+    font-size:1.6rem;font-weight:700;letter-spacing:0.02em;
+    background:linear-gradient(135deg,var(--gold),var(--orange));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    background-clip:text;
+  }
+  .header p{color:var(--text-dim);font-size:0.85rem;margin-top:0.3rem}
+
+  /* Cards */
+  .card{
+    background:var(--bg2);border:1px solid var(--bg4);
+    border-radius:var(--radius);padding:1.2rem;width:100%;margin-bottom:1rem;
+  }
+  .card h2{font-size:1.1rem;margin-bottom:0.8rem;color:var(--text-bright)}
+
+  /* Form groups */
+  .form-group{margin-bottom:1rem}
+  .form-row{display:flex;gap:0.8rem}
+  .form-row>*{flex:1}
+
+  /* Primary button */
+  .btn-primary{
+    background:linear-gradient(135deg,var(--blue),var(--blue-dim));
+    color:#fff;font-weight:600;width:100%;padding:0.75rem;
+    font-size:1rem;
+  }
+  .btn-primary:hover:not(:disabled){filter:brightness(1.1)}
+  .btn-secondary{
+    background:var(--bg3);color:var(--text);font-weight:500;width:100%;
+    padding:0.75rem;font-size:1rem;border:1px solid var(--bg4);
+  }
+  .btn-secondary:hover:not(:disabled){background:var(--bg4)}
+  .btn-small{padding:0.4rem 0.7rem;font-size:0.85rem}
+  .btn-danger{background:var(--red-dim);color:#fff;font-weight:600}
+  .btn-danger:hover:not(:disabled){background:var(--red)}
+  .btn-kick{
+    padding:0.2rem 0.5rem;font-size:0.7rem;font-weight:600;
+    background:var(--bg4);color:var(--red);border:1px solid var(--red-dim);
+    border-radius:3px;margin-left:auto;
+  }
+  .btn-kick:hover{background:var(--red-dim);color:#fff}
+
+  /* Divider */
+  .divider{
+    display:flex;align-items:center;gap:0.8rem;
+    margin:0.8rem 0;color:var(--text-dim);font-size:0.8rem;
+  }
+  .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--bg4)}
+
+  /* Room code display */
+  .room-code{
+    font-size:2.5rem;font-weight:800;letter-spacing:0.25em;
+    text-align:center;color:var(--gold);padding:1rem;
+    font-family:'Courier New',monospace;
+  }
+  .room-code-label{text-align:center;color:var(--text-dim);font-size:0.85rem}
+
+  /* Player list in lobby */
+  .player-list{list-style:none;width:100%}
+  .player-list li{
+    display:flex;align-items:center;gap:0.6rem;
+    padding:0.6rem 0.8rem;background:var(--bg3);
+    border-radius:var(--radius-sm);margin-bottom:0.5rem;
+  }
+  .player-dot{
+    width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;
+  }
+  .player-list li .player-name{flex:1}
+  .player-list li .host-badge{
+    font-size:0.7rem;background:var(--gold);color:#000;
+    padding:0.15rem 0.4rem;border-radius:3px;font-weight:600;
+  }
+
+  /* Status bar */
+  .status-bar{
+    display:flex;align-items:center;gap:0.5rem;
+    padding:0.5rem 0.8rem;background:var(--bg3);border-radius:var(--radius-sm);
+    margin-bottom:1rem;font-size:0.8rem;width:100%;
+  }
+  .status-dot{
+    width:6px;height:6px;border-radius:50%;flex-shrink:0;
+  }
+  .status-dot.connected{background:var(--green)}
+  .status-dot.disconnected{background:var(--red)}
+
+  /* Game screen */
+  .player-panel{
+    background:var(--bg2);border:1px solid var(--bg4);
+    border-radius:var(--radius);padding:1.2rem;width:100%;margin-bottom:1rem;
+  }
+  .player-panel.is-you{border-color:var(--blue-dim)}
+  .player-panel.is-lost{opacity:0.45}
+  .player-panel .player-header{
+    display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;
+  }
+  .player-panel .player-name-display{font-size:1.1rem;font-weight:600}
+  .player-panel .player-tag{
+    font-size:0.65rem;padding:0.1rem 0.35rem;border-radius:3px;font-weight:600;
+  }
+  .player-panel .tag-you{background:var(--blue-dim);color:#fff}
+  .player-panel .tag-host{background:var(--gold);color:#000}
+  .player-panel .tag-lost{background:var(--red-dim);color:#fff}
+
+  /* Life display */
+  .life-section{text-align:center;margin-bottom:1rem}
+  .life-label{font-size:0.75rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.3rem}
+  .life-total{
+    font-size:4.5rem;font-weight:800;line-height:1;
+    font-variant-numeric:tabular-nums;
+    transition:color 0.2s;
+  }
+  .life-total.compact{font-size:2.5rem}
+  .life-total.positive{color:var(--green)}
+  .life-total.danger{color:var(--red)}
+  .life-total.normal{color:var(--text-bright)}
+  .life-controls{
+    display:flex;gap:0.5rem;justify-content:center;margin-top:0.6rem;
+    flex-wrap:wrap;
+  }
+  .life-btn{
+    min-width:52px;font-weight:700;font-size:1.1rem;
+    padding:0.5rem 0.8rem;border-radius:var(--radius-sm);
+  }
+  .life-btn.compact{min-width:40px;font-size:0.9rem;padding:0.35rem 0.5rem}
+  .life-btn.minus{background:var(--red-dim);color:#fff}
+  .life-btn.minus:hover{background:var(--red)}
+  .life-btn.plus{background:var(--green-dim);color:#fff}
+  .life-btn.plus:hover{background:var(--green)}
+
+  /* Poison section */
+  .poison-section{
+    display:flex;align-items:center;justify-content:center;gap:0.6rem;
+    padding:0.6rem;background:var(--bg3);border-radius:var(--radius-sm);
+    margin-bottom:0.8rem;
+  }
+  .poison-section .poison-label{
+    font-size:0.8rem;color:var(--purple);font-weight:600;min-width:60px;
+  }
+  .poison-count{
+    font-size:1.4rem;font-weight:700;color:var(--purple);
+    min-width:2rem;text-align:center;font-variant-numeric:tabular-nums;
+  }
+  .poison-count.compact{font-size:1.1rem}
+  .poison-btn{
+    width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+    font-size:1rem;font-weight:700;border-radius:50%;padding:0;
+  }
+  .poison-btn.minus{background:var(--bg4);color:var(--purple)}
+  .poison-btn.minus:hover{background:var(--purple-dim);color:#fff}
+  .poison-btn.plus{background:var(--purple-dim);color:#fff}
+  .poison-btn.plus:hover{background:var(--purple)}
+
+  /* Opponent stats (read-only) */
+  .stat-row{
+    display:flex;gap:0.8rem;align-items:center;justify-content:center;
+    font-size:0.85rem;margin-top:0.3rem;
+  }
+  .stat-row .stat-item{display:flex;align-items:center;gap:0.25rem}
+  .stat-row .stat-poison{color:var(--purple);font-weight:600}
+  .stat-row .stat-cmd{color:var(--orange);font-weight:600}
+
+  /* Commander damage */
+  .commander-section{
+    margin-top:0.8rem;width:100%;
+  }
+  .commander-header{
+    font-size:0.85rem;color:var(--orange);text-transform:uppercase;
+    letter-spacing:0.08em;margin-bottom:0.5rem;font-weight:600;
+  }
+  .cmd-row{
+    display:flex;align-items:center;gap:0.5rem;
+    padding:0.5rem 0.6rem;background:var(--bg3);
+    border-radius:var(--radius-sm);margin-bottom:0.4rem;font-size:0.85rem;
+  }
+  .cmd-from{flex:1;color:var(--text-dim)}
+  .cmd-damage{
+    font-weight:700;color:var(--orange);font-variant-numeric:tabular-nums;
+    min-width:1.5rem;text-align:center;
+  }
+  .cmd-btn{
+    width:26px;height:26px;display:flex;align-items:center;justify-content:center;
+    font-size:0.85rem;font-weight:700;border-radius:50%;padding:0;
+    background:var(--orange-dim);color:#fff;
+  }
+  .cmd-btn:hover{background:var(--orange)}
+
+  /* Game over overlay */
+  .game-over{
+    position:fixed;inset:0;background:rgba(0,0,0,0.85);
+    display:none;align-items:center;justify-content:center;
+    z-index:100;flex-direction:column;gap:1rem;padding:2rem;
+  }
+  .game-over.active{display:flex}
+  .game-over h2{
+    font-size:2rem;
+    background:linear-gradient(135deg,var(--gold),var(--orange));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    background-clip:text;
+  }
+  .game-over .winner-name{font-size:1.5rem;font-weight:700;color:var(--text-bright)}
+  .game-over p{color:var(--text-dim)}
+
+  /* Error / info messages */
+  .msg{
+    padding:0.6rem 0.8rem;border-radius:var(--radius-sm);
+    font-size:0.85rem;margin-bottom:0.8rem;width:100%;
+  }
+  .msg.error{background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.3)}
+  .msg.info{background:rgba(59,130,246,0.15);color:var(--blue);border:1px solid rgba(59,130,246,0.3)}
+
+  /* Spinner */
+  .spinner{
+    display:inline-block;width:16px;height:16px;
+    border:2px solid var(--bg4);border-top-color:var(--blue);
+    border-radius:50%;animation:spin 0.6s linear infinite;
+    vertical-align:middle;margin-right:0.4rem;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* Section headers */
+  .section-header{
+    font-size:0.85rem;color:var(--text-dim);text-transform:uppercase;
+    letter-spacing:0.08em;margin-bottom:0.5rem;
+  }
+
+  /* Auth header bar */
+  .auth-bar{
+    display:flex;justify-content:flex-end;align-items:center;gap:0.5rem;
+    width:100%;padding:0.5rem 0;margin-bottom:0.5rem;
+  }
+  .auth-bar .user-info{
+    display:flex;align-items:center;gap:0.5rem;
+    color:var(--text-dim);font-size:0.85rem;
+  }
+  .auth-bar .user-name{color:var(--text);font-weight:500}
+  .btn-link{
+    background:none;color:var(--blue);padding:0.3rem 0.5rem;
+    font-size:0.85rem;text-decoration:underline;
+  }
+  .btn-link:hover{color:var(--blue-dim)}
+
+  /* Stats display */
+  .stats-grid{
+    display:grid;grid-template-columns:repeat(2,1fr);gap:0.8rem;
+    margin-bottom:1rem;
+  }
+  .stat-card{
+    background:var(--bg3);border-radius:var(--radius-sm);padding:0.8rem;
+    text-align:center;
+  }
+  .stat-card .stat-value{
+    font-size:1.5rem;font-weight:700;color:var(--text-bright);
+  }
+  .stat-card .stat-label{
+    font-size:0.75rem;color:var(--text-dim);text-transform:uppercase;
+    letter-spacing:0.05em;margin-top:0.2rem;
+  }
+  .stat-card.highlight .stat-value{color:var(--gold)}
+
+  /* History list */
+  .history-list{list-style:none}
+  .history-item{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:0.6rem 0.8rem;background:var(--bg3);
+    border-radius:var(--radius-sm);margin-bottom:0.5rem;
+  }
+  .history-item .format-badge{
+    font-size:0.7rem;padding:0.1rem 0.4rem;border-radius:3px;
+    background:var(--bg4);color:var(--text-dim);font-weight:600;
+    text-transform:uppercase;
+  }
+  .history-item .result-win{color:var(--green);font-weight:600}
+  .history-item .result-loss{color:var(--red);font-weight:600}
+
+  /* Responsive */
+  @media(max-width:480px){
+    .container{padding:0.6rem}
+    .life-total{font-size:3.5rem}
+    .life-total.compact{font-size:2rem}
+    .room-code{font-size:2rem}
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- AUTH BAR - shown on home screen -->
+  <div id="auth-bar" class="auth-bar">
+    <div id="auth-logged-out">
+      <button class="btn-link" onclick="showScreen('login')">Login</button>
+      <button class="btn-link" onclick="showScreen('register')">Register</button>
+    </div>
+    <div id="auth-logged-in" style="display:none">
+      <span class="user-info">
+        <span class="user-name" id="auth-username">--</span>
+      </span>
+      <button class="btn-link" onclick="showScreen('profile')">Profile</button>
+      <button class="btn-link" onclick="logout()">Logout</button>
+    </div>
+  </div>
+
+  <!-- LOGIN SCREEN -->
+  <div id="screen-login" class="screen">
+    <div class="header">
+      <h1>MTG Life Tracker</h1>
+      <p>Login to your account</p>
+    </div>
+
+    <div class="card">
+      <h2>Login</h2>
+      <div class="form-group">
+        <label for="login-username">Username</label>
+        <input id="login-username" type="text" placeholder="Enter username" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label for="login-password">Password</label>
+        <input id="login-password" type="password" placeholder="Enter password" autocomplete="current-password">
+      </div>
+      <button id="btn-login" class="btn-primary" onclick="doLogin()">Login</button>
+    </div>
+
+    <div class="divider">or</div>
+
+    <button class="btn-secondary" onclick="showScreen('register')">Create Account</button>
+    <div style="height:0.5rem"></div>
+    <button class="btn-link" onclick="showScreen('home')">Continue as Guest</button>
+
+    <div id="login-msg" style="margin-top:0.8rem"></div>
+  </div>
+
+  <!-- REGISTER SCREEN -->
+  <div id="screen-register" class="screen">
+    <div class="header">
+      <h1>MTG Life Tracker</h1>
+      <p>Create your account</p>
+    </div>
+
+    <div class="card">
+      <h2>Register</h2>
+      <div class="form-group">
+        <label for="register-username">Username</label>
+        <input id="register-username" type="text" placeholder="Choose a username" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label for="register-email">Email</label>
+        <input id="register-email" type="email" placeholder="Enter your email" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label for="register-password">Password</label>
+        <input id="register-password" type="password" placeholder="At least 8 characters" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label for="register-name">Display Name (optional)</label>
+        <input id="register-name" type="text" placeholder="How you appear in games" autocomplete="name">
+      </div>
+      <button id="btn-register" class="btn-primary" onclick="doRegister()">Create Account</button>
+    </div>
+
+    <div class="divider">or</div>
+
+    <button class="btn-secondary" onclick="showScreen('login')">Already have an account?</button>
+    <div style="height:0.5rem"></div>
+    <button class="btn-link" onclick="showScreen('home')">Continue as Guest</button>
+
+    <div id="register-msg" style="margin-top:0.8rem"></div>
+  </div>
+
+  <!-- PROFILE SCREEN -->
+  <div id="screen-profile" class="screen">
+    <div class="header">
+      <h1>MTG Life Tracker</h1>
+      <p>Your Profile</p>
+    </div>
+
+    <div class="card">
+      <h2 id="profile-display-name">--</h2>
+      <p style="color:var(--text-dim);font-size:0.85rem" id="profile-username">@--</p>
+    </div>
+
+    <div class="card">
+      <h2>Statistics</h2>
+      <div class="stats-grid">
+        <div class="stat-card highlight">
+          <div class="stat-value" id="stat-total-wins">0</div>
+          <div class="stat-label">Total Wins</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-games-played">0</div>
+          <div class="stat-label">Games Played</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-modern-record">0-0</div>
+          <div class="stat-label">Modern</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-edh-record">0-0</div>
+          <div class="stat-label">EDH</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Recent Games</h2>
+      <ul id="profile-history" class="history-list">
+        <li style="color:var(--text-dim);text-align:center;padding:1rem">No games yet</li>
+      </ul>
+    </div>
+
+    <button class="btn-secondary" onclick="showScreen('home')">Back to Home</button>
+    <div style="height:0.5rem"></div>
+    <button class="btn-link" onclick="logout()">Logout</button>
+
+    <div id="profile-msg" style="margin-top:0.8rem"></div>
+  </div>
+
+  <!-- HOME SCREEN -->
+  <div id="screen-home" class="screen active">
+    <div class="header">
+      <h1>MTG Life Tracker</h1>
+      <p>Track life, poison, and commander damage</p>
+    </div>
+
+    <div class="card">
+      <h2>Create Game</h2>
+      <div class="form-group">
+        <label for="create-name">Your Name</label>
+        <input id="create-name" type="text" placeholder="Enter your name" maxlength="20" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="create-format">Format</label>
+        <select id="create-format">
+          <option value="modern">Modern (2 players, 20 life)</option>
+          <option value="edh">EDH / Commander (2-6 players, 40 life)</option>
+        </select>
+      </div>
+      <button id="btn-create" class="btn-primary" onclick="createGame()">Create Game</button>
+    </div>
+
+    <div class="divider">or join an existing game</div>
+
+    <div class="card">
+      <h2>Join Game</h2>
+      <div class="form-group">
+        <label for="join-name">Your Name</label>
+        <input id="join-name" type="text" placeholder="Enter your name" maxlength="20" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="join-code">Room Code</label>
+        <input id="join-code" type="text" placeholder="e.g. AB3X" maxlength="4"
+          style="text-transform:uppercase;letter-spacing:0.15em;font-weight:600" autocomplete="off">
+      </div>
+      <button id="btn-join" class="btn-primary" onclick="joinGame()">Join Game</button>
+    </div>
+
+    <div id="home-msg"></div>
+  </div>
+
+  <!-- LOBBY SCREEN -->
+  <div id="screen-lobby" class="screen">
+    <div class="header">
+      <h1>MTG Life Tracker</h1>
+    </div>
+
+    <div class="room-code-label">Room Code</div>
+    <div id="lobby-room-code" class="room-code">----</div>
+
+    <div id="lobby-status" class="status-bar">
+      <span class="status-dot disconnected" id="lobby-ws-dot"></span>
+      <span id="lobby-ws-text">Connecting...</span>
+    </div>
+
+    <div class="card">
+      <h2>Players <span id="lobby-player-count" style="color:var(--text-dim);font-weight:400;font-size:0.9rem"></span></h2>
+      <ul id="lobby-players" class="player-list"></ul>
+    </div>
+
+    <button id="btn-start" class="btn-primary" onclick="startGame()" style="display:none">Start Game</button>
+    <div style="height:0.6rem"></div>
+    <button class="btn-secondary" onclick="leaveLobby()">Leave</button>
+
+    <div id="lobby-msg" style="margin-top:0.8rem"></div>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div id="screen-game" class="screen">
+    <div style="display:flex;justify-content:space-between;align-items:center;width:100%;margin-bottom:0.6rem">
+      <div style="font-size:0.8rem;color:var(--text-dim)" id="game-format-label"></div>
+      <div id="game-status" class="status-bar" style="width:auto;margin-bottom:0">
+        <span class="status-dot disconnected" id="game-ws-dot"></span>
+        <span id="game-ws-text" style="font-size:0.75rem">--</span>
+      </div>
+    </div>
+
+    <!-- All player panels rendered here -->
+    <div id="players-list" style="width:100%"></div>
+
+    <div style="height:0.8rem"></div>
+    <button class="btn-secondary btn-small" onclick="leaveLobby()" style="align-self:flex-start">Leave Game</button>
+    <div id="game-msg" style="margin-top:0.8rem"></div>
+  </div>
+
+  <!-- Game Over Overlay -->
+  <div id="game-over" class="game-over">
+    <h2>Game Over</h2>
+    <div class="winner-name" id="winner-name">--</div>
+    <p>wins the game!</p>
+    <button class="btn-primary" style="max-width:200px" onclick="leaveLobby()">Back to Home</button>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  // -- Config --
+  var API = 'http://localhost:3000';
+  var WS_URL = 'ws://localhost:3000';
+
+  // -- Session state --
+  var state = {
+    playerId: null,
+    playerName: null,
+    roomCode: null,
+    game: null,
+    ws: null,
+    pollTimer: null,
+    isHost: false,
+    // Auth state
+    authToken: null,
+    user: null
+  };
+
+  // -- Screens --
+  function showScreen(name) {
+    var screens = document.querySelectorAll('.screen');
+    for (var i = 0; i < screens.length; i++) {
+      screens[i].classList.remove('active');
+    }
+    document.getElementById('screen-' + name).classList.add('active');
+    clearMessages();
+    updateAuthBar();
+
+    // Load profile data when showing profile screen
+    if (name === 'profile' && state.user) {
+      loadProfile();
+    }
+  }
+  window.showScreen = showScreen;
+
+  function clearMessages() {
+    var ids = ['home-msg', 'lobby-msg', 'game-msg', 'login-msg', 'register-msg', 'profile-msg'];
+    for (var i = 0; i < ids.length; i++) {
+      var el = document.getElementById(ids[i]);
+      if (el) el.innerHTML = '';
+    }
+  }
+
+  function showMsg(containerId, text, type) {
+    var el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = '<div class="msg ' + type + '">' + escapeHtml(text) + '</div>';
+    if (type === 'info') {
+      setTimeout(function() { if (el) el.innerHTML = ''; }, 4000);
+    }
+  }
+
+  function escapeHtml(s) {
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(s));
+    return div.innerHTML;
+  }
+
+  // -- API helpers --
+  function api(method, path, body) {
+    var opts = {
+      method: method,
+      headers: { 'Content-Type': 'application/json' }
+    };
+    if (state.authToken) {
+      opts.headers['Authorization'] = 'Bearer ' + state.authToken;
+    }
+    if (body) opts.body = JSON.stringify(body);
+    return fetch(API + path, opts).then(function(r) { return r.json(); });
+  }
+
+  // -- Auth UI update --
+  function updateAuthBar() {
+    var loggedOut = document.getElementById('auth-logged-out');
+    var loggedIn = document.getElementById('auth-logged-in');
+    var authBar = document.getElementById('auth-bar');
+    var activeScreen = document.querySelector('.screen.active');
+
+    // Only show auth bar on home screen
+    if (activeScreen && activeScreen.id === 'screen-home') {
+      authBar.style.display = 'flex';
+    } else {
+      authBar.style.display = 'none';
+    }
+
+    if (state.user) {
+      loggedOut.style.display = 'none';
+      loggedIn.style.display = 'flex';
+      document.getElementById('auth-username').textContent = state.user.display_name || state.user.username;
+    } else {
+      loggedOut.style.display = 'flex';
+      loggedIn.style.display = 'none';
+    }
+  }
+
+  // -- Auth persistence (localStorage for token) --
+  function saveAuth() {
+    if (state.authToken) {
+      localStorage.setItem('mtg_authToken', state.authToken);
+      localStorage.setItem('mtg_user', JSON.stringify(state.user));
+    } else {
+      localStorage.removeItem('mtg_authToken');
+      localStorage.removeItem('mtg_user');
+    }
+  }
+
+  function loadAuth() {
+    state.authToken = localStorage.getItem('mtg_authToken') || null;
+    var userJson = localStorage.getItem('mtg_user');
+    state.user = userJson ? JSON.parse(userJson) : null;
+  }
+
+  // -- Login --
+  window.doLogin = function() {
+    var username = document.getElementById('login-username').value.trim();
+    var password = document.getElementById('login-password').value;
+
+    if (!username) { showMsg('login-msg', 'Please enter username.', 'error'); return; }
+    if (!password) { showMsg('login-msg', 'Please enter password.', 'error'); return; }
+
+    var btn = document.getElementById('btn-login');
+    btn.disabled = true;
+    btn.textContent = 'Logging in...';
+
+    api('POST', '/api/auth/login', { username: username, password: password })
+      .then(function(data) {
+        btn.disabled = false;
+        btn.textContent = 'Login';
+        if (!data.success) {
+          showMsg('login-msg', data.message || 'Login failed', 'error');
+          return;
+        }
+        state.authToken = data.token;
+        state.user = data.user;
+        saveAuth();
+        showScreen('home');
+        showMsg('home-msg', 'Welcome back, ' + (state.user.display_name || state.user.username) + '!', 'info');
+      })
+      .catch(function() {
+        btn.disabled = false;
+        btn.textContent = 'Login';
+        showMsg('login-msg', 'Connection error.', 'error');
+      });
+  };
+
+  // -- Register --
+  window.doRegister = function() {
+    var username = document.getElementById('register-username').value.trim();
+    var email = document.getElementById('register-email').value.trim();
+    var password = document.getElementById('register-password').value;
+    var displayName = document.getElementById('register-name').value.trim();
+
+    if (!username) { showMsg('register-msg', 'Please enter username.', 'error'); return; }
+    if (!email) { showMsg('register-msg', 'Please enter email.', 'error'); return; }
+    if (!password || password.length < 8) { showMsg('register-msg', 'Password must be at least 8 characters.', 'error'); return; }
+
+    var btn = document.getElementById('btn-register');
+    btn.disabled = true;
+    btn.textContent = 'Creating account...';
+
+    api('POST', '/api/auth/register', {
+      username: username,
+      email: email,
+      password: password,
+      display_name: displayName || username
+    })
+      .then(function(data) {
+        btn.disabled = false;
+        btn.textContent = 'Create Account';
+        if (!data.success) {
+          showMsg('register-msg', data.message || 'Registration failed', 'error');
+          return;
+        }
+        state.authToken = data.token;
+        state.user = data.user;
+        saveAuth();
+        showScreen('home');
+        showMsg('home-msg', 'Account created! Welcome, ' + (state.user.display_name || state.user.username) + '!', 'info');
+      })
+      .catch(function() {
+        btn.disabled = false;
+        btn.textContent = 'Create Account';
+        showMsg('register-msg', 'Connection error.', 'error');
+      });
+  };
+
+  // -- Logout --
+  window.logout = function() {
+    state.authToken = null;
+    state.user = null;
+    saveAuth();
+    showScreen('home');
+  };
+
+  // -- Load profile data --
+  function loadProfile() {
+    if (!state.user) return;
+
+    document.getElementById('profile-display-name').textContent = state.user.display_name || state.user.username;
+    document.getElementById('profile-username').textContent = '@' + state.user.username;
+
+    // Fetch fresh stats
+    api('GET', '/api/auth/me')
+      .then(function(data) {
+        if (!data.success) return;
+        var stats = data.stats || {};
+        var totalWins = (stats.modern_won || 0) + (stats.edh_won || 0);
+        var modernLosses = (stats.modern_played || 0) - (stats.modern_won || 0);
+        var edhLosses = (stats.edh_played || 0) - (stats.edh_won || 0);
+
+        document.getElementById('stat-total-wins').textContent = totalWins;
+        document.getElementById('stat-games-played').textContent = stats.games_played || 0;
+        document.getElementById('stat-modern-record').textContent = (stats.modern_won || 0) + '-' + modernLosses;
+        document.getElementById('stat-edh-record').textContent = (stats.edh_won || 0) + '-' + edhLosses;
+      })
+      .catch(function() {});
+
+    // Fetch game history
+    api('GET', '/api/users/' + state.user.id + '/history')
+      .then(function(data) {
+        var list = document.getElementById('profile-history');
+        if (!data.success || !data.history || data.history.length === 0) {
+          list.innerHTML = '<li style="color:var(--text-dim);text-align:center;padding:1rem">No games yet</li>';
+          return;
+        }
+        list.innerHTML = '';
+        for (var i = 0; i < Math.min(data.history.length, 10); i++) {
+          var g = data.history[i];
+          var li = document.createElement('li');
+          li.className = 'history-item';
+
+          var left = document.createElement('div');
+          var badge = document.createElement('span');
+          badge.className = 'format-badge';
+          badge.textContent = g.format.toUpperCase();
+          left.appendChild(badge);
+          left.appendChild(document.createTextNode(' vs ' + (g.player_count - 1) + ' player' + (g.player_count > 2 ? 's' : '')));
+
+          var right = document.createElement('span');
+          right.className = g.was_winner ? 'result-win' : 'result-loss';
+          right.textContent = g.was_winner ? 'WIN' : 'LOSS';
+
+          li.appendChild(left);
+          li.appendChild(right);
+          list.appendChild(li);
+        }
+      })
+      .catch(function() {});
+  }
+
+  // -- Sort players by join_order for stable ordering --
+  function sortPlayers(players) {
+    if (!players) return [];
+    return players.slice().sort(function(a, b) {
+      var ao = (a.join_order != null) ? a.join_order : 0;
+      var bo = (b.join_order != null) ? b.join_order : 0;
+      return ao - bo;
+    });
+  }
+
+  // -- Create Game --
+  window.createGame = function() {
+    var name = document.getElementById('create-name').value.trim();
+    var format = document.getElementById('create-format').value;
+    if (!name) { showMsg('home-msg', 'Please enter your name.', 'error'); return; }
+
+    var btn = document.getElementById('btn-create');
+    btn.disabled = true;
+    btn.textContent = 'Creating...';
+
+    var body = { format: format, host_name: name };
+    if (state.user) { body.user_id = state.user.id; }
+    api('POST', '/api/games', body)
+      .then(function(data) {
+        btn.disabled = false;
+        btn.textContent = 'Create Game';
+        if (!data.success) { showMsg('home-msg', data.error || 'Failed to create game', 'error'); return; }
+
+        var game = data.game;
+        var players = sortPlayers(game.players);
+        // Host is the first player (join_order 0)
+        var myId = null;
+        for (var i = 0; i < players.length; i++) {
+          if (players[i].name === name) { myId = players[i].id; break; }
+        }
+        state.playerId = myId;
+        state.playerName = name;
+        state.roomCode = data.room_code;
+        state.game = game;
+        state.isHost = true;
+        saveSession();
+        enterLobby();
+      })
+      .catch(function() {
+        btn.disabled = false;
+        btn.textContent = 'Create Game';
+        showMsg('home-msg', 'Connection error. Is the server running at ' + API + '?', 'error');
+      });
+  };
+
+  // -- Join Game --
+  window.joinGame = function() {
+    var name = document.getElementById('join-name').value.trim();
+    var code = document.getElementById('join-code').value.trim().toUpperCase();
+    if (!name) { showMsg('home-msg', 'Please enter your name.', 'error'); return; }
+    if (!code || code.length !== 4) { showMsg('home-msg', 'Please enter a 4-character room code.', 'error'); return; }
+
+    var btn = document.getElementById('btn-join');
+    btn.disabled = true;
+    btn.textContent = 'Joining...';
+
+    var body = { player_name: name };
+    if (state.user) { body.user_id = state.user.id; }
+    api('POST', '/api/games/' + code + '/join', body)
+      .then(function(data) {
+        btn.disabled = false;
+        btn.textContent = 'Join Game';
+        if (!data.success) { showMsg('home-msg', data.error || 'Failed to join game', 'error'); return; }
+
+        state.playerId = data.player_id;
+        state.playerName = name;
+        state.roomCode = code;
+        state.game = data.game;
+        state.isHost = false;
+        saveSession();
+        enterLobby();
+      })
+      .catch(function() {
+        btn.disabled = false;
+        btn.textContent = 'Join Game';
+        showMsg('home-msg', 'Connection error. Is the server running at ' + API + '?', 'error');
+      });
+  };
+
+  // -- Session persistence --
+  function saveSession() {
+    sessionStorage.setItem('mtg_playerId', state.playerId || '');
+    sessionStorage.setItem('mtg_playerName', state.playerName || '');
+    sessionStorage.setItem('mtg_roomCode', state.roomCode || '');
+    sessionStorage.setItem('mtg_isHost', state.isHost ? '1' : '0');
+  }
+
+  function loadSession() {
+    state.playerId = sessionStorage.getItem('mtg_playerId') || null;
+    state.playerName = sessionStorage.getItem('mtg_playerName') || null;
+    state.roomCode = sessionStorage.getItem('mtg_roomCode') || null;
+    state.isHost = sessionStorage.getItem('mtg_isHost') === '1';
+  }
+
+  function clearSession() {
+    state.playerId = null;
+    state.playerName = null;
+    state.roomCode = null;
+    state.game = null;
+    state.isHost = false;
+    sessionStorage.removeItem('mtg_playerId');
+    sessionStorage.removeItem('mtg_playerName');
+    sessionStorage.removeItem('mtg_roomCode');
+    sessionStorage.removeItem('mtg_isHost');
+  }
+
+  // -- Lobby --
+  function enterLobby() {
+    showScreen('lobby');
+    document.getElementById('lobby-room-code').textContent = state.roomCode;
+    connectWebSocket();
+    refreshGameState();
+    state.pollTimer = setInterval(refreshGameState, 2000);
+  }
+
+  window.startGame = function() {
+    var btn = document.getElementById('btn-start');
+    btn.disabled = true;
+    btn.textContent = 'Starting...';
+
+    api('POST', '/api/games/' + state.roomCode + '/start', { player_id: state.playerId })
+      .then(function(data) {
+        btn.disabled = false;
+        btn.textContent = 'Start Game';
+        if (!data.success) { showMsg('lobby-msg', data.error || 'Failed to start game', 'error'); return; }
+        state.game = data.game;
+        wsSend({ type: 'state_updated' });
+        enterGame();
+      })
+      .catch(function() {
+        btn.disabled = false;
+        btn.textContent = 'Start Game';
+        showMsg('lobby-msg', 'Connection error.', 'error');
+      });
+  };
+
+  window.leaveLobby = function() {
+    if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
+    if (state.ws) { state.ws.close(); state.ws = null; }
+    document.getElementById('game-over').classList.remove('active');
+    clearSession();
+    showScreen('home');
+  };
+
+  function renderLobby() {
+    var game = state.game;
+    if (!game) return;
+
+    // Determine if current player is host
+    state.isHost = (game.host_id === state.playerId);
+    saveSession();
+
+    var list = document.getElementById('lobby-players');
+    list.innerHTML = '';
+    var players = sortPlayers(game.players);
+    for (var i = 0; i < players.length; i++) {
+      var p = players[i];
+      var li = document.createElement('li');
+      var dot = document.createElement('span');
+      dot.className = 'player-dot';
+      var nameSpan = document.createElement('span');
+      nameSpan.className = 'player-name';
+      nameSpan.textContent = p.name;
+      li.appendChild(dot);
+      li.appendChild(nameSpan);
+      if (p.id === game.host_id) {
+        var badge = document.createElement('span');
+        badge.className = 'host-badge';
+        badge.textContent = 'HOST';
+        li.appendChild(badge);
+      } else if (state.isHost) {
+        var kickBtn = document.createElement('button');
+        kickBtn.className = 'btn-kick';
+        kickBtn.textContent = 'Kick';
+        kickBtn.dataset.action = 'kick';
+        kickBtn.dataset.playerId = p.id;
+        li.appendChild(kickBtn);
+      }
+      list.appendChild(li);
+    }
+
+    document.getElementById('lobby-player-count').textContent = '(' + players.length + ')';
+
+    // Only host sees the Start button
+    var startBtn = document.getElementById('btn-start');
+    startBtn.style.display = state.isHost ? '' : 'none';
+
+    if (game.started) {
+      enterGame();
+    }
+  }
+
+  // -- Game --
+  function enterGame() {
+    if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
+    showScreen('game');
+    renderGame();
+    state.pollTimer = setInterval(refreshGameState, 3000);
+  }
+
+  // Check if the current user can edit a given player's values.
+  // The host can edit everyone; non-host players can only edit themselves.
+  function canEdit(playerId) {
+    if (state.isHost) return true;
+    return playerId === state.playerId;
+  }
+
+  function renderGame() {
+    var game = state.game;
+    if (!game) return;
+
+    // Update host flag from game state
+    state.isHost = (game.host_id === state.playerId);
+
+    // Format label
+    var fmt = game.format === 'edh' ? 'EDH / Commander' : 'Modern';
+    document.getElementById('game-format-label').textContent = fmt + ' -- ' + state.roomCode;
+
+    var players = sortPlayers(game.players);
+    var container = document.getElementById('players-list');
+    container.innerHTML = '';
+
+    // Find "me" for commander damage section
+    var me = null;
+    var opponents = [];
+    for (var i = 0; i < players.length; i++) {
+      if (players[i].id === state.playerId) {
+        me = players[i];
+      } else {
+        opponents.push(players[i]);
+      }
+    }
+
+    // Render all player panels. "You" panel comes first, then opponents in join order.
+    var orderedPlayers = [];
+    if (me) orderedPlayers.push(me);
+    for (var j = 0; j < opponents.length; j++) {
+      orderedPlayers.push(opponents[j]);
+    }
+
+    for (var k = 0; k < orderedPlayers.length; k++) {
+      var p = orderedPlayers[k];
+      var isMe = (p.id === state.playerId);
+      var editable = canEdit(p.id) && !p.is_lost && !game.finished;
+      var isLarge = isMe;
+
+      var panel = document.createElement('div');
+      panel.className = 'player-panel' + (isMe ? ' is-you' : '') + (p.is_lost ? ' is-lost' : '');
+
+      // Header with name + tags
+      var tagsHtml = '';
+      if (isMe) tagsHtml += '<span class="player-tag tag-you">YOU</span> ';
+      if (p.id === game.host_id) tagsHtml += '<span class="player-tag tag-host">HOST</span> ';
+      if (p.is_lost) tagsHtml += '<span class="player-tag tag-lost">LOST</span> ';
+
+      var headerEl = document.createElement('div');
+      headerEl.className = 'player-header';
+      var nameSpan = document.createElement('span');
+      nameSpan.className = 'player-name-display';
+      nameSpan.textContent = p.name;
+      var tagsDiv = document.createElement('div');
+      tagsDiv.innerHTML = tagsHtml;
+      headerEl.appendChild(nameSpan);
+      headerEl.appendChild(tagsDiv);
+      if (state.isHost && !isMe) {
+        var kickBtn = document.createElement('button');
+        kickBtn.className = 'btn-kick';
+        kickBtn.textContent = 'Kick';
+        kickBtn.dataset.action = 'kick';
+        kickBtn.dataset.playerId = p.id;
+        headerEl.appendChild(kickBtn);
+      }
+      panel.appendChild(headerEl);
+
+      // Life section
+      var lifeClass = p.life <= 5 ? 'danger' : p.life >= 30 ? 'positive' : 'normal';
+      var sizeClass = isLarge ? '' : ' compact';
+
+      var lifeSection = document.createElement('div');
+      lifeSection.className = 'life-section';
+
+      var lifeLabel = document.createElement('div');
+      lifeLabel.className = 'life-label';
+      lifeLabel.textContent = 'Life Total';
+      lifeSection.appendChild(lifeLabel);
+
+      var lifeNum = document.createElement('div');
+      lifeNum.className = 'life-total ' + lifeClass + sizeClass;
+      lifeNum.textContent = p.life;
+      lifeSection.appendChild(lifeNum);
+
+      if (editable) {
+        var btnClass = isLarge ? '' : ' compact';
+        var lifeControls = document.createElement('div');
+        lifeControls.className = 'life-controls';
+        var lifeAmounts = [-5, -1, 1, 5];
+        for (var la = 0; la < lifeAmounts.length; la++) {
+          var lb = document.createElement('button');
+          lb.className = 'life-btn ' + (lifeAmounts[la] < 0 ? 'minus' : 'plus') + btnClass;
+          lb.textContent = (lifeAmounts[la] > 0 ? '+' : '') + lifeAmounts[la];
+          lb.dataset.action = 'life';
+          lb.dataset.playerId = p.id;
+          lb.dataset.amount = lifeAmounts[la];
+          lifeControls.appendChild(lb);
+        }
+        lifeSection.appendChild(lifeControls);
+      }
+      panel.appendChild(lifeSection);
+
+      // Poison section
+      if (editable) {
+        var pSizeClass = isLarge ? '' : ' compact';
+        var poisonDiv = document.createElement('div');
+        poisonDiv.className = 'poison-section';
+
+        var plbl = document.createElement('span');
+        plbl.className = 'poison-label';
+        plbl.textContent = 'Poison';
+        poisonDiv.appendChild(plbl);
+
+        var pMinus = document.createElement('button');
+        pMinus.className = 'poison-btn minus';
+        pMinus.textContent = '-';
+        pMinus.dataset.action = 'poison';
+        pMinus.dataset.playerId = p.id;
+        pMinus.dataset.amount = -1;
+        poisonDiv.appendChild(pMinus);
+
+        var pCount = document.createElement('span');
+        pCount.className = 'poison-count' + pSizeClass;
+        pCount.textContent = p.poison;
+        poisonDiv.appendChild(pCount);
+
+        var pPlus = document.createElement('button');
+        pPlus.className = 'poison-btn plus';
+        pPlus.textContent = '+';
+        pPlus.dataset.action = 'poison';
+        pPlus.dataset.playerId = p.id;
+        pPlus.dataset.amount = 1;
+        poisonDiv.appendChild(pPlus);
+
+        panel.appendChild(poisonDiv);
+      } else if (p.poison > 0) {
+        var poisonRo = document.createElement('div');
+        poisonRo.className = 'poison-section';
+        var plblRo = document.createElement('span');
+        plblRo.className = 'poison-label';
+        plblRo.textContent = 'Poison';
+        var pcRo = document.createElement('span');
+        pcRo.className = 'poison-count compact';
+        pcRo.textContent = p.poison;
+        poisonRo.appendChild(plblRo);
+        poisonRo.appendChild(pcRo);
+        panel.appendChild(poisonRo);
+      }
+
+      // Commander damage section (EDH only) - per player
+      if (game.format === 'edh') {
+        var cmdDamageList = game.commander_damage || [];
+        var others = [];
+        for (var op = 0; op < orderedPlayers.length; op++) {
+          if (orderedPlayers[op].id !== p.id) others.push(orderedPlayers[op]);
+        }
+        if (others.length > 0) {
+          var cmdDiv = document.createElement('div');
+          cmdDiv.className = 'commander-section';
+          var cmdHeader = document.createElement('div');
+          cmdHeader.className = 'commander-header';
+          cmdHeader.textContent = 'Commander Damage';
+          cmdDiv.appendChild(cmdHeader);
+
+          for (var ci = 0; ci < others.length; ci++) {
+            var src = others[ci];
+            var dmg = 0;
+            for (var cj = 0; cj < cmdDamageList.length; cj++) {
+              var entry = cmdDamageList[cj];
+              if (entry.source_player_id === src.id && entry.target_player_id === p.id) {
+                dmg += entry.damage;
+              }
+            }
+            var cmdRow = document.createElement('div');
+            cmdRow.className = 'cmd-row';
+
+            var cmdFrom = document.createElement('span');
+            cmdFrom.className = 'cmd-from';
+            cmdFrom.textContent = 'from ' + src.name;
+            cmdRow.appendChild(cmdFrom);
+
+            var cmdDmg = document.createElement('span');
+            cmdDmg.className = 'cmd-damage';
+            cmdDmg.textContent = dmg;
+            cmdRow.appendChild(cmdDmg);
+
+            if (editable) {
+              var cmdBtn = document.createElement('button');
+              cmdBtn.className = 'cmd-btn';
+              cmdBtn.textContent = '+';
+              cmdBtn.title = '+1 commander damage';
+              cmdBtn.dataset.action = 'cmddmg';
+              cmdBtn.dataset.sourceId = src.id;
+              cmdBtn.dataset.targetId = p.id;
+              cmdRow.appendChild(cmdBtn);
+            }
+
+            cmdDiv.appendChild(cmdRow);
+          }
+          panel.appendChild(cmdDiv);
+        }
+      }
+
+      container.appendChild(panel);
+    }
+
+    // Game over check
+    if (game.finished && game.winner) {
+      document.getElementById('winner-name').textContent = game.winner;
+      document.getElementById('game-over').classList.add('active');
+    } else {
+      document.getElementById('game-over').classList.remove('active');
+    }
+  }
+
+  // -- API actions --
+  function doChangeLife(playerId, amount) {
+    api('PATCH', '/api/games/' + state.roomCode + '/life', {
+      player_id: playerId,
+      amount: amount
+    }).then(function(data) {
+      if (!data.success) { showMsg('game-msg', data.error || 'Error', 'error'); return; }
+      state.game = data.game;
+      renderGame();
+      wsSend({ type: 'state_updated' });
+    }).catch(function() { showMsg('game-msg', 'Connection error.', 'error'); });
+  }
+
+  function doChangePoison(playerId, amount) {
+    api('PATCH', '/api/games/' + state.roomCode + '/poison', {
+      player_id: playerId,
+      amount: amount
+    }).then(function(data) {
+      if (!data.success) { showMsg('game-msg', data.error || 'Error', 'error'); return; }
+      state.game = data.game;
+      renderGame();
+      wsSend({ type: 'state_updated' });
+    }).catch(function() { showMsg('game-msg', 'Connection error.', 'error'); });
+  }
+
+  function doCommanderDamage(sourcePlayerId, targetPlayerId, amount) {
+    api('PATCH', '/api/games/' + state.roomCode + '/commander-damage', {
+      source_player_id: sourcePlayerId,
+      target_player_id: targetPlayerId,
+      commander_name: 'Commander',
+      amount: amount
+    }).then(function(data) {
+      if (!data.success) { showMsg('game-msg', data.error || 'Error', 'error'); return; }
+      state.game = data.game;
+      renderGame();
+      wsSend({ type: 'state_updated' });
+    }).catch(function() { showMsg('game-msg', 'Connection error.', 'error'); });
+  }
+
+  function doKickPlayer(playerId) {
+    var msgTarget = document.querySelector('.screen.active').id === 'screen-lobby' ? 'lobby-msg' : 'game-msg';
+    api('POST', '/api/games/' + state.roomCode + '/kick', {
+      requester_id: state.playerId,
+      player_id: playerId
+    }).then(function(data) {
+      if (!data.success) { showMsg(msgTarget, data.error || 'Error', 'error'); return; }
+      state.game = data.game;
+      var screen = document.querySelector('.screen.active');
+      if (screen && screen.id === 'screen-lobby') {
+        renderLobby();
+      } else {
+        renderGame();
+      }
+      wsSend({ type: 'state_updated' });
+    }).catch(function() { showMsg(msgTarget, 'Connection error.', 'error'); });
+  }
+
+  // -- Delegated event handler for game buttons --
+  document.getElementById('players-list').addEventListener('click', function(e) {
+    var btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    var action = btn.dataset.action;
+    if (action === 'life') {
+      doChangeLife(btn.dataset.playerId, parseInt(btn.dataset.amount, 10));
+    } else if (action === 'poison') {
+      doChangePoison(btn.dataset.playerId, parseInt(btn.dataset.amount, 10));
+    } else if (action === 'cmddmg') {
+      doCommanderDamage(btn.dataset.sourceId, btn.dataset.targetId, 1);
+    } else if (action === 'kick') {
+      doKickPlayer(btn.dataset.playerId);
+    }
+  });
+
+  // -- Delegated event handler for lobby kick buttons --
+  document.getElementById('lobby-players').addEventListener('click', function(e) {
+    var btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    if (btn.dataset.action === 'kick') {
+      doKickPlayer(btn.dataset.playerId);
+    }
+  });
+
+  // -- Fetch game state --
+  function refreshGameState() {
+    if (!state.roomCode) return;
+    api('GET', '/api/games/' + state.roomCode)
+      .then(function(data) {
+        if (!data.success) return;
+        // Check if we were kicked (no longer in the player list)
+        var found = false;
+        var players = data.game.players || [];
+        for (var i = 0; i < players.length; i++) {
+          if (players[i].id === state.playerId) { found = true; break; }
+        }
+        if (!found) {
+          if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
+          if (state.ws) { state.ws.close(); state.ws = null; }
+          clearSession();
+          showScreen('home');
+          showMsg('home-msg', 'You were removed from the game by the host.', 'error');
+          return;
+        }
+        state.game = data.game;
+        var screen = document.querySelector('.screen.active');
+        if (screen && screen.id === 'screen-lobby') {
+          renderLobby();
+        } else if (screen && screen.id === 'screen-game') {
+          renderGame();
+        }
+      })
+      .catch(function() { /* silent - will retry on next poll */ });
+  }
+
+  // -- WebSocket --
+  function connectWebSocket() {
+    if (state.ws) { state.ws.close(); state.ws = null; }
+    if (!state.roomCode) return;
+
+    var url = WS_URL + '/game/' + state.roomCode;
+    var ws;
+    try {
+      ws = new WebSocket(url);
+    } catch (e) {
+      updateWsStatus(false);
+      return;
+    }
+
+    ws.onopen = function() {
+      updateWsStatus(true);
+    };
+
+    ws.onmessage = function(ev) {
+      var data;
+      try { data = JSON.parse(ev.data); } catch (e) { return; }
+
+      if (data.type === 'state_updated') {
+        refreshGameState();
+      }
+    };
+
+    ws.onclose = function() {
+      updateWsStatus(false);
+      setTimeout(function() {
+        if (state.roomCode) connectWebSocket();
+      }, 2000);
+    };
+
+    ws.onerror = function() {
+      updateWsStatus(false);
+    };
+
+    state.ws = ws;
+  }
+
+  function wsSend(msg) {
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify(msg));
+    }
+  }
+
+  function updateWsStatus(connected) {
+    var dots = document.querySelectorAll('#lobby-ws-dot, #game-ws-dot');
+    var texts = [document.getElementById('lobby-ws-text'), document.getElementById('game-ws-text')];
+    for (var i = 0; i < dots.length; i++) {
+      dots[i].className = 'status-dot ' + (connected ? 'connected' : 'disconnected');
+    }
+    for (var j = 0; j < texts.length; j++) {
+      if (texts[j]) texts[j].textContent = connected ? 'Live' : 'Reconnecting...';
+    }
+  }
+
+  // -- Init --
+  function init() {
+    loadSession();
+    loadAuth();
+    updateAuthBar();
+
+    // Pre-fill name fields if logged in
+    if (state.user) {
+      var displayName = state.user.display_name || state.user.username;
+      document.getElementById('create-name').value = displayName;
+      document.getElementById('join-name').value = displayName;
+    }
+
+    if (state.roomCode && state.playerId) {
+      // Try to reconnect to existing game
+      api('GET', '/api/games/' + state.roomCode)
+        .then(function(data) {
+          if (!data.success) { clearSession(); return; }
+          state.game = data.game;
+          // Update host status from server
+          state.isHost = (data.game.host_id === state.playerId);
+          saveSession();
+          // Verify we're still in this game
+          var found = false;
+          var players = data.game.players || [];
+          for (var i = 0; i < players.length; i++) {
+            if (players[i].id === state.playerId) { found = true; break; }
+          }
+          if (!found) { clearSession(); return; }
+          if (data.game.started) {
+            connectWebSocket();
+            enterGame();
+          } else {
+            enterLobby();
+          }
+        })
+        .catch(function() { clearSession(); });
+    }
+
+    // Enter key handling
+    document.getElementById('create-name').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') window.createGame();
+    });
+    document.getElementById('join-name').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') document.getElementById('join-code').focus();
+    });
+    document.getElementById('join-code').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') window.joinGame();
+    });
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
