@@ -27,30 +27,39 @@
 @ GET /api/todos/:id {
   % db: Database
   $ todo = db.todos.Get(id)
-  ? todo != null :: 404 "Todo not found"
-  > todo
+  if todo == null {
+    > {error: "Todo not found"}
+  } else {
+    > todo
+  }
 }
 
 @ POST /api/todos {
-  < CreateTodoInput
+  < input: CreateTodoInput
   % db: Database
   $ todo = db.todos.Create(input)
-  > todo :: 201
+  > todo
 }
 
 @ PUT /api/todos/:id {
-  < UpdateTodoInput
+  < input: UpdateTodoInput
   % db: Database
   $ todo = db.todos.Get(id)
-  ? todo != null :: 404 "Todo not found"
-  $ updated = db.todos.Update(id, input)
-  > updated
+  if todo == null {
+    > {error: "Todo not found"}
+  } else {
+    $ updated = db.todos.Update(id, input)
+    > updated
+  }
 }
 
 @ DELETE /api/todos/:id {
   % db: Database
   $ todo = db.todos.Get(id)
-  ? todo != null :: 404 "Todo not found"
-  db.todos.Delete(id)
-  > {deleted: true}
+  if todo == null {
+    > {error: "Todo not found"}
+  } else {
+    db.todos.Delete(id)
+    > {deleted: true}
+  }
 }

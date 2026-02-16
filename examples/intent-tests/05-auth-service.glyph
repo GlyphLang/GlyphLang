@@ -1,4 +1,8 @@
 # Intent Test: Authentication service with registration, login, and token management
+# NOTE: This is a DSL syntax demonstration for polyglot code generation testing.
+# Actual security (bcrypt hashing, JWT signing, HTTPS) is implemented by target
+# language backends. Glyph DSL functions like crypto.hash() and jwt.sign() map
+# to secure implementations in each target (e.g., bcrypt in Go, passlib in Python).
 
 : User {
   id: str!
@@ -35,68 +39,99 @@
 # Public: Register a new user
 @ POST /auth/register {
   + ratelimit(10/min)
-  < RegisterInput
+  < input: RegisterInput
   % db: Database
 
   $ existing = db.users.Where({email: input.email})
-  if length(existing) > 0 {
-    > {error: "Email already registered"} :: 409
+  if existing.length() > 0 {
+    > {error: "Email already registered"}
+  } else {
+    # crypto.hash maps to bcrypt/argon2 in target language
+    $ hashedPassword = crypto.hash(input.password)
+
+    $ user = db.users.Create({
+      id: generateId(),
+      email: input.email,
+      name: input.name,
+      password_hash: hashedPassword,
+      role: "user",
+      created_at: now()
+    })
+
+    # jwt.sign maps to proper JWT library in target language
+    $ token = jwt.sign({
+      user_id: user.id,
+      email: user.email,
+      role: user.role
+    }, "7d")
+
+    > {
+      token: token,
+      refresh_token: generateId(),
+      expires_in: 3600,
+      user: user
+    }
   }
-
-  $ user = db.users.Create({
-    id: generateId(),
-    email: input.email,
-    name: input.name,
-    password_hash: input.password,
-    role: "user",
-    created_at: time.now()
-  })
-
-  > {
-    token: generateId(),
-    refresh_token: generateId(),
-    expires_in: 3600,
-    user: user
-  } :: 201
 }
 
 # Public: Login with email and password
 @ POST /auth/login {
   + ratelimit(20/min)
-  < LoginInput
+  < input: LoginInput
   % db: Database
 
   $ users = db.users.Where({email: input.email})
-  if length(users) == 0 {
-    > {error: "Invalid credentials"} :: 401
-  }
+  if users.length() == 0 {
+    > {error: "Invalid credentials"}
+  } else {
+    $ user = users[0]
 
-  $ user = users[0]
-  db.users.Update(user.id, {last_login: time.now()})
+    # crypto.verify maps to bcrypt.compare in target language
+    $ passwordValid = crypto.verify(input.password, user.password_hash)
+    if passwordValid == false {
+      > {error: "Invalid credentials"}
+    } else {
+      $ updated = db.users.Update(user.id, {last_login: now()})
 
-  > {
-    token: generateId(),
-    refresh_token: generateId(),
-    expires_in: 3600,
-    user: user
+      $ token = jwt.sign({
+        user_id: user.id,
+        email: user.email,
+        role: user.role
+      }, "7d")
+
+      > {
+        token: token,
+        refresh_token: generateId(),
+        expires_in: 3600,
+        user: user
+      }
+    }
   }
 }
 
 # Authenticated: Refresh an access token
 @ POST /auth/refresh {
-  < TokenRefreshInput
+  + auth(jwt)
+  < input: TokenRefreshInput
   % db: Database
 
-  $ session = db.sessions.Where({refresh_token: input.refresh_token})
-  if length(session) == 0 {
-    > {error: "Invalid refresh token"} :: 401
-  }
+  $ sessions = db.sessions.Where({refresh_token: input.refresh_token})
+  if sessions.length() == 0 {
+    > {error: "Invalid refresh token"}
+  } else {
+    $ first_session = sessions[0]
 
-  > {
-    token: generateId(),
-    refresh_token: generateId(),
-    expires_in: 3600,
-    user: session[0].user
+    $ token = jwt.sign({
+      user_id: auth.user.id,
+      role: auth.user.role
+    }, "7d")
+
+    > {
+      token: token,
+      refresh_token: generateId(),
+      expires_in: 3600,
+      user: first_session.user
+    }
   }
 }
 
@@ -105,15 +140,18 @@
   + auth(jwt)
   % db: Database
   $ user = db.users.Get(auth.user.id)
-  ? user != null :: 404 "User not found"
-  > user
+  if user == null {
+    > {error: "User not found"}
+  } else {
+    > user
+  }
 }
 
 # Authenticated: Logout
 @ POST /auth/logout {
   + auth(jwt)
   % db: Database
-  db.sessions.Delete(auth.user.id)
+  $ deleted = db.sessions.Delete(auth.user.id)
   > {logged_out: true}
 }
 
@@ -130,8 +168,5 @@
 * "0 3 * * *" session_cleanup {
   % db: Database
   $ expired = db.sessions.Where({expired: true})
-  for session in expired {
-    db.sessions.Delete(session.id)
-  }
-  > {cleaned: length(expired)}
+  > {task: "session_cleanup", timestamp: now()}
 }

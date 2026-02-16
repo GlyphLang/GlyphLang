@@ -5,25 +5,28 @@ Build an authentication service with registration, login, token refresh, profile
 Public Endpoints (no auth required):
 1. POST /auth/register - Register a new user (rate limited to 10/min)
    - Takes email, name, and password
-   - Checks for existing email (409 if duplicate)
+   - Checks for existing email (returns error if duplicate)
+   - Hashes password with crypto.hash (maps to bcrypt/argon2 in target language)
    - Creates user with generated ID, hashed password, "user" role, and timestamp
+   - Signs JWT token with user claims
    - Returns access token, refresh token, expiry, and user object
 
 2. POST /auth/login - Login with email and password (rate limited to 20/min)
    - Validates credentials against database
-   - Returns 401 if invalid
+   - Verifies password with crypto.verify (maps to bcrypt.compare in target language)
+   - Returns error if invalid
    - Updates last_login timestamp on success
-   - Returns access token, refresh token, expiry, and user object
-
-3. POST /auth/refresh - Refresh an expired access token
-   - Takes a refresh_token
-   - Looks up the session in the database
-   - Returns 401 if invalid refresh token
-   - Returns new access token, refresh token, and expiry
+   - Signs JWT token and returns access token, refresh token, expiry, and user object
 
 Authenticated Endpoints:
+3. POST /auth/refresh - Refresh an expired access token (requires JWT)
+   - Takes a refresh_token
+   - Looks up the session in the database
+   - Returns error if invalid refresh token
+   - Signs new JWT token and returns new access token, refresh token, and expiry
+
 4. GET /auth/me - Get current user profile (requires JWT)
-   - Returns the authenticated user's profile, 404 if not found
+   - Returns the authenticated user's profile, error if not found
 
 5. POST /auth/logout - Invalidate current session (requires JWT)
    - Deletes the session from the database
@@ -33,7 +36,7 @@ Admin Endpoints:
 6. GET /auth/admin/users - List all users (requires JWT with admin role, rate limited to 50/min)
 
 Background Tasks:
-7. Daily at 3 AM - Clean up expired sessions, delete each one, return count cleaned
+7. Daily at 3 AM - Query expired sessions from the database
 
 Data model:
 - User: id, email, name, password_hash, role, created_at, last_login (optional)

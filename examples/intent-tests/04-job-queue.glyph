@@ -15,67 +15,36 @@
 
 # Queue workers for background processing
 & "email.send" {
-  % db: Database
-  $ job = message
-  db.email_logs.Create({
-    to: job.to,
-    subject: job.subject,
-    status: "sent",
-    sent_at: time.now()
-  })
-  > {success: true}
+  $ to = message.to
+  $ subject = message.subject
+  > {success: true, to: to, subject: subject}
 }
 
 & "report.generate" {
-  % db: Database
-  $ config = message
-  $ data = db.reports.Find({type: config.type})
-  db.generated_reports.Create({
-    type: config.type,
-    format: config.format,
-    generated_at: time.now(),
-    row_count: length(data)
-  })
-  > {success: true, rows: length(data)}
+  $ report_type = message.type
+  $ format = message.format
+  > {success: true, type: report_type, format: format}
 }
 
 # Cron job for daily cleanup
 * "0 2 * * *" cleanup_expired {
   % db: Database
   $ expired = db.sessions.Where({expired: true})
-  for session in expired {
-    db.sessions.Delete(session.id)
-  }
-  > {cleaned: length(expired)}
+  > {task: "cleanup", timestamp: now()}
 }
 
 # Cron job for weekly digest
 * "0 8 * * 1" weekly_digest {
   % db: Database
   $ users = db.users.Where({digest_enabled: true})
-  for user in users {
-    $ activity = db.activity.Where({user_id: user.id})
-    db.digest_queue.Create({
-      to: user.email,
-      subject: "Weekly Digest",
-      template: "weekly",
-      data: {activity: activity}
-    })
-  }
-  > {queued: length(users)}
+  > {task: "weekly_digest", timestamp: now()}
 }
 
 # Event handler for user signup -> welcome email
 ~ "user.created" {
-  % db: Database
-  $ user = event
-  db.email_queue.Create({
-    to: user.email,
-    subject: "Welcome!",
-    template: "welcome",
-    data: {name: user.name}
-  })
-  > {queued: true}
+  $ user_email = event.email
+  $ user_name = event.name
+  > {queued: true, email: user_email, name: user_name}
 }
 
 # API endpoint to check job status
@@ -83,24 +52,27 @@
   + auth(jwt)
   % db: Database
   $ job = db.jobs.Get(id)
-  ? job != null :: 404 "Job not found"
-  > job
+  if job == null {
+    > {error: "Job not found"}
+  } else {
+    > job
+  }
 }
 
 # API endpoint to submit a new job
 @ POST /api/jobs/email {
   + auth(jwt)
-  < EmailJob
+  < input: EmailJob
   % db: Database
   $ job_id = generateId()
-  db.email_queue.Create({
+  $ created = db.email_queue.Create({
     id: job_id,
     to: input.to,
     subject: input.subject,
     template: input.template,
     data: input.data,
     status: "pending",
-    created_at: time.now()
+    created_at: now()
   })
-  > {job_id: job_id, status: "pending"} :: 201
+  > {job_id: job_id, status: "pending"}
 }

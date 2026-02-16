@@ -15,18 +15,22 @@
   created_at: int!
 }
 
+: CreateRoomInput {
+  name: str!
+}
+
 # REST endpoints for room management
 @ POST /api/rooms {
   + auth(jwt)
-  < { name: str! }
+  < input: CreateRoomInput
   % db: Database
   $ room = db.rooms.Create({
     id: generateId(),
     name: input.name,
     created_by: auth.user.id,
-    created_at: time.now()
+    created_at: now()
   })
-  > room :: 201
+  > room
 }
 
 @ GET /api/rooms {
@@ -46,20 +50,14 @@
 # WebSocket for real-time messaging
 @ ws /chat {
   on connect {
-    broadcast({type: "system", content: "User joined"})
+    ws.broadcast("User joined the chat")
   }
 
   on message {
-    send(client, {type: "ack", id: message.id})
-    broadcast({
-      type: "message",
-      sender: message.sender,
-      content: message.content,
-      timestamp: time.now()
-    })
+    ws.broadcast(input)
   }
 
   on disconnect {
-    broadcast({type: "system", content: "User left"})
+    ws.broadcast("User left the chat")
   }
 }
