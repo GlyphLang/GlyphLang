@@ -1,0 +1,65 @@
+# Intent Test: CRUD API for a Todo application
+# This .glyph file should produce identical behavior across all target languages.
+
+: Todo {
+  id: int!
+  title: str!
+  completed: bool!
+  created_at: str
+}
+
+: CreateTodoInput {
+  title: str!
+  completed: bool = false
+}
+
+: UpdateTodoInput {
+  title: str?
+  completed: bool?
+}
+
+@ GET /api/todos {
+  % db: Database
+  $ todos = db.todos.Find()
+  > todos
+}
+
+@ GET /api/todos/:id {
+  % db: Database
+  $ todo = db.todos.Get(id)
+  if todo == null {
+    > {error: "Todo not found"}
+  } else {
+    > todo
+  }
+}
+
+@ POST /api/todos {
+  < input: CreateTodoInput
+  % db: Database
+  $ todo = db.todos.Create(input)
+  > todo
+}
+
+@ PUT /api/todos/:id {
+  < input: UpdateTodoInput
+  % db: Database
+  $ todo = db.todos.Get(id)
+  if todo == null {
+    > {error: "Todo not found"}
+  } else {
+    $ updated = db.todos.Update(id, input)
+    > updated
+  }
+}
+
+@ DELETE /api/todos/:id {
+  % db: Database
+  $ todo = db.todos.Get(id)
+  if todo == null {
+    > {error: "Todo not found"}
+  } else {
+    db.todos.Delete(id)
+    > {deleted: true}
+  }
+}

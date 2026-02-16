@@ -202,6 +202,9 @@ func (r *ModuleResolver) extractExports(module *Module) map[string]interface{} {
 		case *ConstDecl:
 			// All top-level constants are exported
 			exports[it.Name] = it
+		case *ProviderDef:
+			// Provider contracts are exported by name
+			exports[it.Name] = it
 		}
 	}
 

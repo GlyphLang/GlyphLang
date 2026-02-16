@@ -5,6 +5,53 @@ import (
 	"reflect"
 )
 
+// providerMethods provides per-provider method whitelists for scoped access control.
+// When a method is called on a provider, this map is checked first. If the provider
+// type is not found here, the global allowedMethods whitelist is used as a fallback.
+var providerMethods = map[string]map[string]bool{
+	"Database": {
+		"Get": true, "Find": true, "Create": true, "Update": true, "Delete": true,
+		"First": true, "All": true, "Where": true, "Count": true, "Save": true,
+		"Insert": true, "Select": true, "Limit": true, "Offset": true, "Order": true,
+		"Filter": true, "Table": true, "CountWhere": true, "NextId": true, "Length": true,
+	},
+	"Redis": {
+		"Get": true, "Set": true, "Del": true, "Exists": true, "Expire": true,
+		"Ttl": true, "Incr": true, "Decr": true, "HGet": true, "HSet": true,
+		"HDel": true, "HGetAll": true, "HExists": true, "LPush": true, "RPush": true,
+		"LPop": true, "RPop": true, "LLen": true, "LRange": true, "SAdd": true,
+		"SRem": true, "SMembers": true, "SIsMember": true, "Publish": true,
+		"Subscribe": true, "Keys": true, "Ping": true, "FlushAll": true,
+	},
+	"MongoDB": {
+		"Collection": true, "FindOne": true, "InsertOne": true, "InsertMany": true,
+		"UpdateOne": true, "UpdateMany": true, "DeleteOne": true, "DeleteMany": true,
+		"CountDocuments": true, "Aggregate": true, "CreateIndex": true, "DropIndex": true,
+	},
+	"LLM": {
+		"Complete": true, "Chat": true, "Stream": true, "Embed": true,
+		"ListModels": true, "TokenCount": true,
+	},
+}
+
+// IsProviderMethodAllowed checks if a method is allowed for a specific provider type.
+// Falls back to the global allowedMethods whitelist if no provider-specific list exists.
+func IsProviderMethodAllowed(providerType, methodName string) bool {
+	if methods, ok := providerMethods[providerType]; ok {
+		return methods[methodName]
+	}
+	return allowedMethods[methodName]
+}
+
+// RegisterProviderMethods adds a method whitelist for a custom provider type.
+func RegisterProviderMethods(providerType string, methods []string) {
+	m := make(map[string]bool, len(methods))
+	for _, method := range methods {
+		m[method] = true
+	}
+	providerMethods[providerType] = m
+}
+
 // allowedMethods is a whitelist of safe methods that can be called via reflection
 var allowedMethods = map[string]bool{
 	// Database/ORM methods

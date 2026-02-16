@@ -32,6 +32,8 @@ type Interpreter struct {
 	redisHandler     interface{}              // Redis handler for dependency injection
 	mongoDBHandler   interface{}              // MongoDB handler for dependency injection
 	llmHandler       interface{}              // LLM handler for AI integration
+	providerHandlers map[string]interface{}   // Generic provider registry: type name -> handler
+	providerDefs     map[string]ProviderDef   // Provider contract definitions
 	moduleResolver   *ModuleResolver          // Module resolver for handling imports
 	importedModules  map[string]*LoadedModule // Imported modules by alias/name
 	constants        map[string]struct{}      // Tracks names that are constants (immutable)
@@ -57,6 +59,8 @@ func NewInterpreter() *Interpreter {
 		grpcHandlers:     make(map[string]GRPCHandler),
 		graphqlResolvers: make(map[string]GraphQLResolver),
 		typeChecker:      typeChecker,
+		providerHandlers: make(map[string]interface{}),
+		providerDefs:     make(map[string]ProviderDef),
 		moduleResolver:   NewModuleResolver(),
 		importedModules:  make(map[string]*LoadedModule),
 		constants:        make(map[string]struct{}),
@@ -167,6 +171,9 @@ func (i *Interpreter) LoadModuleWithPath(module Module, basePath string) error {
 
 		case *TestBlock:
 			i.testBlocks = append(i.testBlocks, *it)
+
+		case *ProviderDef:
+			i.providerDefs[it.Name] = *it
 
 		case *MacroDef:
 			i.macros[it.Name] = it
@@ -364,75 +371,111 @@ func extractModuleName(path string) string {
 	return name
 }
 
-// SetDatabaseHandler sets the database handler for dependency injection
+// SetDatabaseHandler sets the database handler for dependency injection.
+// Also registers the handler in the generic provider registry.
 func (i *Interpreter) SetDatabaseHandler(handler interface{}) {
 	i.dbHandler = handler
+	i.providerHandlers["Database"] = handler
 }
 
-// SetRedisHandler sets the Redis handler for dependency injection
+// SetRedisHandler sets the Redis handler for dependency injection.
+// Also registers the handler in the generic provider registry.
 func (i *Interpreter) SetRedisHandler(handler interface{}) {
 	i.redisHandler = handler
+	i.providerHandlers["Redis"] = handler
 }
 
-// SetMongoDBHandler sets the MongoDB handler for dependency injection
+// SetMongoDBHandler sets the MongoDB handler for dependency injection.
+// Also registers the handler in the generic provider registry.
 func (i *Interpreter) SetMongoDBHandler(handler interface{}) {
 	i.mongoDBHandler = handler
+	i.providerHandlers["MongoDB"] = handler
 }
 
-// SetLLMHandler sets the LLM handler for AI integration dependency injection
+// SetLLMHandler sets the LLM handler for AI integration dependency injection.
+// Also registers the handler in the generic provider registry.
 func (i *Interpreter) SetLLMHandler(handler interface{}) {
 	i.llmHandler = handler
+	i.providerHandlers["LLM"] = handler
+}
+
+// SetProviderHandler registers a handler for a named provider type.
+// This is the generic mechanism for dependency injection. The standard
+// providers (Database, Redis, MongoDB, LLM) are also registered here
+// when their legacy Set*Handler methods are called.
+func (i *Interpreter) SetProviderHandler(providerType string, handler interface{}) {
+	i.providerHandlers[providerType] = handler
+}
+
+// GetProviderHandler retrieves a registered provider handler by type name.
+func (i *Interpreter) GetProviderHandler(providerType string) (interface{}, bool) {
+	h, ok := i.providerHandlers[providerType]
+	return h, ok
+}
+
+// GetProviderDefs returns all registered provider definitions.
+func (i *Interpreter) GetProviderDefs() map[string]ProviderDef {
+	result := make(map[string]ProviderDef, len(i.providerDefs))
+	for k, v := range i.providerDefs {
+		result[k] = v
+	}
+	return result
+}
+
+// resolveProviderType extracts the provider type name from an injection's type annotation.
+func resolveProviderType(t Type) string {
+	switch t.(type) {
+	case DatabaseType:
+		return "Database"
+	case RedisType:
+		return "Redis"
+	case MongoDBType:
+		return "MongoDB"
+	case LLMType:
+		return "LLM"
+	case NamedType:
+		return t.(NamedType).Name
+	default:
+		return ""
+	}
 }
 
 // injectDependency handles a single dependency injection into the given environment.
-// It checks for DatabaseType/NamedType{"Database"}, RedisType/NamedType{"Redis"}, MongoDBType/NamedType{"MongoDB"}, and LLMType/NamedType{"LLM"}.
+// It first checks legacy handler fields for backward compatibility, then falls
+// back to the generic provider registry for custom providers.
 func (i *Interpreter) injectDependency(injection Injection, env *Environment) {
-	// Check for DatabaseType or NamedType{Name: "Database"}
-	isDB := false
-	if _, ok := injection.Type.(DatabaseType); ok {
-		isDB = true
-	} else if named, ok := injection.Type.(NamedType); ok && named.Name == "Database" {
-		isDB = true
-	}
-	if isDB && i.dbHandler != nil {
-		env.Define(injection.Name, i.dbHandler)
-		return
+	providerType := resolveProviderType(injection.Type)
+
+	// Legacy handler lookup for backward compatibility
+	switch providerType {
+	case "Database":
+		if i.dbHandler != nil {
+			env.Define(injection.Name, i.dbHandler)
+			return
+		}
+	case "Redis":
+		if i.redisHandler != nil {
+			env.Define(injection.Name, i.redisHandler)
+			return
+		}
+	case "MongoDB":
+		if i.mongoDBHandler != nil {
+			env.Define(injection.Name, i.mongoDBHandler)
+			return
+		}
+	case "LLM":
+		if i.llmHandler != nil {
+			env.Define(injection.Name, i.llmHandler)
+			return
+		}
 	}
 
-	// Check for RedisType or NamedType{Name: "Redis"}
-	isRedis := false
-	if _, ok := injection.Type.(RedisType); ok {
-		isRedis = true
-	} else if named, ok := injection.Type.(NamedType); ok && named.Name == "Redis" {
-		isRedis = true
-	}
-	if isRedis && i.redisHandler != nil {
-		env.Define(injection.Name, i.redisHandler)
-		return
-	}
-
-	// Check for MongoDBType or NamedType{Name: "MongoDB"}
-	isMongo := false
-	if _, ok := injection.Type.(MongoDBType); ok {
-		isMongo = true
-	} else if named, ok := injection.Type.(NamedType); ok && named.Name == "MongoDB" {
-		isMongo = true
-	}
-	if isMongo && i.mongoDBHandler != nil {
-		env.Define(injection.Name, i.mongoDBHandler)
-		return
-	}
-
-	// Check for LLMType or NamedType{Name: "LLM"}
-	isLLM := false
-	if _, ok := injection.Type.(LLMType); ok {
-		isLLM = true
-	} else if named, ok := injection.Type.(NamedType); ok && named.Name == "LLM" {
-		isLLM = true
-	}
-	if isLLM && i.llmHandler != nil {
-		env.Define(injection.Name, i.llmHandler)
-		return
+	// Generic provider registry lookup
+	if providerType != "" {
+		if handler, ok := i.providerHandlers[providerType]; ok && handler != nil {
+			env.Define(injection.Name, handler)
+			return
+		}
 	}
 }
 

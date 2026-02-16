@@ -1,0 +1,78 @@
+# Intent Test: Background job queue with email sending, report generation, and cleanup
+
+: EmailJob {
+  to: str!
+  subject: str!
+  template: str!
+  data: any
+}
+
+: ReportConfig {
+  type: str!
+  date_range: str!
+  format: str!
+}
+
+# Queue workers for background processing
+& "email.send" {
+  $ to = message.to
+  $ subject = message.subject
+  > {success: true, to: to, subject: subject}
+}
+
+& "report.generate" {
+  $ report_type = message.type
+  $ format = message.format
+  > {success: true, type: report_type, format: format}
+}
+
+# Cron job for daily cleanup
+* "0 2 * * *" cleanup_expired {
+  % db: Database
+  $ expired = db.sessions.Where({expired: true})
+  > {task: "cleanup", timestamp: now()}
+}
+
+# Cron job for weekly digest
+* "0 8 * * 1" weekly_digest {
+  % db: Database
+  $ users = db.users.Where({digest_enabled: true})
+  > {task: "weekly_digest", timestamp: now()}
+}
+
+# Event handler for user signup -> welcome email
+~ "user.created" {
+  $ user_email = event.email
+  $ user_name = event.name
+  > {queued: true, email: user_email, name: user_name}
+}
+
+# API endpoint to check job status
+@ GET /api/jobs/:id {
+  + auth(jwt)
+  % db: Database
+  $ job = db.jobs.Get(id)
+  if job == null {
+    > {error: "Job not found"}
+  } else {
+    > job
+  }
+}
+
+# API endpoint to submit a new job
+@ POST /api/jobs/email {
+  + auth(jwt)
+  < input: EmailJob
+  % db: Database
+  $ job_id = generateId()
+  $ created = db.email_queue.Create({
+    id: job_id,
+    to: input.to,
+    subject: input.subject,
+    template: input.template,
+    data: input.data,
+    status: "pending",
+    created_at: now()
+  })
+  > {job_id: job_id, status: "pending"}
+}
