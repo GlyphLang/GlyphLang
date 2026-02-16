@@ -12,6 +12,8 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -220,6 +222,12 @@ func executeRoute(route *ast.Route, ctx *server.Context, interp *interpreter.Int
 		}
 	}
 
+	// For routes with auth middleware, extract user data from the bearer
+	// token so the interpreter can populate the auth variable.
+	if route.Auth != nil {
+		request.AuthData = extractDevAuthData(ctx.Request.Header.Get("Authorization"))
+	}
+
 	// Use ExecuteRoute instead of ExecuteRouteSimple to handle request body
 	response, err := interp.ExecuteRoute(route, request)
 	if err != nil {
@@ -227,6 +235,41 @@ func executeRoute(route *ast.Route, ctx *server.Context, interp *interpreter.Int
 	}
 
 	return response.Body, nil
+}
+
+// extractDevAuthData parses auth data from a bearer token for interpreted
+// (dev) mode. The interpreter does not have a JWT library, so GLYPH apps
+// running in --interpret mode issue demo tokens with the format
+// "demo-token-<userID>-<username>". This function extracts user claims
+// from that format so routes declaring + auth(jwt) can access auth.user.
+//
+// In compiled/production mode, real JWT validation replaces this entirely.
+func extractDevAuthData(authHeader string) map[string]interface{} {
+	if authHeader == "" {
+		return nil
+	}
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+	if !strings.HasPrefix(token, "demo-token-") {
+		return nil
+	}
+	// Format: "demo-token-<id>-<username>"
+	parts := strings.SplitN(token, "-", 4)
+	if len(parts) != 4 {
+		return nil
+	}
+	uid, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		return nil
+	}
+	return map[string]interface{}{
+		"user": map[string]interface{}{
+			"id":       uid,
+			"username": parts[3],
+			"role":     "",
+		},
+		"token":     token,
+		"expiresAt": int64(0),
+	}
 }
 
 // createHandler creates the main HTTP handler.
