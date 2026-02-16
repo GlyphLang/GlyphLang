@@ -96,6 +96,23 @@ func (tc *TypeChecker) CheckType(value interface{}, expectedType Type) error {
 		return nil // No type constraint
 	}
 
+	// Service types (Database, Redis, MongoDB, LLM) are injected by the
+	// runtime's dependency injection system which already guarantees the
+	// correct type. Skip runtime type checking for these because the
+	// injected Go values (e.g. *database.MockDatabase) have no
+	// corresponding representation in GetRuntimeType.
+	// Note: Injections use DatabaseType{} etc., but function parameter
+	// annotations use NamedType{Name: "Database"} — handle both.
+	switch et := expectedType.(type) {
+	case DatabaseType, RedisType, MongoDBType, LLMType:
+		return nil
+	case NamedType:
+		switch et.Name {
+		case "Database", "Redis", "MongoDB", "LLM":
+			return nil
+		}
+	}
+
 	actualType := GetRuntimeType(value)
 	if actualType == nil {
 		return fmt.Errorf("cannot determine type of value: %T", value)
