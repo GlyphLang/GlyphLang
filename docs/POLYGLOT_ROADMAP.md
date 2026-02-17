@@ -12,15 +12,15 @@ The Semantic IR, generalized provider system, and Python/FastAPI codegen are mer
 - [x] **Formal notation spec** (`docs/GLYPH_NOTATION_SPEC.md`) — Symbol vocabulary, type mapping table, EBNF grammar
 - [x] **Intent-test examples** (`examples/intent-tests/`) — 5 validated .glyph + .txt pairs
 
-## Phase 1: CLI Pipeline (next)
+## Phase 1: CLI Pipeline (complete)
 
-**Goal**: `glyph codegen python app.glyph` outputs a working FastAPI application.
+**Goal**: `glyph codegen app.glyph` outputs a working FastAPI application.
 
-- [ ] Add `codegen` subcommand to `cmd/glyph/`
-- [ ] Wire up: parse .glyph → AST → IR analyzer → Python generator → write output files
-- [ ] Support `--output` flag for target directory
-- [ ] Support `--lang python` flag (extensible for future targets)
-- [ ] Generate project structure: `main.py`, `models.py`, `requirements.txt`
+- [x] Add `codegen` subcommand to `cmd/glyph/`
+- [x] Wire up: parse .glyph → AST → IR analyzer → Python generator → write output files
+- [x] Support `--output` flag for target directory
+- [x] Support `--lang python` flag (extensible for future targets)
+- [x] Generate project structure: `main.py`, `requirements.txt`
 
 ## Phase 2: Provider Parser Syntax
 
@@ -69,3 +69,29 @@ The Semantic IR, generalized provider system, and Python/FastAPI codegen are mer
 - [ ] gRPC service/method definitions
 - [ ] Pattern matching in IR → target language switch/match statements
 - [ ] Async/await mapping per target language
+
+## When Polyglot Is Ready: Documentation & Website Updates
+
+When at least 2 target languages are working end-to-end (Phase 3 complete), update the following:
+
+### GlyphLangSite (`/home/dadams/projects/glyph/GlyphLangSite`)
+
+- [ ] **Landing page** (`index.html`): Add polyglot code generation to the features grid and use cases
+- [ ] **Landing page**: Update "Built with 100% pure Go" messaging to reflect multi-language output
+- [ ] **Landing page**: Add a code comparison showing the same `.glyph` generating Python and TypeScript
+- [ ] **Docs page** (`docs.html`): Expand the `codegen` CLI section with all supported languages
+- [ ] **Docs page**: Add a "Polyglot Code Generation" section explaining one `.glyph` → multiple languages
+- [ ] **Docs page**: Update the dependency injection / provider documentation to cover custom providers
+- [ ] **Docs page**: Add examples showing generated output for each target language
+
+### VS Code Extension (`/home/dadams/projects/glyph/vscode-extension`)
+
+- [ ] Add `codegen` command integration (run from editor, pick target language)
+- [ ] Add preview panel for generated output
+- [ ] Update README with polyglot features
+
+### Main Repo (`/home/dadams/projects/glyph/GlyphLang`)
+
+- [ ] Update root README.md with polyglot code generation feature
+- [ ] Add generated output examples to `examples/` directory
+- [ ] Update CLAUDE.md if the workflow changes
