@@ -320,6 +320,126 @@ func TestAnalyzeCustomProvider(t *testing.T) {
 	}
 }
 
+func TestAnalyzeProviderDef(t *testing.T) {
+	a := NewAnalyzer()
+	module := &ast.Module{
+		Items: []ast.Item{
+			&ast.ProviderDef{
+				Name: "EmailService",
+				Methods: []ast.ProviderMethod{
+					{
+						Name: "send",
+						Params: []ast.Field{
+							{Name: "to", TypeAnnotation: ast.StringType{}, Required: true},
+							{Name: "subject", TypeAnnotation: ast.StringType{}, Required: true},
+						},
+						ReturnType: ast.BoolType{},
+					},
+					{
+						Name:       "status",
+						Params:     []ast.Field{{Name: "id", TypeAnnotation: ast.StringType{}, Required: true}},
+						ReturnType: ast.StringType{},
+					},
+				},
+			},
+		},
+	}
+
+	ir, err := a.Analyze(module)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(ir.Providers) != 1 {
+		t.Fatalf("expected 1 provider, got %d", len(ir.Providers))
+	}
+
+	prov := ir.Providers[0]
+	if prov.ProviderType != "EmailService" {
+		t.Errorf("expected provider type 'EmailService', got %q", prov.ProviderType)
+	}
+	if prov.IsStandard {
+		t.Error("expected EmailService to NOT be a standard provider")
+	}
+	if len(prov.Methods) != 2 {
+		t.Fatalf("expected 2 methods, got %d", len(prov.Methods))
+	}
+	if prov.Methods[0].Name != "send" {
+		t.Errorf("expected method name 'send', got %q", prov.Methods[0].Name)
+	}
+	if len(prov.Methods[0].Params) != 2 {
+		t.Errorf("expected 2 params on send, got %d", len(prov.Methods[0].Params))
+	}
+	if prov.Methods[0].ReturnType.Kind != TypeBool {
+		t.Errorf("expected send return type TypeBool, got %v", prov.Methods[0].ReturnType.Kind)
+	}
+	if prov.Methods[1].Name != "status" {
+		t.Errorf("expected method name 'status', got %q", prov.Methods[1].Name)
+	}
+	if prov.Methods[1].ReturnType.Kind != TypeString {
+		t.Errorf("expected status return type TypeString, got %v", prov.Methods[1].ReturnType.Kind)
+	}
+}
+
+func TestAnalyzeProviderDefWithInjection(t *testing.T) {
+	a := NewAnalyzer()
+	module := &ast.Module{
+		Items: []ast.Item{
+			&ast.ProviderDef{
+				Name: "PaymentGateway",
+				Methods: []ast.ProviderMethod{
+					{
+						Name:       "charge",
+						Params:     []ast.Field{{Name: "amount", TypeAnnotation: ast.IntType{}, Required: true}},
+						ReturnType: ast.StringType{},
+					},
+				},
+			},
+			&ast.Route{
+				Method: ast.Post,
+				Path:   "/api/charge",
+				Injections: []ast.Injection{
+					{Name: "pay", Type: ast.NamedType{Name: "PaymentGateway"}},
+				},
+				Body: []ast.Statement{
+					ast.ReturnStatement{Value: ast.LiteralExpr{Value: ast.NullLiteral{}}},
+				},
+			},
+		},
+	}
+
+	ir, err := a.Analyze(module)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Provider should appear once (not duplicated by both ProviderDef and injection)
+	if len(ir.Providers) != 1 {
+		t.Fatalf("expected 1 provider, got %d", len(ir.Providers))
+	}
+	prov := ir.Providers[0]
+	if prov.ProviderType != "PaymentGateway" {
+		t.Errorf("expected 'PaymentGateway', got %q", prov.ProviderType)
+	}
+	// Methods should be populated from the contract
+	if len(prov.Methods) != 1 {
+		t.Fatalf("expected 1 method from contract, got %d", len(prov.Methods))
+	}
+	if prov.Methods[0].Name != "charge" {
+		t.Errorf("expected method 'charge', got %q", prov.Methods[0].Name)
+	}
+
+	// Route should reference the provider
+	if len(ir.Routes) != 1 {
+		t.Fatalf("expected 1 route, got %d", len(ir.Routes))
+	}
+	if len(ir.Routes[0].Providers) != 1 {
+		t.Fatalf("expected 1 route provider, got %d", len(ir.Routes[0].Providers))
+	}
+	if ir.Routes[0].Providers[0].ProviderType != "PaymentGateway" {
+		t.Errorf("expected route provider 'PaymentGateway', got %q", ir.Routes[0].Providers[0].ProviderType)
+	}
+}
+
 func TestConvertTypes(t *testing.T) {
 	a := NewAnalyzer()
 
