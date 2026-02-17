@@ -118,21 +118,28 @@ func (g *PythonGenerator) writeModel(sb *strings.Builder, t ir.TypeSchema) {
 	for _, f := range t.Fields {
 		pyType := irTypeToPython(f.Type)
 		if !f.Required {
-			pyType = fmt.Sprintf("Optional[%s]", pyType)
+			// Only wrap in Optional if the IR type isn't already Optional
+			// (e.g., `str?` produces TypeOptional(TypeString), which irTypeToPython
+			// already renders as "Optional[str]")
+			if f.Type.Kind != ir.TypeOptional {
+				pyType = fmt.Sprintf("Optional[%s]", pyType)
+			}
 			fmt.Fprintf(sb, "    %s: %s = None\n", f.Name, pyType)
-		} else if f.Default.Kind != ir.ExprNull || f.Default.IsNull {
-			// Has a non-null default
-			if f.Default.Kind == ir.ExprBool {
+		} else if f.HasDefault {
+			switch f.Default.Kind {
+			case ir.ExprBool:
 				def := "False"
 				if f.Default.BoolVal {
 					def = "True"
 				}
 				fmt.Fprintf(sb, "    %s: %s = %s\n", f.Name, pyType, def)
-			} else if f.Default.Kind == ir.ExprString {
+			case ir.ExprString:
 				fmt.Fprintf(sb, "    %s: %s = %q\n", f.Name, pyType, f.Default.StringVal)
-			} else if f.Default.Kind == ir.ExprInt {
+			case ir.ExprInt:
 				fmt.Fprintf(sb, "    %s: %s = %d\n", f.Name, pyType, f.Default.IntVal)
-			} else {
+			case ir.ExprFloat:
+				fmt.Fprintf(sb, "    %s: %s = %g\n", f.Name, pyType, f.Default.FloatVal)
+			default:
 				fmt.Fprintf(sb, "    %s: %s\n", f.Name, pyType)
 			}
 		} else {
@@ -356,15 +363,31 @@ func (g *PythonGenerator) writeExpr(sb *strings.Builder, expr ir.ExprIR) {
 		g.writeExpr(sb, expr.IndexAccess.Index)
 		sb.WriteString("]")
 	case ir.ExprCall:
-		sb.WriteString(expr.Call.Name)
-		sb.WriteString("(")
-		for i, arg := range expr.Call.Args {
-			if i > 0 {
-				sb.WriteString(", ")
+		// The Glyph parser converts method calls (obj.method(args)) into function
+		// calls where the object is the first argument. Detect this pattern and
+		// render as a method call: if the first arg is a field access or variable
+		// and the function name is simple (no dots), it's a method call.
+		if len(expr.Call.Args) > 0 && !strings.Contains(expr.Call.Name, ".") && isObjectReceiver(expr.Call.Args[0]) {
+			g.writeExpr(sb, expr.Call.Args[0])
+			fmt.Fprintf(sb, ".%s(", expr.Call.Name)
+			for i, arg := range expr.Call.Args[1:] {
+				if i > 0 {
+					sb.WriteString(", ")
+				}
+				g.writeExpr(sb, arg)
 			}
-			g.writeExpr(sb, arg)
+			sb.WriteString(")")
+		} else {
+			sb.WriteString(expr.Call.Name)
+			sb.WriteString("(")
+			for i, arg := range expr.Call.Args {
+				if i > 0 {
+					sb.WriteString(", ")
+				}
+				g.writeExpr(sb, arg)
+			}
+			sb.WriteString(")")
 		}
-		sb.WriteString(")")
 	case ir.ExprObject:
 		sb.WriteString("{")
 		for i, f := range expr.Object.Fields {
@@ -545,15 +568,27 @@ func routeToFuncName(route ir.RouteHandler) string {
 	segments := strings.Split(route.Path, "/")
 	var nameParts []string
 	for _, seg := range segments {
-		if seg == "" || strings.HasPrefix(seg, ":") || strings.HasPrefix(seg, "{") {
+		if seg == "" {
 			continue
 		}
-		nameParts = append(nameParts, seg)
+		if strings.HasPrefix(seg, ":") {
+			nameParts = append(nameParts, seg[1:])
+		} else if strings.HasPrefix(seg, "{") {
+			nameParts = append(nameParts, strings.Trim(seg, "{}"))
+		} else {
+			nameParts = append(nameParts, seg)
+		}
 	}
 	if len(nameParts) == 0 {
 		return method + "_root"
 	}
 	return method + "_" + strings.Join(nameParts, "_")
+}
+
+// isObjectReceiver returns true if the expression looks like a method receiver
+// (a variable or field access chain, not a literal or complex expression).
+func isObjectReceiver(expr ir.ExprIR) bool {
+	return expr.Kind == ir.ExprFieldAccess || expr.Kind == ir.ExprVar
 }
 
 func binOpToPython(op ir.BinOp) string {

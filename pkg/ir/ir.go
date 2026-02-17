@@ -39,6 +39,7 @@ type FieldSchema struct {
 	Name        string
 	Type        TypeRef
 	Required    bool
+	HasDefault  bool
 	Default     ExprIR
 	Annotations []Annotation
 }

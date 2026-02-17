@@ -51,7 +51,7 @@ func TestPythonGenerateModel(t *testing.T) {
 	if !strings.Contains(output, "name: str") {
 		t.Error("expected 'name: str' field")
 	}
-	if !strings.Contains(output, "age: Optional[Optional[int]] = None") {
+	if !strings.Contains(output, "age: Optional[int] = None") {
 		t.Error("expected optional age field")
 	}
 }
@@ -70,8 +70,14 @@ func TestPythonGenerateRoute(t *testing.T) {
 					ast.AssignStatement{
 						Target: "user",
 						Value: ast.FunctionCallExpr{
-							Name: "db.users.Get",
-							Args: []ast.Expr{ast.VariableExpr{Name: "id"}},
+							Name: "Get",
+							Args: []ast.Expr{
+								ast.FieldAccessExpr{
+									Object: ast.VariableExpr{Name: "db"},
+									Field:  "users",
+								},
+								ast.VariableExpr{Name: "id"},
+							},
 						},
 					},
 					ast.ReturnStatement{

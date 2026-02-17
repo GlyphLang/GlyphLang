@@ -14,6 +14,7 @@ import (
 	"github.com/glyphlang/glyph/pkg/codegen"
 	"github.com/glyphlang/glyph/pkg/docs"
 	"github.com/glyphlang/glyph/pkg/formatter"
+	"github.com/glyphlang/glyph/pkg/ir"
 	"github.com/glyphlang/glyph/pkg/openapi"
 	"github.com/glyphlang/glyph/pkg/parser"
 	"github.com/spf13/cobra"
@@ -337,6 +338,76 @@ func runClient(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Print(code)
+	return nil
+}
+
+// runCodegen handles the codegen command - generates server code for target languages
+func runCodegen(cmd *cobra.Command, args []string) error {
+	filePath := args[0]
+	output, _ := cmd.Flags().GetString("output")
+	lang, _ := cmd.Flags().GetString("lang")
+
+	// Read source file
+	source, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Parse source
+	module, err := parseSource(string(source))
+	if err != nil {
+		return fmt.Errorf("parse error: %w", err)
+	}
+
+	// Transform AST to Semantic IR
+	analyzer := ir.NewAnalyzer()
+	service, err := analyzer.Analyze(module)
+	if err != nil {
+		return fmt.Errorf("IR analysis error: %w", err)
+	}
+
+	switch lang {
+	case "python", "py":
+		return generatePython(service, output, filePath)
+	default:
+		return fmt.Errorf("unsupported language: %s (supported: python)", lang)
+	}
+}
+
+// generatePython writes Python/FastAPI output to the target directory or stdout
+func generatePython(service *ir.ServiceIR, output, sourceFile string) error {
+	gen := codegen.NewPythonGenerator("0.0.0.0", 8000)
+	code := gen.Generate(service)
+	reqs := gen.GenerateRequirements(service)
+
+	// If no output directory, write to stdout
+	if output == "" {
+		fmt.Print(code)
+		return nil
+	}
+
+	// Create output directory
+	if err := os.MkdirAll(output, 0755); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
+
+	// Write main.py
+	mainPath := filepath.Join(output, "main.py")
+	if err := os.WriteFile(mainPath, []byte(code), 0644); err != nil {
+		return fmt.Errorf("failed to write main.py: %w", err)
+	}
+
+	// Write requirements.txt
+	reqsPath := filepath.Join(output, "requirements.txt")
+	if err := os.WriteFile(reqsPath, []byte(reqs), 0644); err != nil {
+		return fmt.Errorf("failed to write requirements.txt: %w", err)
+	}
+
+	printSuccess(fmt.Sprintf("Python/FastAPI code written to %s/", output))
+	printInfo(fmt.Sprintf("  %s (%d bytes)", mainPath, len(code)))
+	printInfo(fmt.Sprintf("  %s (%d bytes)", reqsPath, len(reqs)))
+	printInfo("Run: pip install -r requirements.txt && uvicorn main:app --reload")
+
 	return nil
 }
 
