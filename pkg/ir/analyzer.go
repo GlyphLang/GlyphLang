@@ -175,6 +175,7 @@ func (a *Analyzer) convertField(f ast.Field) (FieldSchema, error) {
 		Required: f.Required,
 	}
 	if f.Default != nil {
+		fs.HasDefault = true
 		fs.Default = a.convertExpr(f.Default)
 	}
 	for _, ann := range f.Annotations {

@@ -305,6 +305,28 @@ Examples:
 	clientCmd.Flags().String("lang", "typescript", "Output language: typescript")
 	clientCmd.Flags().String("base-url", "http://localhost:3000", "Base URL for the API client")
 
+	// Codegen command - generate server code for target languages
+	var codegenCmd = &cobra.Command{
+		Use:   "codegen <file>",
+		Short: "Generate server code for a target language from GLYPH source",
+		Long: `Generate a complete server application from your GLYPH source code.
+
+Parses the .glyph file, transforms it through the Semantic IR, and generates
+a working server application in the target language.
+
+Output languages:
+  - python: Python/FastAPI server (default)
+
+Examples:
+  glyph codegen main.glyph                          # Output Python to stdout
+  glyph codegen main.glyph --output ./out            # Write project to directory
+  glyph codegen main.glyph --lang python -o ./out    # Explicit language selection`,
+		Args: cobra.ExactArgs(1),
+		RunE: runCodegen,
+	}
+	codegenCmd.Flags().StringP("output", "o", "", "Output directory for generated project")
+	codegenCmd.Flags().String("lang", "python", "Target language: python")
+
 	// REPL command - interactive Read-Eval-Print Loop
 	var replCmd = &cobra.Command{
 		Use:   "repl",
@@ -381,6 +403,7 @@ Example:
 	rootCmd.AddCommand(openapiCmd)
 	rootCmd.AddCommand(docsCmd)
 	rootCmd.AddCommand(clientCmd)
+	rootCmd.AddCommand(codegenCmd)
 	rootCmd.AddCommand(testCmd)
 	rootCmd.AddCommand(versionCmd)
 
