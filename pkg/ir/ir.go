@@ -427,6 +427,8 @@ type ExprIR struct {
 	Lambda      *LambdaExpr
 	Pipe        *PipeExpr
 	Match       *MatchExpr
+	Async       *AsyncExprIR
+	Await       *AwaitExprIR
 }
 
 // ExprKind classifies the type of expression.
@@ -449,6 +451,8 @@ const (
 	ExprLambda
 	ExprPipe
 	ExprMatch
+	ExprAsync
+	ExprAwait
 )
 
 // BinaryExpr describes a binary operation.
@@ -537,6 +541,16 @@ type LambdaExpr struct {
 type PipeExpr struct {
 	Left  ExprIR
 	Right ExprIR
+}
+
+// AsyncExprIR describes an async block.
+type AsyncExprIR struct {
+	Body []StmtIR
+}
+
+// AwaitExprIR describes an await expression.
+type AwaitExprIR struct {
+	Expr ExprIR
 }
 
 // MatchExpr describes a pattern match.

@@ -52,7 +52,7 @@ The Semantic IR, generalized provider system, and Python/FastAPI codegen are mer
 - [x] Parse each intent-test .glyph → IR → Python, verify output structure (`tests/codegen_integration_test.go`)
 - [x] Parse each intent-test .glyph → IR → TypeScript, verify output structure
 - [x] Regression tests: both targets tested against all 5 intent-test files + custom-provider example
-- [ ] Add to CI pipeline
+- [x] Add to CI pipeline (included via `go test ./...` in CI workflow and Makefile)
 
 ## Phase 5: Intent Hypothesis Testing
 
@@ -64,15 +64,15 @@ The Semantic IR, generalized provider system, and Python/FastAPI codegen are mer
 - [ ] Compare results across the 5 intent-test scenarios
 - [ ] Document findings
 
-## Phase 6: Expand IR Coverage
+## Phase 6: Expand IR Coverage (complete)
 
 **Goal**: Handle all Glyph language features in the IR.
 
-- [ ] WebSocket details (connect/message/disconnect handlers, room management)
-- [ ] GraphQL schema/resolver generation
-- [ ] gRPC service/method definitions
-- [ ] Pattern matching in IR → target language switch/match statements
-- [ ] Async/await mapping per target language
+- [x] WebSocket details (connect/message/disconnect handlers, room management)
+- [x] GraphQL schema/resolver generation
+- [x] gRPC service/method definitions
+- [x] Pattern matching in IR → target language switch/match statements
+- [x] Async/await mapping per target language
 
 ## When Polyglot Is Ready: Documentation & Website Updates
 

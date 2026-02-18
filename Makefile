@@ -55,15 +55,15 @@ installer: build-all
 # Test targets
 test:
 	@echo "Running Go tests..."
-	go test ./pkg/... -v
+	go test ./... -v
 
 test-short:
 	@echo "Running Go tests (short mode)..."
-	go test ./pkg/... -v -short
+	go test ./... -v -short
 
 test-coverage:
 	@echo "Running tests with coverage..."
-	go test ./pkg/... -coverprofile=coverage.out -covermode=atomic
+	go test ./... -coverprofile=coverage.out -covermode=atomic
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
 
