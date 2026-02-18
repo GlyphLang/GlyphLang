@@ -95,6 +95,11 @@ Java:   @GetMapping("/users/{id}")...  (28 tokens)
 - **Security** - JWT auth, rate limiting, CORS, SQL injection prevention
 - **Observability** - logging, Prometheus metrics, OpenTelemetry tracing
 
+### Code Generation
+- **Polyglot Output** - Generate Python/FastAPI or TypeScript/Express servers from the same `.glyph` source
+- **Custom Providers** - Define provider contracts with `provider Name { method(...) -> Type }`
+- **Semantic IR** - Language-neutral intermediate representation powers multi-target output
+
 ### Tooling
 - **LSP Server** - full IDE support with completions, diagnostics, rename
 - **[VS Code Extension](https://marketplace.visualstudio.com/items?itemName=GlyphLang.GlyphLang)** - syntax highlighting, LSP support, error checking
@@ -528,15 +533,17 @@ glyph context --changed
 ### Standard Commands
 
 ```bash
-glyph run <file>        # Run a Glyph file
-glyph dev <file>        # Development server with hot reload
-glyph compile <file>    # Compile to bytecode
-glyph decompile <file>  # Decompile bytecode
-glyph lsp               # Start LSP server
-glyph init              # Initialize new project
-glyph commands <file>   # List CLI commands in a file
-glyph exec <file> <cmd> # Execute a CLI command
-glyph version           # Show version
+glyph run <file>            # Run a Glyph file
+glyph dev <file>            # Development server with hot reload
+glyph compile <file>        # Compile to bytecode
+glyph decompile <file>      # Decompile bytecode
+glyph codegen <file>        # Generate server code (default: Python/FastAPI)
+glyph codegen <file> --lang typescript -o ./out  # TypeScript/Express
+glyph lsp                   # Start LSP server
+glyph init                  # Initialize new project
+glyph commands <file>       # List CLI commands in a file
+glyph exec <file> <cmd>     # Execute a CLI command
+glyph version               # Show version
 ```
 
 ## Documentation
