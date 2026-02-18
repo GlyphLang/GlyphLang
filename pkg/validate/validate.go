@@ -163,26 +163,43 @@ func (v *Validator) validateSemantics(module *ast.Module, result *ValidationResu
 	builtinTypes := map[string]bool{
 		"int": true, "str": true, "string": true, "bool": true,
 		"float": true, "timestamp": true, "any": true, "object": true,
-		"List": true, "Map": true, "Result": true, "Database": true,
+		"List": true, "Map": true, "Result": true,
+		"Database": true, "Redis": true, "MongoDB": true, "LLM": true,
 	}
 
 	// Process imports to collect types from imported modules
 	v.processImports(module, definedTypes, result)
 
-	// First pass: collect all type definitions
+	// First pass: collect all type and provider definitions
+	definedProviders := make(map[string]bool)
 	for _, item := range module.Items {
-		if typeDef, ok := item.(*ast.TypeDef); ok {
-			if definedTypes[typeDef.Name] {
+		switch it := item.(type) {
+		case *ast.TypeDef:
+			if definedTypes[it.Name] {
 				result.Errors = append(result.Errors, &ValidationError{
 					Type:      ErrTypeDuplicate,
-					Message:   fmt.Sprintf("duplicate type definition: %s", typeDef.Name),
+					Message:   fmt.Sprintf("duplicate type definition: %s", it.Name),
 					Severity:  "error",
-					RelatedTo: typeDef.Name,
-					FixHint:   fmt.Sprintf("rename one of the '%s' type definitions or remove the duplicate", typeDef.Name),
+					RelatedTo: it.Name,
+					FixHint:   fmt.Sprintf("rename one of the '%s' type definitions or remove the duplicate", it.Name),
 				})
 				result.Valid = false
 			}
-			definedTypes[typeDef.Name] = true
+			definedTypes[it.Name] = true
+		case *ast.ProviderDef:
+			if definedProviders[it.Name] {
+				result.Errors = append(result.Errors, &ValidationError{
+					Type:      ErrTypeDuplicate,
+					Message:   fmt.Sprintf("duplicate provider definition: %s", it.Name),
+					Severity:  "error",
+					RelatedTo: it.Name,
+					FixHint:   fmt.Sprintf("rename one of the '%s' provider definitions or remove the duplicate", it.Name),
+				})
+				result.Valid = false
+			}
+			definedProviders[it.Name] = true
+			// Provider names are valid types for injection
+			definedTypes[it.Name] = true
 		}
 	}
 
@@ -192,9 +209,15 @@ func (v *Validator) validateSemantics(module *ast.Module, result *ValidationResu
 		case *ast.TypeDef:
 			v.validateTypeFields(node, definedTypes, builtinTypes, result)
 		case *ast.Route:
-			v.validateRoute(node, definedTypes, builtinTypes, result)
+			// Routes receive definedProviders to validate injection types.
+			// validateFunction does not need it since functions don't have injections.
+			v.validateRoute(node, definedTypes, builtinTypes, definedProviders, result)
 		case *ast.Function:
 			v.validateFunction(node, definedTypes, builtinTypes, result)
+		case *ast.ProviderDef:
+			// validateProvider checks method param/return types only,
+			// so it doesn't need definedProviders.
+			v.validateProvider(node, definedTypes, builtinTypes, result)
 		}
 	}
 
@@ -276,7 +299,7 @@ func (v *Validator) validateTypeFields(typeDef *ast.TypeDef, defined, builtin ma
 }
 
 // validateRoute validates a route definition
-func (v *Validator) validateRoute(route *ast.Route, defined, builtin map[string]bool, result *ValidationResult) {
+func (v *Validator) validateRoute(route *ast.Route, defined, builtin, providers map[string]bool, result *ValidationResult) {
 	// Validate return type
 	if route.ReturnType != nil {
 		v.validateTypeRef(route.ReturnType, defined, builtin, result, fmt.Sprintf("route %s %s", route.Method, route.Path))
@@ -311,6 +334,62 @@ func (v *Validator) validateRoute(route *ast.Route, defined, builtin map[string]
 			}
 			params[param] = true
 		}
+	}
+
+	// Validate injected provider types
+	for _, inj := range route.Injections {
+		provType := resolveProviderTypeName(inj.Type)
+		if provType != "" && !providers[provType] && !isBuiltinProvider(provType) {
+			result.Errors = append(result.Errors, &ValidationError{
+				Type:      ErrTypeUndefined,
+				Message:   fmt.Sprintf("undefined provider type: %s", provType),
+				Severity:  "error",
+				RelatedTo: fmt.Sprintf("route %s %s", route.Method, route.Path),
+				FixHint:   fmt.Sprintf("define 'provider %s { ... }' or use a builtin provider (Database, Redis, MongoDB, LLM)", provType),
+			})
+			result.Valid = false
+		}
+	}
+}
+
+// validateProvider validates a provider definition's method types
+func (v *Validator) validateProvider(prov *ast.ProviderDef, defined, builtin map[string]bool, result *ValidationResult) {
+	for _, method := range prov.Methods {
+		context := fmt.Sprintf("provider %s method %s", prov.Name, method.Name)
+		if method.ReturnType != nil {
+			v.validateTypeRef(method.ReturnType, defined, builtin, result, context)
+		}
+		for _, param := range method.Params {
+			v.validateTypeRef(param.TypeAnnotation, defined, builtin, result, context)
+		}
+	}
+}
+
+// resolveProviderTypeName extracts the provider type name from an AST type
+func resolveProviderTypeName(t ast.Type) string {
+	switch typ := t.(type) {
+	case ast.DatabaseType:
+		return "Database"
+	case ast.RedisType:
+		return "Redis"
+	case ast.MongoDBType:
+		return "MongoDB"
+	case ast.LLMType:
+		return "LLM"
+	case ast.NamedType:
+		return typ.Name
+	default:
+		return ""
+	}
+}
+
+// isBuiltinProvider returns true for the four standard provider types
+func isBuiltinProvider(name string) bool {
+	switch name {
+	case "Database", "Redis", "MongoDB", "LLM":
+		return true
+	default:
+		return false
 	}
 }
 

@@ -160,6 +160,16 @@ func (p *Parser) Parse() (*ast.Module, error) {
 					return nil, err
 				}
 				items = append(items, item)
+			} else if p.current().Literal == "provider" {
+				// provider Name { method(params) -> ReturnType }
+				// Custom provider contract declaration, following the same
+				// pattern as trait/contract parsing (IDENT-based keywords).
+				p.advance() // consume "provider"
+				item, err := p.parseProvider()
+				if err != nil {
+					return nil, err
+				}
+				items = append(items, item)
 			} else if p.peek(1).Type == BANG {
 				// Macro invocation at top level: name!(args)
 				item, err := p.parseMacroInvocation()
@@ -171,7 +181,7 @@ func (p *Parser) Parse() (*ast.Module, error) {
 				return nil, p.errorWithHint(
 					fmt.Sprintf("Unexpected token %s", p.current().Type),
 					p.current(),
-					"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'contract', 'trait', 'import', 'from', 'module', 'const', or 'test'",
+					"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'contract', 'trait', 'provider', 'import', 'from', 'module', 'const', or 'test'",
 				)
 			}
 		case EOF:
@@ -180,7 +190,7 @@ func (p *Parser) Parse() (*ast.Module, error) {
 			return nil, p.errorWithHint(
 				fmt.Sprintf("Unexpected token %s", p.current().Type),
 				p.current(),
-				"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'contract', 'trait', 'import', 'from', 'module', 'const', or 'test'",
+				"Top-level items must start with ':', '@', '!', '*', '~', '&', 'macro', 'contract', 'trait', 'provider', 'import', 'from', 'module', 'const', or 'test'",
 			)
 		}
 	}
@@ -467,6 +477,103 @@ func (p *Parser) parseTraitMethodSignature() (ast.TraitMethodSignature, error) {
 	}
 
 	return ast.TraitMethodSignature{
+		Name:       name,
+		Params:     params,
+		ReturnType: returnType,
+	}, nil
+}
+
+// parseProvider parses a provider contract definition.
+// Syntax: provider Name { method(params) -> ReturnType }
+// The ProviderDef and ProviderMethod AST types are defined in ast.go:965-985.
+// This follows the same pattern as parseTrait (line 384).
+func (p *Parser) parseProvider() (ast.Item, error) {
+	name, err := p.expectIdent()
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse optional generic type parameters
+	typeParams, err := p.parseTypeParameters()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := p.expect(LBRACE); err != nil {
+		return nil, err
+	}
+
+	p.skipNewlines()
+
+	var methods []ast.ProviderMethod
+
+	for !p.check(RBRACE) && !p.isAtEnd() {
+		p.skipNewlines()
+
+		if p.check(RBRACE) {
+			break
+		}
+
+		method, err := p.parseProviderMethod()
+		if err != nil {
+			return nil, err
+		}
+		methods = append(methods, method)
+
+		p.skipNewlines()
+	}
+
+	if err := p.expect(RBRACE); err != nil {
+		return nil, err
+	}
+
+	return &ast.ProviderDef{
+		Name:       name,
+		TypeParams: typeParams,
+		Methods:    methods,
+	}, nil
+}
+
+// parseProviderMethod parses a provider method signature: name(params) -> returnType
+// This follows the same pattern as parseTraitMethodSignature (line 432).
+func (p *Parser) parseProviderMethod() (ast.ProviderMethod, error) {
+	name, err := p.expectIdent()
+	if err != nil {
+		return ast.ProviderMethod{}, err
+	}
+
+	if err := p.expect(LPAREN); err != nil {
+		return ast.ProviderMethod{}, err
+	}
+
+	var params []ast.Field
+	for !p.check(RPAREN) && !p.isAtEnd() {
+		if len(params) > 0 {
+			if err := p.expect(COMMA); err != nil {
+				return ast.ProviderMethod{}, err
+			}
+		}
+		field, err := p.parseField()
+		if err != nil {
+			return ast.ProviderMethod{}, err
+		}
+		params = append(params, field)
+	}
+
+	if err := p.expect(RPAREN); err != nil {
+		return ast.ProviderMethod{}, err
+	}
+
+	// Parse optional return type: -> type
+	var returnType ast.Type
+	if p.match(ARROW) {
+		returnType, _, err = p.parseType()
+		if err != nil {
+			return ast.ProviderMethod{}, err
+		}
+	}
+
+	return ast.ProviderMethod{
 		Name:       name,
 		Params:     params,
 		ReturnType: returnType,

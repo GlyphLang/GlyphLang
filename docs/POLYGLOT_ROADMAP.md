@@ -22,15 +22,16 @@ The Semantic IR, generalized provider system, and Python/FastAPI codegen are mer
 - [x] Support `--lang python` flag (extensible for future targets)
 - [x] Generate project structure: `main.py`, `requirements.txt`
 
-## Phase 2: Provider Parser Syntax
+## Phase 2: Provider Parser Syntax (complete)
 
 **Goal**: Parse `provider` declarations in .glyph source files.
 
-- [ ] Add `provider` keyword to lexer (both compact and expanded)
-- [ ] Add parser rule for `provider Name { method(...): ReturnType }` blocks
-- [ ] Produce `ProviderDef` AST nodes from parsed source
-- [ ] Add validation in the `validate` command
-- [ ] Add examples demonstrating custom providers
+- [x] Add `provider` keyword to parser (IDENT-based, no compact symbol needed)
+- [x] Add parser rule for `provider Name { method(params) -> ReturnType }` blocks
+- [x] Produce `ProviderDef` AST nodes from parsed source (AST types already existed)
+- [x] Wire `ProviderDef` through IR analyzer with method signatures
+- [x] Add validation in the `validate` command (duplicate detection, method type checking, injection validation)
+- [x] Add examples demonstrating custom providers (`examples/custom-provider/`)
 
 ## Phase 3: Second Target Language
 

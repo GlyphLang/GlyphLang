@@ -11,15 +11,17 @@ import (
 // It resolves types, extracts provider requirements, and normalizes
 // the AST into a language-neutral intermediate representation.
 type Analyzer struct {
-	types     map[string]ast.TypeDef
-	providers map[string]ProviderRef // all discovered provider dependencies
+	types             map[string]ast.TypeDef
+	providers         map[string]ProviderRef      // all discovered provider dependencies
+	providerContracts map[string]*ast.ProviderDef // provider contracts from source
 }
 
 // NewAnalyzer creates a new Analyzer.
 func NewAnalyzer() *Analyzer {
 	return &Analyzer{
-		types:     make(map[string]ast.TypeDef),
-		providers: make(map[string]ProviderRef),
+		types:             make(map[string]ast.TypeDef),
+		providers:         make(map[string]ProviderRef),
+		providerContracts: make(map[string]*ast.ProviderDef),
 	}
 }
 
@@ -27,11 +29,13 @@ func NewAnalyzer() *Analyzer {
 func (a *Analyzer) Analyze(module *ast.Module) (*ServiceIR, error) {
 	ir := &ServiceIR{}
 
-	// First pass: collect type definitions
+	// First pass: collect type definitions and provider contracts
 	for _, item := range module.Items {
 		switch it := item.(type) {
 		case *ast.TypeDef:
 			a.types[it.Name] = *it
+		case *ast.ProviderDef:
+			a.providerContracts[it.Name] = it
 		}
 	}
 
@@ -131,6 +135,11 @@ func (a *Analyzer) processItem(ir *ServiceIR, item ast.Item) error {
 			return fmt.Errorf("const %s: %w", it.Name, err)
 		}
 		ir.Constants = append(ir.Constants, cd)
+
+	case *ast.ProviderDef:
+		prov := a.convertProviderDef(it)
+		// Register as a known provider so injections can reference it
+		a.providers[prov.ProviderType] = prov
 
 	case *ast.TestBlock, *ast.ImportStatement, *ast.ModuleDecl,
 		*ast.MacroDef, *ast.MacroInvocation, *ast.ContractDef,
@@ -355,11 +364,16 @@ func (a *Analyzer) registerInjection(inj ast.Injection) InjectionRef {
 
 	// Track unique providers
 	if _, exists := a.providers[providerType]; !exists {
-		a.providers[providerType] = ProviderRef{
+		prov := ProviderRef{
 			Name:         strings.ToLower(providerType),
 			ProviderType: providerType,
 			IsStandard:   isStandardProvider(providerType),
 		}
+		// If a provider contract was declared, populate its methods
+		if contract, ok := a.providerContracts[providerType]; ok {
+			prov = a.convertProviderDef(contract)
+		}
+		a.providers[providerType] = prov
 	}
 	return ref
 }
@@ -388,6 +402,30 @@ func isStandardProvider(name string) bool {
 	default:
 		return false
 	}
+}
+
+// --- Provider conversion ---
+
+func (a *Analyzer) convertProviderDef(pd *ast.ProviderDef) ProviderRef {
+	prov := ProviderRef{
+		Name:         strings.ToLower(pd.Name),
+		ProviderType: pd.Name,
+		IsStandard:   false,
+	}
+	for _, m := range pd.Methods {
+		ms := MethodSig{
+			Name: m.Name,
+		}
+		for _, p := range m.Params {
+			fs, _ := a.convertField(p)
+			ms.Params = append(ms.Params, fs)
+		}
+		if m.ReturnType != nil {
+			ms.ReturnType = a.convertType(m.ReturnType)
+		}
+		prov.Methods = append(prov.Methods, ms)
+	}
+	return prov
 }
 
 // --- Function, CronTask, EventHandler, QueueWorker, Command conversion ---
