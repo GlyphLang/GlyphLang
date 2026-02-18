@@ -369,8 +369,10 @@ func runCodegen(cmd *cobra.Command, args []string) error {
 	switch lang {
 	case "python", "py":
 		return generatePython(service, output, filePath)
+	case "typescript", "ts":
+		return generateTypeScript(service, output, filePath)
 	default:
-		return fmt.Errorf("unsupported language: %s (supported: python)", lang)
+		return fmt.Errorf("unsupported language: %s (supported: python, typescript)", lang)
 	}
 }
 
@@ -407,6 +409,52 @@ func generatePython(service *ir.ServiceIR, output, sourceFile string) error {
 	printInfo(fmt.Sprintf("  %s (%d bytes)", mainPath, len(code)))
 	printInfo(fmt.Sprintf("  %s (%d bytes)", reqsPath, len(reqs)))
 	printInfo("Run: pip install -r requirements.txt && uvicorn main:app --reload")
+
+	return nil
+}
+
+// generateTypeScript writes TypeScript/Express output to the target directory or stdout
+func generateTypeScript(service *ir.ServiceIR, output, sourceFile string) error {
+	gen := codegen.NewTypeScriptServerGenerator("0.0.0.0", 3000)
+	code := gen.Generate(service)
+	pkg := gen.GeneratePackageJSON(service)
+	tsconfig := gen.GenerateTSConfig()
+
+	// If no output directory, write to stdout
+	if output == "" {
+		fmt.Print(code)
+		return nil
+	}
+
+	// Create output directory with src/ subdirectory
+	srcDir := filepath.Join(output, "src")
+	if err := os.MkdirAll(srcDir, 0755); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
+
+	// Write src/app.ts
+	appPath := filepath.Join(srcDir, "app.ts")
+	if err := os.WriteFile(appPath, []byte(code), 0644); err != nil {
+		return fmt.Errorf("failed to write app.ts: %w", err)
+	}
+
+	// Write package.json
+	pkgPath := filepath.Join(output, "package.json")
+	if err := os.WriteFile(pkgPath, []byte(pkg), 0644); err != nil {
+		return fmt.Errorf("failed to write package.json: %w", err)
+	}
+
+	// Write tsconfig.json
+	tsconfigPath := filepath.Join(output, "tsconfig.json")
+	if err := os.WriteFile(tsconfigPath, []byte(tsconfig), 0644); err != nil {
+		return fmt.Errorf("failed to write tsconfig.json: %w", err)
+	}
+
+	printSuccess(fmt.Sprintf("TypeScript/Express code written to %s/", output))
+	printInfo(fmt.Sprintf("  %s (%d bytes)", appPath, len(code)))
+	printInfo(fmt.Sprintf("  %s (%d bytes)", pkgPath, len(pkg)))
+	printInfo(fmt.Sprintf("  %s (%d bytes)", tsconfigPath, len(tsconfig)))
+	printInfo("Run: npm install && npm run dev")
 
 	return nil
 }

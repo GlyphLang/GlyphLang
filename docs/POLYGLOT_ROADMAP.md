@@ -11,6 +11,8 @@ The Semantic IR, generalized provider system, and Python/FastAPI codegen are mer
 - [x] **Python/FastAPI codegen** (`pkg/codegen/python.go`) — Generates complete FastAPI apps with Pydantic models, Depends() injection, APScheduler cron, provider stubs
 - [x] **Formal notation spec** (`docs/GLYPH_NOTATION_SPEC.md`) — Symbol vocabulary, type mapping table, EBNF grammar
 - [x] **Intent-test examples** (`examples/intent-tests/`) — 5 validated .glyph + .txt pairs
+- [x] **Provider parser syntax** — `provider` keyword with IR wiring and validation
+- [x] **TypeScript/Express codegen** (`pkg/codegen/typescript_server.go`) — Generates complete Express apps with TypeScript interfaces, provider stubs, node-cron
 
 ## Phase 1: CLI Pipeline (complete)
 
@@ -33,14 +35,14 @@ The Semantic IR, generalized provider system, and Python/FastAPI codegen are mer
 - [x] Add validation in the `validate` command (duplicate detection, method type checking, injection validation)
 - [x] Add examples demonstrating custom providers (`examples/custom-provider/`)
 
-## Phase 3: Second Target Language
+## Phase 3: Second Target Language (complete)
 
 **Goal**: Prove polyglot promise with a second codegen backend.
 
-- [ ] TypeScript/Express generator (`pkg/codegen/typescript.go`) — or Go/Chi
-- [ ] Reuse the same `ServiceIR` input, different output
-- [ ] Extend `glyph codegen --lang typescript` support
-- [ ] Verify identical behavior from the same .glyph source across both targets
+- [x] TypeScript/Express generator (`pkg/codegen/typescript_server.go`)
+- [x] Reuse the same `ServiceIR` input, different output
+- [x] Extend `glyph codegen --lang typescript` support
+- [x] Verify identical behavior from the same .glyph source across both targets
 
 ## Phase 4: Integration Tests
 

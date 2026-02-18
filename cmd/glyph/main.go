@@ -316,16 +316,18 @@ a working server application in the target language.
 
 Output languages:
   - python: Python/FastAPI server (default)
+  - typescript: TypeScript/Express server
 
 Examples:
-  glyph codegen main.glyph                          # Output Python to stdout
-  glyph codegen main.glyph --output ./out            # Write project to directory
-  glyph codegen main.glyph --lang python -o ./out    # Explicit language selection`,
+  glyph codegen main.glyph                               # Output Python to stdout
+  glyph codegen main.glyph --output ./out                 # Write project to directory
+  glyph codegen main.glyph --lang python -o ./out         # Python/FastAPI
+  glyph codegen main.glyph --lang typescript -o ./out     # TypeScript/Express`,
 		Args: cobra.ExactArgs(1),
 		RunE: runCodegen,
 	}
 	codegenCmd.Flags().StringP("output", "o", "", "Output directory for generated project")
-	codegenCmd.Flags().String("lang", "python", "Target language: python")
+	codegenCmd.Flags().String("lang", "python", "Target language: python, typescript")
 
 	// REPL command - interactive Read-Eval-Print Loop
 	var replCmd = &cobra.Command{
