@@ -90,9 +90,9 @@ When at least 2 target languages are working end-to-end (Phase 3 complete), upda
 
 ### VS Code Extension (`/home/dadams/projects/glyph/vscode-extension`)
 
-- [ ] Add `codegen` command integration (run from editor, pick target language)
-- [ ] Add preview panel for generated output
-- [ ] Update README with polyglot features
+- [x] Add `codegen` command integration (run from editor, pick target language)
+- [x] Add preview panel for generated output
+- [x] Update README with polyglot features
 
 ### Main Repo (`/home/dadams/projects/glyph/GlyphLang`)
 
