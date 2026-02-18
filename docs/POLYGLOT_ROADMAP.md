@@ -97,5 +97,5 @@ When at least 2 target languages are working end-to-end (Phase 3 complete), upda
 ### Main Repo (`/home/dadams/projects/glyph/GlyphLang`)
 
 - [x] Update root README.md with polyglot code generation feature
-- [ ] Add generated output examples to `examples/` directory
+- [x] Add generated output examples to `examples/` directory
 - [ ] Update CLAUDE.md if the workflow changes
