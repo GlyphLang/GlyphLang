@@ -957,6 +957,26 @@ func (a *Analyzer) convertExpr(expr ast.Expr) ExprIR {
 		return a.convertMatchExpr(e)
 	case ast.MatchExpr:
 		return a.convertMatchExpr(&e)
+	case *ast.AsyncExpr:
+		return ExprIR{
+			Kind:  ExprAsync,
+			Async: &AsyncExprIR{Body: a.convertStatements(e.Body)},
+		}
+	case ast.AsyncExpr:
+		return ExprIR{
+			Kind:  ExprAsync,
+			Async: &AsyncExprIR{Body: a.convertStatements(e.Body)},
+		}
+	case *ast.AwaitExpr:
+		return ExprIR{
+			Kind:  ExprAwait,
+			Await: &AwaitExprIR{Expr: a.convertExpr(e.Expr)},
+		}
+	case ast.AwaitExpr:
+		return ExprIR{
+			Kind:  ExprAwait,
+			Await: &AwaitExprIR{Expr: a.convertExpr(e.Expr)},
+		}
 	default:
 		return ExprIR{Kind: ExprNull, IsNull: true}
 	}

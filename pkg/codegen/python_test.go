@@ -270,6 +270,314 @@ func TestGlyphPathToFastAPI(t *testing.T) {
 	}
 }
 
+func TestPythonSwitchStatement(t *testing.T) {
+	gen := NewPythonGenerator("", 8000)
+	service := &ir.ServiceIR{
+		Routes: []ir.RouteHandler{
+			{
+				Method: ir.MethodGet,
+				Path:   "/api/status",
+				Body: []ir.StmtIR{
+					{
+						Kind: ir.StmtSwitch,
+						Switch: &ir.SwitchStmt{
+							Value: ir.ExprIR{Kind: ir.ExprVar, VarName: "code"},
+							Cases: []ir.SwitchCase{
+								{
+									Value: ir.ExprIR{Kind: ir.ExprInt, IntVal: 200},
+									Body: []ir.StmtIR{
+										{Kind: ir.StmtReturn, Return: &ir.ReturnStmt{Value: ir.ExprIR{Kind: ir.ExprString, StringVal: "ok"}}},
+									},
+								},
+								{
+									Value: ir.ExprIR{Kind: ir.ExprInt, IntVal: 404},
+									Body: []ir.StmtIR{
+										{Kind: ir.StmtReturn, Return: &ir.ReturnStmt{Value: ir.ExprIR{Kind: ir.ExprString, StringVal: "not found"}}},
+									},
+								},
+							},
+							Default: []ir.StmtIR{
+								{Kind: ir.StmtReturn, Return: &ir.ReturnStmt{Value: ir.ExprIR{Kind: ir.ExprString, StringVal: "error"}}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	output := gen.Generate(service)
+
+	if !strings.Contains(output, "if code == 200") {
+		t.Error("expected first case as if statement")
+	}
+	if !strings.Contains(output, "elif code == 404") {
+		t.Error("expected second case as elif statement")
+	}
+	if !strings.Contains(output, "else:") {
+		t.Error("expected default as else block")
+	}
+}
+
+func TestPythonPipeExpr(t *testing.T) {
+	gen := NewPythonGenerator("", 8000)
+	service := &ir.ServiceIR{
+		Routes: []ir.RouteHandler{
+			{
+				Method: ir.MethodGet,
+				Path:   "/api/pipe",
+				Body: []ir.StmtIR{
+					{
+						Kind: ir.StmtReturn,
+						Return: &ir.ReturnStmt{
+							Value: ir.ExprIR{
+								Kind: ir.ExprPipe,
+								Pipe: &ir.PipeExpr{
+									Left:  ir.ExprIR{Kind: ir.ExprVar, VarName: "data"},
+									Right: ir.ExprIR{Kind: ir.ExprVar, VarName: "transform"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	output := gen.Generate(service)
+
+	if !strings.Contains(output, "transform(data)") {
+		t.Error("expected pipe expression rendered as function call")
+	}
+}
+
+func TestPythonWebSocket(t *testing.T) {
+	gen := NewPythonGenerator("", 8000)
+	service := &ir.ServiceIR{
+		WebSocket: []ir.WebSocketDef{
+			{
+				Path: "/ws/chat",
+				Events: []ir.WSEventDef{
+					{
+						EventType: ir.WSConnect,
+						Body:      []ir.StmtIR{},
+					},
+					{
+						EventType: ir.WSMessage,
+						Body: []ir.StmtIR{
+							{Kind: ir.StmtExpr, ExprStmt: &ir.ExprIR{Kind: ir.ExprVar, VarName: "handle_message"}},
+						},
+					},
+					{
+						EventType: ir.WSDisconnect,
+						Body:      []ir.StmtIR{},
+					},
+				},
+			},
+		},
+	}
+	output := gen.Generate(service)
+
+	if !strings.Contains(output, "class ConnectionManager") {
+		t.Error("expected ConnectionManager class")
+	}
+	if !strings.Contains(output, `@app.websocket("/ws/chat")`) {
+		t.Error("expected websocket decorator")
+	}
+	if !strings.Contains(output, "await manager.connect(websocket)") {
+		t.Error("expected websocket connect")
+	}
+	if !strings.Contains(output, "WebSocketDisconnect") {
+		t.Error("expected WebSocketDisconnect handling")
+	}
+	if !strings.Contains(output, "from fastapi import WebSocket, WebSocketDisconnect") {
+		t.Error("expected WebSocket imports")
+	}
+}
+
+func TestPythonWebSocketRequirements(t *testing.T) {
+	gen := NewPythonGenerator("", 8000)
+	service := &ir.ServiceIR{
+		WebSocket: []ir.WebSocketDef{
+			{Path: "/ws"},
+		},
+	}
+	reqs := gen.GenerateRequirements(service)
+
+	if !strings.Contains(reqs, "websockets>=12.0") {
+		t.Error("expected websockets dependency")
+	}
+}
+
+func TestPythonGraphQL(t *testing.T) {
+	gen := NewPythonGenerator("", 8000)
+	service := &ir.ServiceIR{
+		GraphQL: []ir.GraphQLDef{
+			{
+				Operation: ir.GraphQLQuery,
+				FieldName: "getUser",
+				Params: []ir.FieldSchema{
+					{Name: "id", Type: ir.TypeRef{Kind: ir.TypeInt}, Required: true},
+				},
+				ReturnType: &ir.TypeRef{Kind: ir.TypeNamed, Name: "User"},
+				Body: []ir.StmtIR{
+					{Kind: ir.StmtReturn, Return: &ir.ReturnStmt{Value: ir.ExprIR{Kind: ir.ExprNull, IsNull: true}}},
+				},
+			},
+			{
+				Operation: ir.GraphQLMutation,
+				FieldName: "createUser",
+				Params: []ir.FieldSchema{
+					{Name: "name", Type: ir.TypeRef{Kind: ir.TypeString}, Required: true},
+				},
+				ReturnType: &ir.TypeRef{Kind: ir.TypeNamed, Name: "User"},
+				Body: []ir.StmtIR{
+					{Kind: ir.StmtReturn, Return: &ir.ReturnStmt{Value: ir.ExprIR{Kind: ir.ExprNull, IsNull: true}}},
+				},
+			},
+		},
+	}
+	output := gen.Generate(service)
+
+	if !strings.Contains(output, "import strawberry") {
+		t.Error("expected strawberry import")
+	}
+	if !strings.Contains(output, "@strawberry.type") {
+		t.Error("expected strawberry type decorator")
+	}
+	if !strings.Contains(output, "class Query:") {
+		t.Error("expected Query class")
+	}
+	if !strings.Contains(output, "class Mutation:") {
+		t.Error("expected Mutation class")
+	}
+	if !strings.Contains(output, "async def getUser") {
+		t.Error("expected getUser resolver")
+	}
+	if !strings.Contains(output, "async def createUser") {
+		t.Error("expected createUser resolver")
+	}
+	if !strings.Contains(output, `schema = strawberry.Schema(`) {
+		t.Error("expected schema creation")
+	}
+	if !strings.Contains(output, `app.include_router(graphql_app, prefix="/graphql")`) {
+		t.Error("expected GraphQL router mount")
+	}
+}
+
+func TestPythonGraphQLRequirements(t *testing.T) {
+	gen := NewPythonGenerator("", 8000)
+	service := &ir.ServiceIR{
+		GraphQL: []ir.GraphQLDef{
+			{Operation: ir.GraphQLQuery, FieldName: "test"},
+		},
+	}
+	reqs := gen.GenerateRequirements(service)
+
+	if !strings.Contains(reqs, "strawberry-graphql>=0.220.0") {
+		t.Error("expected strawberry-graphql dependency")
+	}
+}
+
+func TestPythonGRPC(t *testing.T) {
+	gen := NewPythonGenerator("", 8000)
+	service := &ir.ServiceIR{
+		GRPC: []ir.GRPCServiceDef{
+			{
+				Name: "UserService",
+				Methods: []ir.GRPCMethodDef{
+					{
+						Name:       "GetUser",
+						InputType:  ir.TypeRef{Kind: ir.TypeNamed, Name: "GetUserRequest"},
+						ReturnType: ir.TypeRef{Kind: ir.TypeNamed, Name: "UserResponse"},
+						StreamType: ir.GRPCUnary,
+					},
+					{
+						Name:       "ListUsers",
+						InputType:  ir.TypeRef{Kind: ir.TypeNamed, Name: "ListRequest"},
+						ReturnType: ir.TypeRef{Kind: ir.TypeNamed, Name: "UserResponse"},
+						StreamType: ir.GRPCServerStream,
+					},
+				},
+				Handlers: []ir.GRPCHandlerDef{
+					{
+						ServiceName: "UserService",
+						MethodName:  "GetUser",
+						Body: []ir.StmtIR{
+							{Kind: ir.StmtReturn, Return: &ir.ReturnStmt{Value: ir.ExprIR{Kind: ir.ExprNull, IsNull: true}}},
+						},
+					},
+				},
+			},
+		},
+	}
+	output := gen.Generate(service)
+
+	if !strings.Contains(output, "import grpc") {
+		t.Error("expected grpc import")
+	}
+	if !strings.Contains(output, "class UserServiceServicer:") {
+		t.Error("expected UserServiceServicer class")
+	}
+	if !strings.Contains(output, "async def GetUser(self, request, context):") {
+		t.Error("expected GetUser handler method")
+	}
+	if !strings.Contains(output, "async def ListUsers(self, request, context):") {
+		t.Error("expected ListUsers stub method")
+	}
+	if !strings.Contains(output, "raise NotImplementedError") {
+		t.Error("expected NotImplementedError for unimplemented methods")
+	}
+	if !strings.Contains(output, "stream") {
+		t.Error("expected stream annotation in proto comment")
+	}
+}
+
+func TestPythonGRPCRequirements(t *testing.T) {
+	gen := NewPythonGenerator("", 8000)
+	service := &ir.ServiceIR{
+		GRPC: []ir.GRPCServiceDef{
+			{Name: "TestService"},
+		},
+	}
+	reqs := gen.GenerateRequirements(service)
+
+	if !strings.Contains(reqs, "grpcio>=1.60.0") {
+		t.Error("expected grpcio dependency")
+	}
+	if !strings.Contains(reqs, "protobuf>=4.25.0") {
+		t.Error("expected protobuf dependency")
+	}
+}
+
+func TestPythonAsyncAwait(t *testing.T) {
+	gen := NewPythonGenerator("", 8000)
+	service := &ir.ServiceIR{
+		Routes: []ir.RouteHandler{
+			{
+				Method: ir.MethodGet,
+				Path:   "/api/async",
+				Body: []ir.StmtIR{
+					{
+						Kind: ir.StmtAssign,
+						Assign: &ir.AssignStmt{
+							Target: "result",
+							Value: ir.ExprIR{
+								Kind:  ir.ExprAwait,
+								Await: &ir.AwaitExprIR{Expr: ir.ExprIR{Kind: ir.ExprCall, Call: &ir.CallExpr{Name: "fetch_data"}}},
+							},
+						},
+					},
+					{Kind: ir.StmtReturn, Return: &ir.ReturnStmt{Value: ir.ExprIR{Kind: ir.ExprVar, VarName: "result"}}},
+				},
+			},
+		},
+	}
+	output := gen.Generate(service)
+
+	if !strings.Contains(output, "await fetch_data()") {
+		t.Error("expected await expression")
+	}
+}
+
 func TestIrTypeToPython(t *testing.T) {
 	tests := []struct {
 		name     string

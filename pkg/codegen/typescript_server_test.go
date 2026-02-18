@@ -748,3 +748,343 @@ func TestTSCronJobNonRouteReturn(t *testing.T) {
 		t.Error("cron job should not use res.json()")
 	}
 }
+
+func TestTSSwitchStatement(t *testing.T) {
+	gen := NewTypeScriptServerGenerator("", 3000)
+	service := &ir.ServiceIR{
+		Routes: []ir.RouteHandler{
+			{
+				Method: ir.MethodGet,
+				Path:   "/api/status",
+				Body: []ir.StmtIR{
+					{
+						Kind: ir.StmtSwitch,
+						Switch: &ir.SwitchStmt{
+							Value: ir.ExprIR{Kind: ir.ExprVar, VarName: "code"},
+							Cases: []ir.SwitchCase{
+								{
+									Value: ir.ExprIR{Kind: ir.ExprInt, IntVal: 200},
+									Body: []ir.StmtIR{
+										{Kind: ir.StmtReturn, Return: &ir.ReturnStmt{Value: ir.ExprIR{Kind: ir.ExprString, StringVal: "ok"}}},
+									},
+								},
+								{
+									Value: ir.ExprIR{Kind: ir.ExprInt, IntVal: 404},
+									Body: []ir.StmtIR{
+										{Kind: ir.StmtReturn, Return: &ir.ReturnStmt{Value: ir.ExprIR{Kind: ir.ExprString, StringVal: "not found"}}},
+									},
+								},
+							},
+							Default: []ir.StmtIR{
+								{Kind: ir.StmtReturn, Return: &ir.ReturnStmt{Value: ir.ExprIR{Kind: ir.ExprString, StringVal: "error"}}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	output := gen.Generate(service)
+
+	if !strings.Contains(output, "switch (code)") {
+		t.Error("expected switch statement")
+	}
+	if !strings.Contains(output, "case 200:") {
+		t.Error("expected case 200")
+	}
+	if !strings.Contains(output, "case 404:") {
+		t.Error("expected case 404")
+	}
+	if !strings.Contains(output, "default:") {
+		t.Error("expected default case")
+	}
+}
+
+func TestTSPipeExpr(t *testing.T) {
+	gen := NewTypeScriptServerGenerator("", 3000)
+	service := &ir.ServiceIR{
+		Routes: []ir.RouteHandler{
+			{
+				Method: ir.MethodGet,
+				Path:   "/api/pipe",
+				Body: []ir.StmtIR{
+					{
+						Kind: ir.StmtReturn,
+						Return: &ir.ReturnStmt{
+							Value: ir.ExprIR{
+								Kind: ir.ExprPipe,
+								Pipe: &ir.PipeExpr{
+									Left:  ir.ExprIR{Kind: ir.ExprVar, VarName: "data"},
+									Right: ir.ExprIR{Kind: ir.ExprVar, VarName: "transform"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	output := gen.Generate(service)
+
+	if !strings.Contains(output, "transform(data)") {
+		t.Error("expected pipe expression rendered as function call")
+	}
+}
+
+func TestTSWebSocket(t *testing.T) {
+	gen := NewTypeScriptServerGenerator("", 3000)
+	service := &ir.ServiceIR{
+		WebSocket: []ir.WebSocketDef{
+			{
+				Path: "/ws/chat",
+				Events: []ir.WSEventDef{
+					{EventType: ir.WSConnect, Body: []ir.StmtIR{}},
+					{
+						EventType: ir.WSMessage,
+						Body: []ir.StmtIR{
+							{Kind: ir.StmtExpr, ExprStmt: &ir.ExprIR{Kind: ir.ExprVar, VarName: "handle_msg"}},
+						},
+					},
+					{EventType: ir.WSDisconnect, Body: []ir.StmtIR{}},
+				},
+			},
+		},
+	}
+	output := gen.Generate(service)
+
+	if !strings.Contains(output, "WebSocketServer") {
+		t.Error("expected WebSocketServer import")
+	}
+	if !strings.Contains(output, "createServer") {
+		t.Error("expected createServer import")
+	}
+	if !strings.Contains(output, `path: '/ws/chat'`) {
+		t.Error("expected WebSocket path")
+	}
+	if !strings.Contains(output, "wss.on('connection'") {
+		t.Error("expected connection handler")
+	}
+	if !strings.Contains(output, "ws.on('message'") {
+		t.Error("expected message handler")
+	}
+	if !strings.Contains(output, "ws.on('close'") {
+		t.Error("expected close handler")
+	}
+	// With WebSocket, should use server.listen instead of app.listen
+	if !strings.Contains(output, "server.listen(3000") {
+		t.Error("expected server.listen for WebSocket support")
+	}
+}
+
+func TestTSWebSocketPackageJSON(t *testing.T) {
+	gen := NewTypeScriptServerGenerator("", 3000)
+	service := &ir.ServiceIR{
+		WebSocket: []ir.WebSocketDef{
+			{Path: "/ws"},
+		},
+	}
+	pkg := gen.GeneratePackageJSON(service)
+
+	if !strings.Contains(pkg, `"ws"`) {
+		t.Error("expected ws dependency")
+	}
+	if !strings.Contains(pkg, `"@types/ws"`) {
+		t.Error("expected @types/ws dev dependency")
+	}
+}
+
+func TestTSGraphQL(t *testing.T) {
+	gen := NewTypeScriptServerGenerator("", 3000)
+	service := &ir.ServiceIR{
+		GraphQL: []ir.GraphQLDef{
+			{
+				Operation: ir.GraphQLQuery,
+				FieldName: "getUser",
+				Params: []ir.FieldSchema{
+					{Name: "id", Type: ir.TypeRef{Kind: ir.TypeInt}, Required: true},
+				},
+				ReturnType: &ir.TypeRef{Kind: ir.TypeNamed, Name: "User"},
+				Body: []ir.StmtIR{
+					{Kind: ir.StmtReturn, Return: &ir.ReturnStmt{Value: ir.ExprIR{Kind: ir.ExprNull, IsNull: true}}},
+				},
+			},
+			{
+				Operation: ir.GraphQLMutation,
+				FieldName: "createUser",
+				Params: []ir.FieldSchema{
+					{Name: "name", Type: ir.TypeRef{Kind: ir.TypeString}, Required: true},
+				},
+				ReturnType: &ir.TypeRef{Kind: ir.TypeNamed, Name: "User"},
+				Body: []ir.StmtIR{
+					{Kind: ir.StmtReturn, Return: &ir.ReturnStmt{Value: ir.ExprIR{Kind: ir.ExprNull, IsNull: true}}},
+				},
+			},
+		},
+	}
+	output := gen.Generate(service)
+
+	if !strings.Contains(output, "ApolloServer") {
+		t.Error("expected ApolloServer import")
+	}
+	if !strings.Contains(output, "type Query {") {
+		t.Error("expected Query type definition")
+	}
+	if !strings.Contains(output, "type Mutation {") {
+		t.Error("expected Mutation type definition")
+	}
+	if !strings.Contains(output, "getUser") {
+		t.Error("expected getUser resolver")
+	}
+	if !strings.Contains(output, "createUser") {
+		t.Error("expected createUser resolver")
+	}
+	if !strings.Contains(output, "apolloServer.start()") {
+		t.Error("expected Apollo server start")
+	}
+	if !strings.Contains(output, "expressMiddleware") {
+		t.Error("expected expressMiddleware mount")
+	}
+}
+
+func TestTSGraphQLPackageJSON(t *testing.T) {
+	gen := NewTypeScriptServerGenerator("", 3000)
+	service := &ir.ServiceIR{
+		GraphQL: []ir.GraphQLDef{
+			{Operation: ir.GraphQLQuery, FieldName: "test"},
+		},
+	}
+	pkg := gen.GeneratePackageJSON(service)
+
+	if !strings.Contains(pkg, `"@apollo/server"`) {
+		t.Error("expected @apollo/server dependency")
+	}
+	if !strings.Contains(pkg, `"graphql"`) {
+		t.Error("expected graphql dependency")
+	}
+}
+
+func TestTSGRPC(t *testing.T) {
+	gen := NewTypeScriptServerGenerator("", 3000)
+	service := &ir.ServiceIR{
+		GRPC: []ir.GRPCServiceDef{
+			{
+				Name: "UserService",
+				Methods: []ir.GRPCMethodDef{
+					{
+						Name:       "GetUser",
+						InputType:  ir.TypeRef{Kind: ir.TypeNamed, Name: "GetUserRequest"},
+						ReturnType: ir.TypeRef{Kind: ir.TypeNamed, Name: "UserResponse"},
+						StreamType: ir.GRPCUnary,
+					},
+					{
+						Name:       "ListUsers",
+						InputType:  ir.TypeRef{Kind: ir.TypeNamed, Name: "ListRequest"},
+						ReturnType: ir.TypeRef{Kind: ir.TypeNamed, Name: "UserResponse"},
+						StreamType: ir.GRPCServerStream,
+					},
+				},
+				Handlers: []ir.GRPCHandlerDef{
+					{
+						ServiceName: "UserService",
+						MethodName:  "GetUser",
+						Body: []ir.StmtIR{
+							{Kind: ir.StmtReturn, Return: &ir.ReturnStmt{Value: ir.ExprIR{Kind: ir.ExprNull, IsNull: true}}},
+						},
+					},
+				},
+			},
+		},
+	}
+	output := gen.Generate(service)
+
+	if !strings.Contains(output, "@grpc/grpc-js") {
+		t.Error("expected grpc-js import")
+	}
+	if !strings.Contains(output, "userServiceHandlers") {
+		t.Error("expected UserService handlers object")
+	}
+	if !strings.Contains(output, "getUser:") {
+		t.Error("expected getUser handler")
+	}
+	if !strings.Contains(output, "listUsers:") {
+		t.Error("expected listUsers stub handler")
+	}
+	if !strings.Contains(output, "throw new Error('Not implemented')") {
+		t.Error("expected Not implemented error for stubs")
+	}
+	if !strings.Contains(output, "stream") {
+		t.Error("expected stream annotation in proto comment")
+	}
+}
+
+func TestTSGRPCPackageJSON(t *testing.T) {
+	gen := NewTypeScriptServerGenerator("", 3000)
+	service := &ir.ServiceIR{
+		GRPC: []ir.GRPCServiceDef{
+			{Name: "TestService"},
+		},
+	}
+	pkg := gen.GeneratePackageJSON(service)
+
+	if !strings.Contains(pkg, `"@grpc/grpc-js"`) {
+		t.Error("expected @grpc/grpc-js dependency")
+	}
+	if !strings.Contains(pkg, `"@grpc/proto-loader"`) {
+		t.Error("expected @grpc/proto-loader dependency")
+	}
+}
+
+func TestTSAsyncAwait(t *testing.T) {
+	gen := NewTypeScriptServerGenerator("", 3000)
+	service := &ir.ServiceIR{
+		Routes: []ir.RouteHandler{
+			{
+				Method: ir.MethodGet,
+				Path:   "/api/async",
+				Body: []ir.StmtIR{
+					{
+						Kind: ir.StmtAssign,
+						Assign: &ir.AssignStmt{
+							Target: "result",
+							Value: ir.ExprIR{
+								Kind:  ir.ExprAwait,
+								Await: &ir.AwaitExprIR{Expr: ir.ExprIR{Kind: ir.ExprCall, Call: &ir.CallExpr{Name: "fetchData"}}},
+							},
+						},
+					},
+					{Kind: ir.StmtReturn, Return: &ir.ReturnStmt{Value: ir.ExprIR{Kind: ir.ExprVar, VarName: "result"}}},
+				},
+			},
+		},
+	}
+	output := gen.Generate(service)
+
+	if !strings.Contains(output, "await fetchData()") {
+		t.Error("expected await expression")
+	}
+}
+
+func TestTSGraphQLSchemaTypes(t *testing.T) {
+	// Verify GraphQL schema type mapping
+	tests := []struct {
+		name     string
+		input    ir.TypeRef
+		expected string
+	}{
+		{"int", ir.TypeRef{Kind: ir.TypeInt}, "Int"},
+		{"float", ir.TypeRef{Kind: ir.TypeFloat}, "Float"},
+		{"string", ir.TypeRef{Kind: ir.TypeString}, "String"},
+		{"bool", ir.TypeRef{Kind: ir.TypeBool}, "Boolean"},
+		{"named", ir.TypeRef{Kind: ir.TypeNamed, Name: "User"}, "User"},
+		{"array", ir.TypeRef{Kind: ir.TypeArray, Inner: &ir.TypeRef{Kind: ir.TypeString}}, "[String]"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := irTypeToGraphQLSchema(tt.input)
+			if result != tt.expected {
+				t.Errorf("irTypeToGraphQLSchema(%v) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}

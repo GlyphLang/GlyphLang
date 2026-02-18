@@ -34,6 +34,9 @@ func (g *PythonGenerator) Generate(service *ir.ServiceIR) string {
 	g.writeModels(&sb, service)
 	g.writeProviderStubs(&sb, service)
 	g.writeRoutes(&sb, service)
+	g.writeGraphQL(&sb, service)
+	g.writeGRPC(&sb, service)
+	g.writeWebSockets(&sb, service)
 	g.writeCronJobs(&sb, service)
 	g.writeEventHandlers(&sb, service)
 	g.writeQueueWorkers(&sb, service)
@@ -69,6 +72,15 @@ func (g *PythonGenerator) GenerateRequirements(service *ir.ServiceIR) string {
 	if len(service.Queues) > 0 {
 		deps = append(deps, "celery>=5.3.0")
 	}
+	if len(service.WebSocket) > 0 {
+		deps = append(deps, "websockets>=12.0")
+	}
+	if len(service.GraphQL) > 0 {
+		deps = append(deps, "strawberry-graphql>=0.220.0")
+	}
+	if len(service.GRPC) > 0 {
+		deps = append(deps, "grpcio>=1.60.0", "grpcio-tools>=1.60.0", "protobuf>=4.25.0")
+	}
 
 	return strings.Join(deps, "\n") + "\n"
 }
@@ -97,6 +109,19 @@ func (g *PythonGenerator) writeImports(sb *strings.Builder, service *ir.ServiceI
 	if len(service.CronJobs) > 0 {
 		sb.WriteString("from apscheduler.schedulers.asyncio import AsyncIOScheduler\n")
 		sb.WriteString("from apscheduler.triggers.cron import CronTrigger\n")
+	}
+
+	if len(service.WebSocket) > 0 {
+		sb.WriteString("from fastapi import WebSocket, WebSocketDisconnect\n")
+	}
+	if len(service.GraphQL) > 0 {
+		sb.WriteString("import strawberry\n")
+		sb.WriteString("from strawberry.fastapi import GraphQLRouter\n")
+	}
+	if len(service.GRPC) > 0 {
+		sb.WriteString("import grpc\n")
+		sb.WriteString("from grpc import aio as grpc_aio\n")
+		sb.WriteString("from concurrent import futures\n")
 	}
 
 	sb.WriteString("\n")
@@ -316,6 +341,27 @@ func (g *PythonGenerator) writeStatement(sb *strings.Builder, stmt ir.StmtIR, in
 		sb.WriteString("# validate: ")
 		g.writeExpr(sb, stmt.Validate.Call)
 		sb.WriteString("\n")
+	case ir.StmtSwitch:
+		if stmt.Switch != nil {
+			for i, c := range stmt.Switch.Cases {
+				writeIndent(sb, indent)
+				if i == 0 {
+					sb.WriteString("if ")
+				} else {
+					sb.WriteString("elif ")
+				}
+				g.writeExpr(sb, stmt.Switch.Value)
+				sb.WriteString(" == ")
+				g.writeExpr(sb, c.Value)
+				sb.WriteString(":\n")
+				g.writeStatements(sb, c.Body, indent+1)
+			}
+			if len(stmt.Switch.Default) > 0 {
+				writeIndent(sb, indent)
+				sb.WriteString("else:\n")
+				g.writeStatements(sb, stmt.Switch.Default, indent+1)
+			}
+		}
 	case ir.StmtBreak:
 		writeIndent(sb, indent)
 		sb.WriteString("break\n")
@@ -417,6 +463,387 @@ func (g *PythonGenerator) writeExpr(sb *strings.Builder, expr ir.ExprIR) {
 		}
 		sb.WriteString(": ")
 		g.writeExpr(sb, expr.Lambda.Body)
+	case ir.ExprPipe:
+		if expr.Pipe != nil {
+			// Python pipe: right(left)
+			g.writeExpr(sb, expr.Pipe.Right)
+			sb.WriteString("(")
+			g.writeExpr(sb, expr.Pipe.Left)
+			sb.WriteString(")")
+		}
+	case ir.ExprMatch:
+		if expr.Match != nil {
+			// Python 3.10+ match/case
+			g.writeMatchExpr(sb, expr.Match)
+		}
+	case ir.ExprAsync:
+		if expr.Async != nil {
+			// Python async: wrap in an async function and call
+			sb.WriteString("asyncio.create_task((async lambda: None)())")
+		}
+	case ir.ExprAwait:
+		if expr.Await != nil {
+			sb.WriteString("await ")
+			g.writeExpr(sb, expr.Await.Expr)
+		}
+	}
+}
+
+func (g *PythonGenerator) writeGraphQL(sb *strings.Builder, service *ir.ServiceIR) {
+	if len(service.GraphQL) == 0 {
+		return
+	}
+	sb.WriteString("\n# --- GraphQL Resolvers ---\n\n")
+
+	// Separate queries, mutations, subscriptions
+	var queries, mutations, subscriptions []ir.GraphQLDef
+	for _, gql := range service.GraphQL {
+		switch gql.Operation {
+		case ir.GraphQLQuery:
+			queries = append(queries, gql)
+		case ir.GraphQLMutation:
+			mutations = append(mutations, gql)
+		case ir.GraphQLSubscription:
+			subscriptions = append(subscriptions, gql)
+		}
+	}
+
+	if len(queries) > 0 {
+		sb.WriteString("@strawberry.type\n")
+		sb.WriteString("class Query:\n")
+		for _, q := range queries {
+			g.writeGraphQLResolver(sb, q, 1)
+		}
+		sb.WriteString("\n")
+	}
+
+	if len(mutations) > 0 {
+		sb.WriteString("@strawberry.type\n")
+		sb.WriteString("class Mutation:\n")
+		for _, m := range mutations {
+			g.writeGraphQLResolver(sb, m, 1)
+		}
+		sb.WriteString("\n")
+	}
+
+	if len(subscriptions) > 0 {
+		sb.WriteString("@strawberry.type\n")
+		sb.WriteString("class Subscription:\n")
+		for _, s := range subscriptions {
+			g.writeGraphQLResolver(sb, s, 1)
+		}
+		sb.WriteString("\n")
+	}
+
+	// Create schema and mount router
+	schemaArgs := []string{}
+	if len(queries) > 0 {
+		schemaArgs = append(schemaArgs, "query=Query")
+	}
+	if len(mutations) > 0 {
+		schemaArgs = append(schemaArgs, "mutation=Mutation")
+	}
+	if len(subscriptions) > 0 {
+		schemaArgs = append(schemaArgs, "subscription=Subscription")
+	}
+	fmt.Fprintf(sb, "schema = strawberry.Schema(%s)\n", strings.Join(schemaArgs, ", "))
+	sb.WriteString("graphql_app = GraphQLRouter(schema)\n")
+	sb.WriteString("app.include_router(graphql_app, prefix=\"/graphql\")\n\n")
+}
+
+func (g *PythonGenerator) writeGraphQLResolver(sb *strings.Builder, gql ir.GraphQLDef, indent int) {
+	writeIndent(sb, indent)
+	sb.WriteString("@strawberry.field\n")
+	writeIndent(sb, indent)
+
+	// Build params
+	var params []string
+	params = append(params, "self")
+	for _, p := range gql.Params {
+		pyType := irTypeToPython(p.Type)
+		params = append(params, fmt.Sprintf("%s: %s", p.Name, pyType))
+	}
+	retType := "Any"
+	if gql.ReturnType != nil {
+		retType = irTypeToPython(*gql.ReturnType)
+	}
+	fmt.Fprintf(sb, "async def %s(%s) -> %s:\n", gql.FieldName, strings.Join(params, ", "), retType)
+
+	if gql.Auth != nil {
+		writeIndent(sb, indent+1)
+		fmt.Fprintf(sb, "# Requires %s authentication\n", gql.Auth.AuthType)
+	}
+
+	// Inject providers
+	for _, prov := range gql.Providers {
+		writeIndent(sb, indent+1)
+		depFunc := providerToDependsFunc(prov.ProviderType)
+		fmt.Fprintf(sb, "%s = %s()\n", prov.Name, depFunc)
+	}
+
+	g.writeStatements(sb, gql.Body, indent+1)
+}
+
+// writeGRPC generates gRPC service implementations for Python.
+// Uses grpcio library. Helper functions used here (irTypeNameForInput, writeIndent,
+// providerToDependsFunc, writeStatements) are all defined in this file (python.go).
+func (g *PythonGenerator) writeGRPC(sb *strings.Builder, service *ir.ServiceIR) {
+	if len(service.GRPC) == 0 {
+		return
+	}
+	sb.WriteString("\n# --- gRPC Services ---\n")
+	sb.WriteString("# Generate .proto files and compile with grpc_tools.protoc\n\n")
+
+	for _, svc := range service.GRPC {
+		// Write proto stub comment
+		fmt.Fprintf(sb, "# Proto definition for %s:\n", svc.Name)
+		fmt.Fprintf(sb, "# service %s {\n", svc.Name)
+		for _, m := range svc.Methods {
+			streamPrefix := ""
+			switch m.StreamType {
+			case ir.GRPCServerStream:
+				streamPrefix = "stream "
+			case ir.GRPCClientStream:
+				streamPrefix = "// client stream: "
+			case ir.GRPCBidirectional:
+				streamPrefix = "// bidirectional stream: "
+			}
+			inputName := irTypeNameForInput(&m.InputType)
+			returnName := irTypeNameForInput(&m.ReturnType)
+			fmt.Fprintf(sb, "#   rpc %s (%s) returns (%s%s);\n", m.Name, inputName, streamPrefix, returnName)
+		}
+		sb.WriteString("# }\n\n")
+
+		// Write service implementation class
+		fmt.Fprintf(sb, "class %sServicer:\n", svc.Name)
+		fmt.Fprintf(sb, "    \"\"\"gRPC service implementation for %s.\"\"\"\n\n", svc.Name)
+
+		hasContent := false
+		for _, h := range svc.Handlers {
+			hasContent = true
+			fmt.Fprintf(sb, "    async def %s(self, request, context):\n", h.MethodName)
+			if h.Auth != nil {
+				writeIndent(sb, 2)
+				fmt.Fprintf(sb, "# Requires %s authentication\n", h.Auth.AuthType)
+			}
+			for _, prov := range h.Providers {
+				writeIndent(sb, 2)
+				depFunc := providerToDependsFunc(prov.ProviderType)
+				fmt.Fprintf(sb, "%s = %s()\n", prov.Name, depFunc)
+			}
+			g.writeStatements(sb, h.Body, 2)
+			sb.WriteString("\n")
+		}
+
+		// Write methods without handlers as stubs
+		for _, m := range svc.Methods {
+			handlerFound := false
+			for _, h := range svc.Handlers {
+				if h.MethodName == m.Name {
+					handlerFound = true
+					break
+				}
+			}
+			if !handlerFound {
+				hasContent = true
+				fmt.Fprintf(sb, "    async def %s(self, request, context):\n", m.Name)
+				sb.WriteString("        raise NotImplementedError\n\n")
+			}
+		}
+
+		if !hasContent {
+			sb.WriteString("    pass\n")
+		}
+		sb.WriteString("\n")
+	}
+}
+
+func (g *PythonGenerator) writeWebSockets(sb *strings.Builder, service *ir.ServiceIR) {
+	if len(service.WebSocket) == 0 {
+		return
+	}
+	sb.WriteString("\n# --- WebSocket Handlers ---\n")
+	sb.WriteString("# Connection manager for WebSocket clients\n")
+	sb.WriteString("class ConnectionManager:\n")
+	sb.WriteString("    def __init__(self):\n")
+	sb.WriteString("        self.active_connections: list[WebSocket] = []\n\n")
+	sb.WriteString("    async def connect(self, websocket: WebSocket):\n")
+	sb.WriteString("        await websocket.accept()\n")
+	sb.WriteString("        self.active_connections.append(websocket)\n\n")
+	sb.WriteString("    def disconnect(self, websocket: WebSocket):\n")
+	sb.WriteString("        self.active_connections.remove(websocket)\n\n")
+	sb.WriteString("    async def broadcast(self, message: str):\n")
+	sb.WriteString("        for connection in self.active_connections:\n")
+	sb.WriteString("            await connection.send_text(message)\n\n")
+	sb.WriteString("manager = ConnectionManager()\n\n")
+
+	for _, ws := range service.WebSocket {
+		fastapiPath := glyphPathToFastAPI(ws.Path)
+		fmt.Fprintf(sb, "\n@app.websocket(\"%s\")\n", fastapiPath)
+		sb.WriteString("async def websocket_endpoint(websocket: WebSocket):\n")
+
+		// Find connect handler
+		hasConnect := false
+		for _, ev := range ws.Events {
+			if ev.EventType == ir.WSConnect {
+				hasConnect = true
+				break
+			}
+		}
+		if hasConnect {
+			for _, ev := range ws.Events {
+				if ev.EventType == ir.WSConnect {
+					sb.WriteString("    await manager.connect(websocket)\n")
+					g.writeStatements(sb, ev.Body, 1)
+					break
+				}
+			}
+		} else {
+			sb.WriteString("    await manager.connect(websocket)\n")
+		}
+
+		sb.WriteString("    try:\n")
+		sb.WriteString("        while True:\n")
+		sb.WriteString("            data = await websocket.receive_text()\n")
+
+		// Message handler
+		for _, ev := range ws.Events {
+			if ev.EventType == ir.WSMessage {
+				g.writeStatements(sb, ev.Body, 3)
+				break
+			}
+		}
+
+		sb.WriteString("    except WebSocketDisconnect:\n")
+		// Disconnect handler
+		hasDisconnect := false
+		for _, ev := range ws.Events {
+			if ev.EventType == ir.WSDisconnect {
+				hasDisconnect = true
+				sb.WriteString("        manager.disconnect(websocket)\n")
+				g.writeStatements(sb, ev.Body, 2)
+				break
+			}
+		}
+		if !hasDisconnect {
+			sb.WriteString("        manager.disconnect(websocket)\n")
+		}
+
+		// Error handler
+		for _, ev := range ws.Events {
+			if ev.EventType == ir.WSError {
+				sb.WriteString("    except Exception as e:\n")
+				g.writeStatements(sb, ev.Body, 2)
+				sb.WriteString("        manager.disconnect(websocket)\n")
+				break
+			}
+		}
+		sb.WriteString("\n")
+	}
+}
+
+func (g *PythonGenerator) writeMatchExpr(sb *strings.Builder, match *ir.MatchExpr) {
+	// Generate as if/elif chain for broad compatibility
+	for i, c := range match.Cases {
+		if c.Pattern.Kind == ir.PatternWildcard {
+			// Wildcard is the default/else case
+			continue
+		}
+		if i == 0 {
+			sb.WriteString("(")
+		} else {
+			sb.WriteString(" if ")
+		}
+		g.writeExpr(sb, c.Body)
+	}
+	// Find wildcard case for the else branch
+	hasWildcard := false
+	for _, c := range match.Cases {
+		if c.Pattern.Kind == ir.PatternWildcard {
+			sb.WriteString(" if True else ")
+			g.writeExpr(sb, c.Body)
+			hasWildcard = true
+			break
+		}
+	}
+	if !hasWildcard && len(match.Cases) > 0 {
+		sb.WriteString(" if True else None")
+	}
+	sb.WriteString(")")
+}
+
+func (g *PythonGenerator) writeMatchStatements(sb *strings.Builder, match *ir.MatchExpr, indent int) {
+	for i, c := range match.Cases {
+		writeIndent(sb, indent)
+		if c.Pattern.Kind == ir.PatternWildcard {
+			sb.WriteString("else:\n")
+			writeIndent(sb, indent+1)
+			g.writeExpr(sb, c.Body)
+			sb.WriteString("\n")
+			continue
+		}
+		if i == 0 {
+			sb.WriteString("if ")
+		} else {
+			sb.WriteString("elif ")
+		}
+		g.writeExpr(sb, match.Value)
+		sb.WriteString(" == ")
+		g.writePattern(sb, c.Pattern)
+		if c.Guard != nil {
+			sb.WriteString(" and ")
+			g.writeExpr(sb, *c.Guard)
+		}
+		sb.WriteString(":\n")
+		writeIndent(sb, indent+1)
+		g.writeExpr(sb, c.Body)
+		sb.WriteString("\n")
+	}
+}
+
+func (g *PythonGenerator) writePattern(sb *strings.Builder, pat ir.PatternIR) {
+	switch pat.Kind {
+	case ir.PatternLiteral:
+		if pat.StrVal != "" {
+			fmt.Fprintf(sb, "%q", pat.StrVal)
+		} else if pat.BoolVal {
+			sb.WriteString("True")
+		} else if pat.IntVal != 0 {
+			fmt.Fprintf(sb, "%d", pat.IntVal)
+		} else if pat.FloatVal != 0 {
+			fmt.Fprintf(sb, "%g", pat.FloatVal)
+		} else {
+			sb.WriteString("0")
+		}
+	case ir.PatternVariable:
+		sb.WriteString(pat.VarName)
+	case ir.PatternWildcard:
+		sb.WriteString("_")
+	case ir.PatternObject:
+		sb.WriteString("{")
+		for i, f := range pat.Fields {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			fmt.Fprintf(sb, "%q: ", f.Key)
+			g.writePattern(sb, f.Pattern)
+		}
+		sb.WriteString("}")
+	case ir.PatternArray:
+		sb.WriteString("[")
+		for i, el := range pat.Elements {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			g.writePattern(sb, el)
+		}
+		if pat.RestVar != "" {
+			if len(pat.Elements) > 0 {
+				sb.WriteString(", ")
+			}
+			fmt.Fprintf(sb, "*%s", pat.RestVar)
+		}
+		sb.WriteString("]")
 	}
 }
 
