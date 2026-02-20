@@ -1,0 +1,103 @@
+openapi: "3.1.0"
+info:
+  title: Webhook Processor
+  description: >
+    Webhook processing service with API key authentication, rate limiting,
+    and event-based routing for Stripe and GitHub webhooks.
+  version: "1.0.0"
+
+paths:
+  /webhooks/stripe:
+    post:
+      operationId: stripeWebhook
+      summary: Process incoming Stripe webhooks
+      description: >
+        Requires API key authentication. Rate limited to 1000 requests per minute.
+        Logs every webhook to a webhook_logs table with a generated ID and timestamp.
+        Routes events by type:
+          - "payment.succeeded" -> update payment status to "completed" using data.id
+          - "payment.failed" -> update payment status to "failed" using data.id
+          - "customer.created" -> create a new customer record from data
+        Returns confirmation with processed=true and the event ID.
+      security:
+        - apiKey: []
+      x-ratelimit:
+        max: 1000
+        window: 60
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookPayload"
+      responses:
+        "200":
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookResult"
+        "401":
+          description: Missing or invalid API key
+        "429":
+          description: Rate limit exceeded
+
+  /webhooks/github:
+    post:
+      operationId: githubWebhook
+      summary: Process incoming GitHub webhooks
+      description: >
+        Requires API key authentication.
+        Logs the webhook with source "github", a generated event ID, and timestamp.
+        Returns confirmation with processed=true and the event ID.
+      security:
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookPayload"
+      responses:
+        "200":
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookResult"
+        "401":
+          description: Missing or invalid API key
+
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    WebhookPayload:
+      type: object
+      required:
+        - event
+        - data
+        - timestamp
+        - signature
+      properties:
+        event:
+          type: string
+        data: {}
+        timestamp:
+          type: integer
+        signature:
+          type: string
+
+    WebhookResult:
+      type: object
+      required:
+        - processed
+      properties:
+        processed:
+          type: boolean
+        event_id:
+          type: string
