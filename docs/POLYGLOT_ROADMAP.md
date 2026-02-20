@@ -64,7 +64,7 @@ The Semantic IR, generalized provider system, and Python/FastAPI codegen are mer
 - [x] Compare results across the 5 intent-test scenarios
 - [x] Document findings
 
-**Results**: Glyph notation scored 9.6/10 average vs 9.1/10 for natural language across correctness, completeness, and structural precision. Largest advantage in structural precision (+1.0). See `tests/intent-hypothesis/RESULTS.md` for full analysis.
+**Results**: Glyph scored 9.93/10 avg vs 9.20/10 for natural language (checklist-validated, 3 independent evaluators). Largest advantage in structural precision (+1.0) and completeness (+0.8). See `tests/intent-hypothesis/RESULTS.md` for full analysis.
 
 ## Phase 6: Expand IR Coverage (complete)
 
