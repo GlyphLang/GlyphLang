@@ -1,0 +1,130 @@
+openapi: "3.1.0"
+info:
+  title: Real-Time Chat Server
+  description: >
+    Chat server with REST endpoints for room management and WebSocket
+    for real-time messaging. All REST endpoints require JWT authentication.
+  version: "1.0.0"
+
+paths:
+  /api/rooms:
+    post:
+      operationId: createRoom
+      summary: Create a new chat room
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoomInput"
+      responses:
+        "201":
+          description: The created room
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Room"
+    get:
+      operationId: listRooms
+      summary: List all chat rooms
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Array of all rooms
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Room"
+
+  /api/rooms/{room_id}/messages:
+    parameters:
+      - name: room_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: listMessages
+      summary: Get message history for a specific room
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Array of messages in the room
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+
+x-websocket:
+  /chat:
+    description: Real-time messaging via WebSocket
+    on-connect:
+      action: broadcast
+      message: "User joined the chat"
+    on-message:
+      action: broadcast
+      payload: The received message content
+    on-disconnect:
+      action: broadcast
+      message: "User left the chat"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Message:
+      type: object
+      required:
+        - id
+        - room
+        - sender
+        - content
+        - timestamp
+      properties:
+        id:
+          type: string
+        room:
+          type: string
+        sender:
+          type: string
+        content:
+          type: string
+        timestamp:
+          type: integer
+
+    Room:
+      type: object
+      required:
+        - id
+        - name
+        - created_by
+        - created_at
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        created_by:
+          type: string
+        created_at:
+          type: integer
+
+    CreateRoomInput:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
