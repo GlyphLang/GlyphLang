@@ -246,69 +246,24 @@ Visit http://localhost:3000/hello
 
 ### Pattern Matching
 
-```glyph
-@ GET /status/:code {
-  $ result = match code {
-    200 => "OK"
-    201 => "Created"
-    400 => "Bad Request"
-    404 => "Not Found"
-    n when n >= 500 => "Server Error"
-    _ => "Unknown"
-  }
-  > {status: code, message: result}
-}
-```
+Advanced control flow using `match` expressions with guards and destructuring.
+
+→ See: [Pattern Matching Documentation](docs/PATTERN_MATCHING.md)
+
 
 ### Async/Await
 
-```glyph
-# Basic async block - executes in background, returns Future
-@ GET /compute {
-  $ future = async {
-    $ x = 10
-    $ y = 20
-    > x + y
-  }
-  $ result = await future
-  > {value: result}
-}
+Concurrency support using async blocks and futures.
 
-# Parallel execution - all requests run concurrently
-@ GET /dashboard {
-  $ userFuture = async { > db.getUser(userId) }
-  $ ordersFuture = async { > db.getOrders(userId) }
-  $ statsFuture = async { > db.getStats(userId) }
+→ See: [Async/Await Documentation](docs/ASYNC.md)
 
-  # Await blocks until Future resolves
-  $ user = await userFuture
-  $ orders = await ordersFuture
-  $ stats = await statsFuture
-
-  > {user: user, orders: orders, stats: stats}
-}
-```
 
 ### Generics
 
-```glyph
-! identity<T>(x: T): T {
-  > x
-}
+Support for type parameters, inference, and constraints.
 
-! first<T>(a: T, b: T): T {
-  > a
-}
+→ See: [Generics Documentation](docs/GENERICS.md)
 
-! map<T, U>(arr: [T], fn: (T) -> U): [U] {
-  $ result = []
-  for item in arr {
-    $ mapped = fn(item)
-    result = append(result, mapped)
-  }
-  > result
-}
-```
 
 ### Modules
 
@@ -328,138 +283,38 @@ import "./utils"
 ```
 
 ### Macros
+Compile-time code generation using macros.
 
-```glyph
-# Define reusable patterns with macros
-macro! validate_required(field) {
-  if field == null {
-    > {error: "field is required", status: 400}
-  }
-}
+→ See: [Macros Documentation](docs/MACROS.md)
 
-macro! json_response(data, status) {
-  > {data: data, status: status, timestamp: now()}
-}
 
-# CRUD pattern - what macro expansion produces:
-@ GET /users {
-  > db.query("SELECT * FROM users")
-}
-
-@ GET /users/:id {
-  > db.query("SELECT * FROM users WHERE id = ?", id)
-}
-
-@ POST /users {
-  > db.insert("users", input)
-}
-
-@ DELETE /users/:id {
-  > db.query("DELETE FROM users WHERE id = ?", id)
-}
-```
 
 ### Cron Tasks
 
-```glyph
-# Daily cleanup at midnight
-* "0 0 * * *" daily_cleanup {
-  % db: Database
-  > {task: "cleanup", timestamp: now()}
-}
+Scheduled background tasks using cron expressions.
 
-# Every 5 minutes health check
-* "*/5 * * * *" health_check {
-  > {status: "healthy", checked_at: now()}
-}
+→ See: [Cron Tasks Documentation](docs/CRON.md)
 
-# Weekly report on Sundays at 9am with retries
-* "0 9 * * 0" weekly_report {
-  + retries(3)
-  % db: Database
-  > {week: "current", generated_at: now()}
-}
-```
 
 ### Event Handlers
 
-```glyph
-# Handle user creation event
-~ "user.created" {
-  $ user_id = event.id
-  $ email = event.email
-  > {handled: true, user_id: user_id}
-}
+Event-driven handlers for asynchronous workflows.
 
-# Async event handler
-~ "order.completed" async {
-  $ order_id = event.order_id
-  $ total = event.total
-  > {processed: true, order_id: order_id}
-}
-```
+→ See: [Event Handlers Documentation](docs/EVENTS.md)
+
 
 ### Queue Workers
 
-```glyph
-# Email sending worker with concurrency and retries
-& "email.send" {
-  + concurrency(5)
-  + retries(3)
-  + timeout(30)
+Background workers for processing queued jobs.
 
-  $ to = message.to
-  $ subject = message.subject
-  > {sent: true, to: to}
-}
+→ See: [Queue Workers Documentation](docs/QUEUES.md)
 
-# Image processing worker
-& "image.process" {
-  + concurrency(3)
-  + timeout(120)
-
-  $ image_id = message.image_id
-  > {processed: true, image_id: image_id}
-}
-```
 
 ### WebSockets
+WebSocket route definitions for real-time communication.
 
-```glyph
-# Basic WebSocket chat
-@ ws /chat {
-  on connect {
-    ws.join("lobby")
-    ws.broadcast("User joined the chat")
-  }
+→ See: [WebSockets Documentation](docs/WEBSOCKETS.md)
 
-  on message {
-    ws.broadcast(input)
-  }
-
-  on disconnect {
-    ws.broadcast("User left the chat")
-    ws.leave("lobby")
-  }
-}
-
-# WebSocket with room parameter
-@ ws /chat/:room {
-  on connect {
-    ws.join(room)
-    ws.broadcast_to_room(room, "User joined")
-  }
-
-  on message {
-    ws.broadcast_to_room(room, input)
-  }
-
-  on disconnect {
-    ws.broadcast_to_room(room, "User left")
-    ws.leave(room)
-  }
-}
-```
 
 ### CLI Commands (In-Language)
 
