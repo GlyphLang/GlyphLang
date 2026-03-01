@@ -1,0 +1,279 @@
+openapi: "3.1.0"
+info:
+  title: Authentication Service
+  description: >
+    Authentication service with registration, login, token refresh,
+    profile management, and admin controls. Includes password hashing
+    (bcrypt/argon2), JWT signing, session management, and role-based access.
+  version: "1.0.0"
+
+paths:
+  /auth/register:
+    post:
+      operationId: register
+      summary: Register a new user
+      description: >
+        Public endpoint, no auth required. Rate limited to 10 requests per minute.
+        Checks for existing email (returns 409 if duplicate).
+        Hashes password with bcrypt/argon2.
+        Creates user with generated ID, hashed password, role "user", and timestamp.
+        Signs JWT token with user_id, email, and role claims.
+        Returns access token, refresh token, expiry (3600s), and user object.
+      x-ratelimit:
+        max: 10
+        window: 60
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "201":
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/login:
+    post:
+      operationId: login
+      summary: Login with email and password
+      description: >
+        Public endpoint, no auth required. Rate limited to 20 requests per minute.
+        Validates credentials against database.
+        Verifies password with bcrypt/argon2.
+        Returns 401 if invalid.
+        Updates last_login timestamp on success.
+        Signs JWT token and returns access token, refresh token, expiry, and user object.
+      x-ratelimit:
+        max: 20
+        window: 60
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/refresh:
+    post:
+      operationId: refreshToken
+      summary: Refresh an expired access token
+      description: >
+        Requires JWT authentication.
+        Takes a refresh_token in the request body.
+        Looks up the session in the database.
+        Returns 401 if invalid refresh token.
+        Signs new JWT token and returns new access token, refresh token, and expiry.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TokenRefreshInput"
+      responses:
+        "200":
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - token
+                  - refresh_token
+                  - expires_in
+                properties:
+                  token:
+                    type: string
+                  refresh_token:
+                    type: string
+                  expires_in:
+                    type: integer
+        "401":
+          description: Invalid refresh token
+
+  /auth/me:
+    get:
+      operationId: getProfile
+      summary: Get current user profile
+      description: >
+        Requires JWT authentication. Returns the authenticated user's profile.
+        Returns 404 if user not found.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          description: User not found
+
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: Invalidate current session
+      description: >
+        Requires JWT authentication. Deletes the session from the database.
+        Returns {logged_out: true}.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - logged_out
+                properties:
+                  logged_out:
+                    type: boolean
+
+  /auth/admin/users:
+    get:
+      operationId: listUsers
+      summary: List all users (admin only)
+      description: >
+        Requires JWT authentication with admin role.
+        Rate limited to 50 requests per minute.
+      security:
+        - bearerAuth: []
+      x-required-role: admin
+      x-ratelimit:
+        max: 50
+        window: 60
+      responses:
+        "200":
+          description: Array of all users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+        "403":
+          description: Admin access required
+
+x-cron-jobs:
+  - name: session_cleanup
+    schedule: "0 3 * * *"
+    description: >
+      Daily at 3 AM. Query and delete expired sessions from the database.
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      required:
+        - id
+        - email
+        - name
+        - password_hash
+        - role
+        - created_at
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        password_hash:
+          type: string
+        role:
+          type: string
+        created_at:
+          type: integer
+        last_login:
+          type: integer
+
+    RegisterInput:
+      type: object
+      required:
+        - email
+        - name
+        - password
+      properties:
+        email:
+          type: string
+        name:
+          type: string
+        password:
+          type: string
+
+    LoginInput:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    AuthResponse:
+      type: object
+      required:
+        - token
+        - refresh_token
+        - expires_in
+        - user
+      properties:
+        token:
+          type: string
+        refresh_token:
+          type: string
+        expires_in:
+          type: integer
+        user:
+          $ref: "#/components/schemas/User"
+
+    TokenRefreshInput:
+      type: object
+      required:
+        - refresh_token
+      properties:
+        refresh_token:
+          type: string
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string

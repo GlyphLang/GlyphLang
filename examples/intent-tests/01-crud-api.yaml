@@ -1,0 +1,148 @@
+openapi: "3.1.0"
+info:
+  title: Todo CRUD API
+  description: REST API for managing Todo items with full CRUD operations.
+  version: "1.0.0"
+
+paths:
+  /api/todos:
+    get:
+      operationId: listTodos
+      summary: List all todos from the database
+      responses:
+        "200":
+          description: Array of all todo items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Todo"
+    post:
+      operationId: createTodo
+      summary: Create a new todo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTodoInput"
+      responses:
+        "201":
+          description: The created todo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Todo"
+
+  /api/todos/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      operationId: getTodo
+      summary: Get a single todo by ID
+      responses:
+        "200":
+          description: The requested todo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Todo"
+        "404":
+          description: Todo not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      operationId: updateTodo
+      summary: Update an existing todo's title and/or completed status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTodoInput"
+      responses:
+        "200":
+          description: The updated todo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Todo"
+        "404":
+          description: Todo not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteTodo
+      summary: Delete a todo by ID
+      responses:
+        "200":
+          description: Deletion confirmation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                required:
+                  - deleted
+        "404":
+          description: Todo not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  schemas:
+    Todo:
+      type: object
+      required:
+        - id
+        - title
+        - completed
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        completed:
+          type: boolean
+        created_at:
+          type: string
+
+    CreateTodoInput:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+        completed:
+          type: boolean
+          default: false
+
+    UpdateTodoInput:
+      type: object
+      properties:
+        title:
+          type: string
+        completed:
+          type: boolean
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string

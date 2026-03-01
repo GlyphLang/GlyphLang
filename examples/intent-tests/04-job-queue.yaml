@@ -1,0 +1,140 @@
+openapi: "3.1.0"
+info:
+  title: Background Job Processing System
+  description: >
+    Job processing system with queue workers, scheduled cron tasks,
+    event handlers, and API endpoints. All REST endpoints require JWT auth.
+  version: "1.0.0"
+
+paths:
+  /api/jobs/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getJobStatus
+      summary: Check job status by ID
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The job record
+          content:
+            application/json:
+              schema:
+                type: object
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/jobs/email:
+    post:
+      operationId: submitEmailJob
+      summary: Submit a new email job to the queue
+      description: >
+        Creates a record in the email queue with the job details,
+        a generated job ID, status "pending", and a created_at timestamp.
+        Returns the job ID and pending status.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailJob"
+      responses:
+        "201":
+          description: Job submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - job_id
+                  - status
+                properties:
+                  job_id:
+                    type: string
+                  status:
+                    type: string
+                    enum:
+                      - pending
+
+x-queue-workers:
+  - name: email.send
+    description: >
+      Process email sending jobs. Extract recipient (to) and subject
+      from the message. Return {success: true, to, subject}.
+  - name: report.generate
+    description: >
+      Generate reports. Extract type and format from the message.
+      Return {success: true, type, format}.
+
+x-cron-jobs:
+  - name: cleanup_expired
+    schedule: "0 2 * * *"
+    description: >
+      Daily at 2 AM. Query expired sessions from the database.
+  - name: weekly_digest
+    schedule: "0 8 * * 1"
+    description: >
+      Weekly on Monday at 8 AM. Query users with digest_enabled=true
+      from the database.
+
+x-event-handlers:
+  - event: user.created
+    description: >
+      When a new user signs up, capture their email and name
+      for a welcome notification. Return {queued: true, email, name}.
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    EmailJob:
+      type: object
+      required:
+        - to
+        - subject
+        - template
+      properties:
+        to:
+          type: string
+        subject:
+          type: string
+        template:
+          type: string
+        data: {}
+
+    ReportConfig:
+      type: object
+      required:
+        - type
+        - date_range
+        - format
+      properties:
+        type:
+          type: string
+        date_range:
+          type: string
+        format:
+          type: string
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string

@@ -54,15 +54,17 @@ The Semantic IR, generalized provider system, and Python/FastAPI codegen are mer
 - [x] Regression tests: both targets tested against all 5 intent-test files + custom-provider example
 - [x] Add to CI pipeline (included via `go test ./...` in CI workflow and Makefile)
 
-## Phase 5: Intent Hypothesis Testing
+## Phase 5: Intent Hypothesis Testing (complete)
 
 **Goal**: Validate that .glyph notation produces better AI-generated code than natural language.
 
-- [ ] Design evaluation methodology (metrics: correctness, completeness, token efficiency)
-- [ ] Feed .glyph files to LLM, generate target-language implementations
-- [ ] Feed .txt files to LLM, generate same implementations
-- [ ] Compare results across the 5 intent-test scenarios
-- [ ] Document findings
+- [x] Design evaluation methodology (metrics: correctness, completeness, token efficiency)
+- [x] Feed .glyph files to LLM, generate target-language implementations
+- [x] Feed .txt files to LLM, generate same implementations
+- [x] Compare results across the 5 intent-test scenarios
+- [x] Document findings
+
+**Results**: Glyph scored 9.93/10 avg vs 9.20/10 for natural language (checklist-validated, 3 independent evaluators). Largest advantage in structural precision (+1.0) and completeness (+0.8). See `tests/intent-hypothesis/RESULTS.md` for full analysis.
 
 ## Phase 6: Expand IR Coverage (complete)
 
