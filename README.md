@@ -656,7 +656,7 @@ Whether you are just getting started or have experience with GlyphLang, we encou
 
 Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-By contributing, you agree to the [Contributor License Agreement](CONTRIBUTING.md#contributor-license-agreement-cla).
+By contributing, you agree to the [Contributor License Agreement](CONTRIBUTING.md#contributor-license-agreement).
 
 ## License
 
