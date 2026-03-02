@@ -70,6 +70,7 @@ test_output.txt
 node_modules/
 vendor/
 .venv/
+__pycache__/
 
 # Coverage
 *.coverprofile
