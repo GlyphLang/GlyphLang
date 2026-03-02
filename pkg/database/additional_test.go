@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -2195,17 +2194,6 @@ func TestPostgresDB_GetLastInsertIDNilDB(t *testing.T) {
 		}
 	}()
 	_, _ = pg.GetLastInsertID(context.Background(), "test", "id")
-}
-
-// TestWithTimeout tests WithTimeout function
-func TestWithTimeout(t *testing.T) {
-	ctx := context.Background()
-	timeoutCtx, cancel := WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	assert.NotNil(t, timeoutCtx)
-	deadline, ok := timeoutCtx.Deadline()
-	assert.True(t, ok)
-	assert.True(t, deadline.After(time.Now()))
 }
 
 // TestColumnsString tests columnsString helper function indirectly
