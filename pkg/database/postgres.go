@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 
 	_ "github.com/lib/pq" // PostgreSQL driver
 )
@@ -376,9 +375,3 @@ func (p *PostgresDB) GetLastInsertID(ctx context.Context, table string, idColumn
 }
 
 // columnsString is unused dead code - use strings.Join(columns, ", ") instead.
-
-// WithTimeout wraps a context with a timeout.
-// The caller is responsible for calling the returned CancelFunc.
-func WithTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(ctx, timeout) // #nosec G118 -- cancel func is returned to caller
-}

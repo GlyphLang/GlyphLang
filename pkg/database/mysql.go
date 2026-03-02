@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 
 	_ "github.com/go-sql-driver/mysql" // MySQL driver
 )
@@ -330,10 +329,4 @@ func (m *MySQLDB) GetLastInsertID(ctx context.Context, table string, idColumn st
 	var id int64
 	err := m.QueryRow(ctx, "SELECT LAST_INSERT_ID()").Scan(&id)
 	return id, err
-}
-
-// WithMySQLTimeout wraps a context with a timeout.
-// The caller is responsible for calling the returned CancelFunc.
-func WithMySQLTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(ctx, timeout) // #nosec G118 -- cancel func is returned to caller
 }
