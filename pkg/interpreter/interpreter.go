@@ -633,7 +633,7 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 			return &Response{
 				StatusCode: 500,
 				Body: map[string]interface{}{
-					"error": fmt.Sprintf("return type mismatch: %v", err),
+					"error": "Internal server error",
 				},
 			}, fmt.Errorf("return type mismatch in route %s %s: %v", route.Method, route.Path, err)
 		}

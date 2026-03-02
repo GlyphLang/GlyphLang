@@ -69,6 +69,7 @@ test_output.txt
 # Dependencies
 node_modules/
 vendor/
+.venv/
 
 # Coverage
 *.coverprofile
