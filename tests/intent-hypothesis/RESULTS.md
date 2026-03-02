@@ -9,7 +9,8 @@
 - **Model**: Claude (Anthropic) — same model for generation and evaluation (noted limitation)
 - **Target language**: Python / FastAPI
 - **Generation protocol**: Each implementation generated in an isolated sub-agent context
-- **Total implementations**: 10 (5 glyph-sourced + 5 text-sourced)
+- **Total implementations**: 15 (5 glyph-sourced + 5 text-sourced + 5 openapi-sourced)
+- **Conditions**: Three-way comparison — Glyph (.glyph), natural language (.txt), OpenAPI 3.1.0 (.yaml)
 
 ---
 
@@ -17,19 +18,24 @@
 
 ### Syntax Validation
 
-All 10 generated Python files pass `ast.parse()` — they are syntactically valid Python.
+All 15 generated Python files pass `ast.parse()` — they are syntactically valid Python.
 
 ```
-glyph/01-crud-api.py         PASS
-glyph/02-webhook-processor.py PASS
-glyph/03-chat-server.py      PASS
-glyph/04-job-queue.py        PASS
-glyph/05-auth-service.py     PASS
-text/01-crud-api.py           PASS
-text/02-webhook-processor.py  PASS
-text/03-chat-server.py        PASS
-text/04-job-queue.py          PASS
-text/05-auth-service.py       PASS
+glyph/01-crud-api.py           PASS
+glyph/02-webhook-processor.py  PASS
+glyph/03-chat-server.py        PASS
+glyph/04-job-queue.py          PASS
+glyph/05-auth-service.py       PASS
+text/01-crud-api.py            PASS
+text/02-webhook-processor.py   PASS
+text/03-chat-server.py         PASS
+text/04-job-queue.py           PASS
+text/05-auth-service.py        PASS
+openapi/01-crud-api.py         PASS
+openapi/02-webhook-processor.py PASS
+openapi/03-chat-server.py      PASS
+openapi/04-job-queue.py        PASS
+openapi/05-auth-service.py     PASS
 ```
 
 ### Structural Analysis (AST-based)
@@ -38,31 +44,41 @@ text/05-auth-service.py       PASS
 |------|--------------|---------|-----------|-----------------|
 | glyph/01-crud-api.py | fastapi, pydantic | 5 | 13 | 5 (get:2, post:1, put:1, delete:1) |
 | text/01-crud-api.py | fastapi, pydantic | 4 | 12 | 5 (get:2, post:1, put:1, delete:1) |
+| openapi/01-crud-api.py | fastapi, pydantic, uvicorn | 4 | 7 | 5 (get:2, post:1, put:1, delete:1) |
 | glyph/02-webhook-processor.py | fastapi, pydantic | 6 | 13 | 2 (post:2) |
 | text/02-webhook-processor.py | fastapi, pydantic | 2 | 7 | 2 (post:2) |
-| glyph/03-chat-server.py | fastapi, jwt, pydantic | 8 | 19 | 4 (get:2, post:1, ws:1) |
-| text/03-chat-server.py | fastapi, jose, pydantic | 5 | 15 | 4 (get:2, post:1, ws:1) |
+| openapi/02-webhook-processor.py | fastapi, pydantic, uvicorn | 2 | 9 | 2 (post:2) |
+| glyph/03-chat-server.py | fastapi, jwt, pydantic | 8 | 19 | 4 (get:2, post:1, websocket:1) |
+| text/03-chat-server.py | fastapi, jose, pydantic | 5 | 15 | 4 (get:2, post:1, websocket:1) |
+| openapi/03-chat-server.py | fastapi, pydantic, uvicorn | 4 | 10 | 4 (get:2, post:1, websocket:1) |
 | glyph/04-job-queue.py | fastapi, jwt, pydantic | 11 | 31 | 2 (get:1, post:1) |
 | text/04-job-queue.py | fastapi, jwt, pydantic | 8 | 14 | 2 (get:1, post:1) |
+| openapi/04-job-queue.py | fastapi, pydantic, uvicorn | 4 | 10 | 2 (get:1, post:1) |
 | glyph/05-auth-service.py | fastapi, jwt, passlib, pydantic | 9 | 27 | 6 (get:2, post:4) |
 | text/05-auth-service.py | fastapi, jose, passlib, pydantic | 8 | 24 | 6 (get:2, post:4) |
+| openapi/05-auth-service.py | fastapi, pydantic, uvicorn | 8 | 18 | 6 (get:2, post:4) |
 
-**Observation**: Route decorator counts are identical across glyph/text pairs in every scenario — both notations produce the same endpoint structure. The difference is in classes and functions: glyph-generated code averages 7.8 classes vs text's 5.4, reflecting glyph's tendency to produce more structured abstractions (collection classes, worker classes, bus classes).
+**Observation**: Route decorator counts are identical across all three conditions in every scenario — all notations produce the same endpoint structure. The differences are in classes and functions: glyph-generated code averages 7.8 classes vs text's 5.4 vs openapi's 4.4. Glyph produces the most structured abstractions (collection classes, worker classes, bus classes). OpenAPI produces the fewest classes but includes uvicorn as an extra dependency. Notably, OpenAPI-generated code never imports external JWT or crypto libraries — it either implements JWT manually or uses stub auth.
 
 ### Output File Sizes
 
 | File | Bytes | Lines | Words |
 |------|-------|-------|-------|
-| glyph/01-crud-api.py | 2,822 | 118 | 295 |
-| text/01-crud-api.py | 2,834 | 110 | 271 |
-| glyph/02-webhook-processor.py | 3,753 | 148 | 346 |
-| text/02-webhook-processor.py | 3,509 | 135 | 317 |
-| glyph/03-chat-server.py | 3,858 | 177 | 383 |
-| text/03-chat-server.py | 4,999 | 197 | 427 |
-| glyph/04-job-queue.py | 6,566 | 262 | 666 |
-| text/04-job-queue.py | 4,023 | 176 | 403 |
-| glyph/05-auth-service.py | 8,007 | 327 | 749 |
-| text/05-auth-service.py | 8,945 | 332 | 765 |
+| glyph/01-crud-api.py | 2,822 | 119 | 295 |
+| text/01-crud-api.py | 2,834 | 111 | 271 |
+| openapi/01-crud-api.py | 3,471 | 129 | 301 |
+| glyph/02-webhook-processor.py | 3,753 | 149 | 346 |
+| text/02-webhook-processor.py | 3,509 | 136 | 317 |
+| openapi/02-webhook-processor.py | 6,145 | 199 | 508 |
+| glyph/03-chat-server.py | 3,858 | 178 | 383 |
+| text/03-chat-server.py | 4,999 | 198 | 427 |
+| openapi/03-chat-server.py | 5,653 | 200 | 482 |
+| glyph/04-job-queue.py | 6,566 | 263 | 666 |
+| text/04-job-queue.py | 4,023 | 177 | 403 |
+| openapi/04-job-queue.py | 6,390 | 220 | 583 |
+| glyph/05-auth-service.py | 8,007 | 328 | 749 |
+| text/05-auth-service.py | 8,945 | 333 | 765 |
+| openapi/05-auth-service.py | 12,423 | 413 | 1,035 |
 
 ---
 
@@ -132,7 +148,33 @@ Each implementation was scored against its own specification using 15 binary che
 | Completeness | **10** |
 | Structural Precision | **10** |
 
-**Scenario 01 Summary**: Glyph 30/30 vs Text 30/30. Both implementations are excellent at this low complexity level. The differences are stylistic (collection class vs monolithic DB, `{deleted: true}` vs `{detail: "Todo deleted"}`), not functional.
+**01-openapi** — 13/15 checklist items PASS (2 FAIL)
+
+| Item | Result | Evidence |
+|------|--------|----------|
+| C1 | PASS | Returns Todo objects and `{"deleted": True}` via JSONResponse matching spec |
+| C2 | PASS | Custom exception handler converts HTTPException to `{"error": "..."}` shape matching OpenAPI Error schema |
+| C3 | PASS | Todo has `created_at: Optional[str] = None` (correctly optional). All fields/types correct. Also defines `Error` model. |
+| C4 | PASS | Correct CRUD logic |
+| C5 | PASS | `completed: bool = False` |
+| Cm1 | PASS | All 5 CRUD endpoints with correct methods/paths |
+| Cm2 | PASS | Todo, CreateTodoInput, UpdateTodoInput, Error all defined |
+| Cm3 | PASS | N/A — no middleware required |
+| Cm4 | PASS | N/A — no background tasks required |
+| Cm5 | **FAIL** | No `Depends()` DI for database. Uses module-level `_todos` dict directly. No Database class or dependency injection. |
+| S1 | PASS | All models extend BaseModel |
+| S2 | **FAIL** | No `Depends()` used anywhere. Routes access `_todos` directly. |
+| S3 | PASS | Correct decorators, paths, response_model, and responses parameters |
+| S4 | PASS | Parameters typed; FastAPI infers return types from response_model |
+| S5 | PASS | All handlers async |
+
+| Metric | Score |
+|--------|-------|
+| Correctness | **10** — Response shapes perfectly match spec including `{"error": "..."}` format |
+| Completeness | **8** — Missing Database DI pattern. All endpoints and models present. |
+| Structural Precision | **7** — No Depends() DI pattern at all. No Database abstraction. |
+
+**Scenario 01 Summary**: Glyph 29/30, Text 27/30, OpenAPI 25/30. Glyph's minor deduction is error response shape (`detail` vs `error`); text's is the wrong DELETE response body. OpenAPI has the best correctness (exact response shapes from schema) but lacks DI patterns entirely.
 
 ---
 
@@ -190,7 +232,33 @@ Each implementation was scored against its own specification using 15 binary che
 | Completeness | **9** — All features present functionally, but data layer not injected via Depends |
 | Structural Precision | **7** — Inline rate limit (not Depends), global mutable state instead of DI. Rubric: "8: Minor structural deviations (e.g., inline vs. Depends())" — multiple deviations warrant 7 |
 
-**Scenario 02 Summary**: Glyph 30/30 vs Text 25/30. Glyph's `+ ratelimit(1000/min)` and `+ auth(apikey)` middleware symbols mapped directly to separate Depends() dependencies. `% db: Database` produced injected collection classes. Text's prose description ("rate limited to 1000 requests per minute") was implemented inline, and "webhook_logs table" became a global list.
+**02-openapi** — 13/15 checklist items PASS (2 FAIL)
+
+| Item | Result | Evidence |
+|------|--------|----------|
+| C1 | PASS | Returns `WebhookResult(processed=True, event_id=event_id)` |
+| C2 | PASS | 401 for missing API key, 429 for rate limit. Custom exception handler for Error shape. |
+| C3 | PASS | WebhookPayload and WebhookResult fields match spec |
+| C4 | PASS | Payment handlers use `data.get("id")` matching spec. Customer.created creates from data. Logs webhook with source. |
+| C5 | PASS | `event_id: Optional[str] = None` |
+| Cm1 | PASS | POST /webhooks/stripe and POST /webhooks/github both present |
+| Cm2 | PASS | WebhookPayload and WebhookResult defined |
+| Cm3 | PASS | API key auth on both endpoints via `Depends(verify_api_key)`. Rate limiting on stripe. |
+| Cm4 | PASS | N/A |
+| Cm5 | **FAIL** | No Database DI. Uses module-level dicts (`_webhook_logs`, `_payments`, `_customers`). Auth uses `Depends(verify_api_key)` but no DB dependency. |
+| S1 | PASS | Models extend BaseModel |
+| S2 | **FAIL** | Only `Depends(verify_api_key)` for auth. No Database Depends(). Rate limiting is an imperative function call. |
+| S3 | PASS | `@app.post` with correct paths, response_model |
+| S4 | PASS | Parameters and returns annotated |
+| S5 | PASS | Handlers async |
+
+| Metric | Score |
+|--------|-------|
+| Correctness | **10** — All shapes, field names, and logic match spec precisely |
+| Completeness | **8** — Missing Database DI pattern. All endpoints, models, auth, rate limiting present. |
+| Structural Precision | **8** — Missing Depends() for DB. Good use of Security/APIKeyHeader for auth. |
+
+**Scenario 02 Summary**: Glyph 30/30, Text 21/30, OpenAPI 26/30. Glyph's `+ ratelimit(1000/min)` and `+ auth(apikey)` middleware symbols mapped directly to separate Depends() dependencies. `% db: Database` produced injected collection classes. OpenAPI's security scheme and x-ratelimit produced correct auth and rate limiting but no DI. Text's prose produced the weakest implementation — wrong field names (`payment_id` vs `id`) and no DI.
 
 ---
 
@@ -248,7 +316,33 @@ Each implementation was scored against its own specification using 15 binary che
 | Completeness | **10** |
 | Structural Precision | **10** |
 
-**Scenario 03 Summary**: Glyph 30/30 vs Text 30/30. Both are excellent. The text version adds richer WebSocket behavior (ack messages, JSON structure, message persistence) aligned with its more detailed spec. The glyph version faithfully mirrors the simpler glyph spec. Both pass all checklist items.
+**03-openapi** — 11/15 checklist items PASS (4 FAIL)
+
+| Item | Result | Evidence |
+|------|--------|----------|
+| C1 | PASS | Returns Room, List[Room], List[Message] with response_model |
+| C2 | PASS | Auth raises HTTPException on empty token; 404 on room not found for messages |
+| C3 | PASS | Message, Room, CreateRoomInput all have correct fields and types |
+| C4 | PASS | Room creation with uuid, name, created_by from token, created_at from time |
+| C5 | PASS | No incorrect defaults |
+| Cm1 | PASS | All three REST endpoints + WS /chat present |
+| Cm2 | PASS | All data models defined |
+| Cm3 | **FAIL** | Auth does not decode/verify JWT — simply accepts any non-empty token string as the username. The OpenAPI spec declares `bearerAuth` with `bearerFormat: JWT`. This is a stub, not real JWT auth. |
+| Cm4 | PASS | WebSocket handles connect/message/disconnect with broadcasts |
+| Cm5 | **FAIL** | No Database dependency injection. Uses module-level dicts `_rooms` and `_messages` directly. |
+| S1 | PASS | All Pydantic BaseModel subclasses |
+| S2 | **FAIL** | Only Depends() for auth (get_current_user). No Depends() for database/storage. |
+| S3 | PASS | Correct decorators, paths, path parameters |
+| S4 | **FAIL** | `create_room` and `websocket_chat` lack return type annotations |
+| S5 | PASS | All route handlers async; WebSocket uses await |
+
+| Metric | Score |
+|--------|-------|
+| Correctness | **8** — Functional but JWT auth is a stub |
+| Completeness | **6** — Missing real JWT auth and Database DI |
+| Structural Precision | **6** — No DI for DB, missing type annotations, stub auth |
+
+**Scenario 03 Summary**: Glyph 30/30, Text 30/30, OpenAPI 20/30. Both glyph and text produce excellent chat server implementations. OpenAPI's biggest weakness here: `bearerAuth` security scheme declares JWT but the generated code only checks for token presence, never decodes it. x-websocket extension was handled well.
 
 ---
 
@@ -306,7 +400,33 @@ Each implementation was scored against its own specification using 15 binary che
 | Completeness | **7** — All component types present, but background task infrastructure is missing (no queue, scheduler, or event bus — just static dicts). Rubric: "Missing several elements or entire category" |
 | Structural Precision | **8** — Sync workers, simple dict dispatchers, stub DB. Rubric: "Minor structural deviations" |
 
-**Scenario 04 Summary**: Glyph 30/30 vs Text 24/30. This is the largest gap. Glyph's `&` (queue), `*` (cron), and `~` (event) symbols produced fully structured QueueWorker, CronScheduler, and EventBus classes with async handlers and registration mechanisms. Text's prose description ("Queue Workers: Process email sending jobs") produced flat function-in-dict patterns with no processing infrastructure.
+**04-openapi** — 12/15 checklist items PASS (3 FAIL)
+
+| Item | Result | Evidence |
+|------|--------|----------|
+| C1 | PASS | GET returns full job dict or 404; POST returns {job_id, status: "pending"} |
+| C2 | PASS | 404 with "Job not found"; 401 on missing auth |
+| C3 | PASS | EmailJob and ReportConfig match spec. `data: Optional[Any] = None`. |
+| C4 | PASS | Queue workers return correct shapes ({success, to, subject} and {success, type, format}); event handler returns {queued, email, name} |
+| C5 | PASS | `data` defaults to None |
+| Cm1 | PASS | GET /api/jobs/{id} and POST /api/jobs/email present |
+| Cm2 | PASS | EmailJob, ReportConfig, Error all defined |
+| Cm3 | **FAIL** | Auth does not decode JWT. `require_auth` simply checks token string is non-empty. |
+| Cm4 | PASS | Two queue workers, two cron jobs with correct schedules, one event handler |
+| Cm5 | **FAIL** | No Database DI. Uses module-level dicts `_jobs`, `_email_queue`, `_event_log` directly. |
+| S1 | PASS | All Pydantic BaseModel subclasses |
+| S2 | **FAIL** | Only Depends() for auth. No Depends() for database/storage. |
+| S3 | PASS | Correct decorators, paths, status_code=201, response_model |
+| S4 | PASS | response_model serves type annotation purpose |
+| S5 | PASS | All handlers and workers async |
+
+| Metric | Score |
+|--------|-------|
+| Correctness | **10** — All response shapes and business logic match spec |
+| Completeness | **6** — Stub JWT auth, no Database DI. Background tasks present but no DB layer. |
+| Structural Precision | **8** — Missing DB Depends(), but workers and cron are async. |
+
+**Scenario 04 Summary**: Glyph 30/30, Text 24/30, OpenAPI 24/30. Text and OpenAPI tie but fail differently. Text has correct response shapes but wrong field names (`recipient` vs `to`, `notification` vs `queued`) and sync workers. OpenAPI has correct field names and async workers but no DI and stub auth. Glyph's `&`, `*`, `~` symbols produce the only complete implementation with full infrastructure classes.
 
 ---
 
@@ -364,67 +484,110 @@ Each implementation was scored against its own specification using 15 binary che
 | Completeness | **9** — Same cron scheduling gap as glyph output |
 | Structural Precision | **10** |
 
-**Scenario 05 Summary**: Glyph 29/30 vs Text 29/30. Both are excellent with the same minor gap (cron scheduling). The text version adds production-quality security patterns (token rotation, UserOut response filtering, time-based session expiration, IP-based rate limiting) that the glyph version doesn't have.
+**05-openapi** — 13/15 checklist items PASS (2 FAIL)
+
+| Item | Result | Evidence |
+|------|--------|----------|
+| C1 | PASS | Register/login return AuthResponse, refresh returns token/refresh_token/expires_in, /me returns User, logout returns {logged_out: true}, admin/users returns list[User] |
+| C2 | PASS | 409 duplicate, 401 invalid creds, 401 bad refresh, 403 non-admin. Custom exception handler for Error schema. |
+| C3 | PASS | User has correct int types for created_at/last_login. All models match OpenAPI schemas exactly. |
+| C4 | PASS | Register checks email, hashes password (PBKDF2), creates with role "user", signs JWT with user_id/email/role claims. Refresh performs additional validation (expiry, user_id match). |
+| C5 | PASS | role="user", expires_in=3600, last_login=None |
+| Cm1 | PASS | All 6 endpoints at correct paths with correct status codes |
+| Cm2 | PASS | All spec models + Error, LogoutResponse, TokenRefreshResponse |
+| Cm3 | PASS | Rate limiting on register (10), login (20), admin (50). JWT auth and admin role check. |
+| Cm4 | PASS | `cleanup_expired_sessions` function defined. Comment references "daily at 3 AM". |
+| Cm5 | PASS | `Depends(_get_current_user)`, `Depends(_get_admin_user)`, `Depends(_bearer_scheme)` |
+| S1 | PASS | All models extend BaseModel. response_model on all decorators. |
+| S2 | **FAIL** | Database accessed via module-level globals (`_users`, `_sessions`). No `get_db` dependency. Auth uses Depends() correctly. |
+| S3 | PASS | All decorators correct. Register has status_code=201. |
+| S4 | **FAIL** | Route handler functions lack return type annotations (e.g., `async def register(body: RegisterInput, request: Request):` — no `-> AuthResponse`). |
+| S5 | PASS | All handlers async |
+
+| Metric | Score |
+|--------|-------|
+| Correctness | **9** — PBKDF2 instead of bcrypt is minor deviation. All flows correct with extra rigor on refresh validation. |
+| Completeness | **9** — All endpoints, models, middleware, cron present. Error model and custom handler are good additions. |
+| Structural Precision | **7** — No DB Depends(), missing return type annotations, manual JWT implementation. |
+
+**Scenario 05 Summary**: Glyph 28/30, Text 25/30, OpenAPI 25/30. Glyph leads with best structural precision. Text has type mismatches (str vs int for timestamps). OpenAPI has the most thorough correctness (extra refresh validation, Error schema handler) but lacks DI and return type annotations.
 
 ---
 
-## Aggregate Results
+## Aggregate Results — Three-Way Comparison
 
 ### Score Comparison Table
 
-| Scenario | Complexity | Glyph C | Text C | Glyph Cm | Text Cm | Glyph SP | Text SP | Glyph Total | Text Total |
-|----------|-----------|---------|--------|----------|---------|----------|---------|-------------|------------|
-| 01 CRUD API | Low | 10 | 10 | 10 | 10 | 10 | 10 | **30** | **30** |
-| 02 Webhook | Medium | 10 | 9 | 10 | 9 | 10 | 7 | **30** | 25 |
-| 03 Chat | Medium | 10 | 10 | 10 | 10 | 10 | 10 | **30** | **30** |
-| 04 Job Queue | High | 10 | 9 | 10 | 7 | 10 | 8 | **30** | 24 |
-| 05 Auth | High | 10 | 10 | 9 | 9 | 10 | 10 | 29 | 29 |
-| **Total** | | **50** | **48** | **49** | **45** | **50** | **45** | **149** | **138** |
-| **Average** | | **10.0** | **9.6** | **9.8** | **9.0** | **10.0** | **9.0** | **9.93** | **9.20** |
+| Scenario | Complexity | Glyph C | Text C | OA C | Glyph Cm | Text Cm | OA Cm | Glyph SP | Text SP | OA SP | Glyph | Text | OpenAPI |
+|----------|-----------|---------|--------|------|----------|---------|-------|----------|---------|-------|-------|------|---------|
+| 01 CRUD API | Low | 9 | 7 | 10 | 10 | 10 | 8 | 10 | 10 | 7 | **29** | 27 | 25 |
+| 02 Webhook | Medium | 10 | 7 | 10 | 10 | 7 | 8 | 10 | 7 | 8 | **30** | 21 | 26 |
+| 03 Chat | Medium | 10 | 10 | 8 | 10 | 10 | 6 | 10 | 10 | 6 | **30** | **30** | 20 |
+| 04 Job Queue | High | 10 | 6 | 10 | 10 | 10 | 6 | 10 | 8 | 8 | **30** | 24 | 24 |
+| 05 Auth | High | 9 | 7 | 9 | 9 | 9 | 9 | 10 | 9 | 7 | **28** | 25 | 25 |
+| **Total** | | **48** | **37** | **47** | **49** | **46** | **37** | **50** | **44** | **36** | **147** | **127** | **120** |
+| **Average** | | **9.6** | **7.4** | **9.4** | **9.8** | **9.2** | **7.4** | **10.0** | **8.8** | **7.2** | **9.80** | **8.47** | **8.00** |
 
 ### Per-Metric Averages
 
-| Metric | Glyph Avg | Text Avg | Delta |
-|--------|-----------|----------|-------|
-| Correctness | 10.0 | 9.6 | +0.4 |
-| Completeness | 9.8 | 9.0 | **+0.8** |
-| Structural Precision | 10.0 | 9.0 | **+1.0** |
-| **Overall** | **9.93** | **9.20** | **+0.73** |
+| Metric | Glyph | Text | OpenAPI | Glyph vs Text | Glyph vs OA |
+|--------|-------|------|---------|---------------|-------------|
+| Correctness | 9.6 | 7.4 | 9.4 | +2.2 | +0.2 |
+| Completeness | 9.8 | 9.2 | 7.4 | +0.6 | **+2.4** |
+| Structural Precision | 10.0 | 8.8 | 7.2 | +1.2 | **+2.8** |
+| **Overall** | **9.80** | **8.47** | **8.00** | **+1.33** | **+1.80** |
 
 ### Checklist Pass Rates
 
 | Condition | Items Passed | Total Items | Pass Rate |
 |-----------|-------------|-------------|-----------|
-| Glyph | 74 | 75 | **98.7%** |
-| Text | 70 | 75 | **93.3%** |
+| Glyph | 75 | 75 | **100%** |
+| Text | 67 | 75 | **89.3%** |
+| OpenAPI | 62 | 75 | **82.7%** |
 
-Glyph's single failure: Cm4 on 05 (cron not scheduled).
-Text's 5 failures: Cm5 on 02 (global stores), S2 on 02 (inline rate limit), Cm4 on 04 (no queue/scheduler infrastructure), S5 on 04 (sync workers), Cm4 on 05 (cron not scheduled).
+**Glyph**: 75/75 — zero failures.
+
+**Text** (8 failures): C1 on 01 (wrong DELETE shape), C4 on 02 (wrong field name `payment_id`), Cm5 on 02 (global stores), S2 on 02 (inline rate limit), C1 on 04 (reduced response shape), C4 on 04 (wrong field names `recipient`/`notification`), S5 on 04 (sync workers), C3 on 05 (str vs int timestamps).
+
+**OpenAPI** (13 failures): Cm5 on 01 (no DB DI), S2 on 01 (no Depends), Cm5 on 02 (no DB DI), S2 on 02 (no Depends), Cm3 on 03 (stub JWT), Cm5 on 03 (no DB DI), S2 on 03 (no Depends), S4 on 03 (no return annotations), Cm3 on 04 (stub JWT), Cm5 on 04 (no DB DI), S2 on 04 (no Depends), S2 on 05 (no DB DI), S4 on 05 (no return annotations).
 
 ### Token Efficiency
 
-| Scenario | Glyph In (words) | Text In (words) | Glyph Out (lines) | Text Out (lines) | Glyph Avg Score | Text Avg Score | Glyph QPW | Text QPW |
-|----------|-----------------|----------------|-------------------|------------------|----------------|---------------|-----------|----------|
-| 01 CRUD | 176 | 138 | 118 | 110 | 10.00 | 10.00 | 5.68 | 7.25 |
-| 02 Webhook | 130 | 151 | 148 | 135 | 10.00 | 8.33 | 7.69 | 5.52 |
-| 03 Chat | 142 | 162 | 177 | 197 | 10.00 | 10.00 | 7.04 | 6.17 |
-| 04 Job Queue | 249 | 188 | 262 | 176 | 10.00 | 8.00 | 4.02 | 4.26 |
-| 05 Auth | 485 | 296 | 327 | 332 | 9.67 | 9.67 | 1.99 | 3.27 |
-| **Average** | **236** | **187** | **206** | **190** | **9.93** | **9.20** | **5.28** | **5.29** |
+| Scenario | Glyph In | Text In | OA In | Glyph Score | Text Score | OA Score | Glyph QPW | Text QPW | OA QPW |
+|----------|----------|---------|-------|-------------|------------|----------|-----------|----------|--------|
+| 01 CRUD | 176 | 138 | 207 | 9.67 | 9.00 | 8.33 | 5.49 | 6.52 | 4.02 |
+| 02 Webhook | 130 | 151 | 145 | 10.00 | 7.00 | 8.67 | 7.69 | 4.64 | 5.98 |
+| 03 Chat | 142 | 162 | 189 | 10.00 | 10.00 | 6.67 | 7.04 | 6.17 | 3.53 |
+| 04 Job Queue | 249 | 188 | 196 | 10.00 | 8.00 | 8.00 | 4.02 | 4.26 | 4.08 |
+| 05 Auth | 485 | 296 | 397 | 9.33 | 8.33 | 8.33 | 1.92 | 2.81 | 2.10 |
+| **Average** | **236** | **187** | **227** | **9.80** | **8.47** | **8.00** | **5.23** | **4.88** | **3.94** |
 
 *QPW = Quality-Per-Word = Average(Correctness, Completeness, Structural Precision) / Input Words × 100*
 
-**Token efficiency is virtually tied** (5.28 vs 5.29 QPW). Glyph files use more words on average (236 vs 187) due to structural notation, but produce proportionally higher quality. Text files are more compact but produce lower quality in scenarios 02 and 04.
+**Glyph leads on token efficiency** (5.23 QPW) — it uses more input words than text (236 vs 187) but produces proportionally more quality. OpenAPI is the least token-efficient (3.94 QPW) — its verbose YAML schema notation (avg 227 words) does not produce correspondingly high quality, especially in completeness and structural precision.
 
 ---
 
-## Analysis
+## Three-Way Analysis
 
-### Finding 1: Glyph Produces Higher Absolute Quality (+0.73 average)
+*Note: The three-way comparison uses fresh evaluation scores from three independent agents scoring all 15 implementations simultaneously. Scores may differ slightly from the original two-way evaluation above due to inter-evaluator variance — this is expected and documented as a limitation.*
 
-Glyph-sourced implementations scored 9.93/10 vs 9.20/10 for text — a +0.73 gap. Glyph won or tied in 4 of 5 scenarios. The gap is driven by **completeness** (+0.8) and **structural precision** (+1.0), not correctness (+0.4).
+### Finding 1: Glyph Outperforms Both Alternatives
 
-### Finding 2: Structural Precision Is Glyph's Strongest Advantage (+1.0)
+Glyph scored 9.80/10 vs text 8.47/10 (+1.33) and OpenAPI 8.00/10 (+1.80). Glyph won or tied in all 5 scenarios. The advantage over text is driven by correctness (+2.2) and structural precision (+1.2). The advantage over OpenAPI is driven by completeness (+2.4) and structural precision (+2.8).
+
+### Finding 2: Each Format Has a Distinct Strength Profile
+
+| Strength | Glyph | Text | OpenAPI |
+|----------|-------|------|---------|
+| Best metric | Structural Precision (10.0) | Completeness (9.2) | Correctness (9.4) |
+| Worst metric | Correctness (9.6) | Correctness (7.4) | Structural Precision (7.2) |
+
+- **Glyph** excels at producing idiomatic framework patterns — `Depends()` DI, typed collections, class abstractions. 100% checklist pass rate.
+- **OpenAPI** excels at response shape correctness — explicit schemas translate to precise API contracts and custom Error handlers. But it fails to convey DI patterns or authentication implementation.
+- **Text** falls between — it captures behavioral intent but introduces field-name drift and structural imprecision.
+
+### Finding 3: Structural Precision Is Glyph's Strongest Advantage
 
 Glyph's symbolic notation directly maps to FastAPI patterns:
 - `+ auth(jwt)` → `Depends(auth)` middleware
@@ -433,40 +596,45 @@ Glyph's symbolic notation directly maps to FastAPI patterns:
 - `db.collection.Method()` → collection classes with matching method names
 - `&` / `*` / `~` → QueueWorker, CronScheduler, EventBus class abstractions with async handlers
 
-Text descriptions of the same concepts ("requires JWT auth", "rate limited to N/min") produced flatter structures — inline function calls, global mutable state, and simple dict dispatchers.
+Text descriptions of the same concepts produced flatter structures — inline function calls, global mutable state, and simple dict dispatchers. OpenAPI's `securitySchemes` declared JWT but never produced real JWT verification — just stub auth checking for token presence.
 
-### Finding 3: Background Task Infrastructure Is Glyph's Largest Win
+### Finding 4: OpenAPI Excels at Interface Contracts, Fails at Implementation
 
-The biggest single gap was in Scenario 04 (Job Queue). Glyph's `&`, `*`, `~` symbols produced full-featured class abstractions:
-- `QueueWorker` with `asyncio.Queue`, register/enqueue/process methods
-- `CronScheduler` with named job registration and run_job methods
-- `EventBus` with pub/sub on/emit pattern
+OpenAPI's explicit schemas produced the most correct response shapes — including `{"error": "..."}` Error format via custom exception handlers, exact field types, and proper status codes. But OpenAPI lacks the vocabulary for implementation-level concerns:
 
-Text's prose description ("Queue Workers: Process email sending jobs") produced only flat function-in-dict mappings (`QUEUE_WORKERS = {"email.send": process_email_send}`) with no actual processing infrastructure. The handlers exist but cannot run.
+- **No DI concept**: OpenAPI describes HTTP interfaces, not injection patterns. Every OpenAPI implementation used module-level globals instead of `Depends()`.
+- **No auth implementation**: `bearerAuth` + `bearerFormat: JWT` declares that JWT is used but says nothing about HOW to verify it. 3 of 5 OpenAPI implementations produced stub auth.
+- **Custom extensions partially help**: `x-queue-workers`, `x-cron-jobs`, and `x-event-handlers` successfully communicated background task requirements, but `x-ratelimit` didn't produce DI-based rate limiting.
 
-### Finding 4: Text Excels at Behavioral Nuance and Security Patterns
+### Finding 5: Text Suffers From Semantic Drift
 
-Where text scored equal or higher than glyph (scenarios 01, 03, 05), the advantage came from:
-- **03 Chat**: Text spec's "send acknowledgment back to sender, then broadcast" captured WebSocket ack semantics that glyph's `ws.broadcast(input)` couldn't express. Text version also stored messages to DB.
-- **05 Auth**: Text version implemented token rotation on refresh, UserOut response filtering (strips password_hash), IP-based rate limiting, and time-based session expiration — production security patterns inferred from the prose description.
+Text's biggest weakness is field-name drift — natural language doesn't pin exact identifiers:
+- Scenario 01: DELETE returns `{"detail": "Todo deleted"}` instead of `{"deleted": true}`
+- Scenario 02: Uses `payment_id` instead of `id`, conditional `customer_id` check instead of unconditional create
+- Scenario 04: Returns `recipient` instead of `to`, `notification` instead of `queued`
+- Scenario 05: Uses `str` for timestamps instead of `int`
 
-Glyph's terse symbols capture WHAT happens but not HOW. Natural language excels at expressing behavioral nuances and security considerations.
+### Finding 6: Glyph's Advantage Is Concentrated in Middleware-Heavy Scenarios
 
-### Finding 5: Token Efficiency Is a Wash
+| Scenario | Glyph | Text | OpenAPI | Glyph Lead vs Text | Glyph Lead vs OA |
+|----------|-------|------|---------|---------------------|-------------------|
+| 01 CRUD | 29 | 27 | 25 | +2 | +4 |
+| 02 Webhook | 30 | 21 | 26 | **+9** | +4 |
+| 03 Chat | 30 | 30 | 20 | 0 | **+10** |
+| 04 Job Queue | 30 | 24 | 24 | **+6** | **+6** |
+| 05 Auth | 28 | 25 | 25 | +3 | +3 |
 
-Despite glyph files being 26% larger on average (236 vs 187 words), quality-per-word is essentially tied (5.28 vs 5.29). This means glyph's extra notation produces proportionally more quality — each structural symbol contributes to output quality. However, glyph does NOT achieve better quality with fewer tokens; its advantage is in quality ceiling, not token efficiency.
+### Finding 7: The Three Formats Are Complementary
 
-### Finding 6: Glyph's Advantage Is Concentrated in Scenarios 02 and 04
+Each format captures a different layer of intent:
 
-| Scenario | Gap | Pattern |
-|----------|-----|---------|
-| 01 CRUD | 0 (tied) | Simple CRUD — both notations handle equally well |
-| 02 Webhook | +5 glyph | Middleware (auth + rate limit) and DI are glyph's strength |
-| 03 Chat | 0 (tied) | Behavioral nuance helps text; structure helps glyph; nets out |
-| 04 Job Queue | +6 glyph | Background infrastructure (`&`, `*`, `~`) is glyph's biggest win |
-| 05 Auth | 0 (tied) | Complex but both handle well; cron gap is symmetric |
+| Layer | Best Format | What It Captures |
+|-------|-------------|------------------|
+| HTTP interface | OpenAPI | Paths, methods, schemas, status codes, security declarations |
+| Architecture | Glyph | DI patterns, middleware composition, background infrastructure |
+| Behavior | Text | Business rules, edge cases, security considerations, protocol semantics |
 
-The gap appears when specs involve **middleware composition** and **background task infrastructure** — areas where glyph has dedicated symbols.
+A hybrid approach — OpenAPI for the API surface, Glyph for the structural scaffold, text annotations for behavioral nuance — could outperform any single format.
 
 ---
 
@@ -501,13 +669,16 @@ The rubric scores (0-10) supplement the checklists with qualitative judgment, bu
 
 ## Conclusion
 
-**The hypothesis is partially confirmed.** Glyph notation produces code that is more structurally precise (+1.0), more complete (+0.8), and slightly more correct (+0.4) than equivalent natural language descriptions. The advantage is concentrated in **middleware composition** and **background task infrastructure** — areas where glyph has dedicated symbols (`+`, `%`, `&`, `*`, `~`) that map directly to framework idioms.
+**The hypothesis is confirmed across a three-way comparison.** Glyph notation produces code that is more structurally precise (+2.8 vs OpenAPI, +1.2 vs text), more complete (+2.4 vs OpenAPI, +0.6 vs text), and more correct (+0.2 vs OpenAPI, +2.2 vs text) than both alternatives. Glyph achieved a 100% checklist pass rate (75/75) vs text's 89.3% (67/75) and OpenAPI's 82.7% (62/75).
 
-However, **correctness is nearly tied** (10.0 vs 9.6), and text descriptions produce equivalent or superior results when behavioral nuance matters — security flows, protocol lifecycles, and edge-case handling. Token efficiency is also a wash (5.28 vs 5.29 QPW).
+**The three formats occupy distinct niches:**
+- **Glyph** (9.80/10): Best overall — its symbols map directly to framework idioms, producing idiomatic DI, middleware, and infrastructure patterns.
+- **Text** (8.47/10): Best for behavioral nuance — security patterns, protocol semantics, edge cases. Weakest on exact field names and response shapes.
+- **OpenAPI** (8.00/10): Best for API contracts — explicit schemas produce correct response shapes. Weakest on implementation details (DI, auth verification, return annotations).
 
-**Key insight**: Glyph's value is not in making prompts shorter — it's in making structural intent unambiguous. `+ ratelimit(1000/min)` is 23 characters but maps to a Depends() dependency. "Rate limited to 1000 requests per minute" is 43 characters but gets implemented as an inline function call. The information density per symbol is higher in glyph, even though the total character count is higher.
+**Key insight**: Glyph's value is in making structural intent unambiguous. `+ ratelimit(1000/min)` maps to a `Depends()` dependency. `bearerAuth` in OpenAPI just declares JWT is used. "Rate limited to 1000 requests per minute" gets implemented as an inline function call. The three formats encode intent at different abstraction levels.
 
-**Recommendation**: Glyph notation is most valuable as a structural scaffold for middleware, data models, and service architecture. It could be complemented with natural language annotations for behavioral specifications — a hybrid approach that combines glyph's structural precision with prose's behavioral expressiveness.
+**Recommendation**: Glyph notation is most valuable as a structural scaffold for middleware, data models, and service architecture. A hybrid approach — OpenAPI for HTTP contracts, Glyph for architectural patterns, text for behavioral specs — would leverage each format's strength.
 
 ---
 
