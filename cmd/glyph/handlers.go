@@ -158,7 +158,7 @@ func createCompiledRouteHandler(route *ast.Route, bytecode []byte, wsHub *websoc
 func createRouteHandler(route *ast.Route, interp *interpreter.Interpreter) server.RouteHandler {
 	return func(ctx *server.Context) error {
 		// Execute route body using the interpreter
-		result, err := executeRoute(route, ctx, interp)
+		response, err := executeRoute(route, ctx, interp)
 		if err != nil {
 			// Log full error server-side, return generic message to client
 			printError(fmt.Errorf("route execution error: %w", err))
@@ -169,15 +169,42 @@ func createRouteHandler(route *ast.Route, interp *interpreter.Interpreter) serve
 			})
 		}
 
-		// Set response
+		// Check for redirect response (Location header set by interpreter)
+		if loc, ok := response.Headers["Location"]; ok && loc != "" {
+			ctx.StatusCode = response.StatusCode
+			ctx.ResponseWriter.Header().Set("Location", loc)
+			ctx.ResponseWriter.WriteHeader(response.StatusCode)
+			return nil
+		}
+
+		// Check if the response has a non-JSON Content-Type header set by
+		// special response types (text(), html(), blob()).
+		if ct, ok := response.Headers["Content-Type"]; ok && ct != "" {
+			ctx.StatusCode = response.StatusCode
+			ctx.ResponseWriter.Header().Set("Content-Type", ct)
+			ctx.ResponseWriter.WriteHeader(response.StatusCode)
+			switch body := response.Body.(type) {
+			case string:
+				_, writeErr := ctx.ResponseWriter.Write([]byte(body))
+				return writeErr
+			case []byte:
+				_, writeErr := ctx.ResponseWriter.Write(body)
+				return writeErr
+			default:
+				// Fallback: encode as JSON even with custom content type
+				return json.NewEncoder(ctx.ResponseWriter).Encode(response.Body)
+			}
+		}
+
+		// Default JSON response
 		ctx.StatusCode = http.StatusOK
 		ctx.ResponseWriter.Header().Set("Content-Type", "application/json")
-		return json.NewEncoder(ctx.ResponseWriter).Encode(result)
+		return json.NewEncoder(ctx.ResponseWriter).Encode(response.Body)
 	}
 }
 
-// executeRoute executes a route's body and returns the result
-func executeRoute(route *ast.Route, ctx *server.Context, interp *interpreter.Interpreter) (interface{}, error) {
+// executeRoute executes a route's body and returns the full interpreter response.
+func executeRoute(route *ast.Route, ctx *server.Context, interp *interpreter.Interpreter) (*interpreter.Response, error) {
 	// Parse request body for POST/PUT/PATCH requests
 	var requestBody interface{}
 	if ctx.Request.Method == "POST" || ctx.Request.Method == "PUT" || ctx.Request.Method == "PATCH" {
@@ -234,7 +261,7 @@ func executeRoute(route *ast.Route, ctx *server.Context, interp *interpreter.Int
 		return nil, fmt.Errorf("route execution failed: %w", err)
 	}
 
-	return response.Body, nil
+	return response, nil
 }
 
 // extractDevAuthData parses auth data from a bearer token for interpreted

@@ -627,6 +627,16 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 		}, nil
 	}
 
+	// Check for special response types
+	if redir, ok := result.(*RedirectResponse); ok {
+		return &Response{
+			StatusCode: redir.StatusCode,
+			Headers: map[string]string{
+				"Location": redir.URL,
+			},
+		}, nil
+	}
+
 	// Validate return value matches declared return type
 	if route.ReturnType != nil {
 		if err := i.typeChecker.CheckType(result, route.ReturnType); err != nil {
@@ -637,6 +647,34 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 				},
 			}, fmt.Errorf("return type mismatch in route %s %s: %v", route.Method, route.Path, err)
 		}
+	}
+
+	// Check for special response types
+	switch r := result.(type) {
+	case *TextResponse:
+		return &Response{
+			StatusCode: r.StatusCode,
+			Body:       r.Body,
+			Headers: map[string]string{
+				"Content-Type": "text/plain; charset=utf-8",
+			},
+		}, nil
+	case *HTMLResponse:
+		return &Response{
+			StatusCode: r.StatusCode,
+			Body:       r.Body,
+			Headers: map[string]string{
+				"Content-Type": "text/html; charset=utf-8",
+			},
+		}, nil
+	case *BlobResponse:
+		return &Response{
+			StatusCode: r.StatusCode,
+			Body:       r.Data,
+			Headers: map[string]string{
+				"Content-Type": r.ContentType,
+			},
+		}, nil
 	}
 
 	// Create response
