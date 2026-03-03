@@ -84,7 +84,7 @@ to rapidly build high-performance, secure backend applications.`,
 		Args:  cobra.ExactArgs(1),
 		RunE:  runInit,
 	}
-	initCmd.Flags().StringP("template", "t", "rest-api", "Project template")
+	initCmd.Flags().StringP("template", "t", "crud", "Project template (crud, rest-api, hello-world)")
 
 	// LSP command
 	var lspCmd = &cobra.Command{
