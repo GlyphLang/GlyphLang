@@ -61,6 +61,7 @@ func init() {
 		"reverse":    builtinReverse,
 		"flat":       builtinFlat,
 		"slice":      builtinSlice,
+		"redirect":   builtinRedirect,
 	}
 }
 
@@ -1071,4 +1072,43 @@ func builtinSlice(i *Interpreter, args []Expr, env *Environment) (interface{}, e
 	result := make([]interface{}, end-start)
 	copy(result, arr[start:end])
 	return result, nil
+}
+
+func builtinRedirect(interp *Interpreter, args []Expr, env *Environment) (interface{}, error) {
+	if len(args) < 1 || len(args) > 2 {
+		return nil, fmt.Errorf("redirect() requires 1-2 arguments: redirect(url) or redirect(url, statusCode)")
+	}
+
+	urlVal, err := interp.EvaluateExpression(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	urlStr, ok := urlVal.(string)
+	if !ok {
+		return nil, fmt.Errorf("redirect() first argument must be a string URL, got %T", urlVal)
+	}
+
+	statusCode := 302 // default
+	if len(args) == 2 {
+		codeVal, err := interp.EvaluateExpression(args[1], env)
+		if err != nil {
+			return nil, err
+		}
+		switch v := codeVal.(type) {
+		case int64:
+			statusCode = int(v)
+		case int:
+			statusCode = v
+		case float64:
+			statusCode = int(v)
+		default:
+			return nil, fmt.Errorf("redirect() second argument must be an integer status code, got %T", codeVal)
+		}
+	}
+
+	if err := ValidateRedirect(urlStr, statusCode); err != nil {
+		return nil, err
+	}
+
+	return &RedirectResponse{URL: urlStr, StatusCode: statusCode}, nil
 }

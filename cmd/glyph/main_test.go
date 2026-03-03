@@ -138,11 +138,12 @@ func TestExecuteRoute(t *testing.T) {
 	}
 	interp := interpreter.NewInterpreter()
 
-	// Execute the route - empty body returns nil which is valid
+	// Execute the route - empty body returns a response with nil body
 	result, err := executeRoute(route, ctx, interp)
 	require.NoError(t, err)
-	// Empty route body returns nil, which is expected
-	assert.Nil(t, result)
+	require.NotNil(t, result)
+	// Empty route body returns nil body in the response
+	assert.Nil(t, result.Body)
 }
 
 // Tests for expand/compact watch mode functionality
