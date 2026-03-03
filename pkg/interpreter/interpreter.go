@@ -639,6 +639,34 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 		}
 	}
 
+	// Check for special response types
+	switch r := result.(type) {
+	case *TextResponse:
+		return &Response{
+			StatusCode: r.StatusCode,
+			Body:       r.Body,
+			Headers: map[string]string{
+				"Content-Type": "text/plain; charset=utf-8",
+			},
+		}, nil
+	case *HTMLResponse:
+		return &Response{
+			StatusCode: r.StatusCode,
+			Body:       r.Body,
+			Headers: map[string]string{
+				"Content-Type": "text/html; charset=utf-8",
+			},
+		}, nil
+	case *BlobResponse:
+		return &Response{
+			StatusCode: r.StatusCode,
+			Body:       r.Data,
+			Headers: map[string]string{
+				"Content-Type": r.ContentType,
+			},
+		}, nil
+	}
+
 	// Create response
 	response := &Response{
 		StatusCode: 200,
