@@ -143,7 +143,6 @@ func TestExecuteRoute(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Equal(t, 200, result.StatusCode)
-	// Empty route body returns nil Body, which is expected
 	assert.Nil(t, result.Body)
 }
 

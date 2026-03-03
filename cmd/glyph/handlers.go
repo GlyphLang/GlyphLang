@@ -169,6 +169,14 @@ func createRouteHandler(route *ast.Route, interp *interpreter.Interpreter) serve
 			})
 		}
 
+		// Check for redirect response (Location header set by interpreter)
+		if loc, ok := response.Headers["Location"]; ok && loc != "" {
+			ctx.StatusCode = response.StatusCode
+			ctx.ResponseWriter.Header().Set("Location", loc)
+			ctx.ResponseWriter.WriteHeader(response.StatusCode)
+			return nil
+		}
+
 		// Check if the response has a non-JSON Content-Type header set by
 		// special response types (text(), html(), blob()).
 		if ct, ok := response.Headers["Content-Type"]; ok && ct != "" {
@@ -195,7 +203,7 @@ func createRouteHandler(route *ast.Route, interp *interpreter.Interpreter) serve
 	}
 }
 
-// executeRoute executes a route's body and returns the interpreter response
+// executeRoute executes a route's body and returns the full interpreter response.
 func executeRoute(route *ast.Route, ctx *server.Context, interp *interpreter.Interpreter) (*interpreter.Response, error) {
 	// Parse request body for POST/PUT/PATCH requests
 	var requestBody interface{}
