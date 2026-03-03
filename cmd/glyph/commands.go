@@ -362,13 +362,19 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	// Create main.glyph file with template
 	var content string
+	var templateDesc string
 	switch template {
 	case "hello-world":
 		content = getHelloWorldTemplate()
+		templateDesc = "Hello World"
 	case "rest-api":
 		content = getRestAPITemplate()
+		templateDesc = "REST API"
+	case "crud":
+		content = getRestCrudTemplate(name)
+		templateDesc = "CRUD REST API"
 	default:
-		return fmt.Errorf("unknown template: %s", template)
+		return fmt.Errorf("unknown template: %s (available: crud, rest-api, hello-world)", template)
 	}
 
 	mainFile := filepath.Join(name, "main.glyph")
@@ -376,8 +382,40 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to write main.glyph: %w", err)
 	}
 
-	printSuccess(fmt.Sprintf("Project created successfully in %s/", name))
-	printInfo(fmt.Sprintf("Run: cd %s && glyph dev main.glyph", name))
+	// Create .gitignore
+	gitignoreContent := "*.glyphc\ngenerated/\n.env\n.glyph/\n"
+	gitignoreFile := filepath.Join(name, ".gitignore")
+	if err := os.WriteFile(gitignoreFile, []byte(gitignoreContent), 0600); err != nil {
+		return fmt.Errorf("failed to write .gitignore: %w", err)
+	}
+
+	// Print project summary
+	fmt.Println()
+	printSuccess(fmt.Sprintf("Project created: %s/", name))
+	fmt.Println()
+	fmt.Printf("  %s/\n", name)
+	fmt.Printf("    main.glyph    %s\n", templateDesc)
+	fmt.Println("    .gitignore")
+	fmt.Println()
+	fmt.Println("  Next steps:")
+	fmt.Println()
+	fmt.Printf("    cd %s\n", name)
+	fmt.Println("    glyph dev main.glyph")
+	fmt.Println()
+
+	if template == "crud" {
+		fmt.Println("  Your API will be running at http://localhost:3000")
+		fmt.Println()
+		fmt.Println("  Endpoints:")
+		fmt.Println("    GET    /api/items      List all items")
+		fmt.Println("    GET    /api/items/:id  Get item by ID")
+		fmt.Println("    POST   /api/items      Create item")
+		fmt.Println("    PUT    /api/items/:id  Update item")
+		fmt.Println("    DELETE /api/items/:id  Delete item")
+		fmt.Println("    GET    /health         Health check")
+		fmt.Println()
+	}
+
 	return nil
 }
 
