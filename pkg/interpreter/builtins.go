@@ -61,6 +61,9 @@ func init() {
 		"reverse":    builtinReverse,
 		"flat":       builtinFlat,
 		"slice":      builtinSlice,
+		"text":       builtinText,
+		"html":       builtinHTML,
+		"blob":       builtinBlob,
 	}
 }
 
@@ -1071,4 +1074,116 @@ func builtinSlice(i *Interpreter, args []Expr, env *Environment) (interface{}, e
 	result := make([]interface{}, end-start)
 	copy(result, arr[start:end])
 	return result, nil
+}
+
+func builtinText(interp *Interpreter, args []Expr, env *Environment) (interface{}, error) {
+	if len(args) < 1 || len(args) > 2 {
+		return nil, fmt.Errorf("text() requires 1-2 arguments: text(body) or text(body, statusCode)")
+	}
+	bodyVal, err := interp.EvaluateExpression(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	bodyStr, ok := bodyVal.(string)
+	if !ok {
+		return nil, fmt.Errorf("text() first argument must be a string, got %T", bodyVal)
+	}
+	statusCode := 200
+	if len(args) == 2 {
+		codeVal, err := interp.EvaluateExpression(args[1], env)
+		if err != nil {
+			return nil, err
+		}
+		switch v := codeVal.(type) {
+		case int64:
+			statusCode = int(v)
+		case int:
+			statusCode = v
+		case float64:
+			statusCode = int(v)
+		default:
+			return nil, fmt.Errorf("text() second argument must be an integer status code, got %T", codeVal)
+		}
+	}
+	return &TextResponse{Body: bodyStr, StatusCode: statusCode}, nil
+}
+
+func builtinHTML(interp *Interpreter, args []Expr, env *Environment) (interface{}, error) {
+	if len(args) < 1 || len(args) > 2 {
+		return nil, fmt.Errorf("html() requires 1-2 arguments: html(body) or html(body, statusCode)")
+	}
+	bodyVal, err := interp.EvaluateExpression(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	bodyStr, ok := bodyVal.(string)
+	if !ok {
+		return nil, fmt.Errorf("html() first argument must be a string, got %T", bodyVal)
+	}
+	statusCode := 200
+	if len(args) == 2 {
+		codeVal, err := interp.EvaluateExpression(args[1], env)
+		if err != nil {
+			return nil, err
+		}
+		switch v := codeVal.(type) {
+		case int64:
+			statusCode = int(v)
+		case int:
+			statusCode = v
+		case float64:
+			statusCode = int(v)
+		default:
+			return nil, fmt.Errorf("html() second argument must be an integer status code, got %T", codeVal)
+		}
+	}
+	return &HTMLResponse{Body: bodyStr, StatusCode: statusCode}, nil
+}
+
+func builtinBlob(interp *Interpreter, args []Expr, env *Environment) (interface{}, error) {
+	if len(args) < 2 || len(args) > 3 {
+		return nil, fmt.Errorf("blob() requires 2-3 arguments: blob(data, contentType) or blob(data, contentType, statusCode)")
+	}
+	dataVal, err := interp.EvaluateExpression(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	// Accept string data and convert to []byte
+	var data []byte
+	switch v := dataVal.(type) {
+	case string:
+		data = []byte(v)
+	case []byte:
+		data = v
+	default:
+		return nil, fmt.Errorf("blob() first argument must be a string or bytes, got %T", dataVal)
+	}
+
+	ctVal, err := interp.EvaluateExpression(args[1], env)
+	if err != nil {
+		return nil, err
+	}
+	contentType, ok := ctVal.(string)
+	if !ok {
+		return nil, fmt.Errorf("blob() second argument must be a content type string, got %T", ctVal)
+	}
+
+	statusCode := 200
+	if len(args) == 3 {
+		codeVal, err := interp.EvaluateExpression(args[2], env)
+		if err != nil {
+			return nil, err
+		}
+		switch v := codeVal.(type) {
+		case int64:
+			statusCode = int(v)
+		case int:
+			statusCode = v
+		case float64:
+			statusCode = int(v)
+		default:
+			return nil, fmt.Errorf("blob() third argument must be an integer status code, got %T", codeVal)
+		}
+	}
+	return &BlobResponse{Data: data, ContentType: contentType, StatusCode: statusCode}, nil
 }
