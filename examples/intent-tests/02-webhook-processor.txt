@@ -1,0 +1,24 @@
+Natural Language Description (for comparison with glyph notation):
+
+Build a webhook processing service with two endpoints:
+
+1. POST /webhooks/stripe
+   - Requires API key authentication
+   - Rate limited to 1000 requests per minute
+   - Accepts a webhook payload with event type, data, timestamp, and signature
+   - Logs every webhook to a webhook_logs table with a generated ID and timestamp
+   - Routes events by type:
+     - "payment.succeeded" -> update payment status to "completed"
+     - "payment.failed" -> update payment status to "failed"
+     - "customer.created" -> create a new customer record
+   - Returns a confirmation with processed=true and the event ID
+
+2. POST /webhooks/github
+   - Requires API key authentication
+   - Accepts a webhook payload
+   - Logs the webhook with source "github"
+   - Returns a confirmation with processed=true and the event ID
+
+Data model:
+- WebhookPayload: event (string, required), data (any, required), timestamp (int, required), signature (string, required)
+- WebhookResult: processed (boolean, required), event_id (string, optional)

@@ -1,10 +1,22 @@
 package interpreter
 
 import (
+	. "github.com/glyphlang/glyph/pkg/ast"
+
 	"fmt"
+	"math"
 	"strings"
+	"sync/atomic"
 	"unicode"
 )
+
+// posError wraps an error with source position information when available.
+func posError(pos Pos, err error) error {
+	if err == nil || !pos.HasPos() {
+		return err
+	}
+	return fmt.Errorf("at %s: %w", pos, err)
+}
 
 // capitalizeFirst capitalizes only the first letter of a string, preserving the rest.
 // This properly handles camelCase: "countWhere" -> "CountWhere", "nextId" -> "NextId"
@@ -19,24 +31,50 @@ func capitalizeFirst(s string) string {
 
 // EvaluateExpression evaluates an expression and returns its value
 func (i *Interpreter) EvaluateExpression(expr Expr, env *Environment) (interface{}, error) {
+	depth := atomic.AddInt64(&i.evalDepth, 1)
+	if depth > maxEvalDepth {
+		atomic.AddInt64(&i.evalDepth, -1)
+		return nil, fmt.Errorf("maximum evaluation depth exceeded (%d levels)", maxEvalDepth)
+	}
+	defer atomic.AddInt64(&i.evalDepth, -1)
 	switch e := expr.(type) {
 	case LiteralExpr:
 		return i.evaluateLiteral(e.Value)
 
 	case VariableExpr:
-		return env.Get(e.Name)
+		val, err := env.Get(e.Name)
+		if err != nil {
+			return nil, posError(e.Pos, err)
+		}
+		return val, nil
 
 	case BinaryOpExpr:
-		return i.evaluateBinaryOp(e, env)
+		val, err := i.evaluateBinaryOp(e, env)
+		if err != nil {
+			return nil, posError(e.Pos, err)
+		}
+		return val, nil
 
 	case UnaryOpExpr:
-		return i.evaluateUnaryOp(e, env)
+		val, err := i.evaluateUnaryOp(e, env)
+		if err != nil {
+			return nil, posError(e.Pos, err)
+		}
+		return val, nil
 
 	case FieldAccessExpr:
-		return i.evaluateFieldAccess(e, env)
+		val, err := i.evaluateFieldAccess(e, env)
+		if err != nil {
+			return nil, posError(e.Pos, err)
+		}
+		return val, nil
 
 	case FunctionCallExpr:
-		return i.evaluateFunctionCall(e, env)
+		val, err := i.evaluateFunctionCall(e, env)
+		if err != nil {
+			return nil, posError(e.Pos, err)
+		}
+		return val, nil
 
 	case ObjectExpr:
 		return i.evaluateObjectExpr(e, env)
@@ -51,7 +89,11 @@ func (i *Interpreter) EvaluateExpression(expr Expr, env *Environment) (interface
 		return i.evaluateAwaitExpr(e, env)
 
 	case ArrayIndexExpr:
-		return i.evaluateArrayIndexExpr(e, env)
+		val, err := i.evaluateArrayIndexExpr(e, env)
+		if err != nil {
+			return nil, posError(e.Pos, err)
+		}
+		return val, nil
 
 	case MatchExpr:
 		return i.evaluateMatchExpr(e, env)
@@ -61,6 +103,9 @@ func (i *Interpreter) EvaluateExpression(expr Expr, env *Environment) (interface
 
 	case PipeExpr:
 		return i.evaluatePipeExpr(e, env)
+
+	case MacroInvocation:
+		return i.evaluateMacroInvocation(e, env)
 
 	default:
 		return nil, fmt.Errorf("unsupported expression type: %T", expr)
@@ -78,13 +123,27 @@ func (i *Interpreter) evaluateAsyncExpr(expr AsyncExpr, env *Environment) (inter
 
 	// Execute the async block in a separate goroutine
 	go func() {
+		// Check for cancellation before starting
+		select {
+		case <-future.Cancelled():
+			return
+		default:
+		}
+
 		// Execute the statements in the async block
 		result, err := i.executeStatements(expr.Body, asyncEnv)
 
+		// Check for cancellation after execution
+		select {
+		case <-future.Cancelled():
+			return
+		default:
+		}
+
 		if err != nil {
 			// Check if it's a return value (which is normal for returning from async blocks)
-			if retErr, ok := err.(*returnValue); ok {
-				future.Resolve(retErr.value)
+			if val, isReturn := unwrapReturn(err); isReturn {
+				future.Resolve(val)
 			} else {
 				future.Reject(err)
 			}
@@ -159,7 +218,7 @@ func (i *Interpreter) evaluateArrayIndexExpr(expr ArrayIndexExpr, env *Environme
 		if val, exists := obj[keyStr]; exists {
 			return val, nil
 		}
-		return nil, fmt.Errorf("key '%s' not found in object", keyStr)
+		return nil, fmt.Errorf("key %q not found in object", keyStr)
 	}
 
 	return nil, fmt.Errorf("cannot index %T", arrayVal)
@@ -185,6 +244,52 @@ func (i *Interpreter) evaluateLiteral(lit Literal) (interface{}, error) {
 
 // evaluateBinaryOp evaluates a binary operation
 func (i *Interpreter) evaluateBinaryOp(expr BinaryOpExpr, env *Environment) (interface{}, error) {
+	// Short-circuit evaluation for logical operators
+	if expr.Op == And {
+		left, err := i.EvaluateExpression(expr.Left, env)
+		if err != nil {
+			return nil, err
+		}
+		leftBool, ok := left.(bool)
+		if !ok {
+			return nil, fmt.Errorf("logical AND operator requires boolean operands, got %T", left)
+		}
+		if !leftBool {
+			return false, nil
+		}
+		right, err := i.EvaluateExpression(expr.Right, env)
+		if err != nil {
+			return nil, err
+		}
+		rightBool, ok := right.(bool)
+		if !ok {
+			return nil, fmt.Errorf("logical AND operator requires boolean operands, got %T", right)
+		}
+		return rightBool, nil
+	}
+	if expr.Op == Or {
+		left, err := i.EvaluateExpression(expr.Left, env)
+		if err != nil {
+			return nil, err
+		}
+		leftBool, ok := left.(bool)
+		if !ok {
+			return nil, fmt.Errorf("logical OR operator requires boolean operands, got %T", left)
+		}
+		if leftBool {
+			return true, nil
+		}
+		right, err := i.EvaluateExpression(expr.Right, env)
+		if err != nil {
+			return nil, err
+		}
+		rightBool, ok := right.(bool)
+		if !ok {
+			return nil, fmt.Errorf("logical OR operator requires boolean operands, got %T", right)
+		}
+		return rightBool, nil
+	}
+
 	left, err := i.EvaluateExpression(expr.Left, env)
 	if err != nil {
 		return nil, err
@@ -204,6 +309,8 @@ func (i *Interpreter) evaluateBinaryOp(expr BinaryOpExpr, env *Environment) (int
 		return i.evaluateMul(left, right)
 	case Div:
 		return i.evaluateDiv(left, right)
+	case Mod:
+		return i.evaluateMod(left, right)
 	case Eq:
 		return i.evaluateEq(left, right)
 	case Ne:
@@ -216,10 +323,6 @@ func (i *Interpreter) evaluateBinaryOp(expr BinaryOpExpr, env *Environment) (int
 		return i.evaluateGt(left, right)
 	case Ge:
 		return i.evaluateGe(left, right)
-	case And:
-		return i.evaluateAnd(left, right)
-	case Or:
-		return i.evaluateOr(left, right)
 	default:
 		return nil, fmt.Errorf("unsupported binary operator: %s", expr.Op)
 	}
@@ -266,6 +369,17 @@ func (i *Interpreter) evaluateAdd(left, right interface{}) (interface{}, error) 
 		return leftStr + rightStr, nil
 	}
 
+	// Array concatenation
+	if leftArr, ok := left.([]interface{}); ok {
+		if rightArr, ok := right.([]interface{}); ok {
+			result := make([]interface{}, len(leftArr)+len(rightArr))
+			copy(result, leftArr)
+			copy(result[len(leftArr):], rightArr)
+			return result, nil
+		}
+		return nil, fmt.Errorf("cannot add array and %T", right)
+	}
+
 	// Numeric addition with automatic coercion
 	coercedLeft, coercedRight, _ := CoerceNumeric(left, right)
 
@@ -288,13 +402,8 @@ func (i *Interpreter) evaluateAdd(left, right interface{}) (interface{}, error) 
 
 // evaluateSub handles subtraction
 func (i *Interpreter) evaluateSub(left, right interface{}) (interface{}, error) {
-	// Numeric subtraction - do not allow automatic coercion
-	coercedLeft, coercedRight, coerced := CoerceNumeric(left, right)
-
-	// If coercion happened, return error (strict type checking for subtraction)
-	if coerced {
-		return nil, fmt.Errorf("cannot subtract %T and %T", left, right)
-	}
+	// Numeric subtraction with automatic coercion (int->float promotion)
+	coercedLeft, coercedRight, _ := CoerceNumeric(left, right)
 
 	// Integer subtraction
 	if leftInt, ok := coercedLeft.(int64); ok {
@@ -315,13 +424,8 @@ func (i *Interpreter) evaluateSub(left, right interface{}) (interface{}, error) 
 
 // evaluateMul handles multiplication
 func (i *Interpreter) evaluateMul(left, right interface{}) (interface{}, error) {
-	// Numeric multiplication - do not allow automatic coercion
-	coercedLeft, coercedRight, coerced := CoerceNumeric(left, right)
-
-	// If coercion happened, return error (strict type checking for multiplication)
-	if coerced {
-		return nil, fmt.Errorf("cannot multiply %T and %T", left, right)
-	}
+	// Numeric multiplication with automatic coercion (int->float promotion)
+	coercedLeft, coercedRight, _ := CoerceNumeric(left, right)
 
 	// Integer multiplication
 	if leftInt, ok := coercedLeft.(int64); ok {
@@ -342,13 +446,8 @@ func (i *Interpreter) evaluateMul(left, right interface{}) (interface{}, error) 
 
 // evaluateDiv handles division
 func (i *Interpreter) evaluateDiv(left, right interface{}) (interface{}, error) {
-	// Numeric division - do not allow automatic coercion
-	coercedLeft, coercedRight, coerced := CoerceNumeric(left, right)
-
-	// If coercion happened, return error (strict type checking for division)
-	if coerced {
-		return nil, fmt.Errorf("cannot divide %T and %T", left, right)
-	}
+	// Numeric division - allow int/float coercion for consistency with Add/Eq (#122)
+	coercedLeft, coercedRight, _ := CoerceNumeric(left, right)
 
 	// Integer division
 	if leftInt, ok := coercedLeft.(int64); ok {
@@ -371,6 +470,34 @@ func (i *Interpreter) evaluateDiv(left, right interface{}) (interface{}, error) 
 	}
 
 	return nil, fmt.Errorf("cannot divide %T and %T", left, right)
+}
+
+// evaluateMod handles modulo/remainder operation
+func (i *Interpreter) evaluateMod(left, right interface{}) (interface{}, error) {
+	// Numeric modulo with automatic coercion (int->float promotion)
+	coercedLeft, coercedRight, _ := CoerceNumeric(left, right)
+
+	// Integer modulo
+	if leftInt, ok := coercedLeft.(int64); ok {
+		if rightInt, ok := coercedRight.(int64); ok {
+			if rightInt == 0 {
+				return nil, fmt.Errorf("modulo by zero")
+			}
+			return leftInt % rightInt, nil
+		}
+	}
+
+	// Float modulo
+	if leftFloat, ok := coercedLeft.(float64); ok {
+		if rightFloat, ok := coercedRight.(float64); ok {
+			if rightFloat == 0 {
+				return nil, fmt.Errorf("modulo by zero")
+			}
+			return math.Mod(leftFloat, rightFloat), nil
+		}
+	}
+
+	return nil, fmt.Errorf("cannot compute modulo of %T and %T", left, right)
 }
 
 // evaluateEq handles equality comparison
@@ -401,13 +528,8 @@ func (i *Interpreter) evaluateNe(left, right interface{}) (interface{}, error) {
 
 // evaluateLt handles less than comparison
 func (i *Interpreter) evaluateLt(left, right interface{}) (interface{}, error) {
-	// Numeric comparison - do not allow automatic coercion
-	coercedLeft, coercedRight, coerced := CoerceNumeric(left, right)
-
-	// If coercion happened, return error (strict type checking)
-	if coerced {
-		return nil, fmt.Errorf("cannot compare %T and %T", left, right)
-	}
+	// Numeric comparison - allow int/float coercion for consistency with Add/Eq (#122)
+	coercedLeft, coercedRight, _ := CoerceNumeric(left, right)
 
 	// Integer comparison
 	if leftInt, ok := coercedLeft.(int64); ok {
@@ -428,13 +550,8 @@ func (i *Interpreter) evaluateLt(left, right interface{}) (interface{}, error) {
 
 // evaluateLe handles less than or equal comparison
 func (i *Interpreter) evaluateLe(left, right interface{}) (interface{}, error) {
-	// Numeric comparison - do not allow automatic coercion
-	coercedLeft, coercedRight, coerced := CoerceNumeric(left, right)
-
-	// If coercion happened, return error (strict type checking)
-	if coerced {
-		return nil, fmt.Errorf("cannot compare %T and %T", left, right)
-	}
+	// Numeric comparison - allow int/float coercion for consistency with Add/Eq (#122)
+	coercedLeft, coercedRight, _ := CoerceNumeric(left, right)
 
 	// Integer comparison
 	if leftInt, ok := coercedLeft.(int64); ok {
@@ -455,13 +572,8 @@ func (i *Interpreter) evaluateLe(left, right interface{}) (interface{}, error) {
 
 // evaluateGt handles greater than comparison
 func (i *Interpreter) evaluateGt(left, right interface{}) (interface{}, error) {
-	// Numeric comparison - do not allow automatic coercion
-	coercedLeft, coercedRight, coerced := CoerceNumeric(left, right)
-
-	// If coercion happened, return error (strict type checking)
-	if coerced {
-		return nil, fmt.Errorf("cannot compare %T and %T", left, right)
-	}
+	// Allow int/float coercion for consistency with evaluateAdd, evaluateEq, evaluateLt, evaluateLe (#122)
+	coercedLeft, coercedRight, _ := CoerceNumeric(left, right)
 
 	// Integer comparison
 	if leftInt, ok := coercedLeft.(int64); ok {
@@ -482,13 +594,8 @@ func (i *Interpreter) evaluateGt(left, right interface{}) (interface{}, error) {
 
 // evaluateGe handles greater than or equal comparison
 func (i *Interpreter) evaluateGe(left, right interface{}) (interface{}, error) {
-	// Numeric comparison - do not allow automatic coercion
-	coercedLeft, coercedRight, coerced := CoerceNumeric(left, right)
-
-	// If coercion happened, return error (strict type checking)
-	if coerced {
-		return nil, fmt.Errorf("cannot compare %T and %T", left, right)
-	}
+	// Allow int/float coercion for consistency with evaluateAdd, evaluateEq, evaluateLt, evaluateLe (#122)
+	coercedLeft, coercedRight, _ := CoerceNumeric(left, right)
 
 	// Integer comparison
 	if leftInt, ok := coercedLeft.(int64); ok {
@@ -507,42 +614,6 @@ func (i *Interpreter) evaluateGe(left, right interface{}) (interface{}, error) {
 	return nil, fmt.Errorf("cannot compare %T and %T", left, right)
 }
 
-// evaluateAnd handles logical AND operation
-func (i *Interpreter) evaluateAnd(left, right interface{}) (interface{}, error) {
-	// Check that left is a boolean
-	leftBool, ok := left.(bool)
-	if !ok {
-		return nil, fmt.Errorf("logical AND operator requires boolean operands, got %T", left)
-	}
-
-	// Check that right is a boolean
-	rightBool, ok := right.(bool)
-	if !ok {
-		return nil, fmt.Errorf("logical AND operator requires boolean operands, got %T", right)
-	}
-
-	// Both operands must be true for AND to return true
-	return leftBool && rightBool, nil
-}
-
-// evaluateOr handles logical OR operation
-func (i *Interpreter) evaluateOr(left, right interface{}) (interface{}, error) {
-	// Check that left is a boolean
-	leftBool, ok := left.(bool)
-	if !ok {
-		return nil, fmt.Errorf("logical OR operator requires boolean operands, got %T", left)
-	}
-
-	// Check that right is a boolean
-	rightBool, ok := right.(bool)
-	if !ok {
-		return nil, fmt.Errorf("logical OR operator requires boolean operands, got %T", right)
-	}
-
-	// At least one operand must be true for OR to return true
-	return leftBool || rightBool, nil
-}
-
 // evaluateFieldAccess handles field access on objects (maps) and database handlers
 func (i *Interpreter) evaluateFieldAccess(expr FieldAccessExpr, env *Environment) (interface{}, error) {
 	obj, err := i.EvaluateExpression(expr.Object, env)
@@ -559,12 +630,31 @@ func (i *Interpreter) evaluateFieldAccess(expr FieldAccessExpr, env *Environment
 		}
 	}
 
+	// Handle Result type field access
+	if result, ok := obj.(*ResultValue); ok {
+		switch expr.Field {
+		case "ok":
+			return result.IsOk(), nil
+		case "error", "err":
+			return result.ErrValue(), nil
+		case "value":
+			return result.OkValue(), nil
+		case "isOk":
+			return result.IsOk(), nil
+		case "isErr":
+			return result.IsErr(), nil
+		default:
+			return nil, fmt.Errorf("Result has no field '%s'", expr.Field)
+		}
+	}
+
 	// Handle map field access
 	if objMap, ok := obj.(map[string]interface{}); ok {
 		if val, exists := objMap[expr.Field]; exists {
 			return val, nil
 		}
-		return nil, fmt.Errorf("field %s not found on object", expr.Field)
+		// Missing fields return null, allowing optional field access (e.g., input.user_id)
+		return nil, nil
 	}
 
 	return nil, fmt.Errorf("cannot access field %s on %T", expr.Field, obj)
@@ -572,484 +662,9 @@ func (i *Interpreter) evaluateFieldAccess(expr FieldAccessExpr, env *Environment
 
 // evaluateFunctionCall handles function calls and method calls
 func (i *Interpreter) evaluateFunctionCall(expr FunctionCallExpr, env *Environment) (interface{}, error) {
-	// Handle built-in functions first (before checking for method calls)
-	switch expr.Name {
-	case "time.now":
-		// Return a mock timestamp for now
-		return int64(1234567890), nil
-
-	case "now":
-		// Return a mock timestamp
-		return int64(1234567890), nil
-
-	case "upper":
-		// Convert string to uppercase
-		if len(expr.Args) != 1 {
-			return nil, fmt.Errorf("upper() expects 1 argument, got %d", len(expr.Args))
-		}
-		arg, err := i.EvaluateExpression(expr.Args[0], env)
-		if err != nil {
-			return nil, err
-		}
-		str, ok := arg.(string)
-		if !ok {
-			return nil, fmt.Errorf("upper() expects a string argument, got %T", arg)
-		}
-		return strings.ToUpper(str), nil
-
-	case "lower":
-		// Convert string to lowercase
-		if len(expr.Args) != 1 {
-			return nil, fmt.Errorf("lower() expects 1 argument, got %d", len(expr.Args))
-		}
-		arg, err := i.EvaluateExpression(expr.Args[0], env)
-		if err != nil {
-			return nil, err
-		}
-		str, ok := arg.(string)
-		if !ok {
-			return nil, fmt.Errorf("lower() expects a string argument, got %T", arg)
-		}
-		return strings.ToLower(str), nil
-
-	case "trim":
-		// Remove leading/trailing whitespace
-		if len(expr.Args) != 1 {
-			return nil, fmt.Errorf("trim() expects 1 argument, got %d", len(expr.Args))
-		}
-		arg, err := i.EvaluateExpression(expr.Args[0], env)
-		if err != nil {
-			return nil, err
-		}
-		str, ok := arg.(string)
-		if !ok {
-			return nil, fmt.Errorf("trim() expects a string argument, got %T", arg)
-		}
-		return strings.TrimSpace(str), nil
-
-	case "split":
-		// Split string into array
-		if len(expr.Args) != 2 {
-			return nil, fmt.Errorf("split() expects 2 arguments, got %d", len(expr.Args))
-		}
-		strArg, err := i.EvaluateExpression(expr.Args[0], env)
-		if err != nil {
-			return nil, err
-		}
-		str, ok := strArg.(string)
-		if !ok {
-			return nil, fmt.Errorf("split() expects first argument to be a string, got %T", strArg)
-		}
-		delimArg, err := i.EvaluateExpression(expr.Args[1], env)
-		if err != nil {
-			return nil, err
-		}
-		delim, ok := delimArg.(string)
-		if !ok {
-			return nil, fmt.Errorf("split() expects second argument to be a string, got %T", delimArg)
-		}
-		parts := strings.Split(str, delim)
-		result := make([]interface{}, len(parts))
-		for i, part := range parts {
-			result[i] = part
-		}
-		return result, nil
-
-	case "join":
-		// Join array into string
-		if len(expr.Args) != 2 {
-			return nil, fmt.Errorf("join() expects 2 arguments, got %d", len(expr.Args))
-		}
-		arrArg, err := i.EvaluateExpression(expr.Args[0], env)
-		if err != nil {
-			return nil, err
-		}
-		arr, ok := arrArg.([]interface{})
-		if !ok {
-			return nil, fmt.Errorf("join() expects first argument to be an array, got %T", arrArg)
-		}
-		delimArg, err := i.EvaluateExpression(expr.Args[1], env)
-		if err != nil {
-			return nil, err
-		}
-		delim, ok := delimArg.(string)
-		if !ok {
-			return nil, fmt.Errorf("join() expects second argument to be a string, got %T", delimArg)
-		}
-		strParts := make([]string, len(arr))
-		for i, elem := range arr {
-			strParts[i] = fmt.Sprintf("%v", elem)
-		}
-		return strings.Join(strParts, delim), nil
-
-	case "contains":
-		// Check if string contains substring
-		if len(expr.Args) != 2 {
-			return nil, fmt.Errorf("contains() expects 2 arguments, got %d", len(expr.Args))
-		}
-		strArg, err := i.EvaluateExpression(expr.Args[0], env)
-		if err != nil {
-			return nil, err
-		}
-		str, ok := strArg.(string)
-		if !ok {
-			return nil, fmt.Errorf("contains() expects first argument to be a string, got %T", strArg)
-		}
-		substrArg, err := i.EvaluateExpression(expr.Args[1], env)
-		if err != nil {
-			return nil, err
-		}
-		substr, ok := substrArg.(string)
-		if !ok {
-			return nil, fmt.Errorf("contains() expects second argument to be a string, got %T", substrArg)
-		}
-		return strings.Contains(str, substr), nil
-
-	case "replace":
-		// Replace occurrences in string
-		if len(expr.Args) != 3 {
-			return nil, fmt.Errorf("replace() expects 3 arguments, got %d", len(expr.Args))
-		}
-		strArg, err := i.EvaluateExpression(expr.Args[0], env)
-		if err != nil {
-			return nil, err
-		}
-		str, ok := strArg.(string)
-		if !ok {
-			return nil, fmt.Errorf("replace() expects first argument to be a string, got %T", strArg)
-		}
-		oldArg, err := i.EvaluateExpression(expr.Args[1], env)
-		if err != nil {
-			return nil, err
-		}
-		old, ok := oldArg.(string)
-		if !ok {
-			return nil, fmt.Errorf("replace() expects second argument to be a string, got %T", oldArg)
-		}
-		newArg, err := i.EvaluateExpression(expr.Args[2], env)
-		if err != nil {
-			return nil, err
-		}
-		new, ok := newArg.(string)
-		if !ok {
-			return nil, fmt.Errorf("replace() expects third argument to be a string, got %T", newArg)
-		}
-		return strings.ReplaceAll(str, old, new), nil
-
-	case "substring":
-		// Get substring
-		if len(expr.Args) != 3 {
-			return nil, fmt.Errorf("substring() expects 3 arguments, got %d", len(expr.Args))
-		}
-		strArg, err := i.EvaluateExpression(expr.Args[0], env)
-		if err != nil {
-			return nil, err
-		}
-		str, ok := strArg.(string)
-		if !ok {
-			return nil, fmt.Errorf("substring() expects first argument to be a string, got %T", strArg)
-		}
-		startArg, err := i.EvaluateExpression(expr.Args[1], env)
-		if err != nil {
-			return nil, err
-		}
-		start, ok := startArg.(int64)
-		if !ok {
-			// Try to convert int to int64
-			if startInt, ok := startArg.(int); ok {
-				start = int64(startInt)
-			} else {
-				return nil, fmt.Errorf("substring() expects second argument to be an integer, got %T", startArg)
-			}
-		}
-		endArg, err := i.EvaluateExpression(expr.Args[2], env)
-		if err != nil {
-			return nil, err
-		}
-		end, ok := endArg.(int64)
-		if !ok {
-			// Try to convert int to int64
-			if endInt, ok := endArg.(int); ok {
-				end = int64(endInt)
-			} else {
-				return nil, fmt.Errorf("substring() expects third argument to be an integer, got %T", endArg)
-			}
-		}
-		if start < 0 || end < 0 {
-			return nil, fmt.Errorf("substring() indices must be non-negative")
-		}
-		if start > end {
-			return nil, fmt.Errorf("substring() start index must be less than or equal to end index")
-		}
-		if int(end) > len(str) {
-			end = int64(len(str))
-		}
-		if int(start) > len(str) {
-			start = int64(len(str))
-		}
-		return str[start:end], nil
-
-	case "length":
-		// Get length of string or array
-		if len(expr.Args) != 1 {
-			return nil, fmt.Errorf("length() expects 1 argument, got %d", len(expr.Args))
-		}
-		arg, err := i.EvaluateExpression(expr.Args[0], env)
-		if err != nil {
-			return nil, err
-		}
-		switch v := arg.(type) {
-		case string:
-			return int64(len(v)), nil
-		case []interface{}:
-			return int64(len(v)), nil
-		default:
-			return nil, fmt.Errorf("length() expects a string or array argument, got %T", arg)
-		}
-
-	case "startsWith":
-		// Check if string starts with prefix
-		if len(expr.Args) != 2 {
-			return nil, fmt.Errorf("startsWith() expects 2 arguments, got %d", len(expr.Args))
-		}
-		strArg, err := i.EvaluateExpression(expr.Args[0], env)
-		if err != nil {
-			return nil, err
-		}
-		str, ok := strArg.(string)
-		if !ok {
-			return nil, fmt.Errorf("startsWith() expects first argument to be a string, got %T", strArg)
-		}
-		prefixArg, err := i.EvaluateExpression(expr.Args[1], env)
-		if err != nil {
-			return nil, err
-		}
-		prefix, ok := prefixArg.(string)
-		if !ok {
-			return nil, fmt.Errorf("startsWith() expects second argument to be a string, got %T", prefixArg)
-		}
-		return strings.HasPrefix(str, prefix), nil
-
-	case "endsWith":
-		// Check if string ends with suffix
-		if len(expr.Args) != 2 {
-			return nil, fmt.Errorf("endsWith() expects 2 arguments, got %d", len(expr.Args))
-		}
-		strArg, err := i.EvaluateExpression(expr.Args[0], env)
-		if err != nil {
-			return nil, err
-		}
-		str, ok := strArg.(string)
-		if !ok {
-			return nil, fmt.Errorf("endsWith() expects first argument to be a string, got %T", strArg)
-		}
-		suffixArg, err := i.EvaluateExpression(expr.Args[1], env)
-		if err != nil {
-			return nil, err
-		}
-		suffix, ok := suffixArg.(string)
-		if !ok {
-			return nil, fmt.Errorf("endsWith() expects second argument to be a string, got %T", suffixArg)
-		}
-		return strings.HasSuffix(str, suffix), nil
-
-	case "indexOf":
-		// Find first occurrence of substring
-		if len(expr.Args) != 2 {
-			return nil, fmt.Errorf("indexOf() expects 2 arguments, got %d", len(expr.Args))
-		}
-		strArg, err := i.EvaluateExpression(expr.Args[0], env)
-		if err != nil {
-			return nil, err
-		}
-		str, ok := strArg.(string)
-		if !ok {
-			return nil, fmt.Errorf("indexOf() expects first argument to be a string, got %T", strArg)
-		}
-		substrArg, err := i.EvaluateExpression(expr.Args[1], env)
-		if err != nil {
-			return nil, err
-		}
-		substr, ok := substrArg.(string)
-		if !ok {
-			return nil, fmt.Errorf("indexOf() expects second argument to be a string, got %T", substrArg)
-		}
-		return int64(strings.Index(str, substr)), nil
-
-	case "charAt":
-		// Get character at index
-		if len(expr.Args) != 2 {
-			return nil, fmt.Errorf("charAt() expects 2 arguments, got %d", len(expr.Args))
-		}
-		strArg, err := i.EvaluateExpression(expr.Args[0], env)
-		if err != nil {
-			return nil, err
-		}
-		str, ok := strArg.(string)
-		if !ok {
-			return nil, fmt.Errorf("charAt() expects first argument to be a string, got %T", strArg)
-		}
-		indexArg, err := i.EvaluateExpression(expr.Args[1], env)
-		if err != nil {
-			return nil, err
-		}
-		index, ok := indexArg.(int64)
-		if !ok {
-			return nil, fmt.Errorf("charAt() expects second argument to be an integer, got %T", indexArg)
-		}
-		if index < 0 || int(index) >= len(str) {
-			return nil, fmt.Errorf("charAt() index out of bounds: %d", index)
-		}
-		return string(str[index]), nil
-
-	case "parseInt":
-		// Parse string to integer
-		if len(expr.Args) != 1 {
-			return nil, fmt.Errorf("parseInt() expects 1 argument, got %d", len(expr.Args))
-		}
-		arg, err := i.EvaluateExpression(expr.Args[0], env)
-		if err != nil {
-			return nil, err
-		}
-		str, ok := arg.(string)
-		if !ok {
-			return nil, fmt.Errorf("parseInt() expects a string argument, got %T", arg)
-		}
-		str = strings.TrimSpace(str)
-		var result int64
-		_, err = fmt.Sscanf(str, "%d", &result)
-		if err != nil {
-			return nil, fmt.Errorf("parseInt() failed to parse '%s': %v", str, err)
-		}
-		return result, nil
-
-	case "parseFloat":
-		// Parse string to float
-		if len(expr.Args) != 1 {
-			return nil, fmt.Errorf("parseFloat() expects 1 argument, got %d", len(expr.Args))
-		}
-		arg, err := i.EvaluateExpression(expr.Args[0], env)
-		if err != nil {
-			return nil, err
-		}
-		str, ok := arg.(string)
-		if !ok {
-			return nil, fmt.Errorf("parseFloat() expects a string argument, got %T", arg)
-		}
-		str = strings.TrimSpace(str)
-		var result float64
-		_, err = fmt.Sscanf(str, "%f", &result)
-		if err != nil {
-			return nil, fmt.Errorf("parseFloat() failed to parse '%s': %v", str, err)
-		}
-		return result, nil
-
-	case "toString":
-		// Convert value to string
-		if len(expr.Args) != 1 {
-			return nil, fmt.Errorf("toString() expects 1 argument, got %d", len(expr.Args))
-		}
-		arg, err := i.EvaluateExpression(expr.Args[0], env)
-		if err != nil {
-			return nil, err
-		}
-		return fmt.Sprintf("%v", arg), nil
-
-	case "abs":
-		// Absolute value
-		if len(expr.Args) != 1 {
-			return nil, fmt.Errorf("abs() expects 1 argument, got %d", len(expr.Args))
-		}
-		arg, err := i.EvaluateExpression(expr.Args[0], env)
-		if err != nil {
-			return nil, err
-		}
-		switch v := arg.(type) {
-		case int64:
-			if v < 0 {
-				return -v, nil
-			}
-			return v, nil
-		case float64:
-			if v < 0 {
-				return -v, nil
-			}
-			return v, nil
-		default:
-			return nil, fmt.Errorf("abs() expects a numeric argument, got %T", arg)
-		}
-
-	case "min":
-		// Minimum of two values
-		if len(expr.Args) != 2 {
-			return nil, fmt.Errorf("min() expects 2 arguments, got %d", len(expr.Args))
-		}
-		leftArg, err := i.EvaluateExpression(expr.Args[0], env)
-		if err != nil {
-			return nil, err
-		}
-		rightArg, err := i.EvaluateExpression(expr.Args[1], env)
-		if err != nil {
-			return nil, err
-		}
-		switch l := leftArg.(type) {
-		case int64:
-			r, ok := rightArg.(int64)
-			if !ok {
-				return nil, fmt.Errorf("min() arguments must be same type")
-			}
-			if l < r {
-				return l, nil
-			}
-			return r, nil
-		case float64:
-			r, ok := rightArg.(float64)
-			if !ok {
-				return nil, fmt.Errorf("min() arguments must be same type")
-			}
-			if l < r {
-				return l, nil
-			}
-			return r, nil
-		default:
-			return nil, fmt.Errorf("min() expects numeric arguments, got %T", leftArg)
-		}
-
-	case "max":
-		// Maximum of two values
-		if len(expr.Args) != 2 {
-			return nil, fmt.Errorf("max() expects 2 arguments, got %d", len(expr.Args))
-		}
-		leftArg, err := i.EvaluateExpression(expr.Args[0], env)
-		if err != nil {
-			return nil, err
-		}
-		rightArg, err := i.EvaluateExpression(expr.Args[1], env)
-		if err != nil {
-			return nil, err
-		}
-		switch l := leftArg.(type) {
-		case int64:
-			r, ok := rightArg.(int64)
-			if !ok {
-				return nil, fmt.Errorf("max() arguments must be same type")
-			}
-			if l > r {
-				return l, nil
-			}
-			return r, nil
-		case float64:
-			r, ok := rightArg.(float64)
-			if !ok {
-				return nil, fmt.Errorf("max() arguments must be same type")
-			}
-			if l > r {
-				return l, nil
-			}
-			return r, nil
-		default:
-			return nil, fmt.Errorf("max() expects numeric arguments, got %T", leftArg)
-		}
+	// Handle built-in functions via dispatch table
+	if fn, ok := builtinFuncs[expr.Name]; ok {
+		return fn(i, expr.Args, env)
 	}
 
 	// Check if this is a method call (contains a dot)
@@ -1103,6 +718,11 @@ func (i *Interpreter) evaluateFunctionCall(expr FunctionCallExpr, env *Environme
 			if arr, ok := obj.([]interface{}); ok {
 				return int64(len(arr)), nil
 			}
+		}
+
+		// Handle Result type methods (result.map, result.isOk, etc.)
+		if result, ok := obj.(*ResultValue); ok {
+			return i.evaluateResultMethod(result, methodName, args, env)
 		}
 
 		// Check if obj is a map (module namespace) and methodName is a function
@@ -1264,6 +884,16 @@ func (i *Interpreter) executeFunction(fn Function, args []Expr, env *Environment
 			return nil, fmt.Errorf("missing required argument %s in function %s", param.Name, fn.Name)
 		}
 
+		// Auto-coerce float64 to int64 when parameter expects int.
+		// JSON numbers always arrive as float64 from HTTP request bodies,
+		// so this coercion is necessary for web server routes to work
+		// with typed function parameters. Only whole numbers are coerced.
+		if fVal, ok := argVal.(float64); ok {
+			if _, isInt := param.TypeAnnotation.(IntType); isInt && fVal == float64(int64(fVal)) {
+				argVal = int64(fVal)
+			}
+		}
+
 		// Validate argument type matches parameter type annotation
 		// Optional parameters can be nil without type checking
 		skipTypeCheck := argVal == nil && !param.Required
@@ -1279,8 +909,8 @@ func (i *Interpreter) executeFunction(fn Function, args []Expr, env *Environment
 	// Execute function body
 	result, err := i.executeStatements(fn.Body, fnEnv)
 	if err != nil {
-		if retErr, ok := err.(*returnValue); ok {
-			result = retErr.value
+		if val, isReturn := unwrapReturn(err); isReturn {
+			result = val
 		} else {
 			return nil, err
 		}
@@ -1354,6 +984,16 @@ func (i *Interpreter) executeGenericFunction(fn Function, typeArgs []Type, args 
 	for idx, param := range instantiatedFn.Params {
 		argVal := argValues[idx]
 
+		// Auto-coerce float64 to int64 when parameter expects int.
+		// JSON numbers always arrive as float64 from HTTP request bodies,
+		// so this coercion is necessary for web server routes to work
+		// with typed function parameters. Only whole numbers are coerced.
+		if fVal, ok := argVal.(float64); ok {
+			if _, isInt := param.TypeAnnotation.(IntType); isInt && fVal == float64(int64(fVal)) {
+				argVal = int64(fVal)
+			}
+		}
+
 		// Validate argument type matches the instantiated parameter type
 		if param.TypeAnnotation != nil {
 			if err := i.typeChecker.CheckType(argVal, param.TypeAnnotation); err != nil {
@@ -1367,8 +1007,8 @@ func (i *Interpreter) executeGenericFunction(fn Function, typeArgs []Type, args 
 	// Execute function body
 	result, err := i.executeStatements(fn.Body, fnEnv)
 	if err != nil {
-		if retErr, ok := err.(*returnValue); ok {
-			result = retErr.value
+		if val, isReturn := unwrapReturn(err); isReturn {
+			result = val
 		} else {
 			return nil, err
 		}
@@ -1513,10 +1153,27 @@ func (i *Interpreter) matchLiteralPattern(pattern LiteralPattern, value interfac
 
 // matchObjectPattern matches a value against an object destructuring pattern
 func (i *Interpreter) matchObjectPattern(pattern ObjectPattern, value interface{}, env *Environment) (bool, error) {
-	// Value must be a map
-	objMap, ok := value.(map[string]interface{})
-	if !ok {
-		return false, nil
+	var objMap map[string]interface{}
+
+	// Handle ResultValue by exposing it as a map with "ok"/"error" keys
+	if result, ok := value.(*ResultValue); ok {
+		if result.IsOk() {
+			objMap = map[string]interface{}{
+				"ok":    result.value,
+				"value": result.value,
+			}
+		} else {
+			objMap = map[string]interface{}{
+				"error": result.value,
+				"err":   result.value,
+			}
+		}
+	} else {
+		var ok bool
+		objMap, ok = value.(map[string]interface{})
+		if !ok {
+			return false, nil
+		}
 	}
 
 	// Match each field in the pattern
@@ -1743,8 +1400,8 @@ func (i *Interpreter) executeFunctionWithValues(fn Function, argVals []interface
 	// Execute function body
 	result, err := i.executeStatements(fn.Body, fnEnv)
 	if err != nil {
-		if retErr, ok := err.(*returnValue); ok {
-			result = retErr.value
+		if val, isReturn := unwrapReturn(err); isReturn {
+			result = val
 		} else {
 			return nil, err
 		}
@@ -1792,8 +1449,8 @@ func (i *Interpreter) callLambdaClosure(closure *LambdaClosure, args []interface
 	if len(closure.Lambda.Block) > 0 {
 		result, err := i.executeStatements(closure.Lambda.Block, lambdaEnv)
 		if err != nil {
-			if retErr, ok := err.(*returnValue); ok {
-				return retErr.value, nil
+			if val, isReturn := unwrapReturn(err); isReturn {
+				return val, nil
 			}
 			return nil, err
 		}
@@ -1801,4 +1458,131 @@ func (i *Interpreter) callLambdaClosure(closure *LambdaClosure, args []interface
 	}
 
 	return nil, nil
+}
+
+// evaluateResultMethod handles method calls on ResultValue instances.
+func (i *Interpreter) evaluateResultMethod(result *ResultValue, method string, args []interface{}, env *Environment) (interface{}, error) {
+	switch method {
+	case "isOk":
+		return result.IsOk(), nil
+
+	case "isErr":
+		return result.IsErr(), nil
+
+	case "unwrap":
+		return result.Unwrap()
+
+	case "unwrapOr":
+		if len(args) != 1 {
+			return nil, fmt.Errorf("unwrapOr() expects 1 argument, got %d", len(args))
+		}
+		return result.UnwrapOr(args[0]), nil
+
+	case "unwrapErr":
+		return result.UnwrapErr()
+
+	case "map":
+		if len(args) != 1 {
+			return nil, fmt.Errorf("map() expects 1 argument (a function), got %d", len(args))
+		}
+		if !result.IsOk() {
+			return result, nil
+		}
+		mapped, err := i.callFnArg(args[0], result.value, env)
+		if err != nil {
+			return nil, fmt.Errorf("Result.map: %w", err)
+		}
+		return NewOk(mapped), nil
+
+	case "mapErr":
+		if len(args) != 1 {
+			return nil, fmt.Errorf("mapErr() expects 1 argument (a function), got %d", len(args))
+		}
+		if result.IsOk() {
+			return result, nil
+		}
+		mapped, err := i.callFnArg(args[0], result.value, env)
+		if err != nil {
+			return nil, fmt.Errorf("Result.mapErr: %w", err)
+		}
+		return NewErr(mapped), nil
+
+	case "andThen":
+		if len(args) != 1 {
+			return nil, fmt.Errorf("andThen() expects 1 argument (a function), got %d", len(args))
+		}
+		if !result.IsOk() {
+			return result, nil
+		}
+		chained, err := i.callFnArg(args[0], result.value, env)
+		if err != nil {
+			return nil, fmt.Errorf("Result.andThen: %w", err)
+		}
+		if _, ok := chained.(*ResultValue); ok {
+			return chained, nil
+		}
+		return NewOk(chained), nil
+
+	case "orElse":
+		if len(args) != 1 {
+			return nil, fmt.Errorf("orElse() expects 1 argument (a function), got %d", len(args))
+		}
+		if result.IsOk() {
+			return result, nil
+		}
+		fallback, err := i.callFnArg(args[0], result.value, env)
+		if err != nil {
+			return nil, fmt.Errorf("Result.orElse: %w", err)
+		}
+		if _, ok := fallback.(*ResultValue); ok {
+			return fallback, nil
+		}
+		return NewOk(fallback), nil
+
+	default:
+		return nil, fmt.Errorf("Result has no method '%s'", method)
+	}
+}
+
+// callFnArg calls a function-like value with a single argument.
+// Supports Function AST nodes and LambdaClosure values.
+func (i *Interpreter) callFnArg(fn interface{}, arg interface{}, env *Environment) (interface{}, error) {
+	switch f := fn.(type) {
+	case Function:
+		fnEnv := NewChildEnvironment(env)
+		if len(f.Params) > 0 {
+			fnEnv.Define(f.Params[0].Name, arg)
+		}
+		result, err := i.executeStatements(f.Body, fnEnv)
+		if err != nil {
+			if val, isReturn := unwrapReturn(err); isReturn {
+				return val, nil
+			}
+			return nil, err
+		}
+		return result, nil
+	case *Function:
+		return i.callFnArg(*f, arg, env)
+	case *LambdaClosure:
+		fnEnv := NewChildEnvironment(f.Env)
+		if len(f.Lambda.Params) > 0 {
+			fnEnv.Define(f.Lambda.Params[0].Name, arg)
+		}
+		if f.Lambda.Body != nil {
+			return i.EvaluateExpression(f.Lambda.Body, fnEnv)
+		}
+		if len(f.Lambda.Block) > 0 {
+			result, err := i.executeStatements(f.Lambda.Block, fnEnv)
+			if err != nil {
+				if val, isReturn := unwrapReturn(err); isReturn {
+					return val, nil
+				}
+				return nil, err
+			}
+			return result, nil
+		}
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("expected a function, got %T", fn)
+	}
 }

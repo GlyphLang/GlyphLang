@@ -96,18 +96,18 @@ func TestFindBestSuggestions(t *testing.T) {
 // Test similarity score calculation
 func TestCalculateSimilarityScore(t *testing.T) {
 	tests := []struct {
-		s1            string
-		s2            string
-		distance      int
-		minScore      float64
-		shouldBeHigh  bool // true if score should be >= 0.7
+		s1           string
+		s2           string
+		distance     int
+		minScore     float64
+		shouldBeHigh bool // true if score should be >= 0.7
 	}{
-		{"hello", "hello", 0, 1.0, true},   // Exact match
-		{"hello", "hallo", 1, 0.6, true},   // Small difference
-		{"count", "cunt", 1, 0.6, true},    // Typo
-		{"user", "users", 1, 0.7, true},    // Suffix
-		{"req", "request", 4, 0.3, true},   // Prefix - high similarity due to prefix bonus
-		{"foo", "bar", 3, 0.0, false},      // Completely different
+		{"hello", "hello", 0, 1.0, true}, // Exact match
+		{"hello", "hallo", 1, 0.6, true}, // Small difference
+		{"count", "cunt", 1, 0.6, true},  // Typo
+		{"user", "users", 1, 0.7, true},  // Suffix
+		{"req", "request", 4, 0.3, true}, // Prefix - high similarity due to prefix bonus
+		{"foo", "bar", 3, 0.0, false},    // Completely different
 	}
 
 	for _, tt := range tests {

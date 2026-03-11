@@ -41,7 +41,7 @@ func TestVMStackOperations(t *testing.T) {
 
 // Helper function to create bytecode header
 func createBytecodeHeader(constants []Value) []byte {
-	bytecode := []byte{0x47, 0x4C, 0x59, 0x50} // Magic "GLYP"
+	bytecode := []byte{0x47, 0x4C, 0x59, 0x50}          // Magic "GLYP"
 	bytecode = append(bytecode, 0x01, 0x00, 0x00, 0x00) // Version 1
 
 	// Constant count
@@ -365,10 +365,10 @@ func TestOpBuildObject(t *testing.T) {
 	operand3 := uint32(3)
 	operand2fields := uint32(2)
 
-	bytecode = addInstruction(bytecode, OpPush, &operand0)          // Push "name"
-	bytecode = addInstruction(bytecode, OpPush, &operand1)          // Push "Alice"
-	bytecode = addInstruction(bytecode, OpPush, &operand2)          // Push "age"
-	bytecode = addInstruction(bytecode, OpPush, &operand3)          // Push 30
+	bytecode = addInstruction(bytecode, OpPush, &operand0)              // Push "name"
+	bytecode = addInstruction(bytecode, OpPush, &operand1)              // Push "Alice"
+	bytecode = addInstruction(bytecode, OpPush, &operand2)              // Push "age"
+	bytecode = addInstruction(bytecode, OpPush, &operand3)              // Push 30
 	bytecode = addInstruction(bytecode, OpBuildObject, &operand2fields) // Build object with 2 fields
 	bytecode = addInstruction(bytecode, OpHalt, nil)
 
@@ -562,10 +562,10 @@ func TestRouteExecution(t *testing.T) {
 	operand1 := uint32(1)
 	operandCount := uint32(1)
 
-	bytecode = addInstruction(bytecode, OpPush, &operand0)         // Push "message"
-	bytecode = addInstruction(bytecode, OpPush, &operand1)         // Push "Hello"
+	bytecode = addInstruction(bytecode, OpPush, &operand0)            // Push "message"
+	bytecode = addInstruction(bytecode, OpPush, &operand1)            // Push "Hello"
 	bytecode = addInstruction(bytecode, OpBuildObject, &operandCount) // Build object with 1 field
-	bytecode = addInstruction(bytecode, OpHttpReturn, nil)         // HTTP Return
+	bytecode = addInstruction(bytecode, OpHttpReturn, nil)            // HTTP Return
 
 	vm := NewVM()
 	result, err := vm.Execute(bytecode)
@@ -806,7 +806,7 @@ func TestOpJumpIfFalse(t *testing.T) {
 	jumpOffset := startOffset + 5 + 5 + 5 // Jump to after "Push 1" instruction
 	jumpTarget := uint32(jumpOffset)
 	bytecode = addInstruction(bytecode, OpJumpIfFalse, &jumpTarget) // offset: startOffset + 5
-	bytecode = addInstruction(bytecode, OpPush, &operand1) // Push 1 (should be skipped) - offset: startOffset + 10
+	bytecode = addInstruction(bytecode, OpPush, &operand1)          // Push 1 (should be skipped) - offset: startOffset + 10
 	// jumpTarget points here: startOffset + 15
 	bytecode = addInstruction(bytecode, OpPush, &operand2) // Push 2 - offset: startOffset + 15
 	bytecode = addInstruction(bytecode, OpHalt, nil)
@@ -841,7 +841,7 @@ func TestOpJumpIfTrue(t *testing.T) {
 	jumpOffset := startOffset + 5 + 5 + 5 // Jump to after "Push 1" instruction
 	jumpTarget := uint32(jumpOffset)
 	bytecode = addInstruction(bytecode, OpJumpIfTrue, &jumpTarget) // offset: startOffset + 5
-	bytecode = addInstruction(bytecode, OpPush, &operand1) // Push 1 (should be skipped) - offset: startOffset + 10
+	bytecode = addInstruction(bytecode, OpPush, &operand1)         // Push 1 (should be skipped) - offset: startOffset + 10
 	// jumpTarget points here: startOffset + 15
 	bytecode = addInstruction(bytecode, OpPush, &operand2) // Push 2 - offset: startOffset + 15
 	bytecode = addInstruction(bytecode, OpHalt, nil)
@@ -874,15 +874,15 @@ func TestOpGetField(t *testing.T) {
 	operand2fields := uint32(2)
 
 	// Build object: {name: "Alice", age: 30}
-	bytecode = addInstruction(bytecode, OpPush, &operand0)             // Push "name"
-	bytecode = addInstruction(bytecode, OpPush, &operand1)             // Push "Alice"
-	bytecode = addInstruction(bytecode, OpPush, &operand2)             // Push "age"
-	bytecode = addInstruction(bytecode, OpPush, &operand3)             // Push 30
+	bytecode = addInstruction(bytecode, OpPush, &operand0)              // Push "name"
+	bytecode = addInstruction(bytecode, OpPush, &operand1)              // Push "Alice"
+	bytecode = addInstruction(bytecode, OpPush, &operand2)              // Push "age"
+	bytecode = addInstruction(bytecode, OpPush, &operand3)              // Push 30
 	bytecode = addInstruction(bytecode, OpBuildObject, &operand2fields) // Build object with 2 fields
 
 	// Get field "name"
-	bytecode = addInstruction(bytecode, OpPush, &operand0)             // Push "name" (field name)
-	bytecode = addInstruction(bytecode, OpGetField, nil)               // Get field
+	bytecode = addInstruction(bytecode, OpPush, &operand0) // Push "name" (field name)
+	bytecode = addInstruction(bytecode, OpGetField, nil)   // Get field
 	bytecode = addInstruction(bytecode, OpHalt, nil)
 
 	vm := NewVM()
@@ -910,13 +910,13 @@ func TestOpGetFieldNotFound(t *testing.T) {
 	operand1field := uint32(1)
 
 	// Build object: {name: "Alice"}
-	bytecode = addInstruction(bytecode, OpPush, &operand0)            // Push "name"
-	bytecode = addInstruction(bytecode, OpPush, &operand1)            // Push "Alice"
+	bytecode = addInstruction(bytecode, OpPush, &operand0)             // Push "name"
+	bytecode = addInstruction(bytecode, OpPush, &operand1)             // Push "Alice"
 	bytecode = addInstruction(bytecode, OpBuildObject, &operand1field) // Build object with 1 field
 
 	// Try to get non-existent field "missing"
-	bytecode = addInstruction(bytecode, OpPush, &operand2)            // Push "missing" (field name)
-	bytecode = addInstruction(bytecode, OpGetField, nil)              // Get field
+	bytecode = addInstruction(bytecode, OpPush, &operand2) // Push "missing" (field name)
+	bytecode = addInstruction(bytecode, OpGetField, nil)   // Get field
 	bytecode = addInstruction(bytecode, OpHalt, nil)
 
 	vm := NewVM()
@@ -1098,7 +1098,6 @@ func TestBuiltinString_Substring(t *testing.T) {
 		{"middle_range", "hello world", 6, 11, "world"},
 		{"full_string", "test", 0, 4, "test"},
 		{"empty_string", "test", 2, 2, ""},
-		{"beyond_length", "test", 0, 10, "test"},
 	}
 
 	for _, tt := range tests {
@@ -1117,4 +1116,16 @@ func TestBuiltinString_Substring(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("beyond_length", func(t *testing.T) {
+		vm := NewVM()
+		_, err := vm.builtins["substring"]([]Value{
+			StringValue{Val: "test"},
+			IntValue{Val: 0},
+			IntValue{Val: 10},
+		})
+		if err == nil {
+			t.Error("Expected error for out-of-bounds end index")
+		}
+	})
 }

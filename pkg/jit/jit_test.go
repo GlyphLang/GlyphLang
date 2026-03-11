@@ -1,10 +1,9 @@
 package jit
 
 import (
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
 	"time"
-
-	"github.com/glyphlang/glyph/pkg/interpreter"
 )
 
 // TestNewJITCompiler tests JIT compiler creation
@@ -49,13 +48,13 @@ func TestCompileRoute(t *testing.T) {
 	jit := NewJITCompiler()
 
 	// Create a simple route
-	route := &interpreter.Route{
-		Method: interpreter.Get,
+	route := &ast.Route{
+		Method: ast.Get,
 		Path:   "/test",
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.LiteralExpr{
-					Value: interpreter.IntLiteral{Value: 42},
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.LiteralExpr{
+					Value: ast.IntLiteral{Value: 42},
 				},
 			},
 		},
@@ -89,13 +88,13 @@ func TestCompileRoute(t *testing.T) {
 func TestCacheHit(t *testing.T) {
 	jit := NewJITCompiler()
 
-	route := &interpreter.Route{
-		Method: interpreter.Get,
+	route := &ast.Route{
+		Method: ast.Get,
 		Path:   "/test",
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.LiteralExpr{
-					Value: interpreter.IntLiteral{Value: 42},
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.LiteralExpr{
+					Value: ast.IntLiteral{Value: 42},
 				},
 			},
 		},
@@ -132,13 +131,13 @@ func TestCacheHit(t *testing.T) {
 func TestRecordExecution(t *testing.T) {
 	jit := NewJITCompiler()
 
-	route := &interpreter.Route{
-		Method: interpreter.Get,
+	route := &ast.Route{
+		Method: ast.Get,
 		Path:   "/test",
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.LiteralExpr{
-					Value: interpreter.IntLiteral{Value: 42},
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.LiteralExpr{
+					Value: ast.IntLiteral{Value: 42},
 				},
 			},
 		},
@@ -181,13 +180,13 @@ func TestHotPathDetection(t *testing.T) {
 	// Use a low threshold for testing
 	jit := NewJITCompilerWithConfig(10, 1*time.Millisecond)
 
-	route := &interpreter.Route{
-		Method: interpreter.Get,
+	route := &ast.Route{
+		Method: ast.Get,
 		Path:   "/test",
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.LiteralExpr{
-					Value: interpreter.IntLiteral{Value: 42},
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.LiteralExpr{
+					Value: ast.IntLiteral{Value: 42},
 				},
 			},
 		},
@@ -259,13 +258,13 @@ func TestGetHotPaths(t *testing.T) {
 func TestInvalidateCache(t *testing.T) {
 	jit := NewJITCompiler()
 
-	route := &interpreter.Route{
-		Method: interpreter.Get,
+	route := &ast.Route{
+		Method: ast.Get,
 		Path:   "/test",
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.LiteralExpr{
-					Value: interpreter.IntLiteral{Value: 42},
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.LiteralExpr{
+					Value: ast.IntLiteral{Value: 42},
 				},
 			},
 		},
@@ -297,13 +296,13 @@ func TestInvalidateCache(t *testing.T) {
 func TestClearCache(t *testing.T) {
 	jit := NewJITCompiler()
 
-	route := &interpreter.Route{
-		Method: interpreter.Get,
+	route := &ast.Route{
+		Method: ast.Get,
 		Path:   "/test",
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.LiteralExpr{
-					Value: interpreter.IntLiteral{Value: 42},
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.LiteralExpr{
+					Value: ast.IntLiteral{Value: 42},
 				},
 			},
 		},
@@ -331,13 +330,13 @@ func TestClearCache(t *testing.T) {
 func TestGetStats(t *testing.T) {
 	jit := NewJITCompiler()
 
-	route := &interpreter.Route{
-		Method: interpreter.Get,
+	route := &ast.Route{
+		Method: ast.Get,
 		Path:   "/test",
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.LiteralExpr{
-					Value: interpreter.IntLiteral{Value: 42},
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.LiteralExpr{
+					Value: ast.IntLiteral{Value: 42},
 				},
 			},
 		},
@@ -372,23 +371,23 @@ func TestGetStats(t *testing.T) {
 func TestOptimizationTiers(t *testing.T) {
 	jit := NewJITCompiler()
 
-	route := &interpreter.Route{
-		Method: interpreter.Get,
+	route := &ast.Route{
+		Method: ast.Get,
 		Path:   "/test",
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "x",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 			},
-			&interpreter.AssignStatement{
+			&ast.AssignStatement{
 				Target: "y",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Add,
-					Left:  &interpreter.VariableExpr{Name: "x"},
-					Right: &interpreter.VariableExpr{Name: "y"},
+			&ast.ReturnStatement{
+				Value: &ast.BinaryOpExpr{
+					Op:    ast.Add,
+					Left:  &ast.VariableExpr{Name: "x"},
+					Right: &ast.VariableExpr{Name: "y"},
 				},
 			},
 		},
@@ -427,13 +426,13 @@ func TestOptimizationTiers(t *testing.T) {
 func TestConcurrentCompilation(t *testing.T) {
 	jit := NewJITCompiler()
 
-	route := &interpreter.Route{
-		Method: interpreter.Get,
+	route := &ast.Route{
+		Method: ast.Get,
 		Path:   "/test",
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.LiteralExpr{
-					Value: interpreter.IntLiteral{Value: 42},
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.LiteralExpr{
+					Value: ast.IntLiteral{Value: 42},
 				},
 			},
 		},
@@ -495,19 +494,19 @@ func TestSettersAndGetters(t *testing.T) {
 func BenchmarkCompileRoute(b *testing.B) {
 	jit := NewJITCompiler()
 
-	route := &interpreter.Route{
-		Method: interpreter.Get,
+	route := &ast.Route{
+		Method: ast.Get,
 		Path:   "/test",
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "x",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Mul,
-					Left:  &interpreter.VariableExpr{Name: "x"},
-					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+			&ast.ReturnStatement{
+				Value: &ast.BinaryOpExpr{
+					Op:    ast.Mul,
+					Left:  &ast.VariableExpr{Name: "x"},
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 				},
 			},
 		},
@@ -527,12 +526,12 @@ func BenchmarkCompileRoute(b *testing.B) {
 func BenchmarkCacheHit(b *testing.B) {
 	jit := NewJITCompiler()
 
-	route := &interpreter.Route{
-		Method: interpreter.Get,
+	route := &ast.Route{
+		Method: ast.Get,
 		Path:   "/test",
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
 			},
 		},
 	}

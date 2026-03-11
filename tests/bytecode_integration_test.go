@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/glyphlang/glyph/pkg/ast"
 	"github.com/glyphlang/glyph/pkg/compiler"
 	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/parser"
@@ -116,9 +117,9 @@ func TestCompareInterpreterVsBytecode(t *testing.T) {
 	}
 
 	// Get first route
-	var route *interpreter.Route
+	var route *ast.Route
 	for _, item := range module.Items {
-		if r, ok := item.(*interpreter.Route); ok {
+		if r, ok := item.(*ast.Route); ok {
 			route = r
 			break
 		}
@@ -185,9 +186,9 @@ func TestBenchmarkInterpreterVsBytecode(t *testing.T) {
 	interp := interpreter.NewInterpreter()
 	interp.LoadModule(*module)
 
-	var route *interpreter.Route
+	var route *ast.Route
 	for _, item := range module.Items {
-		if r, ok := item.(*interpreter.Route); ok {
+		if r, ok := item.(*ast.Route); ok {
 			route = r
 			break
 		}
@@ -293,9 +294,7 @@ func TestCompilationSpeed(t *testing.T) {
 
 // TestRoundTrip tests compile -> decompile round trip
 func TestRoundTrip(t *testing.T) {
-	t.Skip("Skipping until DeserializeFromBinary and FormatAST are implemented in pure Go")
-
-	// TODO: Implement these in pure Go
+	t.Skip("Skipping: DeserializeFromBinary and FormatAST are not yet implemented in pure Go")
 	// source := `@ GET /hello
 	//   > {message: "Hello, World!"}`
 	//

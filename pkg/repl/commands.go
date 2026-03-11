@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/glyphlang/glyph/pkg/ast"
 	"github.com/glyphlang/glyph/pkg/interpreter"
 )
 
@@ -139,7 +140,7 @@ func getTypeName(v interface{}) string {
 		return "[" + elemType + "]"
 	case map[string]interface{}:
 		return "object"
-	case interpreter.Function:
+	case ast.Function:
 		return "function"
 	default:
 		return fmt.Sprintf("%T", v)
@@ -219,7 +220,7 @@ func (r *REPL) cmdVars(args []string) error {
 	for _, name := range names {
 		val := vars[name]
 		// Skip functions
-		if _, ok := val.(interpreter.Function); ok {
+		if _, ok := val.(ast.Function); ok {
 			continue
 		}
 		typeName := getTypeName(val)
@@ -246,7 +247,7 @@ func (r *REPL) cmdFunctions(args []string) error {
 
 	var fns []string
 	for name, val := range vars {
-		if fn, ok := val.(interpreter.Function); ok {
+		if fn, ok := val.(ast.Function); ok {
 			sig := formatFunctionSignature(name, fn)
 			fns = append(fns, sig)
 		}
@@ -270,7 +271,7 @@ func (r *REPL) cmdFunctions(args []string) error {
 }
 
 // formatFunctionSignature formats a function signature for display.
-func formatFunctionSignature(name string, fn interpreter.Function) string {
+func formatFunctionSignature(name string, fn ast.Function) string {
 	var params []string
 	for _, param := range fn.Params {
 		paramStr := param.Name
@@ -293,27 +294,27 @@ func formatFunctionSignature(name string, fn interpreter.Function) string {
 }
 
 // formatType formats a type for display.
-func formatType(t interpreter.Type) string {
+func formatType(t ast.Type) string {
 	if t == nil {
 		return "any"
 	}
 
 	switch typ := t.(type) {
-	case interpreter.IntType:
+	case ast.IntType:
 		return "int"
-	case interpreter.StringType:
+	case ast.StringType:
 		return "str"
-	case interpreter.BoolType:
+	case ast.BoolType:
 		return "bool"
-	case interpreter.FloatType:
+	case ast.FloatType:
 		return "float"
-	case interpreter.ArrayType:
+	case ast.ArrayType:
 		return "[" + formatType(typ.ElementType) + "]"
-	case interpreter.OptionalType:
+	case ast.OptionalType:
 		return formatType(typ.InnerType) + "?"
-	case interpreter.NamedType:
+	case ast.NamedType:
 		return typ.Name
-	case interpreter.GenericType:
+	case ast.GenericType:
 		base := formatType(typ.BaseType)
 		if len(typ.TypeArgs) > 0 {
 			var args []string
@@ -323,7 +324,7 @@ func formatType(t interpreter.Type) string {
 			return base + "<" + strings.Join(args, ", ") + ">"
 		}
 		return base
-	case interpreter.FunctionType:
+	case ast.FunctionType:
 		var params []string
 		for _, param := range typ.ParamTypes {
 			params = append(params, formatType(param))

@@ -56,13 +56,13 @@ const (
 	WHILE   // while
 
 	// Keywords
-	SWITCH   // switch
-	CASE     // case
-	DEFAULT  // default
-	FOR      // for
-	IN       // in
-	MACRO    // macro
-	QUOTE    // quote
+	SWITCH    // switch
+	CASE      // case
+	DEFAULT   // default
+	FOR       // for
+	IN        // in
+	MACRO     // macro
+	QUOTE     // quote
 	MATCH     // match
 	WHEN      // when (for guards in match)
 	FATARROW  // =>
@@ -74,6 +74,10 @@ const (
 	AS        // as
 	MODULE    // module
 	CONST     // const
+	TEST      // test
+	ASSERT    // assert
+	BREAK     // break
+	CONTINUE  // continue
 )
 
 // Token represents a lexical token
@@ -209,6 +213,14 @@ func (t TokenType) String() string {
 		return "MODULE"
 	case CONST:
 		return "CONST"
+	case TEST:
+		return "TEST"
+	case ASSERT:
+		return "ASSERT"
+	case BREAK:
+		return "BREAK"
+	case CONTINUE:
+		return "CONTINUE"
 	default:
 		return "UNKNOWN"
 	}

@@ -757,10 +757,10 @@ func TestFormatLocalsWithValues(t *testing.T) {
 	d := NewDebugger(v)
 
 	locals := map[string]vm.Value{
-		"x":       vm.IntValue{Val: 42},
-		"name":    vm.StringValue{Val: "test"},
-		"active":  vm.BoolValue{Val: true},
-		"price":   vm.FloatValue{Val: 3.14},
+		"x":      vm.IntValue{Val: 42},
+		"name":   vm.StringValue{Val: "test"},
+		"active": vm.BoolValue{Val: true},
+		"price":  vm.FloatValue{Val: 3.14},
 	}
 	d.PushCallFrame("testFunc", 100, locals)
 

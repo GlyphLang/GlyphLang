@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"strings"
+	"time"
 )
 
 // Opcode represents a bytecode operation
@@ -16,6 +18,7 @@ const (
 	OpSub         Opcode = 0x11
 	OpMul         Opcode = 0x12
 	OpDiv         Opcode = 0x13
+	OpMod         Opcode = 0x14
 	OpEq          Opcode = 0x20
 	OpNe          Opcode = 0x21
 	OpLt          Opcode = 0x22
@@ -102,6 +105,9 @@ type VM struct {
 
 	// WebSocket context (set when executing WebSocket handlers)
 	wsHandler WebSocketHandler
+
+	// Maximum number of execution steps (0 = unlimited)
+	maxSteps int
 }
 
 // NewVM creates a new virtual machine
@@ -142,10 +148,30 @@ func (vm *VM) Execute(bytecode []byte) (Value, error) {
 	vm.pc = offset
 	vm.halted = false
 
-	// Execute instructions
+	return vm.runLoop()
+}
+
+// executeRaw runs raw instruction bytes without a bytecode header.
+// Constants, locals, globals, and builtins must already be set on the VM.
+func (vm *VM) executeRaw(instructions []byte) (Value, error) {
+	vm.code = instructions
+	vm.pc = 0
+	vm.halted = false
+
+	return vm.runLoop()
+}
+
+// runLoop is the core execution loop shared by Execute and executeRaw.
+func (vm *VM) runLoop() (Value, error) {
+	// Execute instructions with step limit to prevent infinite loops
+	steps := 0
 	for !vm.halted && vm.pc < len(vm.code) {
 		if err := vm.step(); err != nil {
 			return nil, err
+		}
+		steps++
+		if vm.maxSteps > 0 && steps > vm.maxSteps {
+			return nil, fmt.Errorf("execution exceeded maximum step limit (%d steps)", vm.maxSteps)
 		}
 	}
 
@@ -273,6 +299,8 @@ func (vm *VM) executeInstruction(opcode Opcode) error {
 		return vm.execMul()
 	case OpDiv:
 		return vm.execDiv()
+	case OpMod:
+		return vm.execMod()
 	case OpEq:
 		return vm.execEq()
 	case OpNe:
@@ -537,6 +565,53 @@ func (vm *VM) execDiv() error {
 	return fmt.Errorf("type error: cannot divide %s and %s", a.Type(), b.Type())
 }
 
+// execMod performs modulo/remainder operation
+func (vm *VM) execMod() error {
+	b, err := vm.Pop()
+	if err != nil {
+		return err
+	}
+	a, err := vm.Pop()
+	if err != nil {
+		return err
+	}
+
+	switch av := a.(type) {
+	case IntValue:
+		if bv, ok := b.(IntValue); ok {
+			if bv.Val == 0 {
+				return fmt.Errorf("modulo by zero")
+			}
+			vm.Push(IntValue{Val: av.Val % bv.Val})
+			return nil
+		}
+		if bv, ok := b.(FloatValue); ok {
+			if bv.Val == 0 {
+				return fmt.Errorf("modulo by zero")
+			}
+			vm.Push(FloatValue{Val: math.Mod(float64(av.Val), bv.Val)})
+			return nil
+		}
+	case FloatValue:
+		if bv, ok := b.(FloatValue); ok {
+			if bv.Val == 0 {
+				return fmt.Errorf("modulo by zero")
+			}
+			vm.Push(FloatValue{Val: math.Mod(av.Val, bv.Val)})
+			return nil
+		}
+		if bv, ok := b.(IntValue); ok {
+			if bv.Val == 0 {
+				return fmt.Errorf("modulo by zero")
+			}
+			vm.Push(FloatValue{Val: math.Mod(av.Val, float64(bv.Val))})
+			return nil
+		}
+	}
+
+	return fmt.Errorf("type error: cannot compute modulo of %s and %s", a.Type(), b.Type())
+}
+
 // execEq checks equality
 func (vm *VM) execEq() error {
 	b, err := vm.Pop()
@@ -729,6 +804,11 @@ func (vm *VM) execIterHasNext() error {
 		hasNext = iter.index < len(iter.keys)
 	default:
 		return fmt.Errorf("cannot iterate over %s", coll.Type())
+	}
+
+	// Clean up exhausted iterators to prevent memory leaks
+	if !hasNext {
+		delete(vm.iterators, int(iterID.Val))
 	}
 
 	vm.Push(BoolValue{Val: hasNext})
@@ -1238,8 +1318,16 @@ func (vm *VM) valuesEqual(a, b Value) bool {
 	return false
 }
 
+// maxStackSize is the maximum stack depth to prevent unbounded memory usage.
+const maxStackSize = 10000
+
 // Push adds a value to the stack
 func (vm *VM) Push(val Value) {
+	if len(vm.stack) >= maxStackSize {
+		// Silently drop to avoid panicking in hot paths; the step limit
+		// will catch runaway programs. In future versions this could return an error.
+		return
+	}
 	vm.stack = append(vm.stack, val)
 }
 
@@ -1293,9 +1381,7 @@ func (vm *VM) registerBuiltins() {
 		if len(args) != 0 {
 			return nil, fmt.Errorf("time.now() takes no arguments, got %d", len(args))
 		}
-		// For now, return a mock timestamp
-		// TODO: Return actual time.Now().Unix() when time package is integrated
-		return IntValue{Val: 1234567890}, nil
+		return IntValue{Val: time.Now().Unix()}, nil
 	}
 
 	// now() - alias for time.now()
@@ -1303,7 +1389,7 @@ func (vm *VM) registerBuiltins() {
 		if len(args) != 0 {
 			return nil, fmt.Errorf("now() takes no arguments, got %d", len(args))
 		}
-		return IntValue{Val: 1234567890}, nil
+		return IntValue{Val: time.Now().Unix()}, nil
 	}
 
 	// length() - returns length of array or string
@@ -1316,7 +1402,7 @@ func (vm *VM) registerBuiltins() {
 		case ArrayValue:
 			return IntValue{Val: int64(len(val.Val))}, nil
 		case StringValue:
-			return IntValue{Val: int64(len(val.Val))}, nil
+			return IntValue{Val: int64(len([]rune(val.Val)))}, nil
 		default:
 			return nil, fmt.Errorf("length() requires array or string, got %T", val)
 		}
@@ -1331,7 +1417,7 @@ func (vm *VM) registerBuiltins() {
 		if !ok {
 			return nil, fmt.Errorf("upper() requires a string, got %T", args[0])
 		}
-		return StringValue{Val: toUpper(str.Val)}, nil
+		return StringValue{Val: strings.ToUpper(str.Val)}, nil
 	}
 
 	// lower() - convert string to lowercase
@@ -1343,7 +1429,7 @@ func (vm *VM) registerBuiltins() {
 		if !ok {
 			return nil, fmt.Errorf("lower() requires a string, got %T", args[0])
 		}
-		return StringValue{Val: toLower(str.Val)}, nil
+		return StringValue{Val: strings.ToLower(str.Val)}, nil
 	}
 
 	// trim() - remove leading/trailing whitespace
@@ -1355,7 +1441,7 @@ func (vm *VM) registerBuiltins() {
 		if !ok {
 			return nil, fmt.Errorf("trim() requires a string, got %T", args[0])
 		}
-		return StringValue{Val: trimSpace(str.Val)}, nil
+		return StringValue{Val: strings.TrimSpace(str.Val)}, nil
 	}
 
 	// split() - split string into array
@@ -1371,7 +1457,7 @@ func (vm *VM) registerBuiltins() {
 		if !ok {
 			return nil, fmt.Errorf("split() second argument must be a string, got %T", args[1])
 		}
-		parts := splitString(str.Val, delim.Val)
+		parts := strings.Split(str.Val, delim.Val)
 		result := make([]Value, len(parts))
 		for i, part := range parts {
 			result[i] = StringValue{Val: part}
@@ -1396,7 +1482,7 @@ func (vm *VM) registerBuiltins() {
 		for i, elem := range arr.Val {
 			strParts[i] = valueToString(elem)
 		}
-		return StringValue{Val: joinStrings(strParts, delim.Val)}, nil
+		return StringValue{Val: strings.Join(strParts, delim.Val)}, nil
 	}
 
 	// contains() - check if string contains substring
@@ -1412,7 +1498,7 @@ func (vm *VM) registerBuiltins() {
 		if !ok {
 			return nil, fmt.Errorf("contains() second argument must be a string, got %T", args[1])
 		}
-		return BoolValue{Val: stringContains(str.Val, substr.Val)}, nil
+		return BoolValue{Val: strings.Contains(str.Val, substr.Val)}, nil
 	}
 
 	// replace() - replace occurrences in string
@@ -1432,7 +1518,7 @@ func (vm *VM) registerBuiltins() {
 		if !ok {
 			return nil, fmt.Errorf("replace() third argument must be a string, got %T", args[2])
 		}
-		return StringValue{Val: replaceAll(str.Val, old.Val, new.Val)}, nil
+		return StringValue{Val: strings.ReplaceAll(str.Val, old.Val, new.Val)}, nil
 	}
 
 	// substring() - get substring
@@ -1458,166 +1544,16 @@ func (vm *VM) registerBuiltins() {
 		if start.Val > end.Val {
 			return nil, fmt.Errorf("substring() start index must be less than or equal to end index")
 		}
-		strLen := int64(len(str.Val))
-		if end.Val > strLen {
-			end.Val = strLen
-		}
+		runes := []rune(str.Val)
+		strLen := int64(len(runes))
 		if start.Val > strLen {
-			start.Val = strLen
+			return nil, fmt.Errorf("substring() start index out of bounds: %d (length %d)", start.Val, strLen)
 		}
-		return StringValue{Val: str.Val[start.Val:end.Val]}, nil
-	}
-}
-
-// Helper functions for string manipulation
-
-// toUpper converts a string to uppercase
-func toUpper(s string) string {
-	result := make([]rune, len(s))
-	for i, r := range s {
-		if r >= 'a' && r <= 'z' {
-			result[i] = r - 32
-		} else {
-			result[i] = r
+		if end.Val > strLen {
+			return nil, fmt.Errorf("substring() end index out of bounds: %d (length %d)", end.Val, strLen)
 		}
+		return StringValue{Val: string(runes[start.Val:end.Val])}, nil
 	}
-	return string(result)
-}
-
-// toLower converts a string to lowercase
-func toLower(s string) string {
-	result := make([]rune, len(s))
-	for i, r := range s {
-		if r >= 'A' && r <= 'Z' {
-			result[i] = r + 32
-		} else {
-			result[i] = r
-		}
-	}
-	return string(result)
-}
-
-// trimSpace removes leading and trailing whitespace
-func trimSpace(s string) string {
-	start := 0
-	end := len(s)
-
-	// Trim leading whitespace
-	for start < end && isWhitespace(rune(s[start])) {
-		start++
-	}
-
-	// Trim trailing whitespace
-	for end > start && isWhitespace(rune(s[end-1])) {
-		end--
-	}
-
-	return s[start:end]
-}
-
-// isWhitespace checks if a rune is whitespace
-func isWhitespace(r rune) bool {
-	return r == ' ' || r == '\t' || r == '\n' || r == '\r'
-}
-
-// splitString splits a string by a delimiter
-func splitString(s, delim string) []string {
-	if delim == "" {
-		// Split into individual characters
-		result := make([]string, len(s))
-		for i := range s {
-			result[i] = string(s[i])
-		}
-		return result
-	}
-
-	var result []string
-	start := 0
-
-	for i := 0; i <= len(s)-len(delim); i++ {
-		if s[i:i+len(delim)] == delim {
-			result = append(result, s[start:i])
-			start = i + len(delim)
-			i += len(delim) - 1
-		}
-	}
-
-	// Add the last part
-	result = append(result, s[start:])
-
-	return result
-}
-
-// joinStrings joins strings with a delimiter
-func joinStrings(parts []string, delim string) string {
-	if len(parts) == 0 {
-		return ""
-	}
-	if len(parts) == 1 {
-		return parts[0]
-	}
-
-	// Calculate total length
-	totalLen := 0
-	for _, part := range parts {
-		totalLen += len(part)
-	}
-	totalLen += (len(parts) - 1) * len(delim)
-
-	// Build result
-	result := make([]byte, totalLen)
-	pos := 0
-
-	for i, part := range parts {
-		copy(result[pos:], part)
-		pos += len(part)
-
-		if i < len(parts)-1 {
-			copy(result[pos:], delim)
-			pos += len(delim)
-		}
-	}
-
-	return string(result)
-}
-
-// stringContains checks if a string contains a substring
-func stringContains(s, substr string) bool {
-	if len(substr) == 0 {
-		return true
-	}
-	if len(substr) > len(s) {
-		return false
-	}
-
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-
-	return false
-}
-
-// replaceAll replaces all occurrences of old with new in s
-func replaceAll(s, old, new string) string {
-	if old == "" {
-		return s
-	}
-
-	var result string
-	start := 0
-
-	for i := 0; i <= len(s)-len(old); i++ {
-		if s[i:i+len(old)] == old {
-			result += s[start:i] + new
-			start = i + len(old)
-			i += len(old) - 1
-		}
-	}
-
-	result += s[start:]
-	return result
 }
 
 // valueToString converts a Value to a string representation
@@ -1668,6 +1604,12 @@ func intToString(n int64) string {
 // floatToString converts a float64 to string
 func floatToString(f float64) string {
 	return fmt.Sprintf("%g", f)
+}
+
+// SetMaxSteps sets the maximum number of execution steps.
+// 0 means unlimited (default). Use this to prevent infinite loops.
+func (vm *VM) SetMaxSteps(maxSteps int) {
+	vm.maxSteps = maxSteps
 }
 
 // SetWebSocketHandler sets the WebSocket handler for WS operations
@@ -1945,32 +1887,46 @@ func (vm *VM) execAsync() error {
 		Done: make(chan struct{}),
 	}
 
+	// Copy constants to avoid sharing mutable slice reference
+	constantsCopy := make([]Value, len(vm.constants))
+	copy(constantsCopy, vm.constants)
+
+	// Snapshot maps before launching goroutine to avoid concurrent reads
+	localsCopy := make(map[string]Value, len(vm.locals))
+	for k, v := range vm.locals {
+		localsCopy[k] = v
+	}
+	globalsCopy := make(map[string]Value, len(vm.globals))
+	for k, v := range vm.globals {
+		globalsCopy[k] = v
+	}
+	builtinsCopy := make(map[string]BuiltinFunc, len(vm.builtins))
+	for k, v := range vm.builtins {
+		builtinsCopy[k] = v
+	}
+
 	go func() {
 		defer close(future.Done)
+		defer func() {
+			if r := recover(); r != nil {
+				future.Error = fmt.Errorf("async panic: %v", r)
+			}
+		}()
 
 		// Create a new VM for the async execution
 		asyncVM := NewVM()
-		asyncVM.constants = vm.constants
+		asyncVM.constants = constantsCopy
+		asyncVM.locals = localsCopy
+		asyncVM.globals = globalsCopy
+		asyncVM.builtins = builtinsCopy
 
-		// Copy current locals to async VM
-		for k, v := range vm.locals {
-			asyncVM.locals[k] = v
-		}
-		for k, v := range vm.globals {
-			asyncVM.globals[k] = v
-		}
-		for k, v := range vm.builtins {
-			asyncVM.builtins[k] = v
-		}
-
-		// Execute the async body
-		result, execErr := asyncVM.Execute(asyncBody)
+		// Execute the async body using raw instructions (no GLYP header)
+		result, execErr := asyncVM.executeRaw(asyncBody)
 		if execErr != nil {
 			future.Error = execErr
 		} else {
 			future.Result = result
 		}
-		future.Resolved = true
 	}()
 
 	// Push the future onto the stack

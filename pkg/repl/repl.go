@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/glyphlang/glyph/pkg/ast"
 	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/parser"
 )
@@ -30,7 +31,7 @@ type REPL struct {
 func New(reader io.Reader, writer io.Writer, version string) *REPL {
 	interp := interpreter.NewInterpreter()
 	// Set up the parse function for module resolution
-	interp.GetModuleResolver().SetParseFunc(func(source string) (*interpreter.Module, error) {
+	interp.GetModuleResolver().SetParseFunc(func(source string) (*ast.Module, error) {
 		lexer := parser.NewLexer(source)
 		tokens, err := lexer.Tokenize()
 		if err != nil {
@@ -263,7 +264,7 @@ func (r *REPL) evaluateStatement(input string) error {
 	}
 
 	// For assignment statements, show the assigned value
-	if _, ok := stmt.(interpreter.AssignStatement); ok {
+	if _, ok := stmt.(ast.AssignStatement); ok {
 		r.printResult(result)
 	}
 
@@ -285,7 +286,7 @@ func (r *REPL) evaluateTypeDef(input string) error {
 
 	// Get the type name from the module
 	for _, item := range module.Items {
-		if typeDef, ok := item.(*interpreter.TypeDef); ok {
+		if typeDef, ok := item.(*ast.TypeDef); ok {
 			r.printf("Type '%s' defined\n", typeDef.Name)
 			return nil
 		}
@@ -310,7 +311,7 @@ func (r *REPL) evaluateFunction(input string) error {
 
 	// Get the function name from the module
 	for _, item := range module.Items {
-		if fn, ok := item.(*interpreter.Function); ok {
+		if fn, ok := item.(*ast.Function); ok {
 			// Also define the function in the REPL environment
 			r.env.Define(fn.Name, *fn)
 			r.printf("Function '%s' defined\n", fn.Name)
@@ -323,7 +324,7 @@ func (r *REPL) evaluateFunction(input string) error {
 }
 
 // parseExpression parses a string as an expression.
-func (r *REPL) parseExpression(input string) (interpreter.Expr, error) {
+func (r *REPL) parseExpression(input string) (ast.Expr, error) {
 	lexer := parser.NewLexer(input)
 	tokens, err := lexer.Tokenize()
 	if err != nil {
@@ -335,7 +336,7 @@ func (r *REPL) parseExpression(input string) (interpreter.Expr, error) {
 }
 
 // parseStatement parses a string as a statement.
-func (r *REPL) parseStatement(input string) (interpreter.Statement, error) {
+func (r *REPL) parseStatement(input string) (ast.Statement, error) {
 	lexer := parser.NewLexer(input)
 	tokens, err := lexer.Tokenize()
 	if err != nil {
@@ -347,7 +348,7 @@ func (r *REPL) parseStatement(input string) (interpreter.Statement, error) {
 }
 
 // parseModule parses a string as a module (for type and function definitions).
-func (r *REPL) parseModule(input string) (*interpreter.Module, error) {
+func (r *REPL) parseModule(input string) (*ast.Module, error) {
 	lexer := parser.NewLexer(input)
 	tokens, err := lexer.Tokenize()
 	if err != nil {
@@ -507,7 +508,7 @@ func (r *REPL) LoadFile(filepath string) error {
 
 	// Copy functions to the REPL environment
 	for _, item := range module.Items {
-		if fn, ok := item.(*interpreter.Function); ok {
+		if fn, ok := item.(*ast.Function); ok {
 			r.env.Define(fn.Name, *fn)
 		}
 	}
@@ -519,7 +520,7 @@ func (r *REPL) LoadFile(filepath string) error {
 func (r *REPL) Reset() {
 	r.env = interpreter.NewEnvironment()
 	r.interp = interpreter.NewInterpreter()
-	r.interp.GetModuleResolver().SetParseFunc(func(source string) (*interpreter.Module, error) {
+	r.interp.GetModuleResolver().SetParseFunc(func(source string) (*ast.Module, error) {
 		lexer := parser.NewLexer(source)
 		tokens, err := lexer.Tokenize()
 		if err != nil {

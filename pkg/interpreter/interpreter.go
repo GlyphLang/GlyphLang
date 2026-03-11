@@ -1,40 +1,72 @@
 package interpreter
 
 import (
+	. "github.com/glyphlang/glyph/pkg/ast"
+
 	"fmt"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
 )
+
+// maxEvalDepth is the maximum recursion depth for expression evaluation.
+const maxEvalDepth = 500
 
 // Interpreter is the main interpreter struct
 type Interpreter struct {
-	globalEnv      *Environment
-	functions      map[string]Function
-	typeDefs       map[string]TypeDef
-	commands       map[string]Command
-	cronTasks      []CronTask
-	eventHandlers  map[string][]EventHandler
-	queueWorkers   map[string]QueueWorker
-	typeChecker    *TypeChecker
-	dbHandler      interface{}       // Database handler for dependency injection
-	moduleResolver  *ModuleResolver           // Module resolver for handling imports
-	importedModules map[string]*LoadedModule // Imported modules by alias/name
-	constants       map[string]struct{}      // Tracks names that are constants (immutable)
+	globalEnv        *Environment
+	functions        map[string]Function
+	typeDefs         map[string]TypeDef
+	commands         map[string]Command
+	cronTasks        []CronTask
+	eventHandlers    map[string][]EventHandler
+	eventMu          sync.RWMutex
+	queueWorkers     map[string]QueueWorker
+	grpcServices     map[string]GRPCService     // key: service name
+	grpcHandlers     map[string]GRPCHandler     // key: method name
+	graphqlResolvers map[string]GraphQLResolver // key: "operation.fieldName"
+	testBlocks       []TestBlock
+	typeChecker      *TypeChecker
+	dbHandler        interface{}              // Database handler for dependency injection
+	redisHandler     interface{}              // Redis handler for dependency injection
+	mongoDBHandler   interface{}              // MongoDB handler for dependency injection
+	llmHandler       interface{}              // LLM handler for AI integration
+	providerHandlers map[string]interface{}   // Generic provider registry: type name -> handler
+	providerDefs     map[string]ProviderDef   // Provider contract definitions
+	moduleResolver   *ModuleResolver          // Module resolver for handling imports
+	importedModules  map[string]*LoadedModule // Imported modules by alias/name
+	constants        map[string]struct{}      // Tracks names that are constants (immutable)
+	contracts        map[string]ContractDef   // Contract definitions by name
+	traitDefs        map[string]TraitDef      // Trait definitions by name
+	macros           map[string]*MacroDef     // Macro definitions by name
+	evalDepth        int64                    // Current recursion depth for evaluation (atomic)
 }
 
 // NewInterpreter creates a new interpreter instance
 func NewInterpreter() *Interpreter {
 	typeChecker := NewTypeChecker()
 	return &Interpreter{
-		globalEnv:       NewEnvironment(),
-		functions:       make(map[string]Function),
-		typeDefs:        make(map[string]TypeDef),
-		commands:        make(map[string]Command),
-		cronTasks:       []CronTask{},
-		eventHandlers:   make(map[string][]EventHandler),
-		queueWorkers:    make(map[string]QueueWorker),
-		typeChecker:     typeChecker,
-		moduleResolver:  NewModuleResolver(),
-		importedModules: make(map[string]*LoadedModule),
-		constants:       make(map[string]struct{}),
+		globalEnv:        NewEnvironment(),
+		functions:        make(map[string]Function),
+		typeDefs:         make(map[string]TypeDef),
+		commands:         make(map[string]Command),
+		cronTasks:        []CronTask{},
+		testBlocks:       []TestBlock{},
+		eventHandlers:    make(map[string][]EventHandler),
+		queueWorkers:     make(map[string]QueueWorker),
+		grpcServices:     make(map[string]GRPCService),
+		grpcHandlers:     make(map[string]GRPCHandler),
+		graphqlResolvers: make(map[string]GraphQLResolver),
+		typeChecker:      typeChecker,
+		providerHandlers: make(map[string]interface{}),
+		providerDefs:     make(map[string]ProviderDef),
+		moduleResolver:   NewModuleResolver(),
+		importedModules:  make(map[string]*LoadedModule),
+		constants:        make(map[string]struct{}),
+		contracts:        make(map[string]ContractDef),
+		traitDefs:        make(map[string]TraitDef),
+		macros:           make(map[string]*MacroDef),
 	}
 }
 
@@ -56,12 +88,13 @@ func (i *Interpreter) GetModuleResolver() *ModuleResolver {
 
 // Request represents an HTTP request
 type Request struct {
-	Path     string
-	Method   string
-	Params   map[string]string
-	Body     interface{}
-	Headers  map[string]string
-	AuthData map[string]interface{} // Authenticated user data from JWT
+	Path      string
+	Method    string
+	Params    map[string]string
+	Body      interface{}
+	Headers   map[string]string
+	AuthData  map[string]interface{} // Authenticated user data from JWT
+	SSEWriter interface{}            // SSEWriter for SSE routes (implements executor.SSEWriter)
 }
 
 // Response represents an HTTP response
@@ -93,6 +126,9 @@ func (i *Interpreter) LoadModuleWithPath(module Module, basePath string) error {
 		case *TypeDef:
 			i.typeDefs[it.Name] = *it
 
+		case *TraitDef:
+			i.traitDefs[it.Name] = *it
+
 		case *Function:
 			i.functions[it.Name] = *it
 			i.globalEnv.Define(it.Name, *it)
@@ -113,10 +149,47 @@ func (i *Interpreter) LoadModuleWithPath(module Module, basePath string) error {
 			i.cronTasks = append(i.cronTasks, *it)
 
 		case *EventHandler:
+			i.eventMu.Lock()
 			i.eventHandlers[it.EventType] = append(i.eventHandlers[it.EventType], *it)
+			i.eventMu.Unlock()
 
 		case *QueueWorker:
 			i.queueWorkers[it.QueueName] = *it
+
+		case *ContractDef:
+			i.contracts[it.Name] = *it
+
+		case *GRPCService:
+			i.grpcServices[it.Name] = *it
+
+		case *GRPCHandler:
+			i.grpcHandlers[it.MethodName] = *it
+
+		case *GraphQLResolver:
+			key := it.Operation.String() + "." + it.FieldName
+			i.graphqlResolvers[key] = *it
+
+		case *TestBlock:
+			i.testBlocks = append(i.testBlocks, *it)
+
+		case *ProviderDef:
+			i.providerDefs[it.Name] = *it
+
+		case *MacroDef:
+			i.macros[it.Name] = it
+
+		case *MacroInvocation:
+			expanded, err := i.expandMacro(it)
+			if err != nil {
+				return err
+			}
+			for _, node := range expanded {
+				if stmt, ok := node.(Statement); ok {
+					if _, err := i.ExecuteStatement(stmt, i.globalEnv); err != nil {
+						return err
+					}
+				}
+			}
 
 		case *ConstDecl:
 			// Evaluate and store constant at module load time
@@ -132,14 +205,19 @@ func (i *Interpreter) LoadModuleWithPath(module Module, basePath string) error {
 			i.globalEnv.Define(it.Name, value)
 			i.constants[it.Name] = struct{}{}
 
+		case *StaticRoute:
+			// Static routes are handled at the server/mux level, not by the interpreter.
+			continue
+
 		default:
 			return fmt.Errorf("unsupported item type: %T", item)
 		}
 	}
 
-	// Sync typeChecker with loaded types and functions
+	// Sync typeChecker with loaded types, functions, and traits
 	i.typeChecker.SetTypeDefs(i.typeDefs)
 	i.typeChecker.SetFunctions(i.functions)
+	i.typeChecker.SetTraitDefs(i.traitDefs)
 
 	return nil
 }
@@ -155,6 +233,12 @@ func (i *Interpreter) processImport(importStmt *ImportStatement, basePath string
 	loadedModule, err := i.moduleResolver.ResolveModule(importStmt.Path, basePath)
 	if err != nil {
 		return fmt.Errorf("failed to import '%s': %w", importStmt.Path, err)
+	}
+
+	// Load all module-internal functions and constants so that imported
+	// functions can call sibling functions from the same module.
+	if err := i.loadModuleInternals(loadedModule); err != nil {
+		return err
 	}
 
 	if importStmt.Selective {
@@ -180,6 +264,12 @@ func (i *Interpreter) processImport(importStmt *ImportStatement, basePath string
 				i.typeDefs[importName] = *exp
 			case *Command:
 				i.commands[importName] = *exp
+			case *ConstDecl:
+				value, err := i.EvaluateExpression(exp.Value, i.globalEnv)
+				if err != nil {
+					return fmt.Errorf("error evaluating constant %s: %v", exp.Name, err)
+				}
+				i.globalEnv.Define(importName, value)
 			default:
 				i.globalEnv.Define(importName, exp)
 			}
@@ -209,6 +299,55 @@ func (i *Interpreter) processImport(importStmt *ImportStatement, basePath string
 	return nil
 }
 
+// loadModuleInternals registers all functions and constants from a loaded
+// module into the interpreter so that imported functions can resolve calls
+// to sibling functions from the same module. This is called during module
+// import processing (single-threaded initialization). Functions/constants
+// are only registered if they don't already exist to avoid overwriting
+// explicit imports or previously loaded definitions. The module's own
+// import statements are also processed to load transitive dependencies.
+// Circular imports are safe because processImport checks the module cache.
+func (i *Interpreter) loadModuleInternals(mod *LoadedModule) error {
+	if mod == nil || mod.Exports == nil {
+		return nil
+	}
+
+	// Process the module's own imports to resolve transitive dependencies.
+	if mod.Module != nil {
+		basePath := filepath.Dir(mod.Path)
+		for _, item := range mod.Module.Items {
+			if importStmt, ok := item.(*ImportStatement); ok {
+				if err := i.processImport(importStmt, basePath); err != nil {
+					return fmt.Errorf("transitive import error in %s: %w", mod.Path, err)
+				}
+			}
+		}
+	}
+
+	for name, exported := range mod.Exports {
+		if exported == nil {
+			continue
+		}
+		switch exp := exported.(type) {
+		case *Function:
+			if _, exists := i.functions[name]; !exists {
+				i.functions[name] = *exp
+				i.globalEnv.Define(name, *exp)
+			}
+		case *ConstDecl:
+			if _, err := i.globalEnv.Get(name); err != nil {
+				if exp.Value != nil {
+					value, evalErr := i.EvaluateExpression(exp.Value, i.globalEnv)
+					if evalErr == nil {
+						i.globalEnv.Define(name, value)
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // extractModuleName extracts the module name from an import path
 func extractModuleName(path string) string {
 	// Remove .glyph extension if present
@@ -232,9 +371,112 @@ func extractModuleName(path string) string {
 	return name
 }
 
-// SetDatabaseHandler sets the database handler for dependency injection
+// SetDatabaseHandler sets the database handler for dependency injection.
+// Also registers the handler in the generic provider registry.
 func (i *Interpreter) SetDatabaseHandler(handler interface{}) {
 	i.dbHandler = handler
+	i.providerHandlers["Database"] = handler
+}
+
+// SetRedisHandler sets the Redis handler for dependency injection.
+// Also registers the handler in the generic provider registry.
+func (i *Interpreter) SetRedisHandler(handler interface{}) {
+	i.redisHandler = handler
+	i.providerHandlers["Redis"] = handler
+}
+
+// SetMongoDBHandler sets the MongoDB handler for dependency injection.
+// Also registers the handler in the generic provider registry.
+func (i *Interpreter) SetMongoDBHandler(handler interface{}) {
+	i.mongoDBHandler = handler
+	i.providerHandlers["MongoDB"] = handler
+}
+
+// SetLLMHandler sets the LLM handler for AI integration dependency injection.
+// Also registers the handler in the generic provider registry.
+func (i *Interpreter) SetLLMHandler(handler interface{}) {
+	i.llmHandler = handler
+	i.providerHandlers["LLM"] = handler
+}
+
+// SetProviderHandler registers a handler for a named provider type.
+// This is the generic mechanism for dependency injection. The standard
+// providers (Database, Redis, MongoDB, LLM) are also registered here
+// when their legacy Set*Handler methods are called.
+func (i *Interpreter) SetProviderHandler(providerType string, handler interface{}) {
+	i.providerHandlers[providerType] = handler
+}
+
+// GetProviderHandler retrieves a registered provider handler by type name.
+func (i *Interpreter) GetProviderHandler(providerType string) (interface{}, bool) {
+	h, ok := i.providerHandlers[providerType]
+	return h, ok
+}
+
+// GetProviderDefs returns all registered provider definitions.
+func (i *Interpreter) GetProviderDefs() map[string]ProviderDef {
+	result := make(map[string]ProviderDef, len(i.providerDefs))
+	for k, v := range i.providerDefs {
+		result[k] = v
+	}
+	return result
+}
+
+// resolveProviderType extracts the provider type name from an injection's type annotation.
+func resolveProviderType(t Type) string {
+	switch t.(type) {
+	case DatabaseType:
+		return "Database"
+	case RedisType:
+		return "Redis"
+	case MongoDBType:
+		return "MongoDB"
+	case LLMType:
+		return "LLM"
+	case NamedType:
+		return t.(NamedType).Name
+	default:
+		return ""
+	}
+}
+
+// injectDependency handles a single dependency injection into the given environment.
+// It first checks legacy handler fields for backward compatibility, then falls
+// back to the generic provider registry for custom providers.
+func (i *Interpreter) injectDependency(injection Injection, env *Environment) {
+	providerType := resolveProviderType(injection.Type)
+
+	// Legacy handler lookup for backward compatibility
+	switch providerType {
+	case "Database":
+		if i.dbHandler != nil {
+			env.Define(injection.Name, i.dbHandler)
+			return
+		}
+	case "Redis":
+		if i.redisHandler != nil {
+			env.Define(injection.Name, i.redisHandler)
+			return
+		}
+	case "MongoDB":
+		if i.mongoDBHandler != nil {
+			env.Define(injection.Name, i.mongoDBHandler)
+			return
+		}
+	case "LLM":
+		if i.llmHandler != nil {
+			env.Define(injection.Name, i.llmHandler)
+			return
+		}
+	}
+
+	// Generic provider registry lookup
+	if providerType != "" {
+		if handler, ok := i.providerHandlers[providerType]; ok && handler != nil {
+			env.Define(injection.Name, handler)
+			return
+		}
+	}
 }
 
 // ExecuteRoute executes a route with the given request
@@ -328,16 +570,7 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 
 	// Handle dependency injections
 	for _, injection := range route.Injections {
-		// Check for DatabaseType or NamedType{Name: "Database"}
-		isDB := false
-		if _, ok := injection.Type.(DatabaseType); ok {
-			isDB = true
-		} else if named, ok := injection.Type.(NamedType); ok && named.Name == "Database" {
-			isDB = true
-		}
-		if isDB && i.dbHandler != nil {
-			routeEnv.Define(injection.Name, i.dbHandler)
-		}
+		i.injectDependency(injection, routeEnv)
 	}
 
 	// Handle auth injection when route has auth middleware
@@ -360,20 +593,48 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 		routeEnv.Define("auth", authData)
 	}
 
+	// For SSE routes (SSE constant defined in ast.go), inject the writer
+	// so yield statements can stream events. The writer is provided by the
+	// server handler and implements the SSEWriter interface from executor.go.
+	// Cleanup/flushing is handled by the server handler after execution.
+	if route.Method == SSE && request.SSEWriter != nil {
+		routeEnv.Define("__sse_writer", request.SSEWriter)
+	}
+
 	// Execute route body
 	result, err := i.executeStatements(route.Body, routeEnv)
 	if err != nil {
 		// Check if it's a return value
-		if retErr, ok := err.(*returnValue); ok {
-			result = retErr.value
+		if val, isReturn := unwrapReturn(err); isReturn {
+			result = val
 		} else {
 			return &Response{
 				StatusCode: 500,
 				Body: map[string]interface{}{
-					"error": err.Error(),
+					"error": "Internal server error",
 				},
 			}, err
 		}
+	}
+
+	// SSE routes stream events via yield — no body is returned.
+	// Type checking is skipped because the yielded event types are
+	// validated individually by the SSEWriter, not as a single return value.
+	if route.Method == SSE {
+		return &Response{
+			StatusCode: 200,
+			Headers:    make(map[string]string),
+		}, nil
+	}
+
+	// Check for special response types
+	if redir, ok := result.(*RedirectResponse); ok {
+		return &Response{
+			StatusCode: redir.StatusCode,
+			Headers: map[string]string{
+				"Location": redir.URL,
+			},
+		}, nil
 	}
 
 	// Validate return value matches declared return type
@@ -382,10 +643,38 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 			return &Response{
 				StatusCode: 500,
 				Body: map[string]interface{}{
-					"error": fmt.Sprintf("return type mismatch: %v", err),
+					"error": "Internal server error",
 				},
 			}, fmt.Errorf("return type mismatch in route %s %s: %v", route.Method, route.Path, err)
 		}
+	}
+
+	// Check for special response types
+	switch r := result.(type) {
+	case *TextResponse:
+		return &Response{
+			StatusCode: r.StatusCode,
+			Body:       r.Body,
+			Headers: map[string]string{
+				"Content-Type": "text/plain; charset=utf-8",
+			},
+		}, nil
+	case *HTMLResponse:
+		return &Response{
+			StatusCode: r.StatusCode,
+			Body:       r.Body,
+			Headers: map[string]string{
+				"Content-Type": "text/html; charset=utf-8",
+			},
+		}, nil
+	case *BlobResponse:
+		return &Response{
+			StatusCode: r.StatusCode,
+			Body:       r.Data,
+			Headers: map[string]string{
+				"Content-Type": r.ContentType,
+			},
+		}, nil
 	}
 
 	// Create response
@@ -410,16 +699,7 @@ func (i *Interpreter) ExecuteRouteSimple(route *Route, pathParams map[string]str
 
 	// Handle dependency injections
 	for _, injection := range route.Injections {
-		// Check for DatabaseType or NamedType{Name: "Database"}
-		isDB := false
-		if _, ok := injection.Type.(DatabaseType); ok {
-			isDB = true
-		} else if named, ok := injection.Type.(NamedType); ok && named.Name == "Database" {
-			isDB = true
-		}
-		if isDB && i.dbHandler != nil {
-			routeEnv.Define(injection.Name, i.dbHandler)
-		}
+		i.injectDependency(injection, routeEnv)
 	}
 
 	// Handle auth injection when route has auth middleware
@@ -440,8 +720,8 @@ func (i *Interpreter) ExecuteRouteSimple(route *Route, pathParams map[string]str
 	result, err := i.executeStatements(route.Body, routeEnv)
 	if err != nil {
 		// Check if it's a return value
-		if retErr, ok := err.(*returnValue); ok {
-			result = retErr.value
+		if val, isReturn := unwrapReturn(err); isReturn {
+			result = val
 		} else {
 			return nil, err
 		}
@@ -501,9 +781,54 @@ func (i *Interpreter) GetQueueWorker(queueName string) (QueueWorker, bool) {
 	return worker, ok
 }
 
+// GetTraitDefs returns all registered trait definitions
+func (i *Interpreter) GetTraitDefs() map[string]TraitDef {
+	return i.traitDefs
+}
+
+// GetTraitDef retrieves a trait definition by name
+func (i *Interpreter) GetTraitDef(name string) (TraitDef, bool) {
+	trait, ok := i.traitDefs[name]
+	return trait, ok
+}
+
+// ValidateTraitImpl checks if a TypeDef correctly implements all methods required by its declared traits.
+// Returns an error listing missing methods if validation fails.
+func (i *Interpreter) ValidateTraitImpl(td TypeDef) error {
+	for _, traitName := range td.Traits {
+		trait, ok := i.traitDefs[traitName]
+		if !ok {
+			return fmt.Errorf("type %s declares impl for unknown trait %s", td.Name, traitName)
+		}
+
+		methodSet := make(map[string]bool)
+		for _, m := range td.Methods {
+			methodSet[m.Name] = true
+		}
+
+		for _, required := range trait.Methods {
+			if !methodSet[required.Name] {
+				return fmt.Errorf("type %s does not implement method %s required by trait %s", td.Name, required.Name, traitName)
+			}
+		}
+	}
+	return nil
+}
+
 // GetQueueWorkers returns all registered queue workers
 func (i *Interpreter) GetQueueWorkers() map[string]QueueWorker {
 	return i.queueWorkers
+}
+
+// GetContract retrieves a contract definition by name
+func (i *Interpreter) GetContract(name string) (ContractDef, bool) {
+	c, ok := i.contracts[name]
+	return c, ok
+}
+
+// GetContracts returns all registered contract definitions
+func (i *Interpreter) GetContracts() map[string]ContractDef {
+	return i.contracts
 }
 
 // ExecuteCommand executes a CLI command with the given arguments
@@ -530,8 +855,8 @@ func (i *Interpreter) ExecuteCommand(cmd *Command, args map[string]interface{}) 
 	// Execute command body
 	result, err := i.executeStatements(cmd.Body, cmdEnv)
 	if err != nil {
-		if retErr, ok := err.(*returnValue); ok {
-			result = retErr.value
+		if val, isReturn := unwrapReturn(err); isReturn {
+			result = val
 		} else {
 			return nil, err
 		}
@@ -554,18 +879,14 @@ func (i *Interpreter) ExecuteCronTask(task *CronTask) (interface{}, error) {
 
 	// Handle dependency injections
 	for _, injection := range task.Injections {
-		if _, ok := injection.Type.(DatabaseType); ok {
-			if i.dbHandler != nil {
-				taskEnv.Define(injection.Name, i.dbHandler)
-			}
-		}
+		i.injectDependency(injection, taskEnv)
 	}
 
 	// Execute task body
 	result, err := i.executeStatements(task.Body, taskEnv)
 	if err != nil {
-		if retErr, ok := err.(*returnValue); ok {
-			result = retErr.value
+		if val, isReturn := unwrapReturn(err); isReturn {
+			result = val
 		} else {
 			return nil, err
 		}
@@ -585,18 +906,14 @@ func (i *Interpreter) ExecuteEventHandler(handler *EventHandler, eventData inter
 
 	// Handle dependency injections
 	for _, injection := range handler.Injections {
-		if _, ok := injection.Type.(DatabaseType); ok {
-			if i.dbHandler != nil {
-				handlerEnv.Define(injection.Name, i.dbHandler)
-			}
-		}
+		i.injectDependency(injection, handlerEnv)
 	}
 
 	// Execute handler body
 	result, err := i.executeStatements(handler.Body, handlerEnv)
 	if err != nil {
-		if retErr, ok := err.(*returnValue); ok {
-			result = retErr.value
+		if val, isReturn := unwrapReturn(err); isReturn {
+			result = val
 		} else {
 			return nil, err
 		}
@@ -607,7 +924,11 @@ func (i *Interpreter) ExecuteEventHandler(handler *EventHandler, eventData inter
 
 // EmitEvent triggers all handlers for a given event type
 func (i *Interpreter) EmitEvent(eventType string, eventData interface{}) error {
-	handlers := i.eventHandlers[eventType]
+	i.eventMu.RLock()
+	handlers := make([]EventHandler, len(i.eventHandlers[eventType]))
+	copy(handlers, i.eventHandlers[eventType])
+	i.eventMu.RUnlock()
+
 	for _, handler := range handlers {
 		if handler.Async {
 			// In a real implementation, this would be executed asynchronously
@@ -635,22 +956,205 @@ func (i *Interpreter) ExecuteQueueWorker(worker *QueueWorker, message interface{
 
 	// Handle dependency injections
 	for _, injection := range worker.Injections {
-		if _, ok := injection.Type.(DatabaseType); ok {
-			if i.dbHandler != nil {
-				workerEnv.Define(injection.Name, i.dbHandler)
-			}
-		}
+		i.injectDependency(injection, workerEnv)
 	}
 
 	// Execute worker body
 	result, err := i.executeStatements(worker.Body, workerEnv)
 	if err != nil {
-		if retErr, ok := err.(*returnValue); ok {
-			result = retErr.value
+		if val, isReturn := unwrapReturn(err); isReturn {
+			result = val
 		} else {
 			return nil, err
 		}
 	}
 
 	return result, nil
+}
+
+// GetGRPCServices returns a copy of the registered gRPC service definitions
+func (i *Interpreter) GetGRPCServices() map[string]GRPCService {
+	result := make(map[string]GRPCService, len(i.grpcServices))
+	for k, v := range i.grpcServices {
+		result[k] = v
+	}
+	return result
+}
+
+// GetGRPCHandlers returns a copy of the registered gRPC handlers
+func (i *Interpreter) GetGRPCHandlers() map[string]GRPCHandler {
+	result := make(map[string]GRPCHandler, len(i.grpcHandlers))
+	for k, v := range i.grpcHandlers {
+		result[k] = v
+	}
+	return result
+}
+
+// GetGraphQLResolvers returns a copy of the registered GraphQL resolvers
+func (i *Interpreter) GetGraphQLResolvers() map[string]GraphQLResolver {
+	result := make(map[string]GraphQLResolver, len(i.graphqlResolvers))
+	for k, v := range i.graphqlResolvers {
+		result[k] = v
+	}
+	return result
+}
+
+// GetTypeDefs returns a copy of the registered type definitions
+func (i *Interpreter) GetTypeDefs() map[string]TypeDef {
+	result := make(map[string]TypeDef, len(i.typeDefs))
+	for k, v := range i.typeDefs {
+		result[k] = v
+	}
+	return result
+}
+
+// ExecuteGRPCHandler executes a gRPC handler with the given request.
+func (i *Interpreter) ExecuteGRPCHandler(handler *GRPCHandler, args map[string]interface{}, authData map[string]interface{}) (interface{}, error) {
+	if handler == nil {
+		return nil, fmt.Errorf("handler is nil")
+	}
+
+	handlerEnv := NewChildEnvironment(i.globalEnv)
+
+	for _, param := range handler.Params {
+		if val, ok := args[param.Name]; ok {
+			handlerEnv.Define(param.Name, val)
+		} else if param.Required {
+			return nil, fmt.Errorf("missing required argument: %s", param.Name)
+		} else if param.Default != nil {
+			defaultVal, err := i.EvaluateExpression(param.Default, handlerEnv)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating default for %s: %v", param.Name, err)
+			}
+			handlerEnv.Define(param.Name, defaultVal)
+		} else {
+			handlerEnv.Define(param.Name, nil)
+		}
+	}
+
+	for _, injection := range handler.Injections {
+		i.injectDependency(injection, handlerEnv)
+	}
+
+	if handler.Auth != nil && authData != nil {
+		handlerEnv.Define("auth", authData)
+	}
+
+	result, err := i.executeStatements(handler.Body, handlerEnv)
+	if err != nil {
+		if val, isReturn := unwrapReturn(err); isReturn {
+			result = val
+		} else {
+			return nil, err
+		}
+	}
+
+	return result, nil
+}
+
+// ExecuteGraphQLResolver executes a single GraphQL resolver with the given arguments.
+func (i *Interpreter) ExecuteGraphQLResolver(resolver *GraphQLResolver, args map[string]interface{}, authData map[string]interface{}) (interface{}, error) {
+	if resolver == nil {
+		return nil, fmt.Errorf("resolver is nil")
+	}
+
+	resolverEnv := NewChildEnvironment(i.globalEnv)
+
+	// Bind arguments matching resolver params
+	for _, param := range resolver.Params {
+		if val, ok := args[param.Name]; ok {
+			resolverEnv.Define(param.Name, val)
+		} else if param.Required {
+			return nil, fmt.Errorf("missing required argument: %s", param.Name)
+		} else if param.Default != nil {
+			defaultVal, err := i.EvaluateExpression(param.Default, resolverEnv)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating default for %s: %v", param.Name, err)
+			}
+			resolverEnv.Define(param.Name, defaultVal)
+		} else {
+			resolverEnv.Define(param.Name, nil)
+		}
+	}
+
+	for _, injection := range resolver.Injections {
+		i.injectDependency(injection, resolverEnv)
+	}
+
+	if resolver.Auth != nil && authData != nil {
+		resolverEnv.Define("auth", authData)
+	}
+
+	result, err := i.executeStatements(resolver.Body, resolverEnv)
+	if err != nil {
+		if val, isReturn := unwrapReturn(err); isReturn {
+			result = val
+		} else {
+			return nil, err
+		}
+	}
+
+	return result, nil
+}
+
+// TestResult represents the result of executing a single test block
+type TestResult struct {
+	Name     string
+	Passed   bool
+	Error    string
+	Duration time.Duration
+}
+
+// GetTestBlocks returns all registered test blocks (returns a copy for safety)
+func (i *Interpreter) GetTestBlocks() []TestBlock {
+	result := make([]TestBlock, len(i.testBlocks))
+	copy(result, i.testBlocks)
+	return result
+}
+
+// RunTests executes all test blocks and returns results.
+func (i *Interpreter) RunTests(filter string) []TestResult {
+	var results []TestResult
+	for _, test := range i.testBlocks {
+		if filter != "" && !matchesFilter(test.Name, filter) {
+			continue
+		}
+		result := i.runSingleTest(test)
+		results = append(results, result)
+	}
+	return results
+}
+
+func (i *Interpreter) runSingleTest(test TestBlock) TestResult {
+	start := time.Now()
+	testEnv := NewChildEnvironment(i.globalEnv)
+
+	_, err := i.executeStatements(test.Body, testEnv)
+	duration := time.Since(start)
+
+	if err != nil {
+		if _, isReturn := unwrapReturn(err); isReturn {
+			return TestResult{Name: test.Name, Passed: true, Duration: duration}
+		}
+		return TestResult{Name: test.Name, Passed: false, Error: err.Error(), Duration: duration}
+	}
+
+	return TestResult{Name: test.Name, Passed: true, Duration: duration}
+}
+
+// matchesFilter checks if a test name matches a filter string.
+func matchesFilter(name, filter string) bool {
+	if filter == "" {
+		return true
+	}
+	if strings.HasPrefix(filter, "*") && strings.HasSuffix(filter, "*") {
+		return strings.Contains(name, filter[1:len(filter)-1])
+	}
+	if strings.HasPrefix(filter, "*") {
+		return strings.HasSuffix(name, filter[1:])
+	}
+	if strings.HasSuffix(filter, "*") {
+		return strings.HasPrefix(name, filter[:len(filter)-1])
+	}
+	return strings.Contains(name, filter)
 }

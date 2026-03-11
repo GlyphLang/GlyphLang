@@ -333,6 +333,7 @@ func opcodeToString(op vm.Opcode) string {
 		vm.OpSub:             "SUB",
 		vm.OpMul:             "MUL",
 		vm.OpDiv:             "DIV",
+		vm.OpMod:             "MOD",
 		vm.OpEq:              "EQ",
 		vm.OpNe:              "NE",
 		vm.OpLt:              "LT",

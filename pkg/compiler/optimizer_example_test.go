@@ -1,9 +1,9 @@
 package compiler
 
 import (
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/vm"
 )
 
@@ -11,28 +11,28 @@ import (
 func Example_constantFolding() {
 	// Code: $ result = 2 + 3 * 4, > result
 	// The optimizer will fold 3 * 4 to 12, then 2 + 12 to 14
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "result",
-				Value: &interpreter.BinaryOpExpr{
-					Op: interpreter.Add,
-					Left: &interpreter.LiteralExpr{
-						Value: interpreter.IntLiteral{Value: 2},
+				Value: &ast.BinaryOpExpr{
+					Op: ast.Add,
+					Left: &ast.LiteralExpr{
+						Value: ast.IntLiteral{Value: 2},
 					},
-					Right: &interpreter.BinaryOpExpr{
-						Op: interpreter.Mul,
-						Left: &interpreter.LiteralExpr{
-							Value: interpreter.IntLiteral{Value: 3},
+					Right: &ast.BinaryOpExpr{
+						Op: ast.Mul,
+						Left: &ast.LiteralExpr{
+							Value: ast.IntLiteral{Value: 3},
 						},
-						Right: &interpreter.LiteralExpr{
-							Value: interpreter.IntLiteral{Value: 4},
+						Right: &ast.LiteralExpr{
+							Value: ast.IntLiteral{Value: 4},
 						},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "result"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "result"},
 			},
 		},
 	}
@@ -52,18 +52,18 @@ func Example_constantFolding() {
 // Example demonstrating dead code elimination
 func Example_deadCodeElimination() {
 	// Code: > 42, $ x = 100 (assignment after return is unreachable)
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.LiteralExpr{
-					Value: interpreter.IntLiteral{Value: 42},
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.LiteralExpr{
+					Value: ast.IntLiteral{Value: 42},
 				},
 			},
 			// This statement is unreachable and will be eliminated
-			&interpreter.AssignStatement{
+			&ast.AssignStatement{
 				Target: "x",
-				Value: &interpreter.LiteralExpr{
-					Value: interpreter.IntLiteral{Value: 100},
+				Value: &ast.LiteralExpr{
+					Value: ast.IntLiteral{Value: 100},
 				},
 			},
 		},
@@ -79,11 +79,11 @@ func Example_deadCodeElimination() {
 // Example demonstrating algebraic simplification
 func Example_algebraicSimplification() {
 	// Code: $ result = x * 1 (simplifies to x)
-	expr := &interpreter.BinaryOpExpr{
-		Op:   interpreter.Mul,
-		Left: &interpreter.VariableExpr{Name: "x"},
-		Right: &interpreter.LiteralExpr{
-			Value: interpreter.IntLiteral{Value: 1},
+	expr := &ast.BinaryOpExpr{
+		Op:   ast.Mul,
+		Left: &ast.VariableExpr{Name: "x"},
+		Right: &ast.LiteralExpr{
+			Value: ast.IntLiteral{Value: 1},
 		},
 	}
 
@@ -97,26 +97,26 @@ func Example_algebraicSimplification() {
 // Benchmark comparing optimized vs non-optimized compilation
 func BenchmarkOptimizedVsNonOptimized(b *testing.B) {
 	// Complex expression with many constant operations
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "a",
-				Value: &interpreter.BinaryOpExpr{
-					Op: interpreter.Add,
-					Left: &interpreter.BinaryOpExpr{
-						Op:    interpreter.Mul,
-						Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
-						Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+				Value: &ast.BinaryOpExpr{
+					Op: ast.Add,
+					Left: &ast.BinaryOpExpr{
+						Op:    ast.Mul,
+						Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
+						Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 					},
-					Right: &interpreter.BinaryOpExpr{
-						Op:    interpreter.Mul,
-						Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 4}},
-						Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
+					Right: &ast.BinaryOpExpr{
+						Op:    ast.Mul,
+						Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 4}},
+						Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "a"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "a"},
 			},
 		},
 	}
@@ -142,14 +142,14 @@ func BenchmarkOptimizedVsNonOptimized(b *testing.B) {
 
 // Benchmark constant folding performance
 func BenchmarkConstantFolding(b *testing.B) {
-	expr := &interpreter.BinaryOpExpr{
-		Op: interpreter.Add,
-		Left: &interpreter.BinaryOpExpr{
-			Op:    interpreter.Mul,
-			Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
-			Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+	expr := &ast.BinaryOpExpr{
+		Op: ast.Add,
+		Left: &ast.BinaryOpExpr{
+			Op:    ast.Mul,
+			Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
+			Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 		},
-		Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 4}},
+		Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 4}},
 	}
 
 	opt := NewOptimizer(OptBasic)
@@ -162,13 +162,13 @@ func BenchmarkConstantFolding(b *testing.B) {
 
 // Benchmark algebraic simplification performance
 func BenchmarkAlgebraicSimplification(b *testing.B) {
-	xVar := &interpreter.VariableExpr{Name: "x"}
+	xVar := &ast.VariableExpr{Name: "x"}
 
 	b.Run("x+0", func(b *testing.B) {
-		expr := &interpreter.BinaryOpExpr{
-			Op:    interpreter.Add,
+		expr := &ast.BinaryOpExpr{
+			Op:    ast.Add,
 			Left:  xVar,
-			Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+			Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 		}
 		opt := NewOptimizer(OptBasic)
 		b.ResetTimer()
@@ -178,10 +178,10 @@ func BenchmarkAlgebraicSimplification(b *testing.B) {
 	})
 
 	b.Run("x*1", func(b *testing.B) {
-		expr := &interpreter.BinaryOpExpr{
-			Op:    interpreter.Mul,
+		expr := &ast.BinaryOpExpr{
+			Op:    ast.Mul,
 			Left:  xVar,
-			Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+			Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 		}
 		opt := NewOptimizer(OptBasic)
 		b.ResetTimer()
@@ -191,10 +191,10 @@ func BenchmarkAlgebraicSimplification(b *testing.B) {
 	})
 
 	b.Run("x*0", func(b *testing.B) {
-		expr := &interpreter.BinaryOpExpr{
-			Op:    interpreter.Mul,
+		expr := &ast.BinaryOpExpr{
+			Op:    ast.Mul,
 			Left:  xVar,
-			Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+			Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 		}
 		opt := NewOptimizer(OptBasic)
 		b.ResetTimer()
@@ -206,21 +206,21 @@ func BenchmarkAlgebraicSimplification(b *testing.B) {
 
 // Benchmark dead code elimination performance
 func BenchmarkDeadCodeElimination(b *testing.B) {
-	stmts := []interpreter.Statement{
-		&interpreter.AssignStatement{
+	stmts := []ast.Statement{
+		&ast.AssignStatement{
 			Target: "x",
-			Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+			Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
 		},
-		&interpreter.ReturnStatement{
-			Value: &interpreter.VariableExpr{Name: "x"},
+		&ast.ReturnStatement{
+			Value: &ast.VariableExpr{Name: "x"},
 		},
-		&interpreter.AssignStatement{
+		&ast.AssignStatement{
 			Target: "y",
-			Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 100}},
+			Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 100}},
 		},
-		&interpreter.AssignStatement{
+		&ast.AssignStatement{
 			Target: "z",
-			Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 200}},
+			Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 200}},
 		},
 	}
 
@@ -234,17 +234,17 @@ func BenchmarkDeadCodeElimination(b *testing.B) {
 
 // Benchmark dead branch elimination
 func BenchmarkDeadBranchElimination(b *testing.B) {
-	stmts := []interpreter.Statement{
-		&interpreter.IfStatement{
-			Condition: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
-			ThenBlock: []interpreter.Statement{
-				&interpreter.ReturnStatement{
-					Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+	stmts := []ast.Statement{
+		&ast.IfStatement{
+			Condition: &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
+			ThenBlock: []ast.Statement{
+				&ast.ReturnStatement{
+					Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 				},
 			},
-			ElseBlock: []interpreter.Statement{
-				&interpreter.ReturnStatement{
-					Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+			ElseBlock: []ast.Statement{
+				&ast.ReturnStatement{
+					Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 				},
 			},
 		},
@@ -260,25 +260,25 @@ func BenchmarkDeadBranchElimination(b *testing.B) {
 
 // Benchmark constant propagation performance
 func BenchmarkConstantPropagation(b *testing.B) {
-	stmts := []interpreter.Statement{
-		&interpreter.AssignStatement{
+	stmts := []ast.Statement{
+		&ast.AssignStatement{
 			Target: "x",
-			Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+			Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
 		},
-		&interpreter.AssignStatement{
+		&ast.AssignStatement{
 			Target: "y",
-			Value: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Mul,
-				Left:  &interpreter.VariableExpr{Name: "x"},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+			Value: &ast.BinaryOpExpr{
+				Op:    ast.Mul,
+				Left:  &ast.VariableExpr{Name: "x"},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 			},
 		},
-		&interpreter.AssignStatement{
+		&ast.AssignStatement{
 			Target: "z",
-			Value: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Add,
-				Left:  &interpreter.VariableExpr{Name: "x"},
-				Right: &interpreter.VariableExpr{Name: "y"},
+			Value: &ast.BinaryOpExpr{
+				Op:    ast.Add,
+				Left:  &ast.VariableExpr{Name: "x"},
+				Right: &ast.VariableExpr{Name: "y"},
 			},
 		},
 	}
@@ -293,10 +293,10 @@ func BenchmarkConstantPropagation(b *testing.B) {
 
 // Benchmark strength reduction performance
 func BenchmarkStrengthReduction(b *testing.B) {
-	expr := &interpreter.BinaryOpExpr{
-		Op:    interpreter.Mul,
-		Left:  &interpreter.VariableExpr{Name: "x"},
-		Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+	expr := &ast.BinaryOpExpr{
+		Op:    ast.Mul,
+		Left:  &ast.VariableExpr{Name: "x"},
+		Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 	}
 
 	opt := NewOptimizer(OptAggressive)
@@ -309,29 +309,29 @@ func BenchmarkStrengthReduction(b *testing.B) {
 
 // Benchmark CSE performance
 func BenchmarkCSE(b *testing.B) {
-	stmts := []interpreter.Statement{
-		&interpreter.AssignStatement{
+	stmts := []ast.Statement{
+		&ast.AssignStatement{
 			Target: "a",
-			Value: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Add,
-				Left:  &interpreter.VariableExpr{Name: "x"},
-				Right: &interpreter.VariableExpr{Name: "y"},
+			Value: &ast.BinaryOpExpr{
+				Op:    ast.Add,
+				Left:  &ast.VariableExpr{Name: "x"},
+				Right: &ast.VariableExpr{Name: "y"},
 			},
 		},
-		&interpreter.AssignStatement{
+		&ast.AssignStatement{
 			Target: "b",
-			Value: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Add,
-				Left:  &interpreter.VariableExpr{Name: "x"},
-				Right: &interpreter.VariableExpr{Name: "y"},
+			Value: &ast.BinaryOpExpr{
+				Op:    ast.Add,
+				Left:  &ast.VariableExpr{Name: "x"},
+				Right: &ast.VariableExpr{Name: "y"},
 			},
 		},
-		&interpreter.AssignStatement{
+		&ast.AssignStatement{
 			Target: "c",
-			Value: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Add,
-				Left:  &interpreter.VariableExpr{Name: "x"},
-				Right: &interpreter.VariableExpr{Name: "y"},
+			Value: &ast.BinaryOpExpr{
+				Op:    ast.Add,
+				Left:  &ast.VariableExpr{Name: "x"},
+				Right: &ast.VariableExpr{Name: "y"},
 			},
 		},
 	}
@@ -346,30 +346,30 @@ func BenchmarkCSE(b *testing.B) {
 
 // Benchmark comparing OptBasic vs OptAggressive
 func BenchmarkOptimizationLevels(b *testing.B) {
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "x",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
 			},
-			&interpreter.AssignStatement{
+			&ast.AssignStatement{
 				Target: "y",
-				Value: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Mul,
-					Left:  &interpreter.VariableExpr{Name: "x"},
-					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+				Value: &ast.BinaryOpExpr{
+					Op:    ast.Mul,
+					Left:  &ast.VariableExpr{Name: "x"},
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 				},
 			},
-			&interpreter.AssignStatement{
+			&ast.AssignStatement{
 				Target: "z",
-				Value: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Add,
-					Left:  &interpreter.VariableExpr{Name: "x"},
-					Right: &interpreter.VariableExpr{Name: "y"},
+				Value: &ast.BinaryOpExpr{
+					Op:    ast.Add,
+					Left:  &ast.VariableExpr{Name: "x"},
+					Right: &ast.VariableExpr{Name: "y"},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "z"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "z"},
 			},
 		},
 	}
@@ -395,36 +395,36 @@ func BenchmarkOptimizationLevels(b *testing.B) {
 
 // Benchmark loop invariant code motion
 func BenchmarkLICM(b *testing.B) {
-	stmts := []interpreter.Statement{
-		&interpreter.WhileStatement{
-			Condition: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Lt,
-				Left:  &interpreter.VariableExpr{Name: "i"},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+	stmts := []ast.Statement{
+		&ast.WhileStatement{
+			Condition: &ast.BinaryOpExpr{
+				Op:    ast.Lt,
+				Left:  &ast.VariableExpr{Name: "i"},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
 			},
-			Body: []interpreter.Statement{
-				&interpreter.AssignStatement{
+			Body: []ast.Statement{
+				&ast.AssignStatement{
 					Target: "x",
-					Value: &interpreter.BinaryOpExpr{
-						Op:    interpreter.Add,
-						Left:  &interpreter.VariableExpr{Name: "a"},
-						Right: &interpreter.VariableExpr{Name: "b"},
+					Value: &ast.BinaryOpExpr{
+						Op:    ast.Add,
+						Left:  &ast.VariableExpr{Name: "a"},
+						Right: &ast.VariableExpr{Name: "b"},
 					},
 				},
-				&interpreter.AssignStatement{
+				&ast.AssignStatement{
 					Target: "y",
-					Value: &interpreter.BinaryOpExpr{
-						Op:    interpreter.Mul,
-						Left:  &interpreter.VariableExpr{Name: "c"},
-						Right: &interpreter.VariableExpr{Name: "d"},
+					Value: &ast.BinaryOpExpr{
+						Op:    ast.Mul,
+						Left:  &ast.VariableExpr{Name: "c"},
+						Right: &ast.VariableExpr{Name: "d"},
 					},
 				},
-				&interpreter.AssignStatement{
+				&ast.AssignStatement{
 					Target: "i",
-					Value: &interpreter.BinaryOpExpr{
-						Op:    interpreter.Add,
-						Left:  &interpreter.VariableExpr{Name: "i"},
-						Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+					Value: &ast.BinaryOpExpr{
+						Op:    ast.Add,
+						Left:  &ast.VariableExpr{Name: "i"},
+						Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 					},
 				},
 			},
@@ -442,20 +442,20 @@ func BenchmarkLICM(b *testing.B) {
 // Test showing optimization reduces bytecode size
 func TestOptimization_ReducesBytecodeSize(t *testing.T) {
 	// Code with constant folding opportunities
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.BinaryOpExpr{
-					Op: interpreter.Add,
-					Left: &interpreter.BinaryOpExpr{
-						Op:    interpreter.Mul,
-						Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
-						Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 20}},
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.BinaryOpExpr{
+					Op: ast.Add,
+					Left: &ast.BinaryOpExpr{
+						Op:    ast.Mul,
+						Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
+						Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 20}},
 					},
-					Right: &interpreter.BinaryOpExpr{
-						Op:    interpreter.Sub,
-						Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 100}},
-						Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 50}},
+					Right: &ast.BinaryOpExpr{
+						Op:    ast.Sub,
+						Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 100}},
+						Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 50}},
 					},
 				},
 			},

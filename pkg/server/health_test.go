@@ -361,7 +361,10 @@ func TestHTTPHealthChecker(t *testing.T) {
 		}))
 		defer server.Close()
 
-		checker := NewHTTPHealthChecker("api", server.URL)
+		checker, err := NewHTTPHealthChecker("api", server.URL)
+		if err != nil {
+			t.Fatalf("NewHTTPHealthChecker() error: %v", err)
+		}
 		result := checker.Check(context.Background())
 
 		if result.Status != StatusHealthy {
@@ -375,7 +378,10 @@ func TestHTTPHealthChecker(t *testing.T) {
 		}))
 		defer server.Close()
 
-		checker := NewHTTPHealthChecker("api", server.URL)
+		checker, err := NewHTTPHealthChecker("api", server.URL)
+		if err != nil {
+			t.Fatalf("NewHTTPHealthChecker() error: %v", err)
+		}
 		result := checker.Check(context.Background())
 
 		if result.Status != StatusUnhealthy {
@@ -389,7 +395,10 @@ func TestHTTPHealthChecker(t *testing.T) {
 		}))
 		defer server.Close()
 
-		checker := NewHTTPHealthChecker("api", server.URL)
+		checker, err := NewHTTPHealthChecker("api", server.URL)
+		if err != nil {
+			t.Fatalf("NewHTTPHealthChecker() error: %v", err)
+		}
 		result := checker.Check(context.Background())
 
 		if result.Status != StatusDegraded {
@@ -398,7 +407,10 @@ func TestHTTPHealthChecker(t *testing.T) {
 	})
 
 	t.Run("unreachable service", func(t *testing.T) {
-		checker := NewHTTPHealthChecker("api", "http://localhost:99999")
+		checker, err := NewHTTPHealthChecker("api", "http://localhost:99999")
+		if err != nil {
+			t.Fatalf("NewHTTPHealthChecker() error: %v", err)
+		}
 		result := checker.Check(context.Background())
 
 		if result.Status != StatusUnhealthy {

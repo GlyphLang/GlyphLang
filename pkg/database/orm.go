@@ -637,18 +637,20 @@ func scanRow(row *sql.Row, columns []string) (map[string]interface{}, error) {
 	return result, nil
 }
 
-// Transaction executes a function within a transaction
-func (o *ORM) Transaction(ctx context.Context, fn func(context.Context) error) error {
-	// For PostgreSQL, we can cast to *PostgresDB
-	if pgDB, ok := o.db.(*PostgresDB); ok {
-		return pgDB.Transaction(ctx, func(tx *sql.Tx) error {
-			// Create a new ORM instance with the transaction
-			// This is a simplified version - in production, you'd want to properly wrap the tx
-			return fn(ctx)
-		})
-	}
+// txContextKey is the context key type for storing a transaction.
+type txContextKey struct{}
 
-	return fmt.Errorf("transaction not supported for this database driver")
+// Transaction executes a function within a database transaction.
+// The provided function receives a transaction-aware context.
+func (o *ORM) Transaction(ctx context.Context, fn func(context.Context) error) error {
+	pgDB, ok := o.db.(*PostgresDB)
+	if !ok {
+		return fmt.Errorf("transaction not supported for this database driver")
+	}
+	return pgDB.Transaction(ctx, func(tx *sql.Tx) error {
+		txCtx := context.WithValue(ctx, txContextKey{}, tx)
+		return fn(txCtx)
+	})
 }
 
 // Timestamp returns current timestamp

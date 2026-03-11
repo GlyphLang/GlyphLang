@@ -1,0 +1,22 @@
+Natural Language Description (for comparison with glyph notation):
+
+Build a background job processing system with queue workers, cron tasks, event handlers, and API endpoints.
+
+Queue Workers:
+1. "email.send" - Process email sending jobs. Extract recipient and subject from the message and return success.
+2. "report.generate" - Generate reports. Extract type and format from the message and return success.
+
+Cron Jobs:
+1. Daily at 2 AM ("0 2 * * *") "cleanup_expired" - Query expired sessions from the database.
+2. Weekly on Monday at 8 AM ("0 8 * * 1") "weekly_digest" - Query users with digest enabled from the database.
+
+Event Handlers:
+1. "user.created" - When a new user signs up, capture their email and name for a welcome notification.
+
+API Endpoints:
+1. GET /api/jobs/:id - Check job status by ID (requires JWT auth, return error if not found)
+2. POST /api/jobs/email - Submit a new email job (requires JWT auth, creates record in queue, returns job ID and pending status)
+
+Data model:
+- EmailJob: to (string, required), subject (string, required), template (string, required), data (any, optional)
+- ReportConfig: type (string, required), date_range (string, required), format (string, required)

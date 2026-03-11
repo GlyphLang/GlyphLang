@@ -917,3 +917,127 @@ func TestValidationResultJSONSerialization(t *testing.T) {
 		t.Error("location line not correct")
 	}
 }
+
+func TestValidateProviderDefinition(t *testing.T) {
+	source := `
+: EmailStatus {
+  id: str!
+  status: str!
+}
+
+provider EmailService {
+  send(to: str!, subject: str!) -> EmailStatus
+  status(id: str!) -> EmailStatus
+}
+
+@ POST /api/email {
+  % email: EmailService
+  $ result = email.send("user@test.com", "Hello")
+  > result
+}
+`
+	v := NewValidator(source, "test.glyph")
+	result := v.Validate()
+
+	if !result.Valid {
+		t.Errorf("expected valid result, got errors: %v", formatErrors(result.Errors))
+	}
+}
+
+func TestValidateDuplicateProvider(t *testing.T) {
+	source := `
+provider Notifier {
+  send(msg: str!)
+}
+
+provider Notifier {
+  send(msg: str!)
+}
+`
+	v := NewValidator(source, "test.glyph")
+	result := v.Validate()
+
+	if result.Valid {
+		t.Error("expected invalid result for duplicate provider")
+	}
+	found := false
+	for _, err := range result.Errors {
+		if err.Type == ErrTypeDuplicate && strings.Contains(err.Message, "Notifier") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected duplicate provider error for 'Notifier'")
+	}
+}
+
+func TestValidateProviderMethodUndefinedType(t *testing.T) {
+	source := `
+provider PaymentGateway {
+  charge(amount: int!) -> ChargeResult
+}
+`
+	v := NewValidator(source, "test.glyph")
+	result := v.Validate()
+
+	if result.Valid {
+		t.Error("expected invalid result for undefined return type in provider method")
+	}
+	found := false
+	for _, err := range result.Errors {
+		if err.Type == ErrTypeUndefined && strings.Contains(err.Message, "ChargeResult") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected undefined type error for 'ChargeResult'")
+	}
+}
+
+func TestValidateUndefinedProviderInjection(t *testing.T) {
+	source := `
+@ GET /api/data {
+  % svc: UnknownService
+  > { ok: true }
+}
+`
+	v := NewValidator(source, "test.glyph")
+	result := v.Validate()
+
+	if result.Valid {
+		t.Error("expected invalid result for undefined provider injection")
+	}
+	found := false
+	for _, err := range result.Errors {
+		if err.Type == ErrTypeUndefined && strings.Contains(err.Message, "UnknownService") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected undefined provider error for 'UnknownService'")
+	}
+}
+
+func TestValidateBuiltinProviderInjection(t *testing.T) {
+	source := `
+@ GET /api/data {
+  % db: Database
+  % cache: Redis
+  > { ok: true }
+}
+`
+	v := NewValidator(source, "test.glyph")
+	result := v.Validate()
+
+	if !result.Valid {
+		t.Errorf("expected valid result for builtin providers, got errors: %v", formatErrors(result.Errors))
+	}
+}
+
+func formatErrors(errors []*ValidationError) string {
+	var msgs []string
+	for _, e := range errors {
+		msgs = append(msgs, fmt.Sprintf("[%s] %s", e.Type, e.Message))
+	}
+	return strings.Join(msgs, "; ")
+}

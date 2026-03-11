@@ -1,0 +1,91 @@
+# Custom Provider Example
+# Demonstrates declaring and using custom provider contracts
+
+# --- Types ---
+
+: EmailMessage {
+  to: str!
+  subject: str!
+  body: str!
+}
+
+: EmailStatus {
+  id: str!
+  status: str!
+  delivered_at: str
+}
+
+: ChargeResult {
+  id: str!
+  amount: int!
+  currency: str!
+  status: str!
+}
+
+: RefundResult {
+  id: str!
+  charge_id: str!
+  status: str!
+}
+
+: NotificationPayload {
+  user_id: str!
+  message: str!
+  channel: str!
+}
+
+# --- Provider Contracts ---
+
+# Email service provider for sending transactional emails.
+# At codegen time, this generates a stub class with these methods.
+provider EmailService {
+  send(to: str!, subject: str!, body: str!) -> EmailStatus
+  status(message_id: str!) -> EmailStatus
+}
+
+# Payment gateway provider for processing charges and refunds.
+provider PaymentGateway {
+  charge(amount: int!, currency: str!, token: str!) -> ChargeResult
+  refund(charge_id: str!) -> RefundResult
+}
+
+# Notification provider (no return type on send).
+provider Notifier {
+  send(payload: NotificationPayload)
+}
+
+# --- Routes ---
+
+@ POST /api/email/send {
+  < input: EmailMessage
+  % email: EmailService
+  $ result = email.send(input.to, input.subject, input.body)
+  > result
+}
+
+@ GET /api/email/status/:id -> EmailStatus {
+  % email: EmailService
+  $ result = email.status(id)
+  > result
+}
+
+@ POST /api/payments/charge {
+  < input: ChargeResult
+  % payments: PaymentGateway
+  $ result = payments.charge(input.amount, input.currency, "tok_test")
+  > result
+}
+
+@ POST /api/payments/refund/:charge_id -> RefundResult {
+  % payments: PaymentGateway
+  $ result = payments.refund(charge_id)
+  > result
+}
+
+@ POST /api/notify/:user_id {
+  % notifier: Notifier
+  % db: Database
+  $ payload = { user_id: user_id, message: "Hello", channel: "push" }
+  $ result = notifier.send(payload)
+  > { success: true }
+}

@@ -94,7 +94,7 @@ type Logger struct {
 	stopped    bool
 	fileWriter *rotatingFileWriter
 	// For Sync() support
-	syncCh     chan chan struct{}
+	syncCh chan chan struct{}
 }
 
 // rotatingFileWriter handles log file rotation

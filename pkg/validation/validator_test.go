@@ -1,6 +1,7 @@
 package validation
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -916,6 +917,221 @@ func TestValidationErrors(t *testing.T) {
 		assert.Contains(t, errMsg, "username")
 		assert.Contains(t, errMsg, "; ")
 	})
+}
+
+// --- Additional ValidateField tests for coverage ---
+
+func TestValidateField_LengthTypeMismatch(t *testing.T) {
+	v := NewValidator()
+	v.AddLengthRule("username", 3, 20)
+
+	// Non-string value for length validation
+	err := v.ValidateField("username", 12345)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "must be a string for length validation")
+}
+
+func TestValidateField_RangeTypeMismatch(t *testing.T) {
+	v := NewValidator()
+	v.AddRangeRule("score", 0.0, 100.0)
+
+	// Non-numeric value for range validation
+	err := v.ValidateField("score", "not a number")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "must be a number")
+}
+
+func TestValidateField_RangeInt64(t *testing.T) {
+	v := NewValidator()
+	v.AddRangeRule("count", 1.0, 100.0)
+
+	// int64 value in range
+	err := v.ValidateField("count", int64(50))
+	assert.NoError(t, err)
+
+	// int64 value out of range
+	err = v.ValidateField("count", int64(200))
+	assert.Error(t, err)
+}
+
+func TestValidateField_PatternTypeMismatch(t *testing.T) {
+	v := NewValidator()
+	v.AddPatternRule("code", `^[A-Z]+$`)
+
+	// Non-string value for pattern validation
+	err := v.ValidateField("code", 12345)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "must be a string for pattern validation")
+}
+
+func TestValidateField_EmailTypeMismatch(t *testing.T) {
+	v := NewValidator()
+	v.AddEmailRule("email")
+
+	// Non-string value for email validation
+	err := v.ValidateField("email", 12345)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "must be a string for email validation")
+}
+
+func TestValidateField_CustomReturnsNonValidationError(t *testing.T) {
+	v := NewValidator()
+	v.AddCustomRule("field", func(value interface{}) error {
+		return fmt.Errorf("generic error from custom rule")
+	})
+
+	err := v.ValidateField("field", "anything")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "generic error from custom rule")
+}
+
+func TestValidateField_RequiredWithNil(t *testing.T) {
+	v := NewValidator()
+	v.AddRequiredRule("name")
+
+	err := v.ValidateField("name", nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "required")
+}
+
+func TestValidateField_MultipleRulesOneFailure(t *testing.T) {
+	v := NewValidator()
+	v.AddRequiredRule("email")
+	v.AddEmailRule("email")
+
+	// Passes required but fails email format
+	err := v.ValidateField("email", "not-an-email")
+	assert.Error(t, err)
+}
+
+// --- Additional Validate tests for coverage ---
+
+func TestValidate_LengthTypeMismatch(t *testing.T) {
+	v := NewValidator()
+	v.AddLengthRule("username", 3, 20)
+
+	data := map[string]interface{}{
+		"username": 12345, // Not a string
+	}
+
+	err := v.Validate(data)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "must be a string for length validation")
+}
+
+func TestValidate_PatternTypeMismatch(t *testing.T) {
+	v := NewValidator()
+	v.AddPatternRule("code", `^[A-Z]+$`)
+
+	data := map[string]interface{}{
+		"code": 12345, // Not a string
+	}
+
+	err := v.Validate(data)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "must be a string for pattern validation")
+}
+
+func TestValidate_RangeInt64(t *testing.T) {
+	v := NewValidator()
+	v.AddRangeRule("count", 1.0, 100.0)
+
+	data := map[string]interface{}{
+		"count": int64(50),
+	}
+
+	err := v.Validate(data)
+	assert.NoError(t, err)
+
+	data2 := map[string]interface{}{
+		"count": int64(200),
+	}
+
+	err = v.Validate(data2)
+	assert.Error(t, err)
+}
+
+func TestValidate_RequiredFieldEmptyString(t *testing.T) {
+	v := NewValidator()
+	v.AddRequiredRule("name")
+
+	data := map[string]interface{}{
+		"name": "", // Exists but empty
+	}
+
+	err := v.Validate(data)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot be empty")
+}
+
+func TestValidate_RequiredFieldNilValue(t *testing.T) {
+	v := NewValidator()
+	v.AddRequiredRule("name")
+
+	data := map[string]interface{}{
+		"name": nil,
+	}
+
+	err := v.Validate(data)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "required")
+}
+
+func TestValidate_CustomReturnsNonValidationError(t *testing.T) {
+	v := NewValidator()
+	v.AddCustomRule("field", func(value interface{}) error {
+		return fmt.Errorf("generic error")
+	})
+
+	data := map[string]interface{}{
+		"field": "anything",
+	}
+
+	err := v.Validate(data)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "generic error")
+}
+
+func TestValidate_OptionalPatternNotValidatedWhenMissing(t *testing.T) {
+	v := NewValidator()
+	v.AddPatternRule("code", `^[A-Z]+$`)
+
+	data := map[string]interface{}{} // code not provided
+
+	err := v.Validate(data)
+	assert.NoError(t, err) // Optional fields not validated when missing
+}
+
+func TestValidate_OptionalLengthNotValidatedWhenMissing(t *testing.T) {
+	v := NewValidator()
+	v.AddLengthRule("username", 3, 20)
+
+	data := map[string]interface{}{} // username not provided
+
+	err := v.Validate(data)
+	assert.NoError(t, err)
+}
+
+func TestValidate_OptionalRangeNotValidatedWhenMissing(t *testing.T) {
+	v := NewValidator()
+	v.AddRangeRule("score", 0.0, 100.0)
+
+	data := map[string]interface{}{} // score not provided
+
+	err := v.Validate(data)
+	assert.NoError(t, err)
+}
+
+func TestValidate_OptionalCustomNotValidatedWhenMissing(t *testing.T) {
+	v := NewValidator()
+	v.AddCustomRule("field", func(value interface{}) error {
+		return &ValidationError{Message: "custom error"}
+	})
+
+	data := map[string]interface{}{} // field not provided
+
+	err := v.Validate(data)
+	assert.NoError(t, err)
 }
 
 // Benchmark tests

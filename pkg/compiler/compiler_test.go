@@ -1,46 +1,48 @@
 package compiler
 
 import (
+	"github.com/glyphlang/glyph/pkg/ast"
+	"math"
 	"testing"
+	"time"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/vm"
 )
 
 func TestCompileLiteral(t *testing.T) {
 	tests := []struct {
 		name     string
-		expr     *interpreter.LiteralExpr
+		expr     *ast.LiteralExpr
 		expected vm.Value
 	}{
 		{
-			name: "int literal",
-			expr: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+			name:     "int literal",
+			expr:     &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
 			expected: vm.IntValue{Val: 42},
 		},
 		{
-			name: "float literal",
-			expr: &interpreter.LiteralExpr{Value: interpreter.FloatLiteral{Value: 3.14}},
+			name:     "float literal",
+			expr:     &ast.LiteralExpr{Value: ast.FloatLiteral{Value: 3.14}},
 			expected: vm.FloatValue{Val: 3.14},
 		},
 		{
-			name: "string literal",
-			expr: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "hello"}},
+			name:     "string literal",
+			expr:     &ast.LiteralExpr{Value: ast.StringLiteral{Value: "hello"}},
 			expected: vm.StringValue{Val: "hello"},
 		},
 		{
-			name: "bool literal true",
-			expr: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
+			name:     "bool literal true",
+			expr:     &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
 			expected: vm.BoolValue{Val: true},
 		},
 		{
-			name: "bool literal false",
-			expr: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: false}},
+			name:     "bool literal false",
+			expr:     &ast.LiteralExpr{Value: ast.BoolLiteral{Value: false}},
 			expected: vm.BoolValue{Val: false},
 		},
 		{
 			name:     "null literal",
-			expr:     &interpreter.LiteralExpr{Value: interpreter.NullLiteral{}},
+			expr:     &ast.LiteralExpr{Value: ast.NullLiteral{}},
 			expected: vm.NullValue{},
 		},
 	}
@@ -54,7 +56,10 @@ func TestCompileLiteral(t *testing.T) {
 			}
 
 			// Execute and verify
-			bytecode := c.buildBytecode()
+			bytecode, err := c.buildBytecode()
+			if err != nil {
+				t.Fatalf("buildBytecode() error: %v", err)
+			}
 			vmInstance := vm.NewVM()
 			result, err := vmInstance.Execute(bytecode)
 			if err != nil {
@@ -71,78 +76,78 @@ func TestCompileLiteral(t *testing.T) {
 func TestCompileBinaryOp(t *testing.T) {
 	tests := []struct {
 		name     string
-		expr     *interpreter.BinaryOpExpr
+		expr     *ast.BinaryOpExpr
 		expected vm.Value
 	}{
 		{
 			name: "5 + 3",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Add,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Add,
+				Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 			},
 			expected: vm.IntValue{Val: 8},
 		},
 		{
 			name: "10 - 4",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Sub,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 4}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Sub,
+				Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 4}},
 			},
 			expected: vm.IntValue{Val: 6},
 		},
 		{
 			name: "6 * 7",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Mul,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 6}},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 7}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Mul,
+				Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 6}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 7}},
 			},
 			expected: vm.IntValue{Val: 42},
 		},
 		{
 			name: "42 == 42",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Eq,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Eq,
+				Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
 			},
 			expected: vm.BoolValue{Val: true},
 		},
 		{
 			name: "5 > 3",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Gt,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Gt,
+				Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 			},
 			expected: vm.BoolValue{Val: true},
 		},
 		{
 			name: "null == null",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Eq,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.NullLiteral{}},
-				Right: &interpreter.LiteralExpr{Value: interpreter.NullLiteral{}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Eq,
+				Left:  &ast.LiteralExpr{Value: ast.NullLiteral{}},
+				Right: &ast.LiteralExpr{Value: ast.NullLiteral{}},
 			},
 			expected: vm.BoolValue{Val: true},
 		},
 		{
 			name: "null != 42",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Ne,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.NullLiteral{}},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Ne,
+				Left:  &ast.LiteralExpr{Value: ast.NullLiteral{}},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
 			},
 			expected: vm.BoolValue{Val: true},
 		},
 		{
 			name: "42 != null",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Ne,
-				Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
-				Right: &interpreter.LiteralExpr{Value: interpreter.NullLiteral{}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Ne,
+				Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
+				Right: &ast.LiteralExpr{Value: ast.NullLiteral{}},
 			},
 			expected: vm.BoolValue{Val: true},
 		},
@@ -159,7 +164,10 @@ func TestCompileBinaryOp(t *testing.T) {
 			c.emit(vm.OpHalt)
 
 			// Execute and verify
-			bytecode := c.buildBytecode()
+			bytecode, err := c.buildBytecode()
+			if err != nil {
+				t.Fatalf("buildBytecode() error: %v", err)
+			}
 			vmInstance := vm.NewVM()
 			result, err := vmInstance.Execute(bytecode)
 			if err != nil {
@@ -175,14 +183,14 @@ func TestCompileBinaryOp(t *testing.T) {
 
 func TestCompileVariableAssignment(t *testing.T) {
 	// Test: $ x = 42, > x
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "x",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "x"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "x"},
 			},
 		},
 	}
@@ -208,15 +216,15 @@ func TestCompileVariableAssignment(t *testing.T) {
 
 func TestCompileVariableRedeclaration(t *testing.T) {
 	// Test: $ x = 1, $ x = 2 (should fail - redeclaration in same scope)
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "x",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 			},
-			&interpreter.AssignStatement{
+			&ast.AssignStatement{
 				Target: "x",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 			},
 		},
 	}
@@ -240,27 +248,27 @@ func TestCompileVariableUpdateInNestedScope(t *testing.T) {
 	// Should work - updating outer variable from nested scope
 	// Note: Using OptNone to prevent optimizer from inlining the if block
 	// (constant propagation would make the condition always true and inline the block)
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "cond",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
+				Value:  &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
 			},
-			&interpreter.AssignStatement{
+			&ast.AssignStatement{
 				Target: "x",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
-			&interpreter.IfStatement{
-				Condition: &interpreter.VariableExpr{Name: "cond"},
-				ThenBlock: []interpreter.Statement{
-					&interpreter.AssignStatement{
+			&ast.IfStatement{
+				Condition: &ast.VariableExpr{Name: "cond"},
+				ThenBlock: []ast.Statement{
+					&ast.AssignStatement{
 						Target: "x",
-						Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+						Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "x"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "x"},
 			},
 		},
 	}
@@ -287,30 +295,30 @@ func TestCompileVariableUpdateInNestedScope(t *testing.T) {
 func TestCompileReassignment(t *testing.T) {
 	// Test: $ x = 0, x = x + 1, x = x + 1, > x
 	// Should work - declaration followed by reassignment
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "x",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
-			&interpreter.ReassignStatement{
+			&ast.ReassignStatement{
 				Target: "x",
-				Value: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Add,
-					Left:  &interpreter.VariableExpr{Name: "x"},
-					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+				Value: &ast.BinaryOpExpr{
+					Op:    ast.Add,
+					Left:  &ast.VariableExpr{Name: "x"},
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 				},
 			},
-			&interpreter.ReassignStatement{
+			&ast.ReassignStatement{
 				Target: "x",
-				Value: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Add,
-					Left:  &interpreter.VariableExpr{Name: "x"},
-					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+				Value: &ast.BinaryOpExpr{
+					Op:    ast.Add,
+					Left:  &ast.VariableExpr{Name: "x"},
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "x"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "x"},
 			},
 		},
 	}
@@ -335,11 +343,11 @@ func TestCompileReassignment(t *testing.T) {
 
 func TestCompileReassignmentUndeclaredVariable(t *testing.T) {
 	// Test: x = 1 (without prior declaration) should fail
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.ReassignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.ReassignStatement{
 				Target: "x",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 			},
 		},
 	}
@@ -361,22 +369,22 @@ func TestCompileReassignmentUndeclaredVariable(t *testing.T) {
 func TestCompileArithmeticExpression(t *testing.T) {
 	// Test: $ result = 5 + 3 * 2, > result
 	// Expected: 11 (5 + (3 * 2))
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "result",
-				Value: &interpreter.BinaryOpExpr{
-					Op: interpreter.Add,
-					Left: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
-					Right: &interpreter.BinaryOpExpr{
-						Op:    interpreter.Mul,
-						Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
-						Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+				Value: &ast.BinaryOpExpr{
+					Op:   ast.Add,
+					Left: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
+					Right: &ast.BinaryOpExpr{
+						Op:    ast.Mul,
+						Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
+						Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "result"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "result"},
 			},
 		},
 	}
@@ -402,18 +410,18 @@ func TestCompileArithmeticExpression(t *testing.T) {
 
 func TestCompileObjectLiteral(t *testing.T) {
 	// Test: > {name: "Alice", age: 30}
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.ObjectExpr{
-					Fields: []interpreter.ObjectField{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.ObjectExpr{
+					Fields: []ast.ObjectField{
 						{
 							Key:   "name",
-							Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "Alice"}},
+							Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "Alice"}},
 						},
 						{
 							Key:   "age",
-							Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 30}},
+							Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 30}},
 						},
 					},
 				},
@@ -454,14 +462,14 @@ func TestCompileObjectLiteral(t *testing.T) {
 
 func TestCompileArrayLiteral(t *testing.T) {
 	// Test: > [1, 2, 3]
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.ArrayExpr{
-					Elements: []interpreter.Expr{
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.ArrayExpr{
+					Elements: []ast.Expr{
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 					},
 				},
 			},
@@ -500,22 +508,22 @@ func TestCompileArrayLiteral(t *testing.T) {
 
 func TestCompileFieldAccess(t *testing.T) {
 	// Test: $ obj = {name: "Alice"}, > obj.name
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "obj",
-				Value: &interpreter.ObjectExpr{
-					Fields: []interpreter.ObjectField{
+				Value: &ast.ObjectExpr{
+					Fields: []ast.ObjectField{
 						{
 							Key:   "name",
-							Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "Alice"}},
+							Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "Alice"}},
 						},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.FieldAccessExpr{
-					Object: &interpreter.VariableExpr{Name: "obj"},
+			&ast.ReturnStatement{
+				Value: &ast.FieldAccessExpr{
+					Object: &ast.VariableExpr{Name: "obj"},
 					Field:  "name",
 				},
 			},
@@ -543,22 +551,22 @@ func TestCompileFieldAccess(t *testing.T) {
 
 func TestCompileIfStatement(t *testing.T) {
 	// Test: if 5 > 3 { > 1 } else { > 2 }
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.IfStatement{
-				Condition: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Gt,
-					Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
-					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.IfStatement{
+				Condition: &ast.BinaryOpExpr{
+					Op:    ast.Gt,
+					Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 				},
-				ThenBlock: []interpreter.Statement{
-					&interpreter.ReturnStatement{
-						Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+				ThenBlock: []ast.Statement{
+					&ast.ReturnStatement{
+						Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 					},
 				},
-				ElseBlock: []interpreter.Statement{
-					&interpreter.ReturnStatement{
-						Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+				ElseBlock: []ast.Statement{
+					&ast.ReturnStatement{
+						Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 					},
 				},
 			},
@@ -587,31 +595,31 @@ func TestCompileIfStatement(t *testing.T) {
 func TestCompileWhileLoop(t *testing.T) {
 	// t.Skip("Skipping - pre-existing VM issue with while loops")
 	// Test: $ x = 0, while x < 3 { $ x = x + 1 }, > x
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "x",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
-			&interpreter.WhileStatement{
-				Condition: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Lt,
-					Left:  &interpreter.VariableExpr{Name: "x"},
-					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+			&ast.WhileStatement{
+				Condition: &ast.BinaryOpExpr{
+					Op:    ast.Lt,
+					Left:  &ast.VariableExpr{Name: "x"},
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 				},
-				Body: []interpreter.Statement{
-					&interpreter.AssignStatement{
+				Body: []ast.Statement{
+					&ast.AssignStatement{
 						Target: "x",
-						Value: &interpreter.BinaryOpExpr{
-							Op:    interpreter.Add,
-							Left:  &interpreter.VariableExpr{Name: "x"},
-							Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+						Value: &ast.BinaryOpExpr{
+							Op:    ast.Add,
+							Left:  &ast.VariableExpr{Name: "x"},
+							Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 						},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "x"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "x"},
 			},
 		},
 	}
@@ -638,43 +646,43 @@ func TestCompileWhileLoop(t *testing.T) {
 func TestCompileWhileLoopSum(t *testing.T) {
 	// Test: $ sum = 0, $ i = 1, while i <= 5 { $ sum = sum + i, $ i = i + 1 }, > sum
 	// Expected: 1+2+3+4+5 = 15
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "sum",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
-			&interpreter.AssignStatement{
+			&ast.AssignStatement{
 				Target: "i",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 			},
-			&interpreter.WhileStatement{
-				Condition: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Le,
-					Left:  &interpreter.VariableExpr{Name: "i"},
-					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
+			&ast.WhileStatement{
+				Condition: &ast.BinaryOpExpr{
+					Op:    ast.Le,
+					Left:  &ast.VariableExpr{Name: "i"},
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
 				},
-				Body: []interpreter.Statement{
-					&interpreter.AssignStatement{
+				Body: []ast.Statement{
+					&ast.AssignStatement{
 						Target: "sum",
-						Value: &interpreter.BinaryOpExpr{
-							Op:    interpreter.Add,
-							Left:  &interpreter.VariableExpr{Name: "sum"},
-							Right: &interpreter.VariableExpr{Name: "i"},
+						Value: &ast.BinaryOpExpr{
+							Op:    ast.Add,
+							Left:  &ast.VariableExpr{Name: "sum"},
+							Right: &ast.VariableExpr{Name: "i"},
 						},
 					},
-					&interpreter.AssignStatement{
+					&ast.AssignStatement{
 						Target: "i",
-						Value: &interpreter.BinaryOpExpr{
-							Op:    interpreter.Add,
-							Left:  &interpreter.VariableExpr{Name: "i"},
-							Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+						Value: &ast.BinaryOpExpr{
+							Op:    ast.Add,
+							Left:  &ast.VariableExpr{Name: "i"},
+							Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 						},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "sum"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "sum"},
 			},
 		},
 	}
@@ -700,31 +708,31 @@ func TestCompileWhileLoopSum(t *testing.T) {
 func TestCompileWhileLoopNoIterations(t *testing.T) {
 	// Test: $ x = 10, while x < 5 { $ x = x + 1 }, > x
 	// Condition is false from start, so loop never executes
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "x",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
 			},
-			&interpreter.WhileStatement{
-				Condition: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Lt,
-					Left:  &interpreter.VariableExpr{Name: "x"},
-					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
+			&ast.WhileStatement{
+				Condition: &ast.BinaryOpExpr{
+					Op:    ast.Lt,
+					Left:  &ast.VariableExpr{Name: "x"},
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
 				},
-				Body: []interpreter.Statement{
-					&interpreter.AssignStatement{
+				Body: []ast.Statement{
+					&ast.AssignStatement{
 						Target: "x",
-						Value: &interpreter.BinaryOpExpr{
-							Op:    interpreter.Add,
-							Left:  &interpreter.VariableExpr{Name: "x"},
-							Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+						Value: &ast.BinaryOpExpr{
+							Op:    ast.Add,
+							Left:  &ast.VariableExpr{Name: "x"},
+							Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 						},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "x"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "x"},
 			},
 		},
 	}
@@ -749,43 +757,43 @@ func TestCompileWhileLoopNoIterations(t *testing.T) {
 
 func TestCompileWhileLoopStringConcat(t *testing.T) {
 	// Test: $ s = "", $ i = 0, while i < 3 { $ s = s + "x", $ i = i + 1 }, > s
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "s",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: ""}},
+				Value:  &ast.LiteralExpr{Value: ast.StringLiteral{Value: ""}},
 			},
-			&interpreter.AssignStatement{
+			&ast.AssignStatement{
 				Target: "i",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
-			&interpreter.WhileStatement{
-				Condition: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Lt,
-					Left:  &interpreter.VariableExpr{Name: "i"},
-					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+			&ast.WhileStatement{
+				Condition: &ast.BinaryOpExpr{
+					Op:    ast.Lt,
+					Left:  &ast.VariableExpr{Name: "i"},
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 				},
-				Body: []interpreter.Statement{
-					&interpreter.AssignStatement{
+				Body: []ast.Statement{
+					&ast.AssignStatement{
 						Target: "s",
-						Value: &interpreter.BinaryOpExpr{
-							Op:    interpreter.Add,
-							Left:  &interpreter.VariableExpr{Name: "s"},
-							Right: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "x"}},
+						Value: &ast.BinaryOpExpr{
+							Op:    ast.Add,
+							Left:  &ast.VariableExpr{Name: "s"},
+							Right: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "x"}},
 						},
 					},
-					&interpreter.AssignStatement{
+					&ast.AssignStatement{
 						Target: "i",
-						Value: &interpreter.BinaryOpExpr{
-							Op:    interpreter.Add,
-							Left:  &interpreter.VariableExpr{Name: "i"},
-							Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+						Value: &ast.BinaryOpExpr{
+							Op:    ast.Add,
+							Left:  &ast.VariableExpr{Name: "i"},
+							Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 						},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "s"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "s"},
 			},
 		},
 	}
@@ -811,52 +819,52 @@ func TestCompileWhileLoopStringConcat(t *testing.T) {
 func TestCompileWhileLoopWithNestedIf(t *testing.T) {
 	// Test: $ count = 0, $ i = 0, while i < 10 { if i > 4 { $ count = count + 1 }, $ i = i + 1 }, > count
 	// Counts numbers from 5 to 9 (5 numbers)
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "count",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
-			&interpreter.AssignStatement{
+			&ast.AssignStatement{
 				Target: "i",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
-			&interpreter.WhileStatement{
-				Condition: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Lt,
-					Left:  &interpreter.VariableExpr{Name: "i"},
-					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+			&ast.WhileStatement{
+				Condition: &ast.BinaryOpExpr{
+					Op:    ast.Lt,
+					Left:  &ast.VariableExpr{Name: "i"},
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
 				},
-				Body: []interpreter.Statement{
-					&interpreter.IfStatement{
-						Condition: &interpreter.BinaryOpExpr{
-							Op:    interpreter.Gt,
-							Left:  &interpreter.VariableExpr{Name: "i"},
-							Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 4}},
+				Body: []ast.Statement{
+					&ast.IfStatement{
+						Condition: &ast.BinaryOpExpr{
+							Op:    ast.Gt,
+							Left:  &ast.VariableExpr{Name: "i"},
+							Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 4}},
 						},
-						ThenBlock: []interpreter.Statement{
-							&interpreter.AssignStatement{
+						ThenBlock: []ast.Statement{
+							&ast.AssignStatement{
 								Target: "count",
-								Value: &interpreter.BinaryOpExpr{
-									Op:    interpreter.Add,
-									Left:  &interpreter.VariableExpr{Name: "count"},
-									Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+								Value: &ast.BinaryOpExpr{
+									Op:    ast.Add,
+									Left:  &ast.VariableExpr{Name: "count"},
+									Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 								},
 							},
 						},
 					},
-					&interpreter.AssignStatement{
+					&ast.AssignStatement{
 						Target: "i",
-						Value: &interpreter.BinaryOpExpr{
-							Op:    interpreter.Add,
-							Left:  &interpreter.VariableExpr{Name: "i"},
-							Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+						Value: &ast.BinaryOpExpr{
+							Op:    ast.Add,
+							Left:  &ast.VariableExpr{Name: "i"},
+							Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 						},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "count"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "count"},
 			},
 		},
 	}
@@ -882,43 +890,43 @@ func TestCompileWhileLoopWithNestedIf(t *testing.T) {
 func TestCompileWhileLoopMultiply(t *testing.T) {
 	// Test: $ result = 1, $ i = 0, while i < 4 { $ result = result * 2, $ i = i + 1 }, > result
 	// 1 * 2 * 2 * 2 * 2 = 16
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "result",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 			},
-			&interpreter.AssignStatement{
+			&ast.AssignStatement{
 				Target: "i",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
-			&interpreter.WhileStatement{
-				Condition: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Lt,
-					Left:  &interpreter.VariableExpr{Name: "i"},
-					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 4}},
+			&ast.WhileStatement{
+				Condition: &ast.BinaryOpExpr{
+					Op:    ast.Lt,
+					Left:  &ast.VariableExpr{Name: "i"},
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 4}},
 				},
-				Body: []interpreter.Statement{
-					&interpreter.AssignStatement{
+				Body: []ast.Statement{
+					&ast.AssignStatement{
 						Target: "result",
-						Value: &interpreter.BinaryOpExpr{
-							Op:    interpreter.Mul,
-							Left:  &interpreter.VariableExpr{Name: "result"},
-							Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+						Value: &ast.BinaryOpExpr{
+							Op:    ast.Mul,
+							Left:  &ast.VariableExpr{Name: "result"},
+							Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 						},
 					},
-					&interpreter.AssignStatement{
+					&ast.AssignStatement{
 						Target: "i",
-						Value: &interpreter.BinaryOpExpr{
-							Op:    interpreter.Add,
-							Left:  &interpreter.VariableExpr{Name: "i"},
-							Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+						Value: &ast.BinaryOpExpr{
+							Op:    ast.Add,
+							Left:  &ast.VariableExpr{Name: "i"},
+							Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 						},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "result"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "result"},
 			},
 		},
 	}
@@ -943,12 +951,12 @@ func TestCompileWhileLoopMultiply(t *testing.T) {
 
 func TestCompileRouteWithPathParameter(t *testing.T) {
 	// Test: GET /users/:id -> > id
-	route := &interpreter.Route{
+	route := &ast.Route{
 		Path:   "/users/:id",
-		Method: interpreter.Get,
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "id"},
+		Method: ast.Get,
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "id"},
 			},
 		},
 	}
@@ -975,15 +983,15 @@ func TestCompileRouteWithPathParameter(t *testing.T) {
 
 func TestCompileRouteWithMultiplePathParameters(t *testing.T) {
 	// Test: GET /users/:userId/posts/:postId -> > userId + postId
-	route := &interpreter.Route{
+	route := &ast.Route{
 		Path:   "/users/:userId/posts/:postId",
-		Method: interpreter.Get,
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Add,
-					Left:  &interpreter.VariableExpr{Name: "userId"},
-					Right: &interpreter.VariableExpr{Name: "postId"},
+		Method: ast.Get,
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.BinaryOpExpr{
+					Op:    ast.Add,
+					Left:  &ast.VariableExpr{Name: "userId"},
+					Right: &ast.VariableExpr{Name: "postId"},
 				},
 			},
 		},
@@ -1012,18 +1020,18 @@ func TestCompileRouteWithMultiplePathParameters(t *testing.T) {
 
 func TestCompileRouteWithInjection(t *testing.T) {
 	// Test: GET /test % db: Database -> > db
-	route := &interpreter.Route{
+	route := &ast.Route{
 		Path:   "/test",
-		Method: interpreter.Get,
-		Injections: []interpreter.Injection{
+		Method: ast.Get,
+		Injections: []ast.Injection{
 			{
 				Name: "db",
-				Type: interpreter.DatabaseType{},
+				Type: ast.DatabaseType{},
 			},
 		},
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "db"},
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "db"},
 			},
 		},
 	}
@@ -1059,26 +1067,26 @@ func TestCompileRouteWithInjection(t *testing.T) {
 
 func TestCompileRouteWithParameterAndInjection(t *testing.T) {
 	// Test: GET /users/:id % db: Database -> > {id: id, db: db}
-	route := &interpreter.Route{
+	route := &ast.Route{
 		Path:   "/users/:id",
-		Method: interpreter.Get,
-		Injections: []interpreter.Injection{
+		Method: ast.Get,
+		Injections: []ast.Injection{
 			{
 				Name: "db",
-				Type: interpreter.DatabaseType{},
+				Type: ast.DatabaseType{},
 			},
 		},
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.ObjectExpr{
-					Fields: []interpreter.ObjectField{
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.ObjectExpr{
+					Fields: []ast.ObjectField{
 						{
 							Key:   "id",
-							Value: &interpreter.VariableExpr{Name: "id"},
+							Value: &ast.VariableExpr{Name: "id"},
 						},
 						{
 							Key:   "hasDb",
-							Value: &interpreter.VariableExpr{Name: "db"},
+							Value: &ast.VariableExpr{Name: "db"},
 						},
 					},
 				},
@@ -1119,28 +1127,28 @@ func TestCompileRouteWithParameterAndInjection(t *testing.T) {
 func TestCompileForLoopSimpleAssign(t *testing.T) {
 	// Simpler test: $ result = 0, for item in [42] { $ result = item }, > result
 	// Expected: 42 (just assigns the item, no arithmetic)
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "result",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
-			&interpreter.ForStatement{
+			&ast.ForStatement{
 				ValueVar: "item",
-				Iterable: &interpreter.ArrayExpr{
-					Elements: []interpreter.Expr{
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+				Iterable: &ast.ArrayExpr{
+					Elements: []ast.Expr{
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
 					},
 				},
-				Body: []interpreter.Statement{
-					&interpreter.AssignStatement{
+				Body: []ast.Statement{
+					&ast.AssignStatement{
 						Target: "result",
-						Value:  &interpreter.VariableExpr{Name: "item"},
+						Value:  &ast.VariableExpr{Name: "item"},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "result"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "result"},
 			},
 		},
 	}
@@ -1167,34 +1175,34 @@ func TestCompileForLoopSimpleAssign(t *testing.T) {
 func TestCompileForLoopSimple(t *testing.T) {
 	// Test: $ sum = 0, for item in [1, 2, 3] { $ sum = sum + item }, > sum
 	// Expected: 6
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "sum",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
-			&interpreter.ForStatement{
+			&ast.ForStatement{
 				ValueVar: "item",
-				Iterable: &interpreter.ArrayExpr{
-					Elements: []interpreter.Expr{
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+				Iterable: &ast.ArrayExpr{
+					Elements: []ast.Expr{
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 					},
 				},
-				Body: []interpreter.Statement{
-					&interpreter.AssignStatement{
+				Body: []ast.Statement{
+					&ast.AssignStatement{
 						Target: "sum",
-						Value: &interpreter.BinaryOpExpr{
-							Op:    interpreter.Add,
-							Left:  &interpreter.VariableExpr{Name: "sum"},
-							Right: &interpreter.VariableExpr{Name: "item"},
+						Value: &ast.BinaryOpExpr{
+							Op:    ast.Add,
+							Left:  &ast.VariableExpr{Name: "sum"},
+							Right: &ast.VariableExpr{Name: "item"},
 						},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "sum"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "sum"},
 			},
 		},
 	}
@@ -1221,35 +1229,35 @@ func TestCompileForLoopSimple(t *testing.T) {
 func TestCompileForLoopWithIndex(t *testing.T) {
 	// Test: $ result = 0, for idx, val in [10, 20, 30] { $ result = result + idx }, > result
 	// Expected: 0 + 1 + 2 = 3
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "result",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
-			&interpreter.ForStatement{
+			&ast.ForStatement{
 				KeyVar:   "idx",
 				ValueVar: "val",
-				Iterable: &interpreter.ArrayExpr{
-					Elements: []interpreter.Expr{
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 20}},
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 30}},
+				Iterable: &ast.ArrayExpr{
+					Elements: []ast.Expr{
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 20}},
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 30}},
 					},
 				},
-				Body: []interpreter.Statement{
-					&interpreter.AssignStatement{
+				Body: []ast.Statement{
+					&ast.AssignStatement{
 						Target: "result",
-						Value: &interpreter.BinaryOpExpr{
-							Op:    interpreter.Add,
-							Left:  &interpreter.VariableExpr{Name: "result"},
-							Right: &interpreter.VariableExpr{Name: "idx"},
+						Value: &ast.BinaryOpExpr{
+							Op:    ast.Add,
+							Left:  &ast.VariableExpr{Name: "result"},
+							Right: &ast.VariableExpr{Name: "idx"},
 						},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "result"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "result"},
 			},
 		},
 	}
@@ -1276,38 +1284,38 @@ func TestCompileForLoopWithIndex(t *testing.T) {
 func TestCompileForLoopWithIndexAndValue(t *testing.T) {
 	// Test using BOTH index and value: for idx, val in [10, 20] { $ result = result + idx + val }
 	// Expected: 0 + (0 + 10) + (1 + 20) = 31
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "result",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
-			&interpreter.ForStatement{
+			&ast.ForStatement{
 				KeyVar:   "idx",
 				ValueVar: "val",
-				Iterable: &interpreter.ArrayExpr{
-					Elements: []interpreter.Expr{
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 20}},
+				Iterable: &ast.ArrayExpr{
+					Elements: []ast.Expr{
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 20}},
 					},
 				},
-				Body: []interpreter.Statement{
-					&interpreter.AssignStatement{
+				Body: []ast.Statement{
+					&ast.AssignStatement{
 						Target: "result",
-						Value: &interpreter.BinaryOpExpr{
-							Op: interpreter.Add,
-							Left: &interpreter.BinaryOpExpr{
-								Op:    interpreter.Add,
-								Left:  &interpreter.VariableExpr{Name: "result"},
-								Right: &interpreter.VariableExpr{Name: "idx"},
+						Value: &ast.BinaryOpExpr{
+							Op: ast.Add,
+							Left: &ast.BinaryOpExpr{
+								Op:    ast.Add,
+								Left:  &ast.VariableExpr{Name: "result"},
+								Right: &ast.VariableExpr{Name: "idx"},
 							},
-							Right: &interpreter.VariableExpr{Name: "val"},
+							Right: &ast.VariableExpr{Name: "val"},
 						},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "result"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "result"},
 			},
 		},
 	}
@@ -1334,47 +1342,47 @@ func TestCompileForLoopWithIndexAndValue(t *testing.T) {
 func TestCompileForLoopObjectCreation(t *testing.T) {
 	// Test: for idx, val in [10, 20] { $ entry = {pos: idx, val: val}, $ arr = arr + [entry] }
 	// Similar to /items endpoint
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "arr",
-				Value:  &interpreter.ArrayExpr{Elements: []interpreter.Expr{}},
+				Value:  &ast.ArrayExpr{Elements: []ast.Expr{}},
 			},
-			&interpreter.ForStatement{
+			&ast.ForStatement{
 				KeyVar:   "idx",
 				ValueVar: "val",
-				Iterable: &interpreter.ArrayExpr{
-					Elements: []interpreter.Expr{
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 20}},
+				Iterable: &ast.ArrayExpr{
+					Elements: []ast.Expr{
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 20}},
 					},
 				},
-				Body: []interpreter.Statement{
-					&interpreter.AssignStatement{
+				Body: []ast.Statement{
+					&ast.AssignStatement{
 						Target: "entry",
-						Value: &interpreter.ObjectExpr{
-							Fields: []interpreter.ObjectField{
-								{Key: "pos", Value: &interpreter.VariableExpr{Name: "idx"}},
-								{Key: "val", Value: &interpreter.VariableExpr{Name: "val"}},
+						Value: &ast.ObjectExpr{
+							Fields: []ast.ObjectField{
+								{Key: "pos", Value: &ast.VariableExpr{Name: "idx"}},
+								{Key: "val", Value: &ast.VariableExpr{Name: "val"}},
 							},
 						},
 					},
-					&interpreter.AssignStatement{
+					&ast.AssignStatement{
 						Target: "arr",
-						Value: &interpreter.BinaryOpExpr{
-							Op:   interpreter.Add,
-							Left: &interpreter.VariableExpr{Name: "arr"},
-							Right: &interpreter.ArrayExpr{
-								Elements: []interpreter.Expr{
-									&interpreter.VariableExpr{Name: "entry"},
+						Value: &ast.BinaryOpExpr{
+							Op:   ast.Add,
+							Left: &ast.VariableExpr{Name: "arr"},
+							Right: &ast.ArrayExpr{
+								Elements: []ast.Expr{
+									&ast.VariableExpr{Name: "entry"},
 								},
 							},
 						},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "arr"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "arr"},
 			},
 		},
 	}
@@ -1416,26 +1424,26 @@ func TestCompileForLoopObjectCreation(t *testing.T) {
 func TestCompileForLoopEmptyArray(t *testing.T) {
 	// Test: $ sum = 42, for item in [] { $ sum = 0 }, > sum
 	// Expected: 42 (loop body never executes)
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "sum",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
 			},
-			&interpreter.ForStatement{
+			&ast.ForStatement{
 				ValueVar: "item",
-				Iterable: &interpreter.ArrayExpr{
-					Elements: []interpreter.Expr{},
+				Iterable: &ast.ArrayExpr{
+					Elements: []ast.Expr{},
 				},
-				Body: []interpreter.Statement{
-					&interpreter.AssignStatement{
+				Body: []ast.Statement{
+					&ast.AssignStatement{
 						Target: "sum",
-						Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+						Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "sum"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "sum"},
 			},
 		},
 	}
@@ -1462,34 +1470,34 @@ func TestCompileForLoopEmptyArray(t *testing.T) {
 func TestCompileForLoopStringConcat(t *testing.T) {
 	// Test: $ result = "", for s in ["a", "b", "c"] { $ result = result + s }, > result
 	// Expected: "abc"
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "result",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: ""}},
+				Value:  &ast.LiteralExpr{Value: ast.StringLiteral{Value: ""}},
 			},
-			&interpreter.ForStatement{
+			&ast.ForStatement{
 				ValueVar: "s",
-				Iterable: &interpreter.ArrayExpr{
-					Elements: []interpreter.Expr{
-						&interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "a"}},
-						&interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "b"}},
-						&interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "c"}},
+				Iterable: &ast.ArrayExpr{
+					Elements: []ast.Expr{
+						&ast.LiteralExpr{Value: ast.StringLiteral{Value: "a"}},
+						&ast.LiteralExpr{Value: ast.StringLiteral{Value: "b"}},
+						&ast.LiteralExpr{Value: ast.StringLiteral{Value: "c"}},
 					},
 				},
-				Body: []interpreter.Statement{
-					&interpreter.AssignStatement{
+				Body: []ast.Statement{
+					&ast.AssignStatement{
 						Target: "result",
-						Value: &interpreter.BinaryOpExpr{
-							Op:    interpreter.Add,
-							Left:  &interpreter.VariableExpr{Name: "result"},
-							Right: &interpreter.VariableExpr{Name: "s"},
+						Value: &ast.BinaryOpExpr{
+							Op:    ast.Add,
+							Left:  &ast.VariableExpr{Name: "result"},
+							Right: &ast.VariableExpr{Name: "s"},
 						},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "result"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "result"},
 			},
 		},
 	}
@@ -1516,39 +1524,39 @@ func TestCompileForLoopStringConcat(t *testing.T) {
 func TestCompileForLoopArrayConcatenation(t *testing.T) {
 	// Test: $ arr = [], for x in [1, 2] { $ arr = arr + [x] }, > arr
 	// Expected: [1, 2]
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "arr",
-				Value: &interpreter.ArrayExpr{
-					Elements: []interpreter.Expr{},
+				Value: &ast.ArrayExpr{
+					Elements: []ast.Expr{},
 				},
 			},
-			&interpreter.ForStatement{
+			&ast.ForStatement{
 				ValueVar: "x",
-				Iterable: &interpreter.ArrayExpr{
-					Elements: []interpreter.Expr{
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+				Iterable: &ast.ArrayExpr{
+					Elements: []ast.Expr{
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 					},
 				},
-				Body: []interpreter.Statement{
-					&interpreter.AssignStatement{
+				Body: []ast.Statement{
+					&ast.AssignStatement{
 						Target: "arr",
-						Value: &interpreter.BinaryOpExpr{
-							Op:   interpreter.Add,
-							Left: &interpreter.VariableExpr{Name: "arr"},
-							Right: &interpreter.ArrayExpr{
-								Elements: []interpreter.Expr{
-									&interpreter.VariableExpr{Name: "x"},
+						Value: &ast.BinaryOpExpr{
+							Op:   ast.Add,
+							Left: &ast.VariableExpr{Name: "arr"},
+							Right: &ast.ArrayExpr{
+								Elements: []ast.Expr{
+									&ast.VariableExpr{Name: "x"},
 								},
 							},
 						},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "arr"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "arr"},
 			},
 		},
 	}
@@ -1585,49 +1593,49 @@ func TestCompileForLoopArrayConcatenation(t *testing.T) {
 func TestCompileForLoopNested(t *testing.T) {
 	// Test: $ sum = 0, for row in [[1,2],[3,4]] { for cell in row { $ sum = sum + cell } }, > sum
 	// Expected: 10 (1+2+3+4)
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "sum",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
-			&interpreter.ForStatement{
+			&ast.ForStatement{
 				ValueVar: "row",
-				Iterable: &interpreter.ArrayExpr{
-					Elements: []interpreter.Expr{
-						&interpreter.ArrayExpr{
-							Elements: []interpreter.Expr{
-								&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-								&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+				Iterable: &ast.ArrayExpr{
+					Elements: []ast.Expr{
+						&ast.ArrayExpr{
+							Elements: []ast.Expr{
+								&ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+								&ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 							},
 						},
-						&interpreter.ArrayExpr{
-							Elements: []interpreter.Expr{
-								&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
-								&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 4}},
+						&ast.ArrayExpr{
+							Elements: []ast.Expr{
+								&ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
+								&ast.LiteralExpr{Value: ast.IntLiteral{Value: 4}},
 							},
 						},
 					},
 				},
-				Body: []interpreter.Statement{
-					&interpreter.ForStatement{
+				Body: []ast.Statement{
+					&ast.ForStatement{
 						ValueVar: "cell",
-						Iterable: &interpreter.VariableExpr{Name: "row"},
-						Body: []interpreter.Statement{
-							&interpreter.AssignStatement{
+						Iterable: &ast.VariableExpr{Name: "row"},
+						Body: []ast.Statement{
+							&ast.AssignStatement{
 								Target: "sum",
-								Value: &interpreter.BinaryOpExpr{
-									Op:    interpreter.Add,
-									Left:  &interpreter.VariableExpr{Name: "sum"},
-									Right: &interpreter.VariableExpr{Name: "cell"},
+								Value: &ast.BinaryOpExpr{
+									Op:    ast.Add,
+									Left:  &ast.VariableExpr{Name: "sum"},
+									Right: &ast.VariableExpr{Name: "cell"},
 								},
 							},
 						},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "sum"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "sum"},
 			},
 		},
 	}
@@ -1655,27 +1663,27 @@ func TestCompileForLoopNested(t *testing.T) {
 
 func TestCompileSwitchSimpleStringMatch(t *testing.T) {
 	// Test: $ status = "pending", switch status { case "pending" { > "matched" } default { > "no match" } }
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "status",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "pending"}},
+				Value:  &ast.LiteralExpr{Value: ast.StringLiteral{Value: "pending"}},
 			},
-			&interpreter.SwitchStatement{
-				Value: &interpreter.VariableExpr{Name: "status"},
-				Cases: []interpreter.SwitchCase{
+			&ast.SwitchStatement{
+				Value: &ast.VariableExpr{Name: "status"},
+				Cases: []ast.SwitchCase{
 					{
-						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "pending"}},
-						Body: []interpreter.Statement{
-							&interpreter.ReturnStatement{
-								Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "matched"}},
+						Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "pending"}},
+						Body: []ast.Statement{
+							&ast.ReturnStatement{
+								Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "matched"}},
 							},
 						},
 					},
 				},
-				Default: []interpreter.Statement{
-					&interpreter.ReturnStatement{
-						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "no match"}},
+				Default: []ast.Statement{
+					&ast.ReturnStatement{
+						Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "no match"}},
 					},
 				},
 			},
@@ -1702,31 +1710,31 @@ func TestCompileSwitchSimpleStringMatch(t *testing.T) {
 
 func TestCompileSwitchSecondCaseMatch(t *testing.T) {
 	// Test: switch "shipped" { case "pending" { > 1 } case "shipped" { > 2 } default { > 3 } }
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.SwitchStatement{
-				Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "shipped"}},
-				Cases: []interpreter.SwitchCase{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.SwitchStatement{
+				Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "shipped"}},
+				Cases: []ast.SwitchCase{
 					{
-						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "pending"}},
-						Body: []interpreter.Statement{
-							&interpreter.ReturnStatement{
-								Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+						Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "pending"}},
+						Body: []ast.Statement{
+							&ast.ReturnStatement{
+								Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 							},
 						},
 					},
 					{
-						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "shipped"}},
-						Body: []interpreter.Statement{
-							&interpreter.ReturnStatement{
-								Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+						Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "shipped"}},
+						Body: []ast.Statement{
+							&ast.ReturnStatement{
+								Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 							},
 						},
 					},
 				},
-				Default: []interpreter.Statement{
-					&interpreter.ReturnStatement{
-						Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+				Default: []ast.Statement{
+					&ast.ReturnStatement{
+						Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 					},
 				},
 			},
@@ -1753,31 +1761,31 @@ func TestCompileSwitchSecondCaseMatch(t *testing.T) {
 
 func TestCompileSwitchDefaultCase(t *testing.T) {
 	// Test: switch "unknown" { case "a" { > 1 } case "b" { > 2 } default { > 99 } }
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.SwitchStatement{
-				Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "unknown"}},
-				Cases: []interpreter.SwitchCase{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.SwitchStatement{
+				Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "unknown"}},
+				Cases: []ast.SwitchCase{
 					{
-						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "a"}},
-						Body: []interpreter.Statement{
-							&interpreter.ReturnStatement{
-								Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+						Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "a"}},
+						Body: []ast.Statement{
+							&ast.ReturnStatement{
+								Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 							},
 						},
 					},
 					{
-						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "b"}},
-						Body: []interpreter.Statement{
-							&interpreter.ReturnStatement{
-								Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+						Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "b"}},
+						Body: []ast.Statement{
+							&ast.ReturnStatement{
+								Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 							},
 						},
 					},
 				},
-				Default: []interpreter.Statement{
-					&interpreter.ReturnStatement{
-						Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 99}},
+				Default: []ast.Statement{
+					&ast.ReturnStatement{
+						Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 99}},
 					},
 				},
 			},
@@ -1804,31 +1812,31 @@ func TestCompileSwitchDefaultCase(t *testing.T) {
 
 func TestCompileSwitchIntegerValues(t *testing.T) {
 	// Test: switch 42 { case 1 { > "one" } case 42 { > "forty-two" } default { > "other" } }
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.SwitchStatement{
-				Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
-				Cases: []interpreter.SwitchCase{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.SwitchStatement{
+				Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
+				Cases: []ast.SwitchCase{
 					{
-						Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-						Body: []interpreter.Statement{
-							&interpreter.ReturnStatement{
-								Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "one"}},
+						Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+						Body: []ast.Statement{
+							&ast.ReturnStatement{
+								Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "one"}},
 							},
 						},
 					},
 					{
-						Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
-						Body: []interpreter.Statement{
-							&interpreter.ReturnStatement{
-								Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "forty-two"}},
+						Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
+						Body: []ast.Statement{
+							&ast.ReturnStatement{
+								Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "forty-two"}},
 							},
 						},
 					},
 				},
-				Default: []interpreter.Statement{
-					&interpreter.ReturnStatement{
-						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "other"}},
+				Default: []ast.Statement{
+					&ast.ReturnStatement{
+						Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "other"}},
 					},
 				},
 			},
@@ -1855,47 +1863,47 @@ func TestCompileSwitchIntegerValues(t *testing.T) {
 
 func TestCompileSwitchWithVariableAssignment(t *testing.T) {
 	// Test: $ result = "", $ n = 2, switch n { case 1 { $ result = "one" } case 2 { $ result = "two" } }, > result
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "result",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: ""}},
+				Value:  &ast.LiteralExpr{Value: ast.StringLiteral{Value: ""}},
 			},
-			&interpreter.AssignStatement{
+			&ast.AssignStatement{
 				Target: "n",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 			},
-			&interpreter.SwitchStatement{
-				Value: &interpreter.VariableExpr{Name: "n"},
-				Cases: []interpreter.SwitchCase{
+			&ast.SwitchStatement{
+				Value: &ast.VariableExpr{Name: "n"},
+				Cases: []ast.SwitchCase{
 					{
-						Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-						Body: []interpreter.Statement{
-							&interpreter.AssignStatement{
+						Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+						Body: []ast.Statement{
+							&ast.AssignStatement{
 								Target: "result",
-								Value:  &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "one"}},
+								Value:  &ast.LiteralExpr{Value: ast.StringLiteral{Value: "one"}},
 							},
 						},
 					},
 					{
-						Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
-						Body: []interpreter.Statement{
-							&interpreter.AssignStatement{
+						Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
+						Body: []ast.Statement{
+							&ast.AssignStatement{
 								Target: "result",
-								Value:  &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "two"}},
+								Value:  &ast.LiteralExpr{Value: ast.StringLiteral{Value: "two"}},
 							},
 						},
 					},
 				},
-				Default: []interpreter.Statement{
-					&interpreter.AssignStatement{
+				Default: []ast.Statement{
+					&ast.AssignStatement{
 						Target: "result",
-						Value:  &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "default"}},
+						Value:  &ast.LiteralExpr{Value: ast.StringLiteral{Value: "default"}},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "result"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "result"},
 			},
 		},
 	}
@@ -1920,38 +1928,38 @@ func TestCompileSwitchWithVariableAssignment(t *testing.T) {
 
 func TestCompileSwitchNoMatchNoDefault(t *testing.T) {
 	// Test: $ result = "unchanged", switch "x" { case "a" { $ result = "a" } case "b" { $ result = "b" } }, > result
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "result",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "unchanged"}},
+				Value:  &ast.LiteralExpr{Value: ast.StringLiteral{Value: "unchanged"}},
 			},
-			&interpreter.SwitchStatement{
-				Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "x"}},
-				Cases: []interpreter.SwitchCase{
+			&ast.SwitchStatement{
+				Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "x"}},
+				Cases: []ast.SwitchCase{
 					{
-						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "a"}},
-						Body: []interpreter.Statement{
-							&interpreter.AssignStatement{
+						Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "a"}},
+						Body: []ast.Statement{
+							&ast.AssignStatement{
 								Target: "result",
-								Value:  &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "a"}},
+								Value:  &ast.LiteralExpr{Value: ast.StringLiteral{Value: "a"}},
 							},
 						},
 					},
 					{
-						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "b"}},
-						Body: []interpreter.Statement{
-							&interpreter.AssignStatement{
+						Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "b"}},
+						Body: []ast.Statement{
+							&ast.AssignStatement{
 								Target: "result",
-								Value:  &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "b"}},
+								Value:  &ast.LiteralExpr{Value: ast.StringLiteral{Value: "b"}},
 							},
 						},
 					},
 				},
 				Default: nil, // No default case
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "result"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "result"},
 			},
 		},
 	}
@@ -1976,24 +1984,24 @@ func TestCompileSwitchNoMatchNoDefault(t *testing.T) {
 
 func TestCompileSwitchObjectReturn(t *testing.T) {
 	// Test: switch "ok" { case "ok" { > {status: "success", code: 200} } default { > {status: "error", code: 500} } }
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.SwitchStatement{
-				Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "ok"}},
-				Cases: []interpreter.SwitchCase{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.SwitchStatement{
+				Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "ok"}},
+				Cases: []ast.SwitchCase{
 					{
-						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "ok"}},
-						Body: []interpreter.Statement{
-							&interpreter.ReturnStatement{
-								Value: &interpreter.ObjectExpr{
-									Fields: []interpreter.ObjectField{
+						Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "ok"}},
+						Body: []ast.Statement{
+							&ast.ReturnStatement{
+								Value: &ast.ObjectExpr{
+									Fields: []ast.ObjectField{
 										{
 											Key:   "status",
-											Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "success"}},
+											Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "success"}},
 										},
 										{
 											Key:   "code",
-											Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 200}},
+											Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 200}},
 										},
 									},
 								},
@@ -2001,17 +2009,17 @@ func TestCompileSwitchObjectReturn(t *testing.T) {
 						},
 					},
 				},
-				Default: []interpreter.Statement{
-					&interpreter.ReturnStatement{
-						Value: &interpreter.ObjectExpr{
-							Fields: []interpreter.ObjectField{
+				Default: []ast.Statement{
+					&ast.ReturnStatement{
+						Value: &ast.ObjectExpr{
+							Fields: []ast.ObjectField{
 								{
 									Key:   "status",
-									Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "error"}},
+									Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "error"}},
 								},
 								{
 									Key:   "code",
-									Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 500}},
+									Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 500}},
 								},
 							},
 						},
@@ -2049,55 +2057,55 @@ func TestCompileSwitchObjectReturn(t *testing.T) {
 
 func TestCompileSwitchMultipleCases(t *testing.T) {
 	// Test switch with many cases to verify jump patching works correctly
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.SwitchStatement{
-				Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
-				Cases: []interpreter.SwitchCase{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.SwitchStatement{
+				Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
+				Cases: []ast.SwitchCase{
 					{
-						Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-						Body: []interpreter.Statement{
-							&interpreter.ReturnStatement{
-								Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "one"}},
+						Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+						Body: []ast.Statement{
+							&ast.ReturnStatement{
+								Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "one"}},
 							},
 						},
 					},
 					{
-						Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
-						Body: []interpreter.Statement{
-							&interpreter.ReturnStatement{
-								Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "two"}},
+						Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
+						Body: []ast.Statement{
+							&ast.ReturnStatement{
+								Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "two"}},
 							},
 						},
 					},
 					{
-						Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
-						Body: []interpreter.Statement{
-							&interpreter.ReturnStatement{
-								Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "three"}},
+						Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
+						Body: []ast.Statement{
+							&ast.ReturnStatement{
+								Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "three"}},
 							},
 						},
 					},
 					{
-						Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 4}},
-						Body: []interpreter.Statement{
-							&interpreter.ReturnStatement{
-								Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "four"}},
+						Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 4}},
+						Body: []ast.Statement{
+							&ast.ReturnStatement{
+								Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "four"}},
 							},
 						},
 					},
 					{
-						Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
-						Body: []interpreter.Statement{
-							&interpreter.ReturnStatement{
-								Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "five"}},
+						Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
+						Body: []ast.Statement{
+							&ast.ReturnStatement{
+								Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "five"}},
 							},
 						},
 					},
 				},
-				Default: []interpreter.Statement{
-					&interpreter.ReturnStatement{
-						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "other"}},
+				Default: []ast.Statement{
+					&ast.ReturnStatement{
+						Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "other"}},
 					},
 				},
 			},
@@ -2126,12 +2134,12 @@ func TestCompileSwitchMultipleCases(t *testing.T) {
 
 func TestCompileFunctionCallNoArgs(t *testing.T) {
 	// Test: > now()
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.FunctionCallExpr{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.FunctionCallExpr{
 					Name: "now",
-					Args: []interpreter.Expr{},
+					Args: []ast.Expr{},
 				},
 			},
 		},
@@ -2149,26 +2157,29 @@ func TestCompileFunctionCallNoArgs(t *testing.T) {
 		t.Fatalf("Execute() error: %v", err)
 	}
 
-	// now() returns a mock timestamp
-	expected := vm.IntValue{Val: 1234567890}
-	if !valuesEqual(result, expected) {
-		t.Errorf("Expected %v, got %v", expected, result)
+	// now() returns the current Unix timestamp
+	intVal, ok := result.(vm.IntValue)
+	if !ok {
+		t.Fatalf("Expected IntValue, got %T", result)
+	}
+	if math.Abs(float64(intVal.Val-time.Now().Unix())) > 2 {
+		t.Errorf("Expected timestamp within 2s of now, got %v", intVal.Val)
 	}
 }
 
 func TestCompileFunctionCallWithOneArg(t *testing.T) {
 	// Test: > length([1, 2, 3])
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.FunctionCallExpr{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.FunctionCallExpr{
 					Name: "length",
-					Args: []interpreter.Expr{
-						&interpreter.ArrayExpr{
-							Elements: []interpreter.Expr{
-								&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-								&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
-								&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+					Args: []ast.Expr{
+						&ast.ArrayExpr{
+							Elements: []ast.Expr{
+								&ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+								&ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
+								&ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 							},
 						},
 					},
@@ -2197,13 +2208,13 @@ func TestCompileFunctionCallWithOneArg(t *testing.T) {
 
 func TestCompileFunctionCallLengthString(t *testing.T) {
 	// Test: > length("hello")
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.FunctionCallExpr{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.FunctionCallExpr{
 					Name: "length",
-					Args: []interpreter.Expr{
-						&interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "hello"}},
+					Args: []ast.Expr{
+						&ast.LiteralExpr{Value: ast.StringLiteral{Value: "hello"}},
 					},
 				},
 			},
@@ -2230,26 +2241,26 @@ func TestCompileFunctionCallLengthString(t *testing.T) {
 
 func TestCompileFunctionCallInExpression(t *testing.T) {
 	// Test: > length([1, 2, 3, 4, 5]) + 10
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.BinaryOpExpr{
-					Op: interpreter.Add,
-					Left: &interpreter.FunctionCallExpr{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.BinaryOpExpr{
+					Op: ast.Add,
+					Left: &ast.FunctionCallExpr{
 						Name: "length",
-						Args: []interpreter.Expr{
-							&interpreter.ArrayExpr{
-								Elements: []interpreter.Expr{
-									&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-									&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
-									&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
-									&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 4}},
-									&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
+						Args: []ast.Expr{
+							&ast.ArrayExpr{
+								Elements: []ast.Expr{
+									&ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+									&ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
+									&ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
+									&ast.LiteralExpr{Value: ast.IntLiteral{Value: 4}},
+									&ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
 								},
 							},
 						},
 					},
-					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
 				},
 			},
 		},
@@ -2275,24 +2286,24 @@ func TestCompileFunctionCallInExpression(t *testing.T) {
 
 func TestCompileFunctionCallWithVariable(t *testing.T) {
 	// Test: $ arr = [1, 2, 3, 4], > length(arr)
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "arr",
-				Value: &interpreter.ArrayExpr{
-					Elements: []interpreter.Expr{
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 4}},
+				Value: &ast.ArrayExpr{
+					Elements: []ast.Expr{
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 4}},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.FunctionCallExpr{
+			&ast.ReturnStatement{
+				Value: &ast.FunctionCallExpr{
 					Name: "length",
-					Args: []interpreter.Expr{
-						&interpreter.VariableExpr{Name: "arr"},
+					Args: []ast.Expr{
+						&ast.VariableExpr{Name: "arr"},
 					},
 				},
 			},
@@ -2319,12 +2330,12 @@ func TestCompileFunctionCallWithVariable(t *testing.T) {
 
 func TestCompileFunctionCallTimeNow(t *testing.T) {
 	// Test: > time.now()
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.FunctionCallExpr{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.FunctionCallExpr{
 					Name: "time.now",
-					Args: []interpreter.Expr{},
+					Args: []ast.Expr{},
 				},
 			},
 		},
@@ -2342,36 +2353,39 @@ func TestCompileFunctionCallTimeNow(t *testing.T) {
 		t.Fatalf("Execute() error: %v", err)
 	}
 
-	// time.now() returns a mock timestamp
-	expected := vm.IntValue{Val: 1234567890}
-	if !valuesEqual(result, expected) {
-		t.Errorf("Expected %v, got %v", expected, result)
+	// time.now() returns the current Unix timestamp
+	intVal, ok := result.(vm.IntValue)
+	if !ok {
+		t.Fatalf("Expected IntValue, got %T", result)
+	}
+	if math.Abs(float64(intVal.Val-time.Now().Unix())) > 2 {
+		t.Errorf("Expected timestamp within 2s of now, got %v", intVal.Val)
 	}
 }
 
 func TestCompileFunctionCallInObject(t *testing.T) {
 	// Test: > {timestamp: now(), items: length([1, 2])}
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.ObjectExpr{
-					Fields: []interpreter.ObjectField{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.ObjectExpr{
+					Fields: []ast.ObjectField{
 						{
 							Key: "timestamp",
-							Value: &interpreter.FunctionCallExpr{
+							Value: &ast.FunctionCallExpr{
 								Name: "now",
-								Args: []interpreter.Expr{},
+								Args: []ast.Expr{},
 							},
 						},
 						{
 							Key: "items",
-							Value: &interpreter.FunctionCallExpr{
+							Value: &ast.FunctionCallExpr{
 								Name: "length",
-								Args: []interpreter.Expr{
-									&interpreter.ArrayExpr{
-										Elements: []interpreter.Expr{
-											&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-											&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+								Args: []ast.Expr{
+									&ast.ArrayExpr{
+										Elements: []ast.Expr{
+											&ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+											&ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 										},
 									},
 								},
@@ -2400,8 +2414,8 @@ func TestCompileFunctionCallInObject(t *testing.T) {
 		t.Fatalf("Expected ObjectValue, got %T", result)
 	}
 
-	if tsVal, ok := objVal.Val["timestamp"].(vm.IntValue); !ok || tsVal.Val != 1234567890 {
-		t.Errorf("Expected timestamp=1234567890, got %v", objVal.Val["timestamp"])
+	if tsVal, ok := objVal.Val["timestamp"].(vm.IntValue); !ok || math.Abs(float64(tsVal.Val-time.Now().Unix())) > 2 {
+		t.Errorf("Expected timestamp within 2s of now, got %v", objVal.Val["timestamp"])
 	}
 
 	if itemsVal, ok := objVal.Val["items"].(vm.IntValue); !ok || itemsVal.Val != 2 {
@@ -2411,37 +2425,37 @@ func TestCompileFunctionCallInObject(t *testing.T) {
 
 func TestCompileFunctionCallInCondition(t *testing.T) {
 	// Test: $ arr = [1, 2, 3], if length(arr) > 2 { > "big" } else { > "small" }
-	route := &interpreter.Route{
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "arr",
-				Value: &interpreter.ArrayExpr{
-					Elements: []interpreter.Expr{
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+				Value: &ast.ArrayExpr{
+					Elements: []ast.Expr{
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 					},
 				},
 			},
-			&interpreter.IfStatement{
-				Condition: &interpreter.BinaryOpExpr{
-					Op: interpreter.Gt,
-					Left: &interpreter.FunctionCallExpr{
+			&ast.IfStatement{
+				Condition: &ast.BinaryOpExpr{
+					Op: ast.Gt,
+					Left: &ast.FunctionCallExpr{
 						Name: "length",
-						Args: []interpreter.Expr{
-							&interpreter.VariableExpr{Name: "arr"},
+						Args: []ast.Expr{
+							&ast.VariableExpr{Name: "arr"},
 						},
 					},
-					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 				},
-				ThenBlock: []interpreter.Statement{
-					&interpreter.ReturnStatement{
-						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "big"}},
+				ThenBlock: []ast.Statement{
+					&ast.ReturnStatement{
+						Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "big"}},
 					},
 				},
-				ElseBlock: []interpreter.Statement{
-					&interpreter.ReturnStatement{
-						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "small"}},
+				ElseBlock: []ast.Statement{
+					&ast.ReturnStatement{
+						Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "small"}},
 					},
 				},
 			},
@@ -2469,17 +2483,17 @@ func TestCompileFunctionCallInCondition(t *testing.T) {
 // Test CompileCommand
 
 func TestCompileCommand_Simple(t *testing.T) {
-	cmd := &interpreter.Command{
+	cmd := &ast.Command{
 		Name: "greet",
-		Params: []interpreter.CommandParam{
-			{Name: "name", Type: interpreter.StringType{}, Required: true},
+		Params: []ast.CommandParam{
+			{Name: "name", Type: ast.StringType{}, Required: true},
 		},
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Add,
-					Left:  &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "Hello, "}},
-					Right: &interpreter.VariableExpr{Name: "name"},
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.BinaryOpExpr{
+					Op:    ast.Add,
+					Left:  &ast.LiteralExpr{Value: ast.StringLiteral{Value: "Hello, "}},
+					Right: &ast.VariableExpr{Name: "name"},
 				},
 			},
 		},
@@ -2497,18 +2511,18 @@ func TestCompileCommand_Simple(t *testing.T) {
 }
 
 func TestCompileCommand_WithMultipleParams(t *testing.T) {
-	cmd := &interpreter.Command{
+	cmd := &ast.Command{
 		Name: "add",
-		Params: []interpreter.CommandParam{
-			{Name: "x", Type: interpreter.IntType{}, Required: true},
-			{Name: "y", Type: interpreter.IntType{}, Required: true},
+		Params: []ast.CommandParam{
+			{Name: "x", Type: ast.IntType{}, Required: true},
+			{Name: "y", Type: ast.IntType{}, Required: true},
 		},
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Add,
-					Left:  &interpreter.VariableExpr{Name: "x"},
-					Right: &interpreter.VariableExpr{Name: "y"},
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.BinaryOpExpr{
+					Op:    ast.Add,
+					Left:  &ast.VariableExpr{Name: "x"},
+					Right: &ast.VariableExpr{Name: "y"},
 				},
 			},
 		},
@@ -2527,47 +2541,47 @@ func TestCompileCommand_WithMultipleParams(t *testing.T) {
 }
 
 func TestCompileCommand_WithComplexBody(t *testing.T) {
-	cmd := &interpreter.Command{
+	cmd := &ast.Command{
 		Name: "process",
-		Params: []interpreter.CommandParam{
-			{Name: "input", Type: interpreter.StringType{}, Required: true},
+		Params: []ast.CommandParam{
+			{Name: "input", Type: ast.StringType{}, Required: true},
 		},
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "result",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
-			&interpreter.AssignStatement{
+			&ast.AssignStatement{
 				Target: "i",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
-			&interpreter.WhileStatement{
-				Condition: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Lt,
-					Left:  &interpreter.VariableExpr{Name: "i"},
-					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
+			&ast.WhileStatement{
+				Condition: &ast.BinaryOpExpr{
+					Op:    ast.Lt,
+					Left:  &ast.VariableExpr{Name: "i"},
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
 				},
-				Body: []interpreter.Statement{
-					&interpreter.AssignStatement{
+				Body: []ast.Statement{
+					&ast.AssignStatement{
 						Target: "result",
-						Value: &interpreter.BinaryOpExpr{
-							Op:    interpreter.Add,
-							Left:  &interpreter.VariableExpr{Name: "result"},
-							Right: &interpreter.VariableExpr{Name: "i"},
+						Value: &ast.BinaryOpExpr{
+							Op:    ast.Add,
+							Left:  &ast.VariableExpr{Name: "result"},
+							Right: &ast.VariableExpr{Name: "i"},
 						},
 					},
-					&interpreter.AssignStatement{
+					&ast.AssignStatement{
 						Target: "i",
-						Value: &interpreter.BinaryOpExpr{
-							Op:    interpreter.Add,
-							Left:  &interpreter.VariableExpr{Name: "i"},
-							Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+						Value: &ast.BinaryOpExpr{
+							Op:    ast.Add,
+							Left:  &ast.VariableExpr{Name: "i"},
+							Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 						},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "result"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "result"},
 			},
 		},
 	}
@@ -2586,18 +2600,18 @@ func TestCompileCommand_WithComplexBody(t *testing.T) {
 // Test CompileCronTask
 
 func TestCompileCronTask_Simple(t *testing.T) {
-	task := &interpreter.CronTask{
+	task := &ast.CronTask{
 		Name:     "daily_cleanup",
 		Schedule: "0 0 * * *",
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "count",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 10}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.ObjectExpr{
-					Fields: []interpreter.ObjectField{
-						{Key: "deleted", Value: &interpreter.VariableExpr{Name: "count"}},
+			&ast.ReturnStatement{
+				Value: &ast.ObjectExpr{
+					Fields: []ast.ObjectField{
+						{Key: "deleted", Value: &ast.VariableExpr{Name: "count"}},
 					},
 				},
 			},
@@ -2616,22 +2630,22 @@ func TestCompileCronTask_Simple(t *testing.T) {
 }
 
 func TestCompileCronTask_WithInjections(t *testing.T) {
-	task := &interpreter.CronTask{
+	task := &ast.CronTask{
 		Name:     "backup",
 		Schedule: "0 0 * * *",
-		Injections: []interpreter.Injection{
-			{Name: "db", Type: interpreter.DatabaseType{}},
+		Injections: []ast.Injection{
+			{Name: "db", Type: ast.DatabaseType{}},
 		},
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "count",
-				Value: &interpreter.FieldAccessExpr{
-					Object: &interpreter.VariableExpr{Name: "db"},
+				Value: &ast.FieldAccessExpr{
+					Object: &ast.VariableExpr{Name: "db"},
 					Field:  "count",
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "count"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "count"},
 			},
 		},
 	}
@@ -2648,45 +2662,45 @@ func TestCompileCronTask_WithInjections(t *testing.T) {
 }
 
 func TestCompileCronTask_ComplexLogic(t *testing.T) {
-	task := &interpreter.CronTask{
+	task := &ast.CronTask{
 		Name:     "hourly_sync",
 		Schedule: "0 */1 * * *",
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "total",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
-			&interpreter.AssignStatement{
+			&ast.AssignStatement{
 				Target: "i",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
-			&interpreter.WhileStatement{
-				Condition: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Lt,
-					Left:  &interpreter.VariableExpr{Name: "i"},
-					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 5}},
+			&ast.WhileStatement{
+				Condition: &ast.BinaryOpExpr{
+					Op:    ast.Lt,
+					Left:  &ast.VariableExpr{Name: "i"},
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
 				},
-				Body: []interpreter.Statement{
-					&interpreter.AssignStatement{
+				Body: []ast.Statement{
+					&ast.AssignStatement{
 						Target: "total",
-						Value: &interpreter.BinaryOpExpr{
-							Op:    interpreter.Add,
-							Left:  &interpreter.VariableExpr{Name: "total"},
-							Right: &interpreter.VariableExpr{Name: "i"},
+						Value: &ast.BinaryOpExpr{
+							Op:    ast.Add,
+							Left:  &ast.VariableExpr{Name: "total"},
+							Right: &ast.VariableExpr{Name: "i"},
 						},
 					},
-					&interpreter.AssignStatement{
+					&ast.AssignStatement{
 						Target: "i",
-						Value: &interpreter.BinaryOpExpr{
-							Op:    interpreter.Add,
-							Left:  &interpreter.VariableExpr{Name: "i"},
-							Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+						Value: &ast.BinaryOpExpr{
+							Op:    ast.Add,
+							Left:  &ast.VariableExpr{Name: "i"},
+							Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 						},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "total"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "total"},
 			},
 		},
 	}
@@ -2705,21 +2719,21 @@ func TestCompileCronTask_ComplexLogic(t *testing.T) {
 // Test CompileEventHandler
 
 func TestCompileEventHandler_Simple(t *testing.T) {
-	handler := &interpreter.EventHandler{
+	handler := &ast.EventHandler{
 		EventType: "user.created",
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "userId",
-				Value: &interpreter.FieldAccessExpr{
-					Object: &interpreter.VariableExpr{Name: "event"},
+				Value: &ast.FieldAccessExpr{
+					Object: &ast.VariableExpr{Name: "event"},
 					Field:  "userId",
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.ObjectExpr{
-					Fields: []interpreter.ObjectField{
-						{Key: "handled", Value: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}}},
-						{Key: "userId", Value: &interpreter.VariableExpr{Name: "userId"}},
+			&ast.ReturnStatement{
+				Value: &ast.ObjectExpr{
+					Fields: []ast.ObjectField{
+						{Key: "handled", Value: &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}}},
+						{Key: "userId", Value: &ast.VariableExpr{Name: "userId"}},
 					},
 				},
 			},
@@ -2738,18 +2752,18 @@ func TestCompileEventHandler_Simple(t *testing.T) {
 }
 
 func TestCompileEventHandler_WithInput(t *testing.T) {
-	handler := &interpreter.EventHandler{
+	handler := &ast.EventHandler{
 		EventType: "order.paid",
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "orderId",
-				Value: &interpreter.FieldAccessExpr{
-					Object: &interpreter.VariableExpr{Name: "input"},
+				Value: &ast.FieldAccessExpr{
+					Object: &ast.VariableExpr{Name: "input"},
 					Field:  "orderId",
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "orderId"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "orderId"},
 			},
 		},
 	}
@@ -2766,21 +2780,21 @@ func TestCompileEventHandler_WithInput(t *testing.T) {
 }
 
 func TestCompileEventHandler_WithInjections(t *testing.T) {
-	handler := &interpreter.EventHandler{
+	handler := &ast.EventHandler{
 		EventType: "notification.send",
-		Injections: []interpreter.Injection{
-			{Name: "db", Type: interpreter.DatabaseType{}},
+		Injections: []ast.Injection{
+			{Name: "db", Type: ast.DatabaseType{}},
 		},
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "user",
-				Value: &interpreter.FieldAccessExpr{
-					Object: &interpreter.VariableExpr{Name: "db"},
+				Value: &ast.FieldAccessExpr{
+					Object: &ast.VariableExpr{Name: "db"},
 					Field:  "user",
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "user"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "user"},
 			},
 		},
 	}
@@ -2797,30 +2811,30 @@ func TestCompileEventHandler_WithInjections(t *testing.T) {
 }
 
 func TestCompileEventHandler_ComplexProcessing(t *testing.T) {
-	handler := &interpreter.EventHandler{
+	handler := &ast.EventHandler{
 		EventType: "data.process",
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "data",
-				Value: &interpreter.FieldAccessExpr{
-					Object: &interpreter.VariableExpr{Name: "event"},
+				Value: &ast.FieldAccessExpr{
+					Object: &ast.VariableExpr{Name: "event"},
 					Field:  "data",
 				},
 			},
-			&interpreter.IfStatement{
-				Condition: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Ne,
-					Left:  &interpreter.VariableExpr{Name: "data"},
-					Right: &interpreter.LiteralExpr{Value: interpreter.NullLiteral{}},
+			&ast.IfStatement{
+				Condition: &ast.BinaryOpExpr{
+					Op:    ast.Ne,
+					Left:  &ast.VariableExpr{Name: "data"},
+					Right: &ast.LiteralExpr{Value: ast.NullLiteral{}},
 				},
-				ThenBlock: []interpreter.Statement{
-					&interpreter.ReturnStatement{
-						Value: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
+				ThenBlock: []ast.Statement{
+					&ast.ReturnStatement{
+						Value: &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
 					},
 				},
-				ElseBlock: []interpreter.Statement{
-					&interpreter.ReturnStatement{
-						Value: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: false}},
+				ElseBlock: []ast.Statement{
+					&ast.ReturnStatement{
+						Value: &ast.LiteralExpr{Value: ast.BoolLiteral{Value: false}},
 					},
 				},
 			},
@@ -2841,21 +2855,21 @@ func TestCompileEventHandler_ComplexProcessing(t *testing.T) {
 // Test CompileQueueWorker
 
 func TestCompileQueueWorker_Simple(t *testing.T) {
-	worker := &interpreter.QueueWorker{
+	worker := &ast.QueueWorker{
 		QueueName: "email.send",
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "to",
-				Value: &interpreter.FieldAccessExpr{
-					Object: &interpreter.VariableExpr{Name: "message"},
+				Value: &ast.FieldAccessExpr{
+					Object: &ast.VariableExpr{Name: "message"},
 					Field:  "to",
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.ObjectExpr{
-					Fields: []interpreter.ObjectField{
-						{Key: "sent", Value: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}}},
-						{Key: "to", Value: &interpreter.VariableExpr{Name: "to"}},
+			&ast.ReturnStatement{
+				Value: &ast.ObjectExpr{
+					Fields: []ast.ObjectField{
+						{Key: "sent", Value: &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}}},
+						{Key: "to", Value: &ast.VariableExpr{Name: "to"}},
 					},
 				},
 			},
@@ -2874,18 +2888,18 @@ func TestCompileQueueWorker_Simple(t *testing.T) {
 }
 
 func TestCompileQueueWorker_WithInput(t *testing.T) {
-	worker := &interpreter.QueueWorker{
+	worker := &ast.QueueWorker{
 		QueueName: "image.resize",
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "imageId",
-				Value: &interpreter.FieldAccessExpr{
-					Object: &interpreter.VariableExpr{Name: "input"},
+				Value: &ast.FieldAccessExpr{
+					Object: &ast.VariableExpr{Name: "input"},
 					Field:  "imageId",
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "imageId"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "imageId"},
 			},
 		},
 	}
@@ -2902,21 +2916,21 @@ func TestCompileQueueWorker_WithInput(t *testing.T) {
 }
 
 func TestCompileQueueWorker_WithInjections(t *testing.T) {
-	worker := &interpreter.QueueWorker{
+	worker := &ast.QueueWorker{
 		QueueName: "report.generate",
-		Injections: []interpreter.Injection{
-			{Name: "db", Type: interpreter.DatabaseType{}},
+		Injections: []ast.Injection{
+			{Name: "db", Type: ast.DatabaseType{}},
 		},
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "data",
-				Value: &interpreter.FieldAccessExpr{
-					Object: &interpreter.VariableExpr{Name: "db"},
+				Value: &ast.FieldAccessExpr{
+					Object: &ast.VariableExpr{Name: "db"},
 					Field:  "data",
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "data"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "data"},
 			},
 		},
 	}
@@ -2933,36 +2947,36 @@ func TestCompileQueueWorker_WithInjections(t *testing.T) {
 }
 
 func TestCompileQueueWorker_ComplexProcessing(t *testing.T) {
-	worker := &interpreter.QueueWorker{
+	worker := &ast.QueueWorker{
 		QueueName: "data.process",
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "items",
-				Value: &interpreter.FieldAccessExpr{
-					Object: &interpreter.VariableExpr{Name: "message"},
+				Value: &ast.FieldAccessExpr{
+					Object: &ast.VariableExpr{Name: "message"},
 					Field:  "items",
 				},
 			},
-			&interpreter.AssignStatement{
+			&ast.AssignStatement{
 				Target: "count",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
-			&interpreter.ForStatement{
+			&ast.ForStatement{
 				ValueVar: "item",
-				Iterable: &interpreter.VariableExpr{Name: "items"},
-				Body: []interpreter.Statement{
-					&interpreter.AssignStatement{
+				Iterable: &ast.VariableExpr{Name: "items"},
+				Body: []ast.Statement{
+					&ast.AssignStatement{
 						Target: "count",
-						Value: &interpreter.BinaryOpExpr{
-							Op:    interpreter.Add,
-							Left:  &interpreter.VariableExpr{Name: "count"},
-							Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+						Value: &ast.BinaryOpExpr{
+							Op:    ast.Add,
+							Left:  &ast.VariableExpr{Name: "count"},
+							Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 						},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "count"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "count"},
 			},
 		},
 	}
@@ -2981,26 +2995,26 @@ func TestCompileQueueWorker_ComplexProcessing(t *testing.T) {
 // Test compilation with multiple statement types
 
 func TestCompile_DirectiveWithIfStatement(t *testing.T) {
-	cmd := &interpreter.Command{
+	cmd := &ast.Command{
 		Name: "check",
-		Params: []interpreter.CommandParam{
-			{Name: "value", Type: interpreter.IntType{}, Required: true},
+		Params: []ast.CommandParam{
+			{Name: "value", Type: ast.IntType{}, Required: true},
 		},
-		Body: []interpreter.Statement{
-			&interpreter.IfStatement{
-				Condition: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Gt,
-					Left:  &interpreter.VariableExpr{Name: "value"},
-					Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+		Body: []ast.Statement{
+			&ast.IfStatement{
+				Condition: &ast.BinaryOpExpr{
+					Op:    ast.Gt,
+					Left:  &ast.VariableExpr{Name: "value"},
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 				},
-				ThenBlock: []interpreter.Statement{
-					&interpreter.ReturnStatement{
-						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "positive"}},
+				ThenBlock: []ast.Statement{
+					&ast.ReturnStatement{
+						Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "positive"}},
 					},
 				},
-				ElseBlock: []interpreter.Statement{
-					&interpreter.ReturnStatement{
-						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "negative"}},
+				ElseBlock: []ast.Statement{
+					&ast.ReturnStatement{
+						Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "negative"}},
 					},
 				},
 			},
@@ -3019,40 +3033,40 @@ func TestCompile_DirectiveWithIfStatement(t *testing.T) {
 }
 
 func TestCompile_DirectiveWithForLoop(t *testing.T) {
-	task := &interpreter.CronTask{
+	task := &ast.CronTask{
 		Name:     "process_items",
 		Schedule: "0 * * * *",
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "items",
-				Value: &interpreter.ArrayExpr{
-					Elements: []interpreter.Expr{
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
-						&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 3}},
+				Value: &ast.ArrayExpr{
+					Elements: []ast.Expr{
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
+						&ast.LiteralExpr{Value: ast.IntLiteral{Value: 3}},
 					},
 				},
 			},
-			&interpreter.AssignStatement{
+			&ast.AssignStatement{
 				Target: "sum",
-				Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 			},
-			&interpreter.ForStatement{
+			&ast.ForStatement{
 				ValueVar: "item",
-				Iterable: &interpreter.VariableExpr{Name: "items"},
-				Body: []interpreter.Statement{
-					&interpreter.AssignStatement{
+				Iterable: &ast.VariableExpr{Name: "items"},
+				Body: []ast.Statement{
+					&ast.AssignStatement{
 						Target: "sum",
-						Value: &interpreter.BinaryOpExpr{
-							Op:    interpreter.Add,
-							Left:  &interpreter.VariableExpr{Name: "sum"},
-							Right: &interpreter.VariableExpr{Name: "item"},
+						Value: &ast.BinaryOpExpr{
+							Op:    ast.Add,
+							Left:  &ast.VariableExpr{Name: "sum"},
+							Right: &ast.VariableExpr{Name: "item"},
 						},
 					},
 				},
 			},
-			&interpreter.ReturnStatement{
-				Value: &interpreter.VariableExpr{Name: "sum"},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "sum"},
 			},
 		},
 	}
@@ -3069,39 +3083,39 @@ func TestCompile_DirectiveWithForLoop(t *testing.T) {
 }
 
 func TestCompile_DirectiveWithSwitchStatement(t *testing.T) {
-	handler := &interpreter.EventHandler{
+	handler := &ast.EventHandler{
 		EventType: "status.changed",
-		Body: []interpreter.Statement{
-			&interpreter.AssignStatement{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
 				Target: "status",
-				Value: &interpreter.FieldAccessExpr{
-					Object: &interpreter.VariableExpr{Name: "event"},
+				Value: &ast.FieldAccessExpr{
+					Object: &ast.VariableExpr{Name: "event"},
 					Field:  "status",
 				},
 			},
-			&interpreter.SwitchStatement{
-				Value: &interpreter.VariableExpr{Name: "status"},
-				Cases: []interpreter.SwitchCase{
+			&ast.SwitchStatement{
+				Value: &ast.VariableExpr{Name: "status"},
+				Cases: []ast.SwitchCase{
 					{
-						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "pending"}},
-						Body: []interpreter.Statement{
-							&interpreter.ReturnStatement{
-								Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
+						Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "pending"}},
+						Body: []ast.Statement{
+							&ast.ReturnStatement{
+								Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
 							},
 						},
 					},
 					{
-						Value: &interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "active"}},
-						Body: []interpreter.Statement{
-							&interpreter.ReturnStatement{
-								Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+						Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "active"}},
+						Body: []ast.Statement{
+							&ast.ReturnStatement{
+								Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 							},
 						},
 					},
 				},
-				Default: []interpreter.Statement{
-					&interpreter.ReturnStatement{
-						Value: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 0}},
+				Default: []ast.Statement{
+					&ast.ReturnStatement{
+						Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
 					},
 				},
 			},
@@ -3123,30 +3137,30 @@ func TestCompile_DirectiveWithSwitchStatement(t *testing.T) {
 func TestCompileUnaryOp(t *testing.T) {
 	tests := []struct {
 		name     string
-		expr     interpreter.Expr
+		expr     ast.Expr
 		expected vm.Value
 	}{
 		{
 			name: "negation",
-			expr: &interpreter.UnaryOpExpr{
-				Op:    interpreter.Neg,
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+			expr: &ast.UnaryOpExpr{
+				Op:    ast.Neg,
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
 			},
 			expected: vm.IntValue{Val: -42},
 		},
 		{
 			name: "not true",
-			expr: &interpreter.UnaryOpExpr{
-				Op:    interpreter.Not,
-				Right: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
+			expr: &ast.UnaryOpExpr{
+				Op:    ast.Not,
+				Right: &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
 			},
 			expected: vm.BoolValue{Val: false},
 		},
 		{
 			name: "not false",
-			expr: &interpreter.UnaryOpExpr{
-				Op:    interpreter.Not,
-				Right: &interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: false}},
+			expr: &ast.UnaryOpExpr{
+				Op:    ast.Not,
+				Right: &ast.LiteralExpr{Value: ast.BoolLiteral{Value: false}},
 			},
 			expected: vm.BoolValue{Val: true},
 		},
@@ -3160,7 +3174,10 @@ func TestCompileUnaryOp(t *testing.T) {
 				t.Fatalf("compileExpression() error: %v", err)
 			}
 
-			bytecode := c.buildBytecode()
+			bytecode, err := c.buildBytecode()
+			if err != nil {
+				t.Fatalf("buildBytecode() error: %v", err)
+			}
 			vmInstance := vm.NewVM()
 			result, err := vmInstance.Execute(bytecode)
 			if err != nil {
@@ -3178,11 +3195,11 @@ func TestCompileUnaryOp(t *testing.T) {
 func TestCompileValidationStatement(t *testing.T) {
 	c := NewCompiler()
 
-	stmt := &interpreter.ValidationStatement{
-		Call: interpreter.FunctionCallExpr{
+	stmt := &ast.ValidationStatement{
+		Call: ast.FunctionCallExpr{
 			Name: "validate",
-			Args: []interpreter.Expr{
-				&interpreter.LiteralExpr{Value: interpreter.BoolLiteral{Value: true}},
+			Args: []ast.Expr{
+				&ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
 			},
 		},
 	}
@@ -3196,11 +3213,11 @@ func TestCompileValidationStatement(t *testing.T) {
 func TestCompileExpressionStatement(t *testing.T) {
 	c := NewCompiler()
 
-	stmt := &interpreter.ExpressionStatement{
-		Expr: &interpreter.FunctionCallExpr{
+	stmt := &ast.ExpressionStatement{
+		Expr: &ast.FunctionCallExpr{
 			Name: "print",
-			Args: []interpreter.Expr{
-				&interpreter.LiteralExpr{Value: interpreter.StringLiteral{Value: "hello"}},
+			Args: []ast.Expr{
+				&ast.LiteralExpr{Value: ast.StringLiteral{Value: "hello"}},
 			},
 		},
 	}
@@ -3283,16 +3300,16 @@ func TestFunctionInliner(t *testing.T) {
 		t.Fatal("NewFunctionInliner returned nil")
 	}
 
-	// Define a simple function using interpreter.Function
-	funcDef := interpreter.Function{
-		Name: "add",
-		Params: []interpreter.Field{{Name: "a", TypeAnnotation: interpreter.IntType{}}, {Name: "b", TypeAnnotation: interpreter.IntType{}}},
-		Body: []interpreter.Statement{
-			&interpreter.ReturnStatement{
-				Value: &interpreter.BinaryOpExpr{
-					Op:    interpreter.Add,
-					Left:  &interpreter.VariableExpr{Name: "a"},
-					Right: &interpreter.VariableExpr{Name: "b"},
+	// Define a simple function using ast.Function
+	funcDef := ast.Function{
+		Name:   "add",
+		Params: []ast.Field{{Name: "a", TypeAnnotation: ast.IntType{}}, {Name: "b", TypeAnnotation: ast.IntType{}}},
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.BinaryOpExpr{
+					Op:    ast.Add,
+					Left:  &ast.VariableExpr{Name: "a"},
+					Right: &ast.VariableExpr{Name: "b"},
 				},
 			},
 		},
@@ -3306,11 +3323,11 @@ func TestFunctionInliner(t *testing.T) {
 	_ = shouldInline
 
 	// Test InlineCall
-	call := &interpreter.FunctionCallExpr{
+	call := &ast.FunctionCallExpr{
 		Name: "add",
-		Args: []interpreter.Expr{
-			&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-			&interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+		Args: []ast.Expr{
+			&ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+			&ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 		},
 	}
 
@@ -3325,22 +3342,22 @@ func TestOptimizerStrengthReduce(t *testing.T) {
 
 	tests := []struct {
 		name string
-		expr interpreter.Expr
+		expr ast.Expr
 	}{
 		{
 			name: "multiply by power of 2",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Mul,
-				Left:  &interpreter.VariableExpr{Name: "x"},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 8}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Mul,
+				Left:  &ast.VariableExpr{Name: "x"},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 8}},
 			},
 		},
 		{
 			name: "divide by power of 2",
-			expr: &interpreter.BinaryOpExpr{
-				Op:    interpreter.Div,
-				Left:  &interpreter.VariableExpr{Name: "x"},
-				Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 4}},
+			expr: &ast.BinaryOpExpr{
+				Op:    ast.Div,
+				Left:  &ast.VariableExpr{Name: "x"},
+				Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 4}},
 			},
 		},
 	}
@@ -3360,10 +3377,10 @@ func TestOptimizerStrengthReduce(t *testing.T) {
 func TestOptimizerApplyPeepholeOptimizations(t *testing.T) {
 	opt := NewOptimizer(OptAggressive)
 
-	stmts := []interpreter.Statement{
-		&interpreter.AssignStatement{
+	stmts := []ast.Statement{
+		&ast.AssignStatement{
 			Target: "x",
-			Value:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 42}},
+			Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
 		},
 	}
 
@@ -3378,14 +3395,871 @@ func TestOptimizerGetStats(t *testing.T) {
 	opt := NewOptimizer(OptAggressive)
 
 	// Run some optimization
-	expr := &interpreter.BinaryOpExpr{
-		Op:    interpreter.Add,
-		Left:  &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 1}},
-		Right: &interpreter.LiteralExpr{Value: interpreter.IntLiteral{Value: 2}},
+	expr := &ast.BinaryOpExpr{
+		Op:    ast.Add,
+		Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+		Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
 	}
 	opt.OptimizeExpression(expr)
 
 	stats := opt.GetStats()
 	// Stats should have some data
 	_ = stats
+}
+
+// =================================================================
+// Match expression tests (compileMatchExpr, compilePatternMatch,
+// compileLiteralValue)
+// =================================================================
+
+func TestCompileMatchExpr_LiteralPatterns(t *testing.T) {
+	// match x { 1 => 10, 2 => 20, _ => 0 }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	matchExpr := &ast.MatchExpr{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.MatchCase{
+			{
+				Pattern: ast.LiteralPattern{
+					Value: ast.IntLiteral{Value: 1},
+				},
+				Body: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
+			},
+			{
+				Pattern: ast.LiteralPattern{
+					Value: ast.IntLiteral{Value: 2},
+				},
+				Body: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 20}},
+			},
+			{
+				Pattern: ast.WildcardPattern{},
+				Body:    &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
+			},
+		},
+	}
+
+	err := c.compileMatchExpr(matchExpr)
+	if err != nil {
+		t.Fatalf("compileMatchExpr() error: %v", err)
+	}
+
+	// Verify bytecode was generated (non-empty code)
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from match expression")
+	}
+}
+
+func TestCompileMatchExpr_VariablePattern(t *testing.T) {
+	// match x { y => y + 1 }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	matchExpr := &ast.MatchExpr{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.MatchCase{
+			{
+				Pattern: ast.VariablePattern{Name: "y"},
+				Body: &ast.BinaryOpExpr{
+					Op:    ast.Add,
+					Left:  &ast.VariableExpr{Name: "y"},
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+				},
+			},
+		},
+	}
+
+	err := c.compileMatchExpr(matchExpr)
+	if err != nil {
+		t.Fatalf("compileMatchExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from match with variable pattern")
+	}
+}
+
+func TestCompileMatchExpr_WildcardPattern(t *testing.T) {
+	// match x { _ => 99 }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	matchExpr := &ast.MatchExpr{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.MatchCase{
+			{
+				Pattern: ast.WildcardPattern{},
+				Body:    &ast.LiteralExpr{Value: ast.IntLiteral{Value: 99}},
+			},
+		},
+	}
+
+	err := c.compileMatchExpr(matchExpr)
+	if err != nil {
+		t.Fatalf("compileMatchExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from match with wildcard pattern")
+	}
+}
+
+func TestCompileMatchExpr_ObjectPattern(t *testing.T) {
+	// match x { {name} => name }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	matchExpr := &ast.MatchExpr{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.MatchCase{
+			{
+				Pattern: ast.ObjectPattern{
+					Fields: []ast.ObjectPatternField{
+						{Key: "name", Pattern: nil}, // bind field to variable
+					},
+				},
+				Body: &ast.VariableExpr{Name: "name"},
+			},
+		},
+	}
+
+	err := c.compileMatchExpr(matchExpr)
+	if err != nil {
+		t.Fatalf("compileMatchExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from match with object pattern")
+	}
+}
+
+func TestCompileMatchExpr_ObjectPatternWithNestedLiteral(t *testing.T) {
+	// match x { {status: 200} => "ok" }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	matchExpr := &ast.MatchExpr{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.MatchCase{
+			{
+				Pattern: ast.ObjectPattern{
+					Fields: []ast.ObjectPatternField{
+						{
+							Key: "status",
+							Pattern: ast.LiteralPattern{
+								Value: ast.IntLiteral{Value: 200},
+							},
+						},
+					},
+				},
+				Body: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "ok"}},
+			},
+		},
+	}
+
+	err := c.compileMatchExpr(matchExpr)
+	if err != nil {
+		t.Fatalf("compileMatchExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from match with nested object pattern")
+	}
+}
+
+func TestCompileMatchExpr_ArrayPattern(t *testing.T) {
+	// match x { [first, second] => first }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	matchExpr := &ast.MatchExpr{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.MatchCase{
+			{
+				Pattern: ast.ArrayPattern{
+					Elements: []ast.Pattern{
+						ast.VariablePattern{Name: "first"},
+						ast.VariablePattern{Name: "second"},
+					},
+				},
+				Body: &ast.VariableExpr{Name: "first"},
+			},
+		},
+	}
+
+	err := c.compileMatchExpr(matchExpr)
+	if err != nil {
+		t.Fatalf("compileMatchExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from match with array pattern")
+	}
+}
+
+func TestCompileMatchExpr_ArrayPatternWithRest(t *testing.T) {
+	// match x { [head, ...rest] => head }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	restName := "rest"
+	matchExpr := &ast.MatchExpr{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.MatchCase{
+			{
+				Pattern: ast.ArrayPattern{
+					Elements: []ast.Pattern{
+						ast.VariablePattern{Name: "head"},
+					},
+					Rest: &restName,
+				},
+				Body: &ast.VariableExpr{Name: "head"},
+			},
+		},
+	}
+
+	err := c.compileMatchExpr(matchExpr)
+	if err != nil {
+		t.Fatalf("compileMatchExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from match with rest pattern")
+	}
+}
+
+func TestCompileMatchExpr_WithGuard(t *testing.T) {
+	// match x { y when y > 0 => y, _ => 0 }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	matchExpr := &ast.MatchExpr{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.MatchCase{
+			{
+				Pattern: ast.VariablePattern{Name: "y"},
+				Guard: &ast.BinaryOpExpr{
+					Op:    ast.Gt,
+					Left:  &ast.VariableExpr{Name: "y"},
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
+				},
+				Body: &ast.VariableExpr{Name: "y"},
+			},
+			{
+				Pattern: ast.WildcardPattern{},
+				Body:    &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
+			},
+		},
+	}
+
+	err := c.compileMatchExpr(matchExpr)
+	if err != nil {
+		t.Fatalf("compileMatchExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from match with guard")
+	}
+}
+
+func TestCompileMatchExpr_ValueTypes(t *testing.T) {
+	// Test MatchExpr as value type in compileExpression
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	// Pointer type
+	matchExpr := &ast.MatchExpr{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.MatchCase{
+			{
+				Pattern: ast.WildcardPattern{},
+				Body:    &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
+			},
+		},
+	}
+	err := c.compileExpression(matchExpr)
+	if err != nil {
+		t.Fatalf("compileExpression(*MatchExpr) error: %v", err)
+	}
+
+	// Value type
+	c.code = make([]byte, 0)
+	matchExprVal := ast.MatchExpr{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.MatchCase{
+			{
+				Pattern: ast.WildcardPattern{},
+				Body:    &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
+			},
+		},
+	}
+	err = c.compileExpression(matchExprVal)
+	if err != nil {
+		t.Fatalf("compileExpression(MatchExpr) error: %v", err)
+	}
+}
+
+func TestCompileMatchExpr_MultipleLiteralPatterns(t *testing.T) {
+	// match x { 1 => "one", 2 => "two", 3 => "three" }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	matchExpr := &ast.MatchExpr{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.MatchCase{
+			{
+				Pattern: ast.LiteralPattern{Value: ast.IntLiteral{Value: 1}},
+				Body:    &ast.LiteralExpr{Value: ast.StringLiteral{Value: "one"}},
+			},
+			{
+				Pattern: ast.LiteralPattern{Value: ast.IntLiteral{Value: 2}},
+				Body:    &ast.LiteralExpr{Value: ast.StringLiteral{Value: "two"}},
+			},
+			{
+				Pattern: ast.LiteralPattern{Value: ast.IntLiteral{Value: 3}},
+				Body:    &ast.LiteralExpr{Value: ast.StringLiteral{Value: "three"}},
+			},
+		},
+	}
+
+	err := c.compileMatchExpr(matchExpr)
+	if err != nil {
+		t.Fatalf("compileMatchExpr() error: %v", err)
+	}
+}
+
+// Test compileLiteralValue with all literal types
+func TestCompileLiteralValue_AllTypes(t *testing.T) {
+	tests := []struct {
+		name string
+		lit  ast.Literal
+	}{
+		{"int", ast.IntLiteral{Value: 42}},
+		{"float", ast.FloatLiteral{Value: 3.14}},
+		{"string", ast.StringLiteral{Value: "hello"}},
+		{"bool true", ast.BoolLiteral{Value: true}},
+		{"bool false", ast.BoolLiteral{Value: false}},
+		{"null", ast.NullLiteral{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := NewCompiler()
+			err := c.compileLiteralValue(tt.lit)
+			if err != nil {
+				t.Fatalf("compileLiteralValue(%s) error: %v", tt.name, err)
+			}
+			if len(c.code) == 0 {
+				t.Error("expected non-empty bytecode")
+			}
+		})
+	}
+}
+
+// =================================================================
+// Async/Await expression tests (compileAsyncExpr, compileAwaitExpr)
+// =================================================================
+
+func TestCompileAsyncExpr_Basic(t *testing.T) {
+	// async { > 42 }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+
+	asyncExpr := &ast.AsyncExpr{
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
+			},
+		},
+	}
+
+	err := c.compileAsyncExpr(asyncExpr)
+	if err != nil {
+		t.Fatalf("compileAsyncExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from async expression")
+	}
+}
+
+func TestCompileAsyncExpr_WithAssignment(t *testing.T) {
+	// async { $ x = 10, > x }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+
+	asyncExpr := &ast.AsyncExpr{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
+				Target: "x",
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 10}},
+			},
+			&ast.ReturnStatement{
+				Value: &ast.VariableExpr{Name: "x"},
+			},
+		},
+	}
+
+	err := c.compileAsyncExpr(asyncExpr)
+	if err != nil {
+		t.Fatalf("compileAsyncExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from async expression with assignment")
+	}
+}
+
+func TestCompileAsyncExpr_EmptyBody(t *testing.T) {
+	// async { }
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+
+	asyncExpr := &ast.AsyncExpr{
+		Body: []ast.Statement{},
+	}
+
+	err := c.compileAsyncExpr(asyncExpr)
+	if err != nil {
+		t.Fatalf("compileAsyncExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from empty async expression")
+	}
+}
+
+func TestCompileAsyncExpr_NoExplicitReturn(t *testing.T) {
+	// async { $ x = 42 } -- no explicit return, should add halt
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+
+	asyncExpr := &ast.AsyncExpr{
+		Body: []ast.Statement{
+			&ast.AssignStatement{
+				Target: "x",
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
+			},
+		},
+	}
+
+	err := c.compileAsyncExpr(asyncExpr)
+	if err != nil {
+		t.Fatalf("compileAsyncExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode")
+	}
+}
+
+func TestCompileAsyncExpr_ValueType(t *testing.T) {
+	// Test AsyncExpr as value type in compileExpression
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+
+	// Pointer type
+	asyncPtrExpr := &ast.AsyncExpr{
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+			},
+		},
+	}
+	err := c.compileExpression(asyncPtrExpr)
+	if err != nil {
+		t.Fatalf("compileExpression(*AsyncExpr) error: %v", err)
+	}
+
+	// Value type
+	c.code = make([]byte, 0)
+	asyncValExpr := ast.AsyncExpr{
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+			},
+		},
+	}
+	err = c.compileExpression(asyncValExpr)
+	if err != nil {
+		t.Fatalf("compileExpression(AsyncExpr) error: %v", err)
+	}
+}
+
+func TestCompileAwaitExpr_Basic(t *testing.T) {
+	// await someExpr
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	futIdx := c.addConstant(vm.StringValue{Val: "future"})
+	c.symbolTable.Define("future", futIdx)
+
+	awaitExpr := &ast.AwaitExpr{
+		Expr: &ast.VariableExpr{Name: "future"},
+	}
+
+	err := c.compileAwaitExpr(awaitExpr)
+	if err != nil {
+		t.Fatalf("compileAwaitExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from await expression")
+	}
+}
+
+func TestCompileAwaitExpr_WithLiteral(t *testing.T) {
+	// await 42
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+
+	awaitExpr := &ast.AwaitExpr{
+		Expr: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
+	}
+
+	err := c.compileAwaitExpr(awaitExpr)
+	if err != nil {
+		t.Fatalf("compileAwaitExpr() error: %v", err)
+	}
+
+	if len(c.code) == 0 {
+		t.Error("expected non-empty bytecode from await expression")
+	}
+}
+
+func TestCompileAwaitExpr_ValueType(t *testing.T) {
+	// Test AwaitExpr as value type in compileExpression
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+
+	// Pointer type
+	awaitPtrExpr := &ast.AwaitExpr{
+		Expr: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+	}
+	err := c.compileExpression(awaitPtrExpr)
+	if err != nil {
+		t.Fatalf("compileExpression(*AwaitExpr) error: %v", err)
+	}
+
+	// Value type
+	c.code = make([]byte, 0)
+	awaitValExpr := ast.AwaitExpr{
+		Expr: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+	}
+	err = c.compileExpression(awaitValExpr)
+	if err != nil {
+		t.Fatalf("compileExpression(AwaitExpr) error: %v", err)
+	}
+}
+
+// =================================================================
+// Additional compileExpression coverage
+// =================================================================
+
+func TestCompileExpression_UnsupportedType(t *testing.T) {
+	c := NewCompiler()
+	// Pass a nil expression which is an unsupported type
+	err := c.compileExpression(nil)
+	if err == nil {
+		t.Fatal("expected error for nil expression, got nil")
+	}
+}
+
+func TestCompileStatement_UnsupportedType(t *testing.T) {
+	c := NewCompiler()
+	// Pass a nil statement which is an unsupported type
+	err := c.compileStatement(nil)
+	if err == nil {
+		t.Fatal("expected error for nil statement, got nil")
+	}
+}
+
+func TestCompileUnaryOp_Not(t *testing.T) {
+	// Test: !true => false
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.UnaryOpExpr{
+					Op:    ast.Not,
+					Right: &ast.LiteralExpr{Value: ast.BoolLiteral{Value: true}},
+				},
+			},
+		},
+	}
+
+	c := NewCompilerWithOptLevel(OptNone)
+	bytecode, err := c.CompileRoute(route)
+	if err != nil {
+		t.Fatalf("CompileRoute() error: %v", err)
+	}
+
+	vmInstance := vm.NewVM()
+	result, err := vmInstance.Execute(bytecode)
+	if err != nil {
+		t.Fatalf("Execute() error: %v", err)
+	}
+
+	expected := vm.BoolValue{Val: false}
+	if !valuesEqual(result, expected) {
+		t.Errorf("Expected %v, got %v", expected, result)
+	}
+}
+
+func TestCompileUnaryOp_Neg(t *testing.T) {
+	// Test: -42 => -42
+	route := &ast.Route{
+		Body: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.UnaryOpExpr{
+					Op:    ast.Neg,
+					Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
+				},
+			},
+		},
+	}
+
+	c := NewCompilerWithOptLevel(OptNone)
+	bytecode, err := c.CompileRoute(route)
+	if err != nil {
+		t.Fatalf("CompileRoute() error: %v", err)
+	}
+
+	vmInstance := vm.NewVM()
+	result, err := vmInstance.Execute(bytecode)
+	if err != nil {
+		t.Fatalf("Execute() error: %v", err)
+	}
+
+	expected := vm.IntValue{Val: -42}
+	if !valuesEqual(result, expected) {
+		t.Errorf("Expected %v, got %v", expected, result)
+	}
+}
+
+func TestCompileUnaryOp_UnsupportedOp(t *testing.T) {
+	c := NewCompiler()
+	// Use an invalid unary op value
+	expr := &ast.UnaryOpExpr{
+		Op:    ast.UnOp(99),
+		Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+	}
+	err := c.compileUnaryOp(expr)
+	if err == nil {
+		t.Fatal("expected error for unsupported unary operator, got nil")
+	}
+}
+
+func TestCompileBinaryOp_UnsupportedOp(t *testing.T) {
+	c := NewCompiler()
+	// Use an invalid binary op value
+	expr := &ast.BinaryOpExpr{
+		Op:    ast.BinOp(99),
+		Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+		Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
+	}
+	err := c.compileBinaryOp(expr)
+	if err == nil {
+		t.Fatal("expected error for unsupported binary operator, got nil")
+	}
+}
+
+func TestCompileReturnStatement_WithExpression(t *testing.T) {
+	// return (x + y)
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+	yIdx := c.addConstant(vm.StringValue{Val: "y"})
+	c.symbolTable.Define("y", yIdx)
+
+	stmt := &ast.ReturnStatement{
+		Value: &ast.BinaryOpExpr{
+			Op:    ast.Add,
+			Left:  &ast.VariableExpr{Name: "x"},
+			Right: &ast.VariableExpr{Name: "y"},
+		},
+	}
+
+	err := c.compileReturnStatement(stmt)
+	if err != nil {
+		t.Fatalf("compileReturnStatement() error: %v", err)
+	}
+
+	// Verify code has OpReturn
+	foundReturn := false
+	for _, b := range c.code {
+		if b == byte(vm.OpReturn) {
+			foundReturn = true
+			break
+		}
+	}
+	if !foundReturn {
+		t.Error("expected OpReturn in bytecode")
+	}
+}
+
+func TestCompileReturnStatement_ErrorInExpression(t *testing.T) {
+	c := NewCompiler()
+	// Reference undefined variable
+	stmt := &ast.ReturnStatement{
+		Value: &ast.VariableExpr{Name: "undefined_var"},
+	}
+
+	err := c.compileReturnStatement(stmt)
+	if err == nil {
+		t.Fatal("expected error for undefined variable in return, got nil")
+	}
+}
+
+func TestCompileArrayIndex_ErrorInArray(t *testing.T) {
+	c := NewCompiler()
+	// Array expression references undefined variable
+	expr := &ast.ArrayIndexExpr{
+		Array: &ast.VariableExpr{Name: "undefined_arr"},
+		Index: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 0}},
+	}
+
+	err := c.compileArrayIndex(expr)
+	if err == nil {
+		t.Fatal("expected error for undefined array, got nil")
+	}
+}
+
+func TestCompileArrayIndex_ErrorInIndex(t *testing.T) {
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	arrIdx := c.addConstant(vm.StringValue{Val: "arr"})
+	c.symbolTable.Define("arr", arrIdx)
+
+	// Index references undefined variable
+	expr := &ast.ArrayIndexExpr{
+		Array: &ast.VariableExpr{Name: "arr"},
+		Index: &ast.VariableExpr{Name: "undefined_idx"},
+	}
+
+	err := c.compileArrayIndex(expr)
+	if err == nil {
+		t.Fatal("expected error for undefined index, got nil")
+	}
+}
+
+// =================================================================
+// Additional compileStatement coverage
+// =================================================================
+
+func TestCompileStatement_SwitchValueType(t *testing.T) {
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	// SwitchStatement as value type
+	switchStmt := ast.SwitchStatement{
+		Value: &ast.VariableExpr{Name: "x"},
+		Cases: []ast.SwitchCase{
+			{
+				Value: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+				Body: []ast.Statement{
+					&ast.ReturnStatement{
+						Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "one"}},
+					},
+				},
+			},
+		},
+		Default: []ast.Statement{
+			&ast.ReturnStatement{
+				Value: &ast.LiteralExpr{Value: ast.StringLiteral{Value: "other"}},
+			},
+		},
+	}
+
+	err := c.compileStatement(switchStmt)
+	if err != nil {
+		t.Fatalf("compileStatement(SwitchStatement value) failed: %v", err)
+	}
+}
+
+func TestCompileStatement_ForValueType(t *testing.T) {
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	itemsIdx := c.addConstant(vm.StringValue{Val: "items"})
+	c.symbolTable.Define("items", itemsIdx)
+
+	// ForStatement as value type
+	forStmt := ast.ForStatement{
+		ValueVar: "item",
+		Iterable: &ast.VariableExpr{Name: "items"},
+		Body: []ast.Statement{
+			&ast.AssignStatement{
+				Target: "x",
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+			},
+		},
+	}
+
+	err := c.compileStatement(forStmt)
+	if err != nil {
+		t.Fatalf("compileStatement(ForStatement value) failed: %v", err)
+	}
+}
+
+func TestCompileStatement_ReassignValueType(t *testing.T) {
+	c := NewCompiler()
+	c.symbolTable = c.symbolTable.EnterScope(RouteScope)
+	xIdx := c.addConstant(vm.StringValue{Val: "x"})
+	c.symbolTable.Define("x", xIdx)
+
+	// ReassignStatement as value type
+	reassignStmt := ast.ReassignStatement{
+		Target: "x",
+		Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 42}},
+	}
+
+	err := c.compileStatement(reassignStmt)
+	if err != nil {
+		t.Fatalf("compileStatement(ReassignStatement value) failed: %v", err)
+	}
+}
+
+func TestCompileStatement_ValidationValueType(t *testing.T) {
+	c := NewCompiler()
+
+	// ValidationStatement as value type
+	validationStmt := ast.ValidationStatement{}
+
+	err := c.compileStatement(validationStmt)
+	if err != nil {
+		t.Fatalf("compileStatement(ValidationStatement value) failed: %v", err)
+	}
+}
+
+func TestCompileStatement_ValidationPtrType(t *testing.T) {
+	c := NewCompiler()
+
+	// ValidationStatement as pointer type
+	validationStmt := &ast.ValidationStatement{}
+
+	err := c.compileStatement(validationStmt)
+	if err != nil {
+		t.Fatalf("compileStatement(*ValidationStatement) failed: %v", err)
+	}
 }

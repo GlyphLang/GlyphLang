@@ -2,60 +2,61 @@ package compiler
 
 import (
 	"fmt"
-
-	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/ast"
 )
+
+const maxMacroExpansionDepth = 100
 
 // MacroExpander handles compile-time macro expansion
 type MacroExpander struct {
-	macros map[string]*interpreter.MacroDef
+	macros map[string]*ast.MacroDef
 }
 
 // NewMacroExpander creates a new macro expander
 func NewMacroExpander() *MacroExpander {
 	return &MacroExpander{
-		macros: make(map[string]*interpreter.MacroDef),
+		macros: make(map[string]*ast.MacroDef),
 	}
 }
 
 // RegisterMacro registers a macro definition
-func (e *MacroExpander) RegisterMacro(macro *interpreter.MacroDef) {
+func (e *MacroExpander) RegisterMacro(macro *ast.MacroDef) {
 	e.macros[macro.Name] = macro
 }
 
 // GetMacro retrieves a registered macro by name
-func (e *MacroExpander) GetMacro(name string) (*interpreter.MacroDef, bool) {
+func (e *MacroExpander) GetMacro(name string) (*ast.MacroDef, bool) {
 	macro, ok := e.macros[name]
 	return macro, ok
 }
 
 // ExpandModule expands all macros in a module
 // This performs compile-time macro expansion before the module is compiled
-func (e *MacroExpander) ExpandModule(module *interpreter.Module) (*interpreter.Module, error) {
+func (e *MacroExpander) ExpandModule(module *ast.Module) (*ast.Module, error) {
 	// First pass: register all macro definitions
 	for _, item := range module.Items {
-		if macro, ok := item.(*interpreter.MacroDef); ok {
+		if macro, ok := item.(*ast.MacroDef); ok {
 			e.RegisterMacro(macro)
 		}
 	}
 
 	// Second pass: expand all macro invocations
-	expandedItems := make([]interpreter.Item, 0, len(module.Items))
+	expandedItems := make([]ast.Item, 0, len(module.Items))
 	for _, item := range module.Items {
 		// Skip macro definitions - they don't produce code
-		if _, ok := item.(*interpreter.MacroDef); ok {
+		if _, ok := item.(*ast.MacroDef); ok {
 			continue
 		}
 
 		// Expand macro invocations
-		if inv, ok := item.(*interpreter.MacroInvocation); ok {
+		if inv, ok := item.(*ast.MacroInvocation); ok {
 			expanded, err := e.ExpandMacroInvocation(inv)
 			if err != nil {
 				return nil, err
 			}
 			// Add all expanded items
 			for _, exp := range expanded {
-				if expItem, ok := exp.(interpreter.Item); ok {
+				if expItem, ok := exp.(ast.Item); ok {
 					expandedItems = append(expandedItems, expItem)
 				}
 			}
@@ -70,11 +71,21 @@ func (e *MacroExpander) ExpandModule(module *interpreter.Module) (*interpreter.M
 		expandedItems = append(expandedItems, expandedItem)
 	}
 
-	return &interpreter.Module{Items: expandedItems}, nil
+	return &ast.Module{Items: expandedItems}, nil
 }
 
 // ExpandMacroInvocation expands a single macro invocation
-func (e *MacroExpander) ExpandMacroInvocation(inv *interpreter.MacroInvocation) ([]interpreter.Node, error) {
+func (e *MacroExpander) ExpandMacroInvocation(inv *ast.MacroInvocation) ([]ast.Node, error) {
+	return e.expandMacroWithDepth(inv, 0)
+}
+
+// expandMacroWithDepth is the depth-tracked implementation of macro expansion.
+// It guards against infinite recursion from self-referential or mutually-recursive macros.
+func (e *MacroExpander) expandMacroWithDepth(inv *ast.MacroInvocation, depth int) ([]ast.Node, error) {
+	if depth >= maxMacroExpansionDepth {
+		return nil, fmt.Errorf("macro expansion depth limit exceeded (%d) while expanding %q", maxMacroExpansionDepth, inv.Name)
+	}
+
 	macro, ok := e.macros[inv.Name]
 	if !ok {
 		return nil, fmt.Errorf("undefined macro: %s", inv.Name)
@@ -86,21 +97,21 @@ func (e *MacroExpander) ExpandMacroInvocation(inv *interpreter.MacroInvocation) 
 	}
 
 	// Create substitution map
-	substitutions := make(map[string]interpreter.Expr)
+	substitutions := make(map[string]ast.Expr)
 	for i, param := range macro.Params {
 		substitutions[param] = inv.Args[i]
 	}
 
 	// Expand macro body with substitutions
-	expandedNodes := make([]interpreter.Node, 0, len(macro.Body))
+	expandedNodes := make([]ast.Node, 0, len(macro.Body))
 	for _, node := range macro.Body {
 		expanded, err := e.substituteNode(node, substitutions)
 		if err != nil {
 			return nil, err
 		}
 		// Recursively expand any nested macro invocations
-		if expandedInv, ok := expanded.(*interpreter.MacroInvocation); ok {
-			nested, err := e.ExpandMacroInvocation(expandedInv)
+		if expandedInv, ok := expanded.(*ast.MacroInvocation); ok {
+			nested, err := e.expandMacroWithDepth(expandedInv, depth+1)
 			if err != nil {
 				return nil, err
 			}
@@ -114,14 +125,14 @@ func (e *MacroExpander) ExpandMacroInvocation(inv *interpreter.MacroInvocation) 
 }
 
 // expandItem recursively expands macros in an item
-func (e *MacroExpander) expandItem(item interpreter.Item) (interpreter.Item, error) {
+func (e *MacroExpander) expandItem(item ast.Item) (ast.Item, error) {
 	switch it := item.(type) {
-	case *interpreter.Route:
+	case *ast.Route:
 		expandedBody, err := e.expandStatements(it.Body)
 		if err != nil {
 			return nil, err
 		}
-		return &interpreter.Route{
+		return &ast.Route{
 			Path:        it.Path,
 			Method:      it.Method,
 			ReturnType:  it.ReturnType,
@@ -132,12 +143,12 @@ func (e *MacroExpander) expandItem(item interpreter.Item) (interpreter.Item, err
 			Body:        expandedBody,
 		}, nil
 
-	case *interpreter.Command:
+	case *ast.Command:
 		expandedBody, err := e.expandStatements(it.Body)
 		if err != nil {
 			return nil, err
 		}
-		return &interpreter.Command{
+		return &ast.Command{
 			Name:        it.Name,
 			Description: it.Description,
 			Params:      it.Params,
@@ -145,12 +156,12 @@ func (e *MacroExpander) expandItem(item interpreter.Item) (interpreter.Item, err
 			Body:        expandedBody,
 		}, nil
 
-	case *interpreter.CronTask:
+	case *ast.CronTask:
 		expandedBody, err := e.expandStatements(it.Body)
 		if err != nil {
 			return nil, err
 		}
-		return &interpreter.CronTask{
+		return &ast.CronTask{
 			Name:       it.Name,
 			Schedule:   it.Schedule,
 			Timezone:   it.Timezone,
@@ -159,24 +170,24 @@ func (e *MacroExpander) expandItem(item interpreter.Item) (interpreter.Item, err
 			Body:       expandedBody,
 		}, nil
 
-	case *interpreter.EventHandler:
+	case *ast.EventHandler:
 		expandedBody, err := e.expandStatements(it.Body)
 		if err != nil {
 			return nil, err
 		}
-		return &interpreter.EventHandler{
+		return &ast.EventHandler{
 			EventType:  it.EventType,
 			Async:      it.Async,
 			Injections: it.Injections,
 			Body:       expandedBody,
 		}, nil
 
-	case *interpreter.QueueWorker:
+	case *ast.QueueWorker:
 		expandedBody, err := e.expandStatements(it.Body)
 		if err != nil {
 			return nil, err
 		}
-		return &interpreter.QueueWorker{
+		return &ast.QueueWorker{
 			QueueName:   it.QueueName,
 			Concurrency: it.Concurrency,
 			MaxRetries:  it.MaxRetries,
@@ -191,17 +202,17 @@ func (e *MacroExpander) expandItem(item interpreter.Item) (interpreter.Item, err
 }
 
 // expandStatements expands macros in a list of statements
-func (e *MacroExpander) expandStatements(stmts []interpreter.Statement) ([]interpreter.Statement, error) {
-	result := make([]interpreter.Statement, 0, len(stmts))
+func (e *MacroExpander) expandStatements(stmts []ast.Statement) ([]ast.Statement, error) {
+	result := make([]ast.Statement, 0, len(stmts))
 	for _, stmt := range stmts {
 		// Check if statement is a macro invocation
-		if inv, ok := stmt.(interpreter.MacroInvocation); ok {
+		if inv, ok := stmt.(ast.MacroInvocation); ok {
 			expanded, err := e.ExpandMacroInvocation(&inv)
 			if err != nil {
 				return nil, err
 			}
 			for _, node := range expanded {
-				if s, ok := node.(interpreter.Statement); ok {
+				if s, ok := node.(ast.Statement); ok {
 					result = append(result, s)
 				}
 			}
@@ -218,9 +229,9 @@ func (e *MacroExpander) expandStatements(stmts []interpreter.Statement) ([]inter
 }
 
 // expandStatement recursively expands macros in a statement
-func (e *MacroExpander) expandStatement(stmt interpreter.Statement) (interpreter.Statement, error) {
+func (e *MacroExpander) expandStatement(stmt ast.Statement) (ast.Statement, error) {
 	switch s := stmt.(type) {
-	case interpreter.IfStatement:
+	case ast.IfStatement:
 		thenBlock, err := e.expandStatements(s.ThenBlock)
 		if err != nil {
 			return nil, err
@@ -229,42 +240,42 @@ func (e *MacroExpander) expandStatement(stmt interpreter.Statement) (interpreter
 		if err != nil {
 			return nil, err
 		}
-		return interpreter.IfStatement{
+		return ast.IfStatement{
 			Condition: s.Condition,
 			ThenBlock: thenBlock,
 			ElseBlock: elseBlock,
 		}, nil
 
-	case interpreter.WhileStatement:
+	case ast.WhileStatement:
 		body, err := e.expandStatements(s.Body)
 		if err != nil {
 			return nil, err
 		}
-		return interpreter.WhileStatement{
+		return ast.WhileStatement{
 			Condition: s.Condition,
 			Body:      body,
 		}, nil
 
-	case interpreter.ForStatement:
+	case ast.ForStatement:
 		body, err := e.expandStatements(s.Body)
 		if err != nil {
 			return nil, err
 		}
-		return interpreter.ForStatement{
+		return ast.ForStatement{
 			KeyVar:   s.KeyVar,
 			ValueVar: s.ValueVar,
 			Iterable: s.Iterable,
 			Body:     body,
 		}, nil
 
-	case interpreter.SwitchStatement:
-		expandedCases := make([]interpreter.SwitchCase, len(s.Cases))
+	case ast.SwitchStatement:
+		expandedCases := make([]ast.SwitchCase, len(s.Cases))
 		for i, c := range s.Cases {
 			body, err := e.expandStatements(c.Body)
 			if err != nil {
 				return nil, err
 			}
-			expandedCases[i] = interpreter.SwitchCase{
+			expandedCases[i] = ast.SwitchCase{
 				Value: c.Value,
 				Body:  body,
 			}
@@ -273,7 +284,7 @@ func (e *MacroExpander) expandStatement(stmt interpreter.Statement) (interpreter
 		if err != nil {
 			return nil, err
 		}
-		return interpreter.SwitchStatement{
+		return ast.SwitchStatement{
 			Value:   s.Value,
 			Cases:   expandedCases,
 			Default: defaultBody,
@@ -285,16 +296,16 @@ func (e *MacroExpander) expandStatement(stmt interpreter.Statement) (interpreter
 }
 
 // substituteNode performs parameter substitution in a node
-func (e *MacroExpander) substituteNode(node interpreter.Node, subs map[string]interpreter.Expr) (interpreter.Node, error) {
+func (e *MacroExpander) substituteNode(node ast.Node, subs map[string]ast.Expr) (ast.Node, error) {
 	switch n := node.(type) {
-	case *interpreter.Route:
+	case *ast.Route:
 		expandedBody, err := e.substituteStatements(n.Body, subs)
 		if err != nil {
 			return nil, err
 		}
 		// Substitute in path (for dynamic route generation)
 		path := e.substituteString(n.Path, subs)
-		return &interpreter.Route{
+		return &ast.Route{
 			Path:        path,
 			Method:      n.Method,
 			ReturnType:  n.ReturnType,
@@ -305,34 +316,34 @@ func (e *MacroExpander) substituteNode(node interpreter.Node, subs map[string]in
 			Body:        expandedBody,
 		}, nil
 
-	case interpreter.AssignStatement:
+	case ast.AssignStatement:
 		subExpr, err := e.substituteExpr(n.Value, subs)
 		if err != nil {
 			return nil, err
 		}
-		return interpreter.AssignStatement{
+		return ast.AssignStatement{
 			Target: e.substituteString(n.Target, subs),
 			Value:  subExpr,
 		}, nil
 
-	case interpreter.ReassignStatement:
+	case ast.ReassignStatement:
 		subExpr, err := e.substituteExpr(n.Value, subs)
 		if err != nil {
 			return nil, err
 		}
-		return interpreter.ReassignStatement{
+		return ast.ReassignStatement{
 			Target: e.substituteString(n.Target, subs),
 			Value:  subExpr,
 		}, nil
 
-	case interpreter.ReturnStatement:
+	case ast.ReturnStatement:
 		subExpr, err := e.substituteExpr(n.Value, subs)
 		if err != nil {
 			return nil, err
 		}
-		return interpreter.ReturnStatement{Value: subExpr}, nil
+		return ast.ReturnStatement{Value: subExpr}, nil
 
-	case interpreter.IfStatement:
+	case ast.IfStatement:
 		cond, err := e.substituteExpr(n.Condition, subs)
 		if err != nil {
 			return nil, err
@@ -345,13 +356,13 @@ func (e *MacroExpander) substituteNode(node interpreter.Node, subs map[string]in
 		if err != nil {
 			return nil, err
 		}
-		return interpreter.IfStatement{
+		return ast.IfStatement{
 			Condition: cond,
 			ThenBlock: thenBlock,
 			ElseBlock: elseBlock,
 		}, nil
 
-	case interpreter.WhileStatement:
+	case ast.WhileStatement:
 		cond, err := e.substituteExpr(n.Condition, subs)
 		if err != nil {
 			return nil, err
@@ -360,12 +371,12 @@ func (e *MacroExpander) substituteNode(node interpreter.Node, subs map[string]in
 		if err != nil {
 			return nil, err
 		}
-		return interpreter.WhileStatement{
+		return ast.WhileStatement{
 			Condition: cond,
 			Body:      body,
 		}, nil
 
-	case interpreter.ForStatement:
+	case ast.ForStatement:
 		iter, err := e.substituteExpr(n.Iterable, subs)
 		if err != nil {
 			return nil, err
@@ -374,23 +385,23 @@ func (e *MacroExpander) substituteNode(node interpreter.Node, subs map[string]in
 		if err != nil {
 			return nil, err
 		}
-		return interpreter.ForStatement{
+		return ast.ForStatement{
 			KeyVar:   n.KeyVar,
 			ValueVar: n.ValueVar,
 			Iterable: iter,
 			Body:     body,
 		}, nil
 
-	case interpreter.ExpressionStatement:
+	case ast.ExpressionStatement:
 		subExpr, err := e.substituteExpr(n.Expr, subs)
 		if err != nil {
 			return nil, err
 		}
-		return interpreter.ExpressionStatement{Expr: subExpr}, nil
+		return ast.ExpressionStatement{Expr: subExpr}, nil
 
-	case *interpreter.MacroInvocation:
+	case *ast.MacroInvocation:
 		// Substitute in macro invocation arguments
-		subArgs := make([]interpreter.Expr, len(n.Args))
+		subArgs := make([]ast.Expr, len(n.Args))
 		for i, arg := range n.Args {
 			subArg, err := e.substituteExpr(arg, subs)
 			if err != nil {
@@ -398,7 +409,7 @@ func (e *MacroExpander) substituteNode(node interpreter.Node, subs map[string]in
 			}
 			subArgs[i] = subArg
 		}
-		return &interpreter.MacroInvocation{
+		return &ast.MacroInvocation{
 			Name: n.Name,
 			Args: subArgs,
 		}, nil
@@ -409,29 +420,29 @@ func (e *MacroExpander) substituteNode(node interpreter.Node, subs map[string]in
 }
 
 // substituteStatements performs substitution in a list of statements
-func (e *MacroExpander) substituteStatements(stmts []interpreter.Statement, subs map[string]interpreter.Expr) ([]interpreter.Statement, error) {
-	result := make([]interpreter.Statement, len(stmts))
+func (e *MacroExpander) substituteStatements(stmts []ast.Statement, subs map[string]ast.Expr) ([]ast.Statement, error) {
+	result := make([]ast.Statement, len(stmts))
 	for i, stmt := range stmts {
 		subNode, err := e.substituteNode(stmt, subs)
 		if err != nil {
 			return nil, err
 		}
-		result[i] = subNode.(interpreter.Statement)
+		result[i] = subNode.(ast.Statement)
 	}
 	return result, nil
 }
 
 // substituteExpr performs parameter substitution in an expression
-func (e *MacroExpander) substituteExpr(expr interpreter.Expr, subs map[string]interpreter.Expr) (interpreter.Expr, error) {
+func (e *MacroExpander) substituteExpr(expr ast.Expr, subs map[string]ast.Expr) (ast.Expr, error) {
 	switch ex := expr.(type) {
-	case interpreter.VariableExpr:
+	case ast.VariableExpr:
 		// Check if this variable should be substituted
 		if sub, ok := subs[ex.Name]; ok {
 			return sub, nil
 		}
 		return ex, nil
 
-	case interpreter.BinaryOpExpr:
+	case ast.BinaryOpExpr:
 		left, err := e.substituteExpr(ex.Left, subs)
 		if err != nil {
 			return nil, err
@@ -440,24 +451,24 @@ func (e *MacroExpander) substituteExpr(expr interpreter.Expr, subs map[string]in
 		if err != nil {
 			return nil, err
 		}
-		return interpreter.BinaryOpExpr{
+		return ast.BinaryOpExpr{
 			Op:    ex.Op,
 			Left:  left,
 			Right: right,
 		}, nil
 
-	case interpreter.UnaryOpExpr:
+	case ast.UnaryOpExpr:
 		right, err := e.substituteExpr(ex.Right, subs)
 		if err != nil {
 			return nil, err
 		}
-		return interpreter.UnaryOpExpr{
+		return ast.UnaryOpExpr{
 			Op:    ex.Op,
 			Right: right,
 		}, nil
 
-	case interpreter.FunctionCallExpr:
-		subArgs := make([]interpreter.Expr, len(ex.Args))
+	case ast.FunctionCallExpr:
+		subArgs := make([]ast.Expr, len(ex.Args))
 		for i, arg := range ex.Args {
 			subArg, err := e.substituteExpr(arg, subs)
 			if err != nil {
@@ -465,22 +476,22 @@ func (e *MacroExpander) substituteExpr(expr interpreter.Expr, subs map[string]in
 			}
 			subArgs[i] = subArg
 		}
-		return interpreter.FunctionCallExpr{
+		return ast.FunctionCallExpr{
 			Name: ex.Name,
 			Args: subArgs,
 		}, nil
 
-	case interpreter.FieldAccessExpr:
+	case ast.FieldAccessExpr:
 		obj, err := e.substituteExpr(ex.Object, subs)
 		if err != nil {
 			return nil, err
 		}
-		return interpreter.FieldAccessExpr{
+		return ast.FieldAccessExpr{
 			Object: obj,
 			Field:  ex.Field,
 		}, nil
 
-	case interpreter.ArrayIndexExpr:
+	case ast.ArrayIndexExpr:
 		arr, err := e.substituteExpr(ex.Array, subs)
 		if err != nil {
 			return nil, err
@@ -489,27 +500,27 @@ func (e *MacroExpander) substituteExpr(expr interpreter.Expr, subs map[string]in
 		if err != nil {
 			return nil, err
 		}
-		return interpreter.ArrayIndexExpr{
+		return ast.ArrayIndexExpr{
 			Array: arr,
 			Index: idx,
 		}, nil
 
-	case interpreter.ObjectExpr:
-		subFields := make([]interpreter.ObjectField, len(ex.Fields))
+	case ast.ObjectExpr:
+		subFields := make([]ast.ObjectField, len(ex.Fields))
 		for i, field := range ex.Fields {
 			subVal, err := e.substituteExpr(field.Value, subs)
 			if err != nil {
 				return nil, err
 			}
-			subFields[i] = interpreter.ObjectField{
+			subFields[i] = ast.ObjectField{
 				Key:   field.Key,
 				Value: subVal,
 			}
 		}
-		return interpreter.ObjectExpr{Fields: subFields}, nil
+		return ast.ObjectExpr{Fields: subFields}, nil
 
-	case interpreter.ArrayExpr:
-		subElems := make([]interpreter.Expr, len(ex.Elements))
+	case ast.ArrayExpr:
+		subElems := make([]ast.Expr, len(ex.Elements))
 		for i, elem := range ex.Elements {
 			subElem, err := e.substituteExpr(elem, subs)
 			if err != nil {
@@ -517,19 +528,19 @@ func (e *MacroExpander) substituteExpr(expr interpreter.Expr, subs map[string]in
 			}
 			subElems[i] = subElem
 		}
-		return interpreter.ArrayExpr{Elements: subElems}, nil
+		return ast.ArrayExpr{Elements: subElems}, nil
 
-	case interpreter.LiteralExpr:
+	case ast.LiteralExpr:
 		// Check if string literal contains parameter references for string interpolation
-		if strLit, ok := ex.Value.(interpreter.StringLiteral); ok {
+		if strLit, ok := ex.Value.(ast.StringLiteral); ok {
 			newVal := e.substituteString(strLit.Value, subs)
-			return interpreter.LiteralExpr{
-				Value: interpreter.StringLiteral{Value: newVal},
+			return ast.LiteralExpr{
+				Value: ast.StringLiteral{Value: newVal},
 			}, nil
 		}
 		return ex, nil
 
-	case interpreter.UnquoteExpr:
+	case ast.UnquoteExpr:
 		// Evaluate the unquote expression - substitute and return the inner expr
 		return e.substituteExpr(ex.Expr, subs)
 
@@ -539,18 +550,18 @@ func (e *MacroExpander) substituteExpr(expr interpreter.Expr, subs map[string]in
 }
 
 // substituteString performs string interpolation for ${param} syntax
-func (e *MacroExpander) substituteString(s string, subs map[string]interpreter.Expr) string {
+func (e *MacroExpander) substituteString(s string, subs map[string]ast.Expr) string {
 	result := s
 	for param, expr := range subs {
 		// Handle ${param} interpolation
 		placeholder := "${" + param + "}"
-		if litExpr, ok := expr.(interpreter.LiteralExpr); ok {
-			if strLit, ok := litExpr.Value.(interpreter.StringLiteral); ok {
+		if litExpr, ok := expr.(ast.LiteralExpr); ok {
+			if strLit, ok := litExpr.Value.(ast.StringLiteral); ok {
 				result = replaceAll(result, placeholder, strLit.Value)
-			} else if intLit, ok := litExpr.Value.(interpreter.IntLiteral); ok {
+			} else if intLit, ok := litExpr.Value.(ast.IntLiteral); ok {
 				result = replaceAll(result, placeholder, fmt.Sprintf("%d", intLit.Value))
 			}
-		} else if varExpr, ok := expr.(interpreter.VariableExpr); ok {
+		} else if varExpr, ok := expr.(ast.VariableExpr); ok {
 			result = replaceAll(result, placeholder, varExpr.Name)
 		}
 	}

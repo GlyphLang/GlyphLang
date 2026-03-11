@@ -1,9 +1,9 @@
 package parser
 
 import (
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -95,7 +95,7 @@ func TestParser_ImportStatement(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, module.Items, 1)
 
-	importStmt, ok := module.Items[0].(*interpreter.ImportStatement)
+	importStmt, ok := module.Items[0].(*ast.ImportStatement)
 	require.True(t, ok, "expected ImportStatement, got %T", module.Items[0])
 
 	assert.Equal(t, "./utils", importStmt.Path)
@@ -115,7 +115,7 @@ func TestParser_ImportWithAlias(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, module.Items, 1)
 
-	importStmt, ok := module.Items[0].(*interpreter.ImportStatement)
+	importStmt, ok := module.Items[0].(*ast.ImportStatement)
 	require.True(t, ok)
 
 	assert.Equal(t, "./models", importStmt.Path)
@@ -135,7 +135,7 @@ func TestParser_FromImport(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, module.Items, 1)
 
-	importStmt, ok := module.Items[0].(*interpreter.ImportStatement)
+	importStmt, ok := module.Items[0].(*ast.ImportStatement)
 	require.True(t, ok)
 
 	assert.Equal(t, "./utils", importStmt.Path)
@@ -157,7 +157,7 @@ func TestParser_FromImportMultiple(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, module.Items, 1)
 
-	importStmt, ok := module.Items[0].(*interpreter.ImportStatement)
+	importStmt, ok := module.Items[0].(*ast.ImportStatement)
 	require.True(t, ok)
 
 	assert.True(t, importStmt.Selective)
@@ -179,7 +179,7 @@ func TestParser_FromImportWithAliases(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, module.Items, 1)
 
-	importStmt, ok := module.Items[0].(*interpreter.ImportStatement)
+	importStmt, ok := module.Items[0].(*ast.ImportStatement)
 	require.True(t, ok)
 
 	assert.True(t, importStmt.Selective)
@@ -204,7 +204,7 @@ func TestParser_ModuleDecl(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, module.Items, 1)
 
-	moduleDecl, ok := module.Items[0].(*interpreter.ModuleDecl)
+	moduleDecl, ok := module.Items[0].(*ast.ModuleDecl)
 	require.True(t, ok, "expected ModuleDecl, got %T", module.Items[0])
 
 	assert.Equal(t, "myapp/utils", moduleDecl.Name)
@@ -227,19 +227,19 @@ from "./helpers" import { formatDate, formatCurrency }
 	require.Len(t, module.Items, 3)
 
 	// First import
-	import1, ok := module.Items[0].(*interpreter.ImportStatement)
+	import1, ok := module.Items[0].(*ast.ImportStatement)
 	require.True(t, ok)
 	assert.Equal(t, "./utils", import1.Path)
 	assert.False(t, import1.Selective)
 
 	// Second import
-	import2, ok := module.Items[1].(*interpreter.ImportStatement)
+	import2, ok := module.Items[1].(*ast.ImportStatement)
 	require.True(t, ok)
 	assert.Equal(t, "./models", import2.Path)
 	assert.Equal(t, "m", import2.Alias)
 
 	// Third import
-	import3, ok := module.Items[2].(*interpreter.ImportStatement)
+	import3, ok := module.Items[2].(*ast.ImportStatement)
 	require.True(t, ok)
 	assert.True(t, import3.Selective)
 	require.Len(t, import3.Names, 2)
@@ -268,15 +268,15 @@ import "./utils"
 	require.Len(t, module.Items, 3)
 
 	// Import
-	_, ok := module.Items[0].(*interpreter.ImportStatement)
+	_, ok := module.Items[0].(*ast.ImportStatement)
 	require.True(t, ok)
 
 	// Type definition
-	_, ok = module.Items[1].(*interpreter.TypeDef)
+	_, ok = module.Items[1].(*ast.TypeDef)
 	require.True(t, ok)
 
 	// Route
-	_, ok = module.Items[2].(*interpreter.Route)
+	_, ok = module.Items[2].(*ast.Route)
 	require.True(t, ok)
 }
 

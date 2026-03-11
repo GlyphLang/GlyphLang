@@ -274,9 +274,9 @@ func BenchmarkJSONSerializationE2E(b *testing.B) {
 			{"id": 4, "name": "User 4", "email": "user4@example.com"},
 			{"id": 5, "name": "User 5", "email": "user5@example.com"},
 		},
-		"total":  5,
-		"page":   1,
-		"limit":  10,
+		"total":   5,
+		"page":    1,
+		"limit":   10,
 		"hasMore": false,
 	}
 

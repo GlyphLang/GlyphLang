@@ -24,11 +24,11 @@ type HTTPError interface {
 
 // BaseError provides common functionality for all error types
 type BaseError struct {
-	Code    int
-	Type    string
-	Msg     string
-	Detail  string
-	Cause   error
+	Code   int
+	Type   string
+	Msg    string
+	Detail string
+	Cause  error
 }
 
 func (e *BaseError) Error() string {
@@ -53,10 +53,9 @@ func (e *BaseError) ToResponse() *ErrorResponse {
 		Message: e.Msg,
 	}
 
+	// Only include the explicit developer-set detail, never raw error internals
 	if e.Detail != "" {
 		resp.Details = e.Detail
-	} else if e.Cause != nil {
-		resp.Details = e.Cause.Error()
 	}
 
 	return resp

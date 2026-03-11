@@ -111,11 +111,11 @@ type MarkupContent struct {
 
 // SymbolInformation represents information about programming constructs
 type SymbolInformation struct {
-	Name          string       `json:"name"`
-	Kind          SymbolKind   `json:"kind"`
-	Location      Location     `json:"location"`
-	ContainerName string       `json:"containerName,omitempty"`
-	Deprecated    bool         `json:"deprecated,omitempty"`
+	Name          string     `json:"name"`
+	Kind          SymbolKind `json:"kind"`
+	Location      Location   `json:"location"`
+	ContainerName string     `json:"containerName,omitempty"`
+	Deprecated    bool       `json:"deprecated,omitempty"`
 }
 
 // DocumentSymbol represents document symbol hierarchy
@@ -336,8 +336,8 @@ type DidOpenTextDocumentParams struct {
 
 // DidChangeTextDocumentParams represents didChange notification parameters
 type DidChangeTextDocumentParams struct {
-	TextDocument   VersionedTextDocumentIdentifier   `json:"textDocument"`
-	ContentChanges []TextDocumentContentChangeEvent  `json:"contentChanges"`
+	TextDocument   VersionedTextDocumentIdentifier  `json:"textDocument"`
+	ContentChanges []TextDocumentContentChangeEvent `json:"contentChanges"`
 }
 
 // DidCloseTextDocumentParams represents didClose notification parameters
@@ -434,14 +434,14 @@ type CodeActionContext struct {
 type CodeActionKind string
 
 const (
-	CodeActionKindQuickFix       CodeActionKind = "quickfix"
-	CodeActionKindRefactor       CodeActionKind = "refactor"
+	CodeActionKindQuickFix        CodeActionKind = "quickfix"
+	CodeActionKindRefactor        CodeActionKind = "refactor"
 	CodeActionKindRefactorExtract CodeActionKind = "refactor.extract"
 	CodeActionKindRefactorInline  CodeActionKind = "refactor.inline"
 	CodeActionKindRefactorRewrite CodeActionKind = "refactor.rewrite"
-	CodeActionKindSource         CodeActionKind = "source"
-	CodeActionKindSourceOrganize CodeActionKind = "source.organizeImports"
-	CodeActionKindSourceFixAll   CodeActionKind = "source.fixAll"
+	CodeActionKindSource          CodeActionKind = "source"
+	CodeActionKindSourceOrganize  CodeActionKind = "source.organizeImports"
+	CodeActionKindSourceFixAll    CodeActionKind = "source.fixAll"
 )
 
 // CodeAction represents a code action
@@ -499,9 +499,9 @@ type SignatureHelpParams struct {
 
 // SignatureHelpContext represents the context for signature help
 type SignatureHelpContext struct {
-	TriggerKind         int    `json:"triggerKind"`
-	TriggerCharacter    string `json:"triggerCharacter,omitempty"`
-	IsRetrigger         bool   `json:"isRetrigger"`
+	TriggerKind         int            `json:"triggerKind"`
+	TriggerCharacter    string         `json:"triggerCharacter,omitempty"`
+	IsRetrigger         bool           `json:"isRetrigger"`
 	ActiveSignatureHelp *SignatureHelp `json:"activeSignatureHelp,omitempty"`
 }
 
@@ -532,11 +532,11 @@ type ParameterInformation struct {
 // ExtendedServerCapabilities includes all server capabilities
 type ExtendedServerCapabilities struct {
 	ServerCapabilities
-	RenameProvider            interface{} `json:"renameProvider,omitempty"`
-	CodeActionProvider        interface{} `json:"codeActionProvider,omitempty"`
-	DocumentFormattingProvider bool        `json:"documentFormattingProvider,omitempty"`
-	DocumentRangeFormattingProvider bool   `json:"documentRangeFormattingProvider,omitempty"`
-	SignatureHelpProvider     *SignatureHelpOptions `json:"signatureHelpProvider,omitempty"`
+	RenameProvider                  interface{}           `json:"renameProvider,omitempty"`
+	CodeActionProvider              interface{}           `json:"codeActionProvider,omitempty"`
+	DocumentFormattingProvider      bool                  `json:"documentFormattingProvider,omitempty"`
+	DocumentRangeFormattingProvider bool                  `json:"documentRangeFormattingProvider,omitempty"`
+	SignatureHelpProvider           *SignatureHelpOptions `json:"signatureHelpProvider,omitempty"`
 }
 
 // RenameOptions represents rename options

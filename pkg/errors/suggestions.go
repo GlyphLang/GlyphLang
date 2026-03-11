@@ -9,18 +9,18 @@ import (
 
 // SuggestionConfig controls suggestion behavior
 type SuggestionConfig struct {
-	MaxSuggestions      int
-	MaxDistance         int
-	MinSimilarityScore  float64
+	MaxSuggestions          int
+	MaxDistance             int
+	MinSimilarityScore      float64
 	ShowMultipleSuggestions bool
 }
 
 // DefaultSuggestionConfig returns the default configuration
 func DefaultSuggestionConfig() *SuggestionConfig {
 	return &SuggestionConfig{
-		MaxSuggestions:      3,
-		MaxDistance:         3,
-		MinSimilarityScore:  0.5,
+		MaxSuggestions:          3,
+		MaxDistance:             3,
+		MinSimilarityScore:      0.5,
 		ShowMultipleSuggestions: true,
 	}
 }
@@ -34,40 +34,40 @@ type SuggestionResult struct {
 
 // Common typo patterns
 var commonTypos = map[string]string{
-	"fucntion": "function",
-	"functoin": "function",
-	"funtion":  "function",
-	"funciton": "function",
-	"retrun":   "return",
-	"reutrn":   "return",
-	"retur":    "return",
-	"slect":    "select",
-	"inser":    "insert",
-	"updaet":   "update",
-	"delte":    "delete",
-	"whre":     "where",
-	"form":     "from",
-	"joim":     "join",
-	"lmit":     "limit",
-	"ofset":    "offset",
-	"ordr":     "order",
-	"grup":     "group",
-	"havin":    "having",
-	"treu":     "true",
-	"flase":    "false",
-	"nill":     "nil",
-	"nul":      "null",
+	"fucntion":  "function",
+	"functoin":  "function",
+	"funtion":   "function",
+	"funciton":  "function",
+	"retrun":    "return",
+	"reutrn":    "return",
+	"retur":     "return",
+	"slect":     "select",
+	"inser":     "insert",
+	"updaet":    "update",
+	"delte":     "delete",
+	"whre":      "where",
+	"form":      "from",
+	"joim":      "join",
+	"lmit":      "limit",
+	"ofset":     "offset",
+	"ordr":      "order",
+	"grup":      "group",
+	"havin":     "having",
+	"treu":      "true",
+	"flase":     "false",
+	"nill":      "nil",
+	"nul":       "null",
 	"undifined": "undefined",
-	"lenght":   "length",
-	"strng":    "string",
-	"integr":   "integer",
-	"boolen":   "boolean",
-	"arry":     "array",
-	"ojbect":   "object",
-	"rquest":   "request",
-	"respone":  "response",
-	"reequest": "request",
-	"resonse":  "response",
+	"lenght":    "length",
+	"strng":     "string",
+	"integr":    "integer",
+	"boolen":    "boolean",
+	"arry":      "array",
+	"ojbect":    "object",
+	"rquest":    "request",
+	"respone":   "response",
+	"reequest":  "request",
+	"resonse":   "response",
 }
 
 // SyntaxPattern represents a common syntax error pattern
@@ -188,7 +188,7 @@ func calculateSimilarityScore(s1, s2 string, distance int) float64 {
 	// Bonus for substring matches
 	substringBonus := 0.0
 	if strings.Contains(strings.ToLower(s1), strings.ToLower(s2)) ||
-	   strings.Contains(strings.ToLower(s2), strings.ToLower(s1)) {
+		strings.Contains(strings.ToLower(s2), strings.ToLower(s1)) {
 		substringBonus = 0.2
 	}
 
@@ -551,9 +551,9 @@ func SuggestMissingSemicolon(source string, line int) bool {
 		if strings.HasPrefix(lineText, pattern) || strings.Contains(lineText, pattern) {
 			// Check if it already ends with semicolon, comma, or brace
 			if !strings.HasSuffix(lineText, ";") &&
-			   !strings.HasSuffix(lineText, ",") &&
-			   !strings.HasSuffix(lineText, "{") &&
-			   !strings.HasSuffix(lineText, "}") {
+				!strings.HasSuffix(lineText, ",") &&
+				!strings.HasSuffix(lineText, "{") &&
+				!strings.HasSuffix(lineText, "}") {
 				return true
 			}
 		}
@@ -568,15 +568,15 @@ func DetectCommonSyntaxErrors(source string, line int, errorMsg string) string {
 
 	// Check for bracket/brace/paren issues
 	if strings.Contains(errorMsgLower, "expect") &&
-	   (strings.Contains(errorMsgLower, "}") ||
-	    strings.Contains(errorMsgLower, "]") ||
-	    strings.Contains(errorMsgLower, ")")) {
+		(strings.Contains(errorMsgLower, "}") ||
+			strings.Contains(errorMsgLower, "]") ||
+			strings.Contains(errorMsgLower, ")")) {
 		return DetectMissingBracket(source, line, 0)
 	}
 
 	// Check for string issues
 	if strings.Contains(errorMsgLower, "string") ||
-	   strings.Contains(errorMsgLower, "unterminated") {
+		strings.Contains(errorMsgLower, "unterminated") {
 		return DetectUnclosedString(source, line)
 	}
 

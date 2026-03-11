@@ -8,41 +8,41 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/glyphlang/glyph/pkg/ast"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/parser"
 )
 
 // ProjectContext represents the complete AI-optimized context for a Glyph project
 type ProjectContext struct {
-	Version     string                 `json:"version"`
-	Generated   time.Time              `json:"generated"`
-	ProjectHash string                 `json:"project_hash"`
-	Files       map[string]*FileContext `json:"files"`
-	Types       map[string]*TypeInfo    `json:"types"`
-	Routes      []*RouteInfo            `json:"routes"`
+	Version     string                   `json:"version"`
+	Generated   time.Time                `json:"generated"`
+	ProjectHash string                   `json:"project_hash"`
+	Files       map[string]*FileContext  `json:"files"`
+	Types       map[string]*TypeInfo     `json:"types"`
+	Routes      []*RouteInfo             `json:"routes"`
 	Functions   map[string]*FunctionInfo `json:"functions"`
 	Commands    map[string]*CommandInfo  `json:"commands"`
-	Patterns    []string                `json:"patterns"`
+	Patterns    []string                 `json:"patterns"`
 }
 
 // FileContext represents context for a single file
 type FileContext struct {
-	Path     string `json:"path"`
-	Hash     string `json:"hash"`
+	Path     string    `json:"path"`
+	Hash     string    `json:"hash"`
 	Modified time.Time `json:"modified"`
-	Summary  string `json:"summary"`
+	Summary  string    `json:"summary"`
 }
 
 // TypeInfo represents a compact type definition
 type TypeInfo struct {
 	Name       string   `json:"name"`
-	Fields     []string `json:"fields"`     // Compact field representations: "name: type" or "name: type!"
+	Fields     []string `json:"fields"`                // Compact field representations: "name: type" or "name: type!"
 	TypeParams []string `json:"type_params,omitempty"` // Generic type parameters
 	Hash       string   `json:"hash"`
 }
@@ -51,7 +51,7 @@ type TypeInfo struct {
 type RouteInfo struct {
 	Method      string   `json:"method"`
 	Path        string   `json:"path"`
-	Params      []string `json:"params,omitempty"`      // Path parameters
+	Params      []string `json:"params,omitempty"`       // Path parameters
 	QueryParams []string `json:"query_params,omitempty"` // Query parameters
 	Returns     string   `json:"returns,omitempty"`
 	Auth        string   `json:"auth,omitempty"`
@@ -62,7 +62,7 @@ type RouteInfo struct {
 // FunctionInfo represents a compact function definition
 type FunctionInfo struct {
 	Name       string   `json:"name"`
-	Params     []string `json:"params"`     // "name: type"
+	Params     []string `json:"params"` // "name: type"
 	Returns    string   `json:"returns"`
 	TypeParams []string `json:"type_params,omitempty"`
 	Hash       string   `json:"hash"`
@@ -169,7 +169,14 @@ func (g *Generator) findGlyphFiles() ([]string, error) {
 		}
 		// Include .glyph files
 		if strings.HasSuffix(path, ".glyph") {
-			relPath, _ := filepath.Rel(g.rootDir, path)
+			relPath, err := filepath.Rel(g.rootDir, path)
+			if err != nil {
+				return fmt.Errorf("failed to compute relative path for %s: %w", path, err)
+			}
+			// Reject paths that escape the root directory
+			if strings.HasPrefix(relPath, "..") {
+				return nil
+			}
 			files = append(files, relPath)
 		}
 		return nil
@@ -214,22 +221,22 @@ func (g *Generator) processFile(relPath string, ctx *ProjectContext) (*FileConte
 
 	for _, item := range module.Items {
 		switch v := item.(type) {
-		case *interpreter.TypeDef:
+		case *ast.TypeDef:
 			typeInfo := extractTypeInfo(v)
 			ctx.Types[v.Name] = typeInfo
 			typeCount++
 
-		case *interpreter.Route:
+		case *ast.Route:
 			routeInfo := extractRouteInfo(v)
 			ctx.Routes = append(ctx.Routes, routeInfo)
 			routeCount++
 
-		case *interpreter.Function:
+		case *ast.Function:
 			funcInfo := extractFunctionInfo(v)
 			ctx.Functions[v.Name] = funcInfo
 			funcCount++
 
-		case *interpreter.Command:
+		case *ast.Command:
 			cmdInfo := extractCommandInfo(v)
 			ctx.Commands[v.Name] = cmdInfo
 			cmdCount++
@@ -265,7 +272,7 @@ func (g *Generator) processFile(relPath string, ctx *ProjectContext) (*FileConte
 }
 
 // extractTypeInfo extracts compact type information
-func extractTypeInfo(t *interpreter.TypeDef) *TypeInfo {
+func extractTypeInfo(t *ast.TypeDef) *TypeInfo {
 	fields := make([]string, len(t.Fields))
 	for i, f := range t.Fields {
 		fieldStr := f.Name + ": " + typeToString(f.TypeAnnotation)
@@ -292,7 +299,7 @@ func extractTypeInfo(t *interpreter.TypeDef) *TypeInfo {
 }
 
 // extractRouteInfo extracts compact route information
-func extractRouteInfo(r *interpreter.Route) *RouteInfo {
+func extractRouteInfo(r *ast.Route) *RouteInfo {
 	// Extract path parameters (e.g., :id from /users/:id)
 	var params []string
 	parts := strings.Split(r.Path, "/")
@@ -349,7 +356,7 @@ func extractRouteInfo(r *interpreter.Route) *RouteInfo {
 }
 
 // extractFunctionInfo extracts compact function information
-func extractFunctionInfo(f *interpreter.Function) *FunctionInfo {
+func extractFunctionInfo(f *ast.Function) *FunctionInfo {
 	params := make([]string, len(f.Params))
 	for i, p := range f.Params {
 		paramStr := p.Name + ": " + typeToString(p.TypeAnnotation)
@@ -381,7 +388,7 @@ func extractFunctionInfo(f *interpreter.Function) *FunctionInfo {
 }
 
 // extractCommandInfo extracts compact command information
-func extractCommandInfo(c *interpreter.Command) *CommandInfo {
+func extractCommandInfo(c *ast.Command) *CommandInfo {
 	params := make([]string, len(c.Params))
 	for i, p := range c.Params {
 		prefix := ""
@@ -468,45 +475,45 @@ func (g *Generator) detectPatterns(ctx *ProjectContext) []string {
 }
 
 // typeToString converts a Type to a compact string representation
-func typeToString(t interpreter.Type) string {
+func typeToString(t ast.Type) string {
 	if t == nil {
 		return "any"
 	}
 
 	switch v := t.(type) {
-	case interpreter.IntType:
+	case ast.IntType:
 		return "int"
-	case interpreter.StringType:
+	case ast.StringType:
 		return "string"
-	case interpreter.BoolType:
+	case ast.BoolType:
 		return "bool"
-	case interpreter.FloatType:
+	case ast.FloatType:
 		return "float"
-	case interpreter.NamedType:
+	case ast.NamedType:
 		return v.Name
-	case interpreter.ArrayType:
+	case ast.ArrayType:
 		return "[" + typeToString(v.ElementType) + "]"
-	case interpreter.OptionalType:
+	case ast.OptionalType:
 		return typeToString(v.InnerType) + "?"
-	case interpreter.GenericType:
+	case ast.GenericType:
 		args := make([]string, len(v.TypeArgs))
 		for i, arg := range v.TypeArgs {
 			args[i] = typeToString(arg)
 		}
 		return typeToString(v.BaseType) + "<" + strings.Join(args, ", ") + ">"
-	case interpreter.UnionType:
+	case ast.UnionType:
 		types := make([]string, len(v.Types))
 		for i, ut := range v.Types {
 			types[i] = typeToString(ut)
 		}
 		return strings.Join(types, " | ")
-	case interpreter.FunctionType:
+	case ast.FunctionType:
 		params := make([]string, len(v.ParamTypes))
 		for i, pt := range v.ParamTypes {
 			params[i] = typeToString(pt)
 		}
 		return "(" + strings.Join(params, ", ") + ") -> " + typeToString(v.ReturnType)
-	case interpreter.DatabaseType:
+	case ast.DatabaseType:
 		return "Database"
 	default:
 		return "any"
@@ -544,10 +551,16 @@ func (ctx *ProjectContext) ToCompact() string {
 	sb.WriteString("# Glyph Project Context\n")
 	sb.WriteString(fmt.Sprintf("# Hash: %s\n\n", ctx.ProjectHash[:12]))
 
-	// Types section
+	// Types section (sorted for deterministic output)
 	if len(ctx.Types) > 0 {
 		sb.WriteString("## Types\n")
-		for name, t := range ctx.Types {
+		typeNames := make([]string, 0, len(ctx.Types))
+		for name := range ctx.Types {
+			typeNames = append(typeNames, name)
+		}
+		sort.Strings(typeNames)
+		for _, name := range typeNames {
+			t := ctx.Types[name]
 			if len(t.TypeParams) > 0 {
 				sb.WriteString(fmt.Sprintf(": %s<%s> { %s }\n", name, strings.Join(t.TypeParams, ", "), strings.Join(t.Fields, ", ")))
 			} else {
@@ -573,10 +586,16 @@ func (ctx *ProjectContext) ToCompact() string {
 		sb.WriteString("\n")
 	}
 
-	// Functions section
+	// Functions section (sorted for deterministic output)
 	if len(ctx.Functions) > 0 {
 		sb.WriteString("## Functions\n")
-		for name, f := range ctx.Functions {
+		funcNames := make([]string, 0, len(ctx.Functions))
+		for name := range ctx.Functions {
+			funcNames = append(funcNames, name)
+		}
+		sort.Strings(funcNames)
+		for _, name := range funcNames {
+			f := ctx.Functions[name]
 			if len(f.TypeParams) > 0 {
 				sb.WriteString(fmt.Sprintf("fn %s<%s>(%s) -> %s\n", name, strings.Join(f.TypeParams, ", "), strings.Join(f.Params, ", "), f.Returns))
 			} else {
@@ -586,10 +605,16 @@ func (ctx *ProjectContext) ToCompact() string {
 		sb.WriteString("\n")
 	}
 
-	// Commands section
+	// Commands section (sorted for deterministic output)
 	if len(ctx.Commands) > 0 {
 		sb.WriteString("## Commands\n")
-		for name, c := range ctx.Commands {
+		cmdNames := make([]string, 0, len(ctx.Commands))
+		for name := range ctx.Commands {
+			cmdNames = append(cmdNames, name)
+		}
+		sort.Strings(cmdNames)
+		for _, name := range cmdNames {
+			c := ctx.Commands[name]
 			sb.WriteString(fmt.Sprintf("@ command %s %s\n", name, strings.Join(c.Params, " ")))
 		}
 		sb.WriteString("\n")
@@ -608,14 +633,14 @@ func (ctx *ProjectContext) ToCompact() string {
 
 // ContextDiff represents changes between two context versions
 type ContextDiff struct {
-	PreviousHash string              `json:"previous_hash"`
-	CurrentHash  string              `json:"current_hash"`
-	HasChanges   bool                `json:"has_changes"`
-	Files        *FilesDiff          `json:"files,omitempty"`
-	Types        *ItemsDiff          `json:"types,omitempty"`
-	Routes       *RoutesDiff         `json:"routes,omitempty"`
-	Functions    *ItemsDiff          `json:"functions,omitempty"`
-	Commands     *ItemsDiff          `json:"commands,omitempty"`
+	PreviousHash string      `json:"previous_hash"`
+	CurrentHash  string      `json:"current_hash"`
+	HasChanges   bool        `json:"has_changes"`
+	Files        *FilesDiff  `json:"files,omitempty"`
+	Types        *ItemsDiff  `json:"types,omitempty"`
+	Routes       *RoutesDiff `json:"routes,omitempty"`
+	Functions    *ItemsDiff  `json:"functions,omitempty"`
+	Commands     *ItemsDiff  `json:"commands,omitempty"`
 }
 
 // FilesDiff represents file-level changes
@@ -1036,15 +1061,15 @@ func truncateHash(hash string) string {
 
 // TargetedContext represents context optimized for a specific task
 type TargetedContext struct {
-	Task        string              `json:"task"`
-	Description string              `json:"description"`
-	Types       map[string]*TypeInfo `json:"types,omitempty"`
-	Routes      []*RouteInfo        `json:"routes,omitempty"`
+	Task        string                   `json:"task"`
+	Description string                   `json:"description"`
+	Types       map[string]*TypeInfo     `json:"types,omitempty"`
+	Routes      []*RouteInfo             `json:"routes,omitempty"`
 	Functions   map[string]*FunctionInfo `json:"functions,omitempty"`
-	Commands    map[string]*CommandInfo `json:"commands,omitempty"`
-	Patterns    []string            `json:"patterns,omitempty"`
-	Injections  []string            `json:"available_injections,omitempty"`
-	Syntax      *SyntaxGuide        `json:"syntax,omitempty"`
+	Commands    map[string]*CommandInfo  `json:"commands,omitempty"`
+	Patterns    []string                 `json:"patterns,omitempty"`
+	Injections  []string                 `json:"available_injections,omitempty"`
+	Syntax      *SyntaxGuide             `json:"syntax,omitempty"`
 }
 
 // SyntaxGuide provides quick reference for Glyph syntax
@@ -1231,10 +1256,16 @@ func (tc *TargetedContext) ToCompact() string {
 		sb.WriteString("\n")
 	}
 
-	// Types
+	// Types (sorted for deterministic output)
 	if len(tc.Types) > 0 {
 		sb.WriteString("## Types\n")
-		for name, t := range tc.Types {
+		tcTypeNames := make([]string, 0, len(tc.Types))
+		for name := range tc.Types {
+			tcTypeNames = append(tcTypeNames, name)
+		}
+		sort.Strings(tcTypeNames)
+		for _, name := range tcTypeNames {
+			t := tc.Types[name]
 			if len(t.TypeParams) > 0 {
 				sb.WriteString(fmt.Sprintf(": %s<%s> { %s }\n", name, strings.Join(t.TypeParams, ", "), strings.Join(t.Fields, ", ")))
 			} else {
@@ -1260,10 +1291,16 @@ func (tc *TargetedContext) ToCompact() string {
 		sb.WriteString("\n")
 	}
 
-	// Functions
+	// Functions (sorted for deterministic output)
 	if len(tc.Functions) > 0 {
 		sb.WriteString("## Functions\n")
-		for name, f := range tc.Functions {
+		tcFuncNames := make([]string, 0, len(tc.Functions))
+		for name := range tc.Functions {
+			tcFuncNames = append(tcFuncNames, name)
+		}
+		sort.Strings(tcFuncNames)
+		for _, name := range tcFuncNames {
+			f := tc.Functions[name]
 			if len(f.TypeParams) > 0 {
 				sb.WriteString(fmt.Sprintf("! %s<%s>(%s): %s\n", name, strings.Join(f.TypeParams, ", "), strings.Join(f.Params, ", "), f.Returns))
 			} else {

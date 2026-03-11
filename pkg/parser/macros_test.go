@@ -1,9 +1,8 @@
 package parser
 
 import (
+	"github.com/glyphlang/glyph/pkg/ast"
 	"testing"
-
-	"github.com/glyphlang/glyph/pkg/interpreter"
 )
 
 func TestParser_MacroDef(t *testing.T) {
@@ -66,7 +65,7 @@ func TestParser_MacroDef(t *testing.T) {
 				t.Fatalf("Expected 1 item, got %d", len(module.Items))
 			}
 
-			macro, ok := module.Items[0].(*interpreter.MacroDef)
+			macro, ok := module.Items[0].(*ast.MacroDef)
 			if !ok {
 				t.Fatalf("Expected MacroDef, got %T", module.Items[0])
 			}
@@ -137,7 +136,7 @@ func TestParser_MacroInvocation(t *testing.T) {
 				t.Fatalf("Expected 1 item, got %d", len(module.Items))
 			}
 
-			inv, ok := module.Items[0].(*interpreter.MacroInvocation)
+			inv, ok := module.Items[0].(*ast.MacroInvocation)
 			if !ok {
 				t.Fatalf("Expected MacroInvocation, got %T", module.Items[0])
 			}
@@ -176,7 +175,7 @@ func TestParser_MacroWithRoute(t *testing.T) {
 		t.Fatalf("Expected 1 item, got %d", len(module.Items))
 	}
 
-	macro, ok := module.Items[0].(*interpreter.MacroDef)
+	macro, ok := module.Items[0].(*ast.MacroDef)
 	if !ok {
 		t.Fatalf("Expected MacroDef, got %T", module.Items[0])
 	}
@@ -198,7 +197,7 @@ func TestParser_MacroWithRoute(t *testing.T) {
 		t.Fatalf("Expected 1 body node, got %d", len(macro.Body))
 	}
 
-	_, ok = macro.Body[0].(*interpreter.Route)
+	_, ok = macro.Body[0].(*ast.Route)
 	if !ok {
 		t.Errorf("Expected Route in body, got %T", macro.Body[0])
 	}
@@ -230,13 +229,13 @@ double!(5)
 	}
 
 	// First item should be macro def
-	_, ok := module.Items[0].(*interpreter.MacroDef)
+	_, ok := module.Items[0].(*ast.MacroDef)
 	if !ok {
 		t.Errorf("Expected first item to be MacroDef, got %T", module.Items[0])
 	}
 
 	// Second item should be macro invocation
-	_, ok = module.Items[1].(*interpreter.MacroInvocation)
+	_, ok = module.Items[1].(*ast.MacroInvocation)
 	if !ok {
 		t.Errorf("Expected second item to be MacroInvocation, got %T", module.Items[1])
 	}

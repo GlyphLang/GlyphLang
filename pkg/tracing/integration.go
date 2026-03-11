@@ -161,9 +161,9 @@ func TraceServerRequest(ctx interface{}, next interface{}) error {
 	}
 
 	// Log completion with trace IDs
-	log.Printf("[TRACE] %s %s - %d (%v) [trace_id=%s span_id=%s]",
-		req.Method,
-		req.URL.Path,
+	log.Printf("[TRACE] %s %s - %d (%v) [trace_id=%s span_id=%s]", // #nosec G706 -- sanitized
+		sanitizeLog(req.Method),
+		sanitizeLog(req.URL.Path),
 		statusCode,
 		duration,
 		GetTraceID(traceCtx),

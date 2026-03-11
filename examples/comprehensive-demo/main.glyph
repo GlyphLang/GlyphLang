@@ -52,17 +52,18 @@
 # Route with logical operators (AND/OR)
 @ GET /access/:age/:premium {
   $ hasAccess = false
+  $ level = ""
 
   # Complex logical expression
   if age >= 18 && premium {
-    $ hasAccess = true
-    $ level = "premium-adult"
+    hasAccess = true
+    level = "premium-adult"
   } else {
     if age >= 18 || premium {
-      $ hasAccess = true
-      $ level = "partial-access"
+      hasAccess = true
+      level = "partial-access"
     } else {
-      $ level = "restricted"
+      level = "restricted"
     }
   }
 

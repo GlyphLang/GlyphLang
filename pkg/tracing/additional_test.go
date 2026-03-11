@@ -1649,4 +1649,3 @@ func TestHTTPMiddlewareWithDifferentPaths(t *testing.T) {
 		}
 	}
 }
-

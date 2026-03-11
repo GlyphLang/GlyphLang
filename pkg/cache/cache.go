@@ -19,14 +19,14 @@ import (
 
 // Entry represents a cached item
 type Entry struct {
-	Key        string
-	Value      interface{}
-	ExpiresAt  time.Time
-	CreatedAt  time.Time
-	AccessedAt time.Time
+	Key         string
+	Value       interface{}
+	ExpiresAt   time.Time
+	CreatedAt   time.Time
+	AccessedAt  time.Time
 	AccessCount uint64
-	Size       int64
-	Tags       []string
+	Size        int64
+	Tags        []string
 }
 
 // IsExpired checks if the entry has expired
@@ -68,15 +68,16 @@ type Stats struct {
 
 // LRUCache implements an LRU (Least Recently Used) cache
 type LRUCache struct {
-	mu         sync.RWMutex
-	capacity   int
-	items      map[string]*list.Element
-	evictList  *list.List
-	ttl        time.Duration
-	onEvict    func(key string, value interface{})
-	stats      Stats
-	maxSize    int64 // Maximum size in bytes
+	mu          sync.RWMutex
+	capacity    int
+	items       map[string]*list.Element
+	evictList   *list.List
+	ttl         time.Duration
+	onEvict     func(key string, value interface{})
+	stats       Stats
+	maxSize     int64 // Maximum size in bytes
 	currentSize int64
+	done        chan struct{}
 }
 
 // LRUOption configures the LRU cache
@@ -118,6 +119,7 @@ func NewLRUCache(opts ...LRUOption) *LRUCache {
 		evictList: list.New(),
 		ttl:       5 * time.Minute,
 		maxSize:   100 * 1024 * 1024, // 100MB default
+		done:      make(chan struct{}),
 	}
 
 	for _, opt := range opts {
@@ -128,6 +130,16 @@ func NewLRUCache(opts ...LRUOption) *LRUCache {
 	go c.cleanup()
 
 	return c
+}
+
+// Close stops the cleanup goroutine and releases resources
+func (c *LRUCache) Close() {
+	select {
+	case <-c.done:
+		// Already closed
+	default:
+		close(c.done)
+	}
 }
 
 // Get retrieves a value from the cache
@@ -274,19 +286,23 @@ func (c *LRUCache) DeleteByTag(tag string) int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	count := 0
+	// Collect elements to remove first to avoid modifying map during iteration
+	var toRemove []*list.Element
 	for _, elem := range c.items {
 		entry := elem.Value.(*Entry)
 		for _, t := range entry.Tags {
 			if t == tag {
-				c.removeElement(elem)
-				count++
+				toRemove = append(toRemove, elem)
 				break
 			}
 		}
 	}
 
-	return count
+	for _, elem := range toRemove {
+		c.removeElement(elem)
+	}
+
+	return len(toRemove)
 }
 
 // Clear removes all entries from the cache
@@ -352,15 +368,25 @@ func (c *LRUCache) cleanup() {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		c.mu.Lock()
-		for _, elem := range c.items {
-			entry := elem.Value.(*Entry)
-			if entry.IsExpired() {
+	for {
+		select {
+		case <-c.done:
+			return
+		case <-ticker.C:
+			c.mu.Lock()
+			// Collect expired elements first to avoid modifying map during iteration
+			var expired []*list.Element
+			for _, elem := range c.items {
+				entry := elem.Value.(*Entry)
+				if entry.IsExpired() {
+					expired = append(expired, elem)
+				}
+			}
+			for _, elem := range expired {
 				c.removeElement(elem)
 			}
+			c.mu.Unlock()
 		}
-		c.mu.Unlock()
 	}
 }
 

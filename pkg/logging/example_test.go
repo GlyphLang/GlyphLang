@@ -83,7 +83,7 @@ func ExampleLogger_fileLogging() {
 		Format:      logging.JSONFormat,
 		FilePath:    "/var/log/myapp/app.log",
 		MaxFileSize: 10 * 1024 * 1024, // 10MB
-		MaxBackups:  5,                 // Keep 5 old files
+		MaxBackups:  5,                // Keep 5 old files
 	})
 	if err != nil {
 		panic(err)

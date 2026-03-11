@@ -8,10 +8,10 @@ import (
 
 // Handler manages database connections and operations for the interpreter
 type Handler struct {
-	db      Database
-	mu      sync.RWMutex
-	tables  map[string]*TableHandler
-	ctx     context.Context
+	db     Database
+	mu     sync.RWMutex
+	tables map[string]*TableHandler
+	ctx    context.Context
 }
 
 // NewHandler creates a new database handler
@@ -47,10 +47,10 @@ func (h *Handler) Table(name string) *TableHandler {
 	}
 
 	handler := &TableHandler{
-		db:      h.db,
-		orm:     NewORM(h.db, name),
-		name:    name,
-		ctx:     h.ctx,
+		db:   h.db,
+		orm:  NewORM(h.db, name),
+		name: name,
+		ctx:  h.ctx,
 	}
 
 	h.tables[name] = handler
@@ -144,11 +144,19 @@ func (t *TableHandler) Query(query string, args ...interface{}) ([]map[string]in
 	return t.orm.Query(t.ctx, query, args...)
 }
 
-// NextId returns the next available ID (mock implementation)
-func (t *TableHandler) NextId() int64 {
-	// In a real implementation, this would query the database for the next sequence value
-	// For now, return a mock value
-	return 1
+// NextId returns the count of existing records plus one as an approximation.
+// For true sequence values, use database-specific sequence queries.
+func (t *TableHandler) NextId() (result int64) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = 1
+		}
+	}()
+	count, err := t.orm.Count(t.ctx)
+	if err != nil {
+		return 1
+	}
+	return count + 1
 }
 
 // Length returns the total count of records

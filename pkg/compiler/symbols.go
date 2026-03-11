@@ -12,12 +12,13 @@ const (
 
 // Symbol represents a variable in the symbol table
 type Symbol struct {
-	Name         string
-	Scope        SymbolScope
-	Index        int  // Index in constant pool for the name
-	IsDefined    bool // Whether this symbol has been assigned a value
-	ConstantIdx  int  // Index of the constant if it's a constant value
-	IsConstant   bool // Whether this is a compile-time constant
+	Name        string
+	Scope       SymbolScope
+	Index       int  // Index in constant pool for the name
+	IsDefined   bool // Whether this symbol has been assigned a value
+	ConstantIdx int  // Index of the constant if it's a constant value
+	IsConstant  bool // Whether this is a compile-time constant
+	IsBuiltin   bool // Whether this is a built-in variable (query, input, ws, auth)
 }
 
 // SymbolTable manages variable symbols and scopes
@@ -48,6 +49,19 @@ func (st *SymbolTable) Define(name string, nameConstantIndex int) *Symbol {
 		Scope:     st.scope,
 		Index:     nameConstantIndex,
 		IsDefined: true,
+	}
+	st.symbols[name] = symbol
+	return symbol
+}
+
+// DefineBuiltin adds a built-in symbol that can be shadowed by user declarations
+func (st *SymbolTable) DefineBuiltin(name string, nameConstantIndex int) *Symbol {
+	symbol := &Symbol{
+		Name:      name,
+		Scope:     st.scope,
+		Index:     nameConstantIndex,
+		IsDefined: true,
+		IsBuiltin: true,
 	}
 	st.symbols[name] = symbol
 	return symbol

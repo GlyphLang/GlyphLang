@@ -1,0 +1,20 @@
+Natural Language Description (for comparison with glyph notation):
+
+Build a real-time chat server with REST endpoints for room management and WebSocket for messaging.
+
+REST Endpoints:
+1. POST /api/rooms - Create a new chat room (requires JWT auth). Takes a name, auto-generates ID and timestamps.
+2. GET /api/rooms - List all chat rooms (requires JWT auth).
+3. GET /api/rooms/:room_id/messages - Get message history for a specific room (requires JWT auth).
+
+WebSocket endpoint:
+- WS /chat - Real-time messaging
+  - On connect: broadcast a system message "User joined" to all clients
+  - On message: send an acknowledgment back to the sender, then broadcast the message to all clients with sender, content, and timestamp
+  - On disconnect: broadcast a system message "User left" to all clients
+
+Data model:
+- Message: id (string), room (string), sender (string), content (string), timestamp (int)
+- Room: id (string), name (string), created_by (string), created_at (int)
+
+All REST endpoints require JWT authentication. The WebSocket endpoint handles connection lifecycle and message broadcasting.
