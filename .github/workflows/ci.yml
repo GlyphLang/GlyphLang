@@ -11,7 +11,7 @@ permissions:
   pull-requests: read
 
 env:
-  GO_VERSION: '1.24'
+  GO_VERSION: '1.25'
 
 jobs:
   lint:
@@ -131,7 +131,7 @@ jobs:
         run: go build -v -ldflags="-s -w" -o glyph-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }} ./cmd/glyph
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: glyph-${{ matrix.os }}-${{ matrix.arch }}
           path: glyph-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
