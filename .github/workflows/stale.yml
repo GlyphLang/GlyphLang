@@ -1,0 +1,31 @@
+name: Stale PRs
+
+on:
+  schedule:
+    - cron: '0 9 * * 1' # Every Monday at 9am UTC
+  workflow_dispatch:
+
+permissions:
+  pull-requests: write
+
+jobs:
+  stale:
+    name: Close stale PRs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          days-before-stale: 30
+          days-before-close: 14
+          stale-pr-message: >
+            Hey — this PR has been inactive for 30 days. If you're still
+            working on it, please push an update or leave a comment and
+            we'll keep it open. Otherwise it will be automatically closed
+            in 14 days. You're welcome to reopen it anytime.
+          close-pr-message: >
+            Closing this PR due to inactivity. Thanks for the contribution!
+            Feel free to reopen if you'd like to pick it back up.
+          stale-pr-label: 'stale'
+          exempt-pr-labels: 'pinned,work-in-progress'
+          days-before-issue-stale: -1
+          days-before-issue-close: -1
