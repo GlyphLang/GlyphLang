@@ -36,6 +36,48 @@ def _make_jwt(sub: str = "test-user", **extra) -> str:
     payload = {"sub": sub, "exp": int(time.time()) + 3600, **extra}
     return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
+
+def _make_expired_jwt(sub: str = "test-user") -> str:
+    """Create an expired HS256 JWT token (expired 1 hour ago)."""
+    payload = {"sub": sub, "exp": int(time.time()) - 3600}
+    return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+
+
+TYPE_MAP = {
+    str: str,
+    int: (int, float),  # JSON numbers may deserialize as float
+    bool: bool,
+    list: list,
+}
+
+
+def assert_response_shape(body: dict, required_fields: dict, optional_fields: dict = None):
+    """Verify that a response body contains required fields with expected types.
+
+    Args:
+        body: The parsed JSON response body (dict).
+        required_fields: Mapping of field name to expected Python type
+                         (str, int, bool, list).
+        optional_fields: Optional mapping of field name to expected type;
+                         these are checked only if present.
+    """
+    for field, expected_type in required_fields.items():
+        assert field in body, f"Required field {field!r} missing from response: {body}"
+        allowed = TYPE_MAP.get(expected_type, expected_type)
+        assert isinstance(body[field], allowed), (
+            f"Field {field!r} expected {expected_type.__name__}, "
+            f"got {type(body[field]).__name__}: {body[field]!r}"
+        )
+    if optional_fields:
+        for field, expected_type in optional_fields.items():
+            if field in body:
+                allowed = TYPE_MAP.get(expected_type, expected_type)
+                assert isinstance(body[field], allowed), (
+                    f"Optional field {field!r} expected {expected_type.__name__}, "
+                    f"got {type(body[field]).__name__}: {body[field]!r}"
+                )
+
+
 def _free_port() -> int:
     with socket.socket() as s:
         s.bind(("", 0))
@@ -164,6 +206,7 @@ class TestCrudApi:
         assert "id" in body
         assert body["title"] == "Test todo"
         assert body["completed"] is False  # default
+        assert_response_shape(body, {"id": int, "title": str, "completed": bool})
 
     def test_create_and_get_todo(self):
         r1 = self.client.post("/api/todos", json={"title": "Get me"})
@@ -196,6 +239,11 @@ class TestCrudApi:
         todos = r.json()
         assert len(todos) >= 1
         assert any(t["title"] == "Listed" for t in todos)
+
+    def test_create_todo_empty_body_returns_422(self):
+        """POST with empty JSON should return 422 (or 400) for missing required fields."""
+        r = self.client.post("/api/todos", json={})
+        assert r.status_code in (400, 422)
 
 
 # ---------------------------------------------------------------------------
@@ -245,6 +293,15 @@ class TestWebhookProcessor:
         if r.status_code == 200:
             body = r.json()
             assert body["processed"] is True
+
+    def test_unknown_webhook_type_returns_404(self):
+        """POST to an unknown webhook type should return 404."""
+        r = self.client.post(
+            "/webhooks/unknown",
+            json=self._webhook_payload(),
+            headers={"X-API-Key": "test-key"},
+        )
+        assert r.status_code == 404
 
 
 # ---------------------------------------------------------------------------
@@ -302,6 +359,38 @@ class TestChatServer:
         assert r2.status_code == 200
         assert isinstance(r2.json(), list)
 
+    def test_missing_auth_header_returns_401(self):
+        """Request without Authorization header should return 401 or 403."""
+        r = self.client.post("/api/rooms", json={"name": "no-auth-room"})
+        assert r.status_code in (401, 403)
+
+    def test_invalid_jwt_returns_401(self):
+        """Request with an invalid JWT token should return 401 or 403."""
+        r = self.client.post(
+            "/api/rooms",
+            json={"name": "bad-jwt-room"},
+            headers={"Authorization": "Bearer invalid-token"},
+        )
+        assert r.status_code in (401, 403)
+
+    def test_expired_jwt_returns_401(self):
+        """Request with an expired JWT should return 401 or 403."""
+        expired_token = _make_expired_jwt()
+        r = self.client.post(
+            "/api/rooms",
+            json={"name": "expired-jwt-room"},
+            headers={"Authorization": f"Bearer {expired_token}"},
+        )
+        assert r.status_code in (401, 403)
+
+    def test_get_nonexistent_room_returns_404(self):
+        """GET messages for a non-existent room should return 404."""
+        r = self.client.get(
+            "/api/rooms/nonexistent-id/messages",
+            headers=self.auth_headers,
+        )
+        assert r.status_code == 404
+
 
 # ---------------------------------------------------------------------------
 # Scenario 04: Job Queue
@@ -353,6 +442,33 @@ class TestJobQueue:
         )
         assert r.status_code == 404
 
+    def test_missing_auth_header_returns_401(self):
+        """Submit a job without Authorization header should return 401 or 403."""
+        r = self.client.post(
+            "/api/jobs/email",
+            json={"to": "user@test.com", "subject": "Hello", "template": "welcome"},
+        )
+        assert r.status_code in (401, 403)
+
+    def test_invalid_jwt_returns_401(self):
+        """Submit a job with an invalid JWT should return 401 or 403."""
+        r = self.client.post(
+            "/api/jobs/email",
+            json={"to": "user@test.com", "subject": "Hello", "template": "welcome"},
+            headers={"Authorization": "Bearer invalid-token"},
+        )
+        assert r.status_code in (401, 403)
+
+    def test_expired_jwt_returns_401(self):
+        """Submit a job with an expired JWT should return 401 or 403."""
+        expired_token = _make_expired_jwt()
+        r = self.client.post(
+            "/api/jobs/email",
+            json={"to": "user@test.com", "subject": "Hello", "template": "welcome"},
+            headers={"Authorization": f"Bearer {expired_token}"},
+        )
+        assert r.status_code in (401, 403)
+
 
 # ---------------------------------------------------------------------------
 # Scenario 05: Auth Service
@@ -380,6 +496,11 @@ class TestAuthService:
         assert "token" in body
         assert "refresh_token" in body
         assert "expires_in" in body
+        assert_response_shape(body, {
+            "token": str,
+            "refresh_token": str,
+            "expires_in": int,
+        })
 
     def test_register_duplicate_returns_409(self):
         payload = {
@@ -444,3 +565,40 @@ class TestAuthService:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert r2.status_code == 200
+
+    def test_missing_auth_header_returns_401(self):
+        """GET /auth/me without Authorization header should return 401 or 403."""
+        r = self.client.get("/auth/me")
+        assert r.status_code in (401, 403)
+
+    def test_invalid_jwt_returns_401(self):
+        """GET /auth/me with an invalid JWT should return 401 or 403."""
+        r = self.client.get(
+            "/auth/me",
+            headers={"Authorization": "Bearer invalid-token"},
+        )
+        assert r.status_code in (401, 403)
+
+    def test_expired_jwt_returns_401(self):
+        """GET /auth/me with an expired JWT should return 401 or 403."""
+        expired_token = _make_expired_jwt()
+        r = self.client.get(
+            "/auth/me",
+            headers={"Authorization": f"Bearer {expired_token}"},
+        )
+        assert r.status_code in (401, 403)
+
+    def test_register_missing_fields_returns_422(self):
+        """POST /auth/register with incomplete body should return 422 or 400."""
+        r = self.client.post("/auth/register", json={"email": "incomplete@example.com"})
+        assert r.status_code in (400, 422)
+
+    def test_get_profile_no_auth_returns_401(self):
+        """GET /auth/me without Authorization header should return 401 or 403."""
+        r = self.client.get("/auth/me")
+        assert r.status_code in (401, 403)
+
+    def test_refresh_no_auth_returns_401(self):
+        """POST /auth/refresh without Authorization header should return 401 or 403."""
+        r = self.client.post("/auth/refresh")
+        assert r.status_code in (401, 403)
