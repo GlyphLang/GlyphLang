@@ -32,6 +32,7 @@ type Interpreter struct {
 	redisHandler     interface{}              // Redis handler for dependency injection
 	mongoDBHandler   interface{}              // MongoDB handler for dependency injection
 	llmHandler       interface{}              // LLM handler for AI integration
+	httpHandler      interface{}              // HTTP client handler for outbound requests
 	providerHandlers map[string]interface{}   // Generic provider registry: type name -> handler
 	providerDefs     map[string]ProviderDef   // Provider contract definitions
 	moduleResolver   *ModuleResolver          // Module resolver for handling imports
@@ -399,6 +400,13 @@ func (i *Interpreter) SetLLMHandler(handler interface{}) {
 	i.providerHandlers["LLM"] = handler
 }
 
+// SetHTTPHandler sets the HTTP client handler for outbound HTTP requests.
+// Also registers the handler in the generic provider registry.
+func (i *Interpreter) SetHTTPHandler(handler interface{}) {
+	i.httpHandler = handler
+	i.providerHandlers["HTTP"] = handler
+}
+
 // SetProviderHandler registers a handler for a named provider type.
 // This is the generic mechanism for dependency injection. The standard
 // providers (Database, Redis, MongoDB, LLM) are also registered here
@@ -433,6 +441,8 @@ func resolveProviderType(t Type) string {
 		return "MongoDB"
 	case LLMType:
 		return "LLM"
+	case HTTPType:
+		return "HTTP"
 	case NamedType:
 		return t.(NamedType).Name
 	default:
@@ -466,6 +476,11 @@ func (i *Interpreter) injectDependency(injection Injection, env *Environment) {
 	case "LLM":
 		if i.llmHandler != nil {
 			env.Define(injection.Name, i.llmHandler)
+			return
+		}
+	case "HTTP":
+		if i.httpHandler != nil {
+			env.Define(injection.Name, i.httpHandler)
 			return
 		}
 	}
