@@ -32,6 +32,9 @@ var providerMethods = map[string]map[string]bool{
 		"Complete": true, "Chat": true, "Stream": true, "Embed": true,
 		"ListModels": true, "TokenCount": true,
 	},
+	"HTTP": {
+		"Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true,
+	},
 }
 
 // IsProviderMethodAllowed checks if a method is allowed for a specific provider type.
