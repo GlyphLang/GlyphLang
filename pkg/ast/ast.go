@@ -121,6 +121,7 @@ type DatabaseType struct{}
 type RedisType struct{}
 type MongoDBType struct{}
 type LLMType struct{}
+type HTTPType struct{}
 
 type UnionType struct {
 	Types []Type
@@ -164,6 +165,7 @@ func (DatabaseType) isType()      {}
 func (RedisType) isType()         {}
 func (MongoDBType) isType()       {}
 func (LLMType) isType()           {}
+func (HTTPType) isType()          {}
 func (UnionType) isType()         {}
 func (GenericType) isType()       {}
 func (TypeParameterType) isType() {}
