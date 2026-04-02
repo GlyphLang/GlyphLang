@@ -3,6 +3,7 @@ package compiler
 import (
 	"github.com/glyphlang/glyph/pkg/ast"
 	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -4261,5 +4262,167 @@ func TestCompileStatement_ValidationPtrType(t *testing.T) {
 	err := c.compileStatement(validationStmt)
 	if err != nil {
 		t.Fatalf("compileStatement(*ValidationStatement) failed: %v", err)
+	}
+}
+
+func TestCompilerErrorMessages(t *testing.T) {
+	tests := []struct {
+		name           string
+		compile        func(*Compiler) error
+		expectedSubstr string
+		isSemantic     bool
+	}{
+		{
+			name: "undefined variable usage",
+			compile: func(c *Compiler) error {
+				route := &ast.Route{
+					Body: []ast.Statement{
+						ast.ExpressionStatement{
+							Expr: &ast.VariableExpr{Name: "nonexistent"},
+						},
+					},
+				}
+				_, err := c.CompileRoute(route)
+				return err
+			},
+			expectedSubstr: "undefined variable: nonexistent",
+			isSemantic:     false,
+		},
+		{
+			name: "variable redeclaration in same scope",
+			compile: func(c *Compiler) error {
+				route := &ast.Route{
+					Body: []ast.Statement{
+						ast.AssignStatement{
+							Target: "x",
+							Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+						},
+						ast.AssignStatement{
+							Target: "x",
+							Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
+						},
+					},
+				}
+				_, err := c.CompileRoute(route)
+				return err
+			},
+			expectedSubstr: "cannot redeclare variable 'x' in the same scope",
+			isSemantic:     true,
+		},
+		{
+			name: "reassign undeclared variable",
+			compile: func(c *Compiler) error {
+				route := &ast.Route{
+					Body: []ast.Statement{
+						ast.ReassignStatement{
+							Target: "x",
+							Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+						},
+					},
+				}
+				_, err := c.CompileRoute(route)
+				return err
+			},
+			expectedSubstr: "cannot assign to undeclared variable 'x'",
+			isSemantic:     true,
+		},
+		{
+			name: "unsupported binary operator",
+			compile: func(c *Compiler) error {
+				route := &ast.Route{
+					Body: []ast.Statement{
+						ast.ExpressionStatement{
+							Expr: &ast.BinaryOpExpr{
+								Left:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+								Op:    ast.BinOp(99),
+								Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 2}},
+							},
+						},
+					},
+				}
+				_, err := c.CompileRoute(route)
+				return err
+			},
+			expectedSubstr: "unsupported binary operator",
+			isSemantic:     false,
+		},
+		{
+			name: "unsupported unary operator",
+			compile: func(c *Compiler) error {
+				route := &ast.Route{
+					Body: []ast.Statement{
+						ast.ExpressionStatement{
+							Expr: &ast.UnaryOpExpr{
+								Op:    ast.UnOp(99),
+								Right: &ast.LiteralExpr{Value: ast.IntLiteral{Value: 1}},
+							},
+						},
+					},
+				}
+				_, err := c.CompileRoute(route)
+				return err
+			},
+			expectedSubstr: "unsupported unary operator",
+			isSemantic:     false,
+		},
+		{
+			name: "break outside loop",
+			compile: func(c *Compiler) error {
+				route := &ast.Route{
+					Body: []ast.Statement{
+						ast.BreakStatement{},
+					},
+				}
+				_, err := c.CompileRoute(route)
+				return err
+			},
+			expectedSubstr: "break statement outside of loop",
+			isSemantic:     true,
+		},
+		{
+			name: "continue outside loop",
+			compile: func(c *Compiler) error {
+				route := &ast.Route{
+					Body: []ast.Statement{
+						ast.ContinueStatement{},
+					},
+				}
+				_, err := c.CompileRoute(route)
+				return err
+			},
+			expectedSubstr: "continue statement outside of loop",
+			isSemantic:     true,
+		},
+		{
+			name: "empty module",
+			compile: func(c *Compiler) error {
+				module := &ast.Module{
+					Items: []ast.Item{},
+				}
+				_, err := c.Compile(module)
+				return err
+			},
+			expectedSubstr: "empty module",
+			isSemantic:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := NewCompiler()
+			err := tt.compile(c)
+			if err == nil {
+				t.Fatal("Expected an error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.expectedSubstr) {
+				t.Errorf("Expected error containing %q, got %q", tt.expectedSubstr, err.Error())
+			}
+			if tt.isSemantic && !IsSemanticError(err) {
+				t.Errorf("Expected SemanticError, got %T: %v", err, err)
+			}
+			if !tt.isSemantic && IsSemanticError(err) {
+				t.Errorf("Expected non-SemanticError, got SemanticError: %v", err)
+			}
+		})
 	}
 }
