@@ -208,3 +208,36 @@ func TestAllowedMethodsWhitelist(t *testing.T) {
 		assert.False(t, allowedMethods[method], "Expected %s to NOT be in whitelist", method)
 	}
 }
+
+// TestHasMethod_NilObject verifies HasMethod returns false for a nil object
+// without panicking. Regression for issue #236.
+func TestHasMethod_NilObject(t *testing.T) {
+	assert.NotPanics(t, func() {
+		assert.False(t, HasMethod(nil, "Table"))
+		assert.False(t, HasMethod(nil, "String"))
+	})
+}
+
+// TestCallMethod_NilObject verifies CallMethod returns a clean error on a nil
+// object instead of panicking. Regression for issue #236.
+// Return values are captured via closure so they can be inspected after the
+// panic-guarded call returns.
+func TestCallMethod_NilObject(t *testing.T) {
+	var result interface{}
+	var err error
+	assert.NotPanics(t, func() {
+		// assign to outer vars so assertions below observe the real return values
+		result, err = CallMethod(nil, "String")
+	})
+	assert.Nil(t, result)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "null")
+}
+
+// TestGetMethodNames_NilObject verifies GetMethodNames returns nil on a nil
+// object instead of panicking. Regression for issue #236.
+func TestGetMethodNames_NilObject(t *testing.T) {
+	assert.NotPanics(t, func() {
+		assert.Nil(t, GetMethodNames(nil))
+	})
+}
