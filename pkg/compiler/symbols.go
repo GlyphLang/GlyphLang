@@ -10,6 +10,21 @@ const (
 	BlockScope
 )
 
+// SymbolSource identifies where a symbol was introduced. It mirrors the
+// runtime BindingSource enum in the interpreter package so the compile-time
+// diagnostics can mention path/query parameter collisions with the same
+// wording (see issue #235).
+type SymbolSource int
+
+const (
+	// SourceUser is a variable declared by user code (default).
+	SourceUser SymbolSource = iota
+	// SourcePathParam is a symbol bound from a route path parameter.
+	SourcePathParam
+	// SourceQueryParam is a symbol bound from a route query parameter.
+	SourceQueryParam
+)
+
 // Symbol represents a variable in the symbol table
 type Symbol struct {
 	Name        string
@@ -19,6 +34,7 @@ type Symbol struct {
 	ConstantIdx int  // Index of the constant if it's a constant value
 	IsConstant  bool // Whether this is a compile-time constant
 	IsBuiltin   bool // Whether this is a built-in variable (query, input, ws, auth)
+	Source      SymbolSource
 }
 
 // SymbolTable manages variable symbols and scopes
@@ -52,6 +68,33 @@ func (st *SymbolTable) Define(name string, nameConstantIndex int) *Symbol {
 	}
 	st.symbols[name] = symbol
 	return symbol
+}
+
+// DefineWithSource adds a new symbol to the current scope and tags it with
+// the binding source so diagnostics can describe collisions involving
+// implicitly bound variables like route path/query parameters (issue #235).
+func (st *SymbolTable) DefineWithSource(name string, nameConstantIndex int, source SymbolSource) *Symbol {
+	symbol := &Symbol{
+		Name:      name,
+		Scope:     st.scope,
+		Index:     nameConstantIndex,
+		IsDefined: true,
+		Source:    source,
+	}
+	st.symbols[name] = symbol
+	return symbol
+}
+
+// DefineIfAbsentWithSource defines a symbol only if no symbol with the same
+// name already exists in the current scope. Returns (symbol, defined) where
+// defined is true if a new symbol was created. This is used when registering
+// query parameters that might collide with a same-named path parameter; path
+// parameters take precedence so we skip the duplicate registration.
+func (st *SymbolTable) DefineIfAbsentWithSource(name string, nameConstantIndex int, source SymbolSource) (*Symbol, bool) {
+	if existing, ok := st.symbols[name]; ok {
+		return existing, false
+	}
+	return st.DefineWithSource(name, nameConstantIndex, source), true
 }
 
 // DefineBuiltin adds a built-in symbol that can be shadowed by user declarations

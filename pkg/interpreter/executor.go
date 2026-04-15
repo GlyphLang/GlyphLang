@@ -148,9 +148,23 @@ func (i *Interpreter) executeAssign(stmt AssignStatement, env *Environment) (int
 		return i.executeFieldAssign(parts[0], parts[1], stmt.Value, env)
 	}
 
-	// Check for redeclaration in current scope (issue #70)
-	// Variables declared with $ cannot be redeclared in the same scope
+	// Check for redeclaration in current scope (issue #70).
+	// Variables declared with $ cannot be redeclared in the same scope.
+	// When the existing binding originates from a route (path or query
+	// parameter) we emit a more specific diagnostic so users understand the
+	// collision comes from the route pattern (issue #235). LocalSource is
+	// defined in environment.go and returns BindingUser when no specific
+	// source is recorded; BindingPathParam and BindingQueryParam are the
+	// enum values for route-bound variables.
 	if env.HasLocal(stmt.Target) {
+		if src, ok := env.LocalSource(stmt.Target); ok {
+			switch src {
+			case BindingPathParam:
+				return nil, fmt.Errorf("cannot redeclare path parameter '%s' — it is already bound from the route pattern", stmt.Target)
+			case BindingQueryParam:
+				return nil, fmt.Errorf("cannot redeclare query parameter '%s' — it is already bound from the route's query parameters", stmt.Target)
+			}
+		}
 		return nil, fmt.Errorf("cannot redeclare variable '%s' in the same scope", stmt.Target)
 	}
 
