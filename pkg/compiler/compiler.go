@@ -132,7 +132,11 @@ func (c *Compiler) CompileRoute(route *ast.Route) ([]byte, error) {
 	params := server.ExtractRouteParamNames(route.Path)
 	for _, param := range params {
 		nameIdx := c.addConstant(vm.StringValue{Val: param})
-		c.symbolTable.Define(param, nameIdx)
+		c.symbolTable.DefineWithSource(param, nameIdx, SourcePathParam)
+	}
+	for _, qp := range route.QueryParams {
+		qpIdx := c.addConstant(vm.StringValue{Val: qp.Name})
+		c.symbolTable.DefineIfAbsentWithSource(qp.Name, qpIdx, SourceQueryParam)
 	}
 
 	// Add injections to symbol table
@@ -376,6 +380,15 @@ func (c *Compiler) compileAssignStatement(stmt *ast.AssignStatement) error {
 	// Variables declared with $ cannot be redeclared in the same scope
 	// Built-in variables (query, input, ws, auth) can be shadowed by user declarations
 	if existing, exists := c.symbolTable.ResolveLocal(stmt.Target); exists && !existing.IsBuiltin {
+		// Emit a specific diagnostic when the colliding symbol came from the
+		// route pattern (issue #235); fall back to the generic message for
+		// user-vs-user collisions.
+		switch existing.Source {
+		case SourcePathParam:
+			return &SemanticError{Message: fmt.Sprintf("cannot redeclare path parameter '%s' — it is already bound from the route pattern", stmt.Target)}
+		case SourceQueryParam:
+			return &SemanticError{Message: fmt.Sprintf("cannot redeclare query parameter '%s' — it is already bound from the route's query parameters", stmt.Target)}
+		}
 		return &SemanticError{Message: fmt.Sprintf("cannot redeclare variable '%s' in the same scope", stmt.Target)}
 	}
 

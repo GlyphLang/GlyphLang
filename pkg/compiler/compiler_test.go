@@ -3,6 +3,7 @@ package compiler
 import (
 	"github.com/glyphlang/glyph/pkg/ast"
 	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -240,6 +241,68 @@ func TestCompileVariableRedeclaration(t *testing.T) {
 	expectedMsg := "cannot redeclare variable 'x' in the same scope"
 	if err.Error() != expectedMsg {
 		t.Errorf("Expected error message %q, got %q", expectedMsg, err.Error())
+	}
+}
+
+// TestCompilePathParamRedeclaration covers issue #235: attempting to
+// `$`-declare a variable whose name matches a path parameter must produce a
+// diagnostic that mentions the route pattern origin, not the generic
+// user-vs-user message.
+func TestCompilePathParamRedeclaration(t *testing.T) {
+	route := &ast.Route{
+		Path:   "/api/thing/:code",
+		Method: ast.Delete,
+		Body: []ast.Statement{
+			&ast.AssignStatement{
+				Target: "code",
+				Value:  &ast.LiteralExpr{Value: ast.StringLiteral{Value: "reassigned"}},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	_, err := c.CompileRoute(route)
+	if err == nil {
+		t.Fatal("Expected redeclaration error, got nil")
+	}
+	if !IsSemanticError(err) {
+		t.Errorf("Expected SemanticError, got %T: %v", err, err)
+	}
+	if !strings.Contains(err.Error(), "cannot redeclare path parameter 'code'") {
+		t.Errorf("Expected path-parameter diagnostic, got %q", err.Error())
+	}
+	if !strings.Contains(err.Error(), "route pattern") {
+		t.Errorf("Expected diagnostic to mention route pattern, got %q", err.Error())
+	}
+}
+
+// TestCompileQueryParamRedeclaration mirrors the path-param test for query
+// parameters (also part of issue #235).
+func TestCompileQueryParamRedeclaration(t *testing.T) {
+	route := &ast.Route{
+		Path:   "/api/things",
+		Method: ast.Get,
+		QueryParams: []ast.QueryParamDecl{
+			{Name: "limit"},
+		},
+		Body: []ast.Statement{
+			&ast.AssignStatement{
+				Target: "limit",
+				Value:  &ast.LiteralExpr{Value: ast.IntLiteral{Value: 5}},
+			},
+		},
+	}
+
+	c := NewCompiler()
+	_, err := c.CompileRoute(route)
+	if err == nil {
+		t.Fatal("Expected redeclaration error, got nil")
+	}
+	if !IsSemanticError(err) {
+		t.Errorf("Expected SemanticError, got %T: %v", err, err)
+	}
+	if !strings.Contains(err.Error(), "cannot redeclare query parameter 'limit'") {
+		t.Errorf("Expected query-parameter diagnostic, got %q", err.Error())
 	}
 }
 

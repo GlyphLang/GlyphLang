@@ -479,6 +479,60 @@ func TestExecuteAssign_RedeclarationError(t *testing.T) {
 	assert.Contains(t, err.Error(), "cannot redeclare variable 'x' in the same scope")
 }
 
+// TestExecuteAssign_PathParamCollision covers issue #235: when user code
+// declares a `$` variable whose name collides with a path parameter bound on
+// the route environment, the error must mention the route pattern origin.
+func TestExecuteAssign_PathParamCollision(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	// Simulate a path parameter binding as done by ExecuteRoute.
+	env.DefineWithSource("code", "abc", BindingPathParam)
+
+	stmt := AssignStatement{
+		Target: "code",
+		Value:  LiteralExpr{Value: StringLiteral{Value: "reassigned"}},
+	}
+	_, err := interp.ExecuteStatement(stmt, env)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot redeclare path parameter 'code'")
+	assert.Contains(t, err.Error(), "route pattern")
+}
+
+// TestExecuteAssign_QueryParamCollision mirrors the path-param test but for
+// query parameters (also part of issue #235).
+func TestExecuteAssign_QueryParamCollision(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	env.DefineWithSource("limit", int64(10), BindingQueryParam)
+
+	stmt := AssignStatement{
+		Target: "limit",
+		Value:  LiteralExpr{Value: IntLiteral{Value: 5}},
+	}
+	_, err := interp.ExecuteStatement(stmt, env)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot redeclare query parameter 'limit'")
+}
+
+// TestExecuteAssign_UserCollisionMessageUnchanged guards against regressions
+// in the generic user-vs-user collision message.
+func TestExecuteAssign_UserCollisionMessageUnchanged(t *testing.T) {
+	interp := NewInterpreter()
+	env := NewEnvironment()
+
+	env.Define("x", int64(1))
+
+	stmt := AssignStatement{
+		Target: "x",
+		Value:  LiteralExpr{Value: IntLiteral{Value: 2}},
+	}
+	_, err := interp.ExecuteStatement(stmt, env)
+	require.Error(t, err)
+	assert.Equal(t, "cannot redeclare variable 'x' in the same scope", err.Error())
+}
+
 func TestExecuteAssign_UpdateParentScope(t *testing.T) {
 	interp := NewInterpreter()
 	parentEnv := NewEnvironment()

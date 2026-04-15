@@ -507,7 +507,7 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 
 	// Add path parameters to environment
 	for key, value := range params {
-		routeEnv.Define(key, value)
+		routeEnv.DefineWithSource(key, value, BindingPathParam)
 	}
 
 	// Extract and process query parameters with type conversion
@@ -539,7 +539,7 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 	// Also bind declared query params directly as variables
 	for _, decl := range route.QueryParams {
 		if val, exists := queryParams[decl.Name]; exists {
-			routeEnv.Define(decl.Name, val)
+			routeEnv.DefineWithSource(decl.Name, val, BindingQueryParam)
 		}
 	}
 
