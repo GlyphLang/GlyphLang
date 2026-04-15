@@ -55,7 +55,7 @@ jobs:
 
       - name: Create Release
         id: create_release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: GlyphLang ${{ github.ref_name }}
           body_path: release_notes.txt
@@ -197,7 +197,7 @@ jobs:
         run: find artifacts -type f
 
       - name: Upload assets to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             artifacts/glyph-linux-amd64/*.zip
