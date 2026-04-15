@@ -18,7 +18,7 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.42.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.42.0
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.42.0
-	go.opentelemetry.io/otel/sdk v1.42.0
+	go.opentelemetry.io/otel/sdk v1.43.0
 	go.opentelemetry.io/otel/trace v1.43.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.48.1
