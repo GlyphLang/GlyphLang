@@ -418,6 +418,283 @@ func TestInvalidateByPrefix(t *testing.T) {
 	}
 }
 
+func TestLRUCache_MaxSizeEviction(t *testing.T) {
+	// Set a small max size so entries get evicted based on memory
+	cache := NewLRUCache(WithCapacity(1000), WithMaxSize(100))
+	defer cache.Close()
+
+	// Add entries until we exceed the max size
+	// Each string value's size is estimated by its length
+	cache.Set("key1", "aaaaaaaaaa", 0) // ~10 bytes
+	cache.Set("key2", "bbbbbbbbbb", 0) // ~10 bytes
+	cache.Set("key3", "cccccccccc", 0) // ~10 bytes
+
+	// Verify they all fit
+	if _, ok := cache.Get("key1"); !ok {
+		t.Error("key1 should exist")
+	}
+
+	// Now add a large entry that pushes us over the limit
+	// This should cause evictions of oldest entries
+	largeValue := make([]byte, 90)
+	for i := range largeValue {
+		largeValue[i] = 'x'
+	}
+	cache.Set("big", string(largeValue), 0)
+
+	stats := cache.Stats()
+	if stats.Evictions == 0 {
+		t.Error("Expected evictions when exceeding max size")
+	}
+
+	// The big entry should exist
+	if _, ok := cache.Get("big"); !ok {
+		t.Error("big key should exist after eviction of older entries")
+	}
+}
+
+func TestLRUCache_UpdateExistingKey(t *testing.T) {
+	cache := NewLRUCache(WithCapacity(100))
+	defer cache.Close()
+
+	cache.Set("a", "val1", 0)
+
+	stats := cache.Stats()
+	initialCount := stats.EntryCount
+
+	// Update the same key
+	cache.Set("a", "val2", 0)
+
+	value, ok := cache.Get("a")
+	if !ok {
+		t.Fatal("key 'a' should exist after update")
+	}
+	if value != "val2" {
+		t.Errorf("Expected 'val2', got %v", value)
+	}
+
+	stats = cache.Stats()
+	if stats.EntryCount != initialCount {
+		t.Errorf("EntryCount should remain %d after update, got %d", initialCount, stats.EntryCount)
+	}
+}
+
+func TestLRUCache_OnEvict(t *testing.T) {
+	var mu sync.Mutex
+	evictedKeys := make([]string, 0)
+
+	cache := NewLRUCache(
+		WithCapacity(2),
+		WithOnEvict(func(key string, value interface{}) {
+			mu.Lock()
+			evictedKeys = append(evictedKeys, key)
+			mu.Unlock()
+		}),
+	)
+	defer cache.Close()
+
+	cache.Set("a", "1", 0)
+	cache.Set("b", "2", 0)
+
+	// This should evict "a" (oldest/least recently used)
+	cache.Set("c", "3", 0)
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(evictedKeys) == 0 {
+		t.Fatal("Expected eviction callback to be called")
+	}
+	if evictedKeys[0] != "a" {
+		t.Errorf("Expected evicted key 'a', got '%s'", evictedKeys[0])
+	}
+}
+
+func TestLRUCache_DeleteNonExistent(t *testing.T) {
+	cache := NewLRUCache(WithCapacity(100))
+	defer cache.Close()
+
+	err := cache.Delete("does-not-exist")
+	if err != nil {
+		t.Errorf("Deleting non-existent key should not error, got: %v", err)
+	}
+}
+
+func TestLRUCache_ConcurrentMixedOperations(t *testing.T) {
+	cache := NewLRUCache(WithCapacity(100))
+	defer cache.Close()
+
+	var wg sync.WaitGroup
+	const goroutines = 20
+	const opsPerGoroutine = 200
+
+	// Concurrent sets
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			for j := 0; j < opsPerGoroutine; j++ {
+				key := string(rune(id*opsPerGoroutine + j))
+				cache.Set(key, j, 0)
+			}
+		}(i)
+	}
+
+	// Concurrent gets
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			for j := 0; j < opsPerGoroutine; j++ {
+				key := string(rune(id*opsPerGoroutine + j))
+				cache.Get(key)
+			}
+		}(i)
+	}
+
+	// Concurrent deletes
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			for j := 0; j < opsPerGoroutine; j++ {
+				key := string(rune(id*opsPerGoroutine + j))
+				cache.Delete(key)
+			}
+		}(i)
+	}
+
+	// Concurrent clears
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 10; j++ {
+				cache.Clear()
+			}
+		}()
+	}
+
+	wg.Wait()
+	// If we get here without a race condition panic, the test passes
+}
+
+func TestLRUCache_DefaultTTL(t *testing.T) {
+	cache := NewLRUCache(
+		WithCapacity(100),
+		WithDefaultTTL(50*time.Millisecond),
+	)
+	defer cache.Close()
+
+	// Set with ttl=0, which should use the default TTL of 50ms
+	cache.Set("default-ttl-key", "value", 0)
+
+	// Should exist immediately
+	if _, ok := cache.Get("default-ttl-key"); !ok {
+		t.Error("Key should exist immediately after set")
+	}
+
+	// Wait for default TTL to expire
+	time.Sleep(100 * time.Millisecond)
+
+	// Should be expired now
+	if _, ok := cache.Get("default-ttl-key"); ok {
+		t.Error("Key should have expired after default TTL")
+	}
+}
+
+func TestLRUCache_Close(t *testing.T) {
+	cache := NewLRUCache(WithCapacity(100))
+
+	cache.Set("key", "value", 0)
+
+	// First close should succeed
+	cache.Close()
+
+	// Second close should not panic (idempotent)
+	cache.Close()
+
+	// Cache should still be functional after close (cleanup goroutine stops but data remains)
+	value, ok := cache.Get("key")
+	if !ok {
+		t.Error("Cache should still return values after Close")
+	}
+	if value != "value" {
+		t.Errorf("Expected 'value', got %v", value)
+	}
+
+	// Set should still work
+	err := cache.Set("key2", "value2", 0)
+	if err != nil {
+		t.Errorf("Set should still work after Close, got: %v", err)
+	}
+}
+
+func TestEntry_IsExpired(t *testing.T) {
+	// Zero time = never expires
+	entry := &Entry{ExpiresAt: time.Time{}}
+	if entry.IsExpired() {
+		t.Error("Entry with zero ExpiresAt should never expire")
+	}
+
+	// Past time = expired
+	entry = &Entry{ExpiresAt: time.Now().Add(-1 * time.Second)}
+	if !entry.IsExpired() {
+		t.Error("Entry with past ExpiresAt should be expired")
+	}
+
+	// Future time = not expired
+	entry = &Entry{ExpiresAt: time.Now().Add(1 * time.Hour)}
+	if entry.IsExpired() {
+		t.Error("Entry with future ExpiresAt should not be expired")
+	}
+}
+
+func TestHTTPCache_NonGetRequest(t *testing.T) {
+	config := DefaultHTTPCacheConfig()
+	hc := NewHTTPCache(config)
+
+	called := false
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(`{"id":1}`))
+	})
+
+	cachedHandler := hc.Middleware()(handler)
+
+	// POST request should pass through without caching
+	req := httptest.NewRequest("POST", "/api/users", nil)
+	rec := httptest.NewRecorder()
+	cachedHandler.ServeHTTP(rec, req)
+
+	if !called {
+		t.Error("Handler should have been called for POST request")
+	}
+	if rec.Code != http.StatusCreated {
+		t.Errorf("Expected 201, got %d", rec.Code)
+	}
+
+	// Verify nothing was cached
+	stats := hc.Stats()
+	if stats.Sets != 0 {
+		t.Errorf("POST requests should not be cached, but got %d sets", stats.Sets)
+	}
+}
+
+func TestKeyBuilder_AddIfNotEmpty(t *testing.T) {
+	kb := NewKeyBuilder()
+	kb.Add("prefix")
+	kb.AddIfNotEmpty("")     // Should be skipped
+	kb.AddIfNotEmpty("part") // Should be added
+	kb.AddIfNotEmpty("")     // Should be skipped
+
+	result := kb.Build()
+	expected := "prefix:part"
+	if result != expected {
+		t.Errorf("Expected %q, got %q", expected, result)
+	}
+}
+
 func BenchmarkLRUCache_Set(b *testing.B) {
 	cache := NewLRUCache(WithCapacity(10000))
 	b.ResetTimer()
