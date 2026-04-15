@@ -146,6 +146,9 @@ func CallMethod(obj interface{}, methodName string, args ...interface{}) (interf
 
 	// Get the value and type of the object
 	objValue := reflect.ValueOf(obj)
+	if !objValue.IsValid() {
+		return nil, fmt.Errorf("cannot call method %s on null", methodName)
+	}
 	objType := objValue.Type()
 
 	// Find the method
@@ -188,6 +191,9 @@ func CallMethod(obj interface{}, methodName string, args ...interface{}) (interf
 // HasMethod checks if an object has a method
 func HasMethod(obj interface{}, methodName string) bool {
 	objValue := reflect.ValueOf(obj)
+	if !objValue.IsValid() {
+		return false
+	}
 	method := objValue.MethodByName(methodName)
 	return method.IsValid()
 }
@@ -195,6 +201,9 @@ func HasMethod(obj interface{}, methodName string) bool {
 // GetMethodNames returns all method names of an object
 func GetMethodNames(obj interface{}) []string {
 	objValue := reflect.ValueOf(obj)
+	if !objValue.IsValid() {
+		return nil
+	}
 	objType := objValue.Type()
 
 	var methods []string

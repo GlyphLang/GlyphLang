@@ -621,6 +621,12 @@ func (i *Interpreter) evaluateFieldAccess(expr FieldAccessExpr, env *Environment
 		return nil, err
 	}
 
+	// Short-circuit on null before any reflection-based access to give a
+	// clean Glyph-level error instead of a Go panic or an opaque reflection error.
+	if obj == nil {
+		return nil, fmt.Errorf("cannot access field %s on null", expr.Field)
+	}
+
 	// Handle database table access (db.tablename) using reflection
 	// Check if obj has a Table(string) method
 	if HasMethod(obj, "Table") {

@@ -69,7 +69,7 @@ jobs:
           go test -v -short -coverprofile=coverage.out -covermode=atomic $(go list ./... | grep -v /websocket)
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: ./coverage.out
           fail_ci_if_error: false
@@ -164,4 +164,5 @@ jobs:
           # G703: path traversal taint - false positives in file serving
           # G704: SSRF taint - false positives in health checks and test helpers
           # G705: XSS taint - false positives in template/cache rendering
-          args: -exclude=G101,G104,G112,G115,G117,G204,G301,G302,G304,G306,G702,G703,G704,G705 -exclude-generated ./...
+          # G124: insecure cookie attributes - CSRF token intentionally has HttpOnly:false so JS can read it
+          args: -exclude=G101,G104,G112,G115,G117,G124,G204,G301,G302,G304,G306,G702,G703,G704,G705 -exclude-generated ./...
