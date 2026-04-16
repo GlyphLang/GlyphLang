@@ -205,9 +205,10 @@ func createRouteHandler(route *ast.Route, interp *interpreter.Interpreter) serve
 
 // executeRoute executes a route's body and returns the full interpreter response.
 func executeRoute(route *ast.Route, ctx *server.Context, interp *interpreter.Interpreter) (*interpreter.Response, error) {
-	// Parse request body for POST/PUT/PATCH requests
+	// Parse request body for POST/PUT/PATCH/DELETE requests.
+	// RFC 7231 permits DELETE to carry a body, and some APIs rely on it.
 	var requestBody interface{}
-	if ctx.Request.Method == "POST" || ctx.Request.Method == "PUT" || ctx.Request.Method == "PATCH" {
+	if ctx.Request.Method == "POST" || ctx.Request.Method == "PUT" || ctx.Request.Method == "PATCH" || ctx.Request.Method == "DELETE" {
 		// Only parse if there's a content type that suggests JSON
 		contentType := ctx.Request.Header.Get("Content-Type")
 		// Accept empty content-type or application/json
