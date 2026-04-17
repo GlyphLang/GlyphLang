@@ -109,6 +109,39 @@ func createCompiledRouteHandler(route *ast.Route, bytecode []byte, wsHub *websoc
 			vmInstance.SetLocal(key, vm.StringValue{Val: value})
 		}
 
+		// Inject query parameters as 'query' object (and individual declared
+		// params) so compiled routes can read query.X the same as interpreted
+		// routes. Reuses interpreter.ProcessQueryParams to guarantee parity
+		// with interpreter mode (issue #240).
+		rawQuery := map[string][]string(ctx.Request.URL.Query())
+		queryParams, qErr := interpreter.ProcessQueryParams(rawQuery, route.QueryParams)
+		if qErr != nil {
+			// Same pattern as success responses below (ctx.StatusCode +
+			// WriteHeader): ctx.StatusCode is for middleware/logging, but
+			// the actual status line needs WriteHeader to flip from 200.
+			ctx.StatusCode = http.StatusBadRequest
+			ctx.ResponseWriter.Header().Set("Content-Type", "application/json")
+			ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+			if encErr := json.NewEncoder(ctx.ResponseWriter).Encode(map[string]interface{}{
+				"error": qErr.Error(),
+			}); encErr != nil {
+				return fmt.Errorf("failed to encode query-param error response: %w", encErr)
+			}
+			return nil
+		}
+		queryObj := make(map[string]vm.Value, len(queryParams))
+		for k, v := range queryParams {
+			queryObj[k] = interfaceToValue(v)
+		}
+		vmInstance.SetLocal("query", vm.ObjectValue{Val: queryObj})
+		// Also bind declared query params directly as variables so `q` works
+		// in addition to `query.q` (matches interpreter behavior).
+		for _, decl := range route.QueryParams {
+			if val, ok := queryParams[decl.Name]; ok {
+				vmInstance.SetLocal(decl.Name, interfaceToValue(val))
+			}
+		}
+
 		// Parse and inject request body as 'input' for POST/PUT/PATCH requests
 		if ctx.Request.Method == "POST" || ctx.Request.Method == "PUT" || ctx.Request.Method == "PATCH" {
 			contentType := ctx.Request.Header.Get("Content-Type")
