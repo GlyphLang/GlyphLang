@@ -44,8 +44,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		StatusCode:     http.StatusOK,
 	}
 
-	// Parse JSON body if present
-	if r.Method == "POST" || r.Method == "PUT" || r.Method == "PATCH" {
+	// Parse JSON body if present.
+	// RFC 7231 permits DELETE to carry a body, so parse it as well.
+	if r.Method == "POST" || r.Method == "PUT" || r.Method == "PATCH" || r.Method == "DELETE" {
 		if err := parseJSONBody(r, ctx); err != nil {
 			h.handleError(w, r, http.StatusBadRequest, "invalid JSON body", err)
 			return
