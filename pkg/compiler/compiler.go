@@ -151,6 +151,10 @@ func (c *Compiler) CompileRoute(route *ast.Route) ([]byte, error) {
 	queryIdx := c.addConstant(vm.StringValue{Val: "query"})
 	c.symbolTable.DefineBuiltin("query", queryIdx)
 
+	// headers - HTTP request headers (always available)
+	headersIdx := c.addConstant(vm.StringValue{Val: "headers"})
+	c.symbolTable.DefineBuiltin("headers", headersIdx)
+
 	// input - Request body (always available, may be nil)
 	inputIdx := c.addConstant(vm.StringValue{Val: "input"})
 	c.symbolTable.DefineBuiltin("input", inputIdx)
