@@ -50,14 +50,36 @@ func TestExtractRawQueryParams(t *testing.T) {
 			path:     "/api/users?debug",
 			expected: map[string][]string{"debug": {""}},
 		},
+		{
+			name:     "percent-encoded value",
+			path:     "/api/search?q=hello%20world",
+			expected: map[string][]string{"q": {"hello world"}},
+		},
+		{
+			name:     "percent-encoded key and value",
+			path:     "/api/data?user%20name=John%20Doe",
+			expected: map[string][]string{"user name": {"John Doe"}},
+		},
+		{
+			name:     "plus as space",
+			path:     "/api/search?q=hello+world",
+			expected: map[string][]string{"q": {"hello world"}},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ExtractRawQueryParams(tt.path)
+			result, err := ExtractRawQueryParams(tt.path)
+			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestExtractRawQueryParams_MalformedEncoding(t *testing.T) {
+	_, err := ExtractRawQueryParams("/api/search?q=%ZZ")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "malformed")
 }
 
 func TestProcessQueryParams_NoDeclarations(t *testing.T) {
