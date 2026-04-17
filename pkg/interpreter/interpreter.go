@@ -583,6 +583,15 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 		routeEnv.Define("input", nil)
 	}
 
+	// Bind request headers as 'headers' object so route handlers can
+	// read them via headers["Content-Type"] or headers.Authorization.
+	// Keys use Go's canonical format (e.g. "Content-Type").
+	headersMap := make(map[string]interface{}, len(request.Headers))
+	for k, v := range request.Headers {
+		headersMap[k] = v
+	}
+	routeEnv.Define("headers", headersMap)
+
 	// Handle dependency injections
 	for _, injection := range route.Injections {
 		i.injectDependency(injection, routeEnv)

@@ -876,21 +876,29 @@ func (vm *VM) execGetIndex() error {
 		return err
 	}
 
-	arrVal, ok := arr.(ArrayValue)
-	if !ok {
-		return fmt.Errorf("type error: can only index arrays, got %s", arr.Type())
+	switch container := arr.(type) {
+	case ArrayValue:
+		indexInt, ok := index.(IntValue)
+		if !ok {
+			return fmt.Errorf("type error: array index must be an integer, got %s", index.Type())
+		}
+		if indexInt.Val < 0 || indexInt.Val >= int64(len(container.Val)) {
+			return fmt.Errorf("index out of bounds: %d", indexInt.Val)
+		}
+		vm.Push(container.Val[indexInt.Val])
+	case ObjectValue:
+		keyStr, ok := index.(StringValue)
+		if !ok {
+			return fmt.Errorf("type error: object key must be a string, got %s", index.Type())
+		}
+		if val, exists := container.Val[keyStr.Val]; exists {
+			vm.Push(val)
+		} else {
+			vm.Push(NullValue{})
+		}
+	default:
+		return fmt.Errorf("type error: can only index arrays or objects, got %s", arr.Type())
 	}
-
-	indexInt, ok := index.(IntValue)
-	if !ok {
-		return fmt.Errorf("type error: array index must be an integer, got %s", index.Type())
-	}
-
-	if indexInt.Val < 0 || indexInt.Val >= int64(len(arrVal.Val)) {
-		return fmt.Errorf("index out of bounds: %d", indexInt.Val)
-	}
-
-	vm.Push(arrVal.Val[indexInt.Val])
 	return nil
 }
 

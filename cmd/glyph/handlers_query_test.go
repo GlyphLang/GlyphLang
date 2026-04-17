@@ -117,3 +117,29 @@ func TestCompiledRouteInvalidQueryParam(t *testing.T) {
 	assert.True(t, strings.Contains(rec.Body.String(), "limit"),
 		"error should mention the offending param, got %q", rec.Body.String())
 }
+
+// TestCompiledRouteHeadersAccess verifies that compiled routes can read
+// request headers via the built-in headers variable (issue 241).
+func TestCompiledRouteHeadersAccess(t *testing.T) {
+	src := `@ GET /api/echo {
+  > {ct: headers["Content-Type"]}
+}`
+	route, bytecode := compileFirstRoute(t, src)
+
+	req := httptest.NewRequest("GET", "/api/echo", nil)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	ctx := &server.Context{
+		Request:        req,
+		ResponseWriter: rec,
+		PathParams:     map[string]string{},
+		StatusCode:     http.StatusOK,
+	}
+	handler := createCompiledRouteHandler(route, bytecode, nil)
+	require.NoError(t, handler(ctx), "handler error")
+
+	assert.Equal(t, http.StatusOK, rec.Code, "body=%s", rec.Body.String())
+	var body map[string]interface{}
+	require.NoError(t, json.NewDecoder(rec.Body).Decode(&body))
+	assert.Equal(t, "application/json", body["ct"])
+}
