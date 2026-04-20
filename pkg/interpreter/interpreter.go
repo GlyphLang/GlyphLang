@@ -511,7 +511,15 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 	}
 
 	// Extract and process query parameters with type conversion
-	rawQueryParams := ExtractRawQueryParams(request.Path)
+	rawQueryParams, err := ExtractRawQueryParams(request.Path)
+	if err != nil {
+		return &Response{
+			StatusCode: 400,
+			Body: map[string]interface{}{
+				"error": err.Error(),
+			},
+		}, err
+	}
 	queryParams, err := ProcessQueryParams(rawQueryParams, route.QueryParams)
 	if err != nil {
 		return &Response{

@@ -143,3 +143,50 @@ func TestCompiledRouteHeadersAccess(t *testing.T) {
 	require.NoError(t, json.NewDecoder(rec.Body).Decode(&body))
 	assert.Equal(t, "application/json", body["ct"])
 }
+
+// TestCompiledRouteQueryDefaultApplied verifies that a declared query param
+// with a default value is populated when the URL omits that param (#244).
+func TestCompiledRouteQueryDefaultApplied(t *testing.T) {
+	src := `@ GET /api/items {
+  ? limit: int = 25
+  > {limit: query.limit}
+}`
+	route, bytecode := compileFirstRoute(t, src)
+	rec := invokeCompiledRoute(t, route, bytecode, "GET", "/api/items")
+
+	assert.Equal(t, http.StatusOK, rec.Code, "body=%s", rec.Body.String())
+	var body map[string]interface{}
+	require.NoError(t, json.NewDecoder(rec.Body).Decode(&body))
+	assert.Equal(t, float64(25), body["limit"], "default should be applied when param is absent")
+}
+
+// TestCompiledRouteQueryDefaultOverridden verifies that an explicit value
+// overrides a declared default.
+func TestCompiledRouteQueryDefaultOverridden(t *testing.T) {
+	src := `@ GET /api/items {
+  ? limit: int = 25
+  > {limit: query.limit}
+}`
+	route, bytecode := compileFirstRoute(t, src)
+	rec := invokeCompiledRoute(t, route, bytecode, "GET", "/api/items?limit=5")
+
+	assert.Equal(t, http.StatusOK, rec.Code, "body=%s", rec.Body.String())
+	var body map[string]interface{}
+	require.NoError(t, json.NewDecoder(rec.Body).Decode(&body))
+	assert.Equal(t, float64(5), body["limit"], "explicit value should override default")
+}
+
+// TestCompiledRouteQueryStringDefault verifies string defaults work.
+func TestCompiledRouteQueryStringDefault(t *testing.T) {
+	src := `@ GET /api/items {
+  ? sort: str = "name"
+  > {sort: query.sort}
+}`
+	route, bytecode := compileFirstRoute(t, src)
+	rec := invokeCompiledRoute(t, route, bytecode, "GET", "/api/items")
+
+	assert.Equal(t, http.StatusOK, rec.Code, "body=%s", rec.Body.String())
+	var body map[string]interface{}
+	require.NoError(t, json.NewDecoder(rec.Body).Decode(&body))
+	assert.Equal(t, "name", body["sort"], "string default should be applied")
+}

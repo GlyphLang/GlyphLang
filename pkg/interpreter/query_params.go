@@ -4,6 +4,7 @@ import (
 	. "github.com/glyphlang/glyph/pkg/ast"
 
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 )
@@ -158,18 +159,20 @@ func convertToArray(values []string, arrayType Type) ([]interface{}, error) {
 	return result, nil
 }
 
-// ExtractRawQueryParams extracts all query parameter values from URL path
-func ExtractRawQueryParams(path string) map[string][]string {
+// ExtractRawQueryParams extracts all query parameter values from a URL path.
+// Percent-encoded sequences are decoded per RFC 3986. Returns an error if
+// any key or value contains a malformed percent sequence.
+func ExtractRawQueryParams(path string) (map[string][]string, error) {
 	result := make(map[string][]string)
 
 	idx := strings.Index(path, "?")
 	if idx == -1 {
-		return result
+		return result, nil
 	}
 
 	queryString := path[idx+1:]
 	if queryString == "" {
-		return result
+		return result, nil
 	}
 
 	pairs := strings.Split(queryString, "&")
@@ -178,13 +181,19 @@ func ExtractRawQueryParams(path string) map[string][]string {
 			continue
 		}
 		parts := strings.SplitN(pair, "=", 2)
-		key := parts[0]
+		key, err := url.QueryUnescape(parts[0])
+		if err != nil {
+			return nil, fmt.Errorf("malformed query parameter key %q: %w", parts[0], err)
+		}
 		value := ""
 		if len(parts) == 2 {
-			value = parts[1]
+			value, err = url.QueryUnescape(parts[1])
+			if err != nil {
+				return nil, fmt.Errorf("malformed query parameter value for %q: %w", key, err)
+			}
 		}
 		result[key] = append(result[key], value)
 	}
 
-	return result
+	return result, nil
 }
