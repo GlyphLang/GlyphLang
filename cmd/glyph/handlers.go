@@ -177,6 +177,16 @@ func createCompiledRouteHandler(route *ast.Route, bytecode []byte, wsHub *websoc
 			vmInstance.SetLocal("input", vm.NullValue{})
 		}
 
+		// Inject request headers as 'headers' object. Keys use Go's
+		// canonical format (e.g. "Content-Type"). First value only.
+		headerObj := make(map[string]vm.Value, len(ctx.Request.Header))
+		for k, vals := range ctx.Request.Header {
+			if len(vals) > 0 {
+				headerObj[k] = vm.StringValue{Val: vals[0]}
+			}
+		}
+		vmInstance.SetLocal("headers", vm.ObjectValue{Val: headerObj})
+
 		// Execute compiled bytecode
 		result, err := vmInstance.Execute(bytecode)
 		if err != nil {
