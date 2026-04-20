@@ -129,6 +129,15 @@ func createCompiledRouteHandler(route *ast.Route, bytecode []byte, wsHub *websoc
 			}
 			return nil
 		}
+		// Apply defaults for declared params not provided in the URL,
+		// matching the interpreter path at interpreter.go:525-534.
+		for _, decl := range route.QueryParams {
+			if _, exists := queryParams[decl.Name]; !exists && decl.Default != nil {
+				if val, ok := evalLiteralExpr(decl.Default); ok {
+					queryParams[decl.Name] = val
+				}
+			}
+		}
 		queryObj := make(map[string]vm.Value, len(queryParams))
 		for k, v := range queryParams {
 			queryObj[k] = interfaceToValue(v)
@@ -665,4 +674,29 @@ func openURL(urlStr string) error {
 	}
 
 	return cmd.Start()
+}
+
+// evalLiteralExpr evaluates a constant AST expression (typically a query-param
+// default like = 1 or = "foo") and returns its Go value. Returns (nil,
+// false) for non-literal expressions; callers should skip the default in that
+// case. This keeps the compiled path free of a full interpreter dependency.
+func evalLiteralExpr(expr ast.Expr) (interface{}, bool) {
+	lit, ok := expr.(ast.LiteralExpr)
+	if !ok {
+		return nil, false
+	}
+	switch v := lit.Value.(type) {
+	case ast.IntLiteral:
+		return v.Value, true
+	case ast.FloatLiteral:
+		return v.Value, true
+	case ast.StringLiteral:
+		return v.Value, true
+	case ast.BoolLiteral:
+		return v.Value, true
+	case ast.NullLiteral:
+		return nil, true
+	default:
+		return nil, false
+	}
 }
