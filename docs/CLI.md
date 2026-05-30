@@ -356,6 +356,49 @@ $ glyph validate main.glyph --ai
 }
 ```
 
+### `glyph ir <file>`
+
+Export a GlyphLang service as a machine-readable Intermediate Representation.
+
+```bash
+glyph ir main.glyph                          # Full ServiceIR as JSON (stdout)
+glyph ir main.glyph --format catalog         # Flattened operation catalog
+glyph ir main.glyph --format compact         # Human-readable notation summary
+glyph ir main.glyph --format catalog -o out.json  # Write to file
+
+# Options:
+#   -f, --format <type>   Output format: json, catalog, compact (default: json)
+#   -o, --output <file>   Output file (default: stdout)
+#       --pretty          Pretty-print JSON (default: true)
+```
+
+**Formats:**
+- `json` — Full `ServiceIR`: all routes, types, providers, functions, commands, events, queues, cron jobs, gRPC, and GraphQL with complete type information
+- `catalog` — Flattened `ServiceCatalog`: a list of named operations (id, kind, notation, params, returns, auth, providers) suitable for ingestion by external agent/orchestration systems
+- `compact` — Human-readable GlyphLang notation summary grouped by operation kind
+
+**Example:**
+```bash
+$ glyph ir api.glyph --format catalog --pretty
+{
+  "service": "api",
+  "version": "1.0",
+  "operations": [
+    {
+      "id": "GET /users/:id",
+      "kind": "route",
+      "notation": "@ GET /users/:id",
+      "method": "GET",
+      "path": "/users/:id",
+      "params": [{"name": "id", "type": "string", "required": true, "kind": "path"}],
+      "returns": "User",
+      "auth": {"type": "jwt", "required": true},
+      "providers": ["Database"]
+    }
+  ]
+}
+```
+
 ### `glyph init <name>`
 
 Initialize a new Glyph project.

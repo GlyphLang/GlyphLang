@@ -539,6 +539,8 @@ glyph compile <file>        # Compile to bytecode
 glyph decompile <file>      # Decompile bytecode
 glyph codegen <file>        # Generate server code (default: Python/FastAPI)
 glyph codegen <file> --lang typescript -o ./out  # TypeScript/Express
+glyph ir <file>             # Export service IR as JSON, catalog, or compact
+glyph ir <file> --format catalog -o catalog.json  # Aetheros-compatible catalog
 glyph lsp                   # Start LSP server
 glyph init                  # Initialize new project
 glyph commands <file>       # List CLI commands in a file

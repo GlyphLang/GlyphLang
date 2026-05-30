@@ -5,65 +5,67 @@
 // It captures intent and semantics without language-specific implementation details.
 package ir
 
+import "encoding/json"
+
 // ServiceIR is the top-level IR node representing a complete service definition.
 // It contains all routes, types, providers, background tasks, and metadata
 // needed to generate or execute a service in any target language.
 type ServiceIR struct {
-	Name      string
-	Types     []TypeSchema
-	Providers []ProviderRef
-	Routes    []RouteHandler
-	Events    []EventBinding
-	CronJobs  []CronBinding
-	Queues    []QueueBinding
-	Commands  []CommandDef
-	Functions []FunctionDef
-	GRPC      []GRPCServiceDef
-	GraphQL   []GraphQLDef
-	WebSocket []WebSocketDef
-	Constants []ConstantDef
+	Name      string           `json:"name"`
+	Types     []TypeSchema     `json:"types,omitempty"`
+	Providers []ProviderRef    `json:"providers,omitempty"`
+	Routes    []RouteHandler   `json:"routes,omitempty"`
+	Events    []EventBinding   `json:"events,omitempty"`
+	CronJobs  []CronBinding    `json:"cron_jobs,omitempty"`
+	Queues    []QueueBinding   `json:"queues,omitempty"`
+	Commands  []CommandDef     `json:"commands,omitempty"`
+	Functions []FunctionDef    `json:"functions,omitempty"`
+	GRPC      []GRPCServiceDef `json:"grpc,omitempty"`
+	GraphQL   []GraphQLDef     `json:"graphql,omitempty"`
+	WebSocket []WebSocketDef   `json:"websocket,omitempty"`
+	Constants []ConstantDef    `json:"constants,omitempty"`
 }
 
 // TypeSchema describes a type definition in the IR.
 // It is target-neutral: no Go, Python, or Java-specific semantics.
 type TypeSchema struct {
-	Name       string
-	Fields     []FieldSchema
-	TypeParams []string
-	Traits     []string
-	Methods    []MethodSchema
+	Name       string         `json:"name"`
+	Fields     []FieldSchema  `json:"fields,omitempty"`
+	TypeParams []string       `json:"type_params,omitempty"`
+	Traits     []string       `json:"traits,omitempty"`
+	Methods    []MethodSchema `json:"methods,omitempty"`
 }
 
 // FieldSchema describes a single field within a TypeSchema.
 type FieldSchema struct {
-	Name        string
-	Type        TypeRef
-	Required    bool
-	HasDefault  bool
-	Default     ExprIR
-	Annotations []Annotation
+	Name        string       `json:"name"`
+	Type        TypeRef      `json:"type"`
+	Required    bool         `json:"required"`
+	HasDefault  bool         `json:"has_default"`
+	Default     ExprIR       `json:"-"`
+	Annotations []Annotation `json:"annotations,omitempty"`
 }
 
 // MethodSchema describes a method on a type.
 type MethodSchema struct {
-	Name       string
-	Params     []FieldSchema
-	ReturnType TypeRef
-	Body       []StmtIR
+	Name       string        `json:"name"`
+	Params     []FieldSchema `json:"params,omitempty"`
+	ReturnType TypeRef       `json:"return_type"`
+	Body       []StmtIR      `json:"-"`
 }
 
 // Annotation represents a declarative annotation on a field (e.g., @email, @minLen(2)).
 type Annotation struct {
-	Name   string
-	Params []interface{}
+	Name   string        `json:"name"`
+	Params []interface{} `json:"params,omitempty"`
 }
 
 // TypeRef is a target-neutral type reference.
 type TypeRef struct {
-	Kind     TypeKind
-	Name     string    // For Named, Provider kinds
-	Inner    *TypeRef  // For Array, Optional, Future kinds
-	Elements []TypeRef // For Union, Generic type args
+	Kind     TypeKind  `json:"kind"`
+	Name     string    `json:"name,omitempty"`     // For Named, Provider kinds
+	Inner    *TypeRef  `json:"inner,omitempty"`    // For Array, Optional, Future kinds
+	Elements []TypeRef `json:"elements,omitempty"` // For Union, Generic type args
 }
 
 // TypeKind classifies the shape of a type reference.
@@ -85,35 +87,74 @@ const (
 	TypeAny
 )
 
+// String returns the TypeKind as a human-readable string.
+func (k TypeKind) String() string {
+	switch k {
+	case TypeInt:
+		return "int"
+	case TypeFloat:
+		return "float"
+	case TypeString:
+		return "string"
+	case TypeBool:
+		return "bool"
+	case TypeArray:
+		return "array"
+	case TypeOptional:
+		return "optional"
+	case TypeNamed:
+		return "named"
+	case TypeProvider:
+		return "provider"
+	case TypeUnion:
+		return "union"
+	case TypeGeneric:
+		return "generic"
+	case TypeFunction:
+		return "function"
+	case TypeFuture:
+		return "future"
+	case TypeAny:
+		return "any"
+	default:
+		return "unknown"
+	}
+}
+
+// MarshalJSON serializes TypeKind as a human-readable string.
+func (k TypeKind) MarshalJSON() ([]byte, error) {
+	return json.Marshal(k.String())
+}
+
 // ProviderRef describes a provider dependency required by the service.
 // This is the generalized form of Database, Redis, MongoDB, LLM, etc.
 type ProviderRef struct {
-	Name         string      // Instance name as used in code (e.g., "db")
-	ProviderType string      // Provider type name (e.g., "Database", "Redis", "ImageProcessor")
-	IsStandard   bool        // True for built-in providers (Database, Redis, MongoDB, LLM)
-	Methods      []MethodSig // Known methods on this provider (from contract)
+	Name         string      `json:"name"`              // Instance name as used in code (e.g., "db")
+	ProviderType string      `json:"provider_type"`     // Provider type name (e.g., "Database", "Redis", "ImageProcessor")
+	IsStandard   bool        `json:"is_standard"`       // True for built-in providers (Database, Redis, MongoDB, LLM)
+	Methods      []MethodSig `json:"methods,omitempty"` // Known methods on this provider (from contract)
 }
 
 // MethodSig describes a method signature on a provider contract.
 type MethodSig struct {
-	Name       string
-	Params     []FieldSchema
-	ReturnType TypeRef
+	Name       string        `json:"name"`
+	Params     []FieldSchema `json:"params,omitempty"`
+	ReturnType TypeRef       `json:"return_type"`
 }
 
 // RouteHandler describes an HTTP route in the IR.
 type RouteHandler struct {
-	Method      HTTPMethod
-	Path        string
-	PathParams  []string
-	QueryParams []QueryParam
-	InputType   *TypeRef
-	ReturnType  *TypeRef
-	Auth        *AuthRequirement
-	RateLimit   *RateLimitConfig
-	Middleware  []MiddlewareRef
-	Providers   []InjectionRef
-	Body        []StmtIR
+	Method      HTTPMethod       `json:"method"`
+	Path        string           `json:"path"`
+	PathParams  []string         `json:"path_params,omitempty"`
+	QueryParams []QueryParam     `json:"query_params,omitempty"`
+	InputType   *TypeRef         `json:"input_type,omitempty"`
+	ReturnType  *TypeRef         `json:"return_type,omitempty"`
+	Auth        *AuthRequirement `json:"auth,omitempty"`
+	RateLimit   *RateLimitConfig `json:"rate_limit,omitempty"`
+	Middleware  []MiddlewareRef  `json:"middleware,omitempty"`
+	Providers   []InjectionRef   `json:"providers,omitempty"`
+	Body        []StmtIR         `json:"-"`
 }
 
 // HTTPMethod represents an HTTP method.
@@ -151,108 +192,113 @@ func (m HTTPMethod) String() string {
 	}
 }
 
+// MarshalJSON serializes HTTPMethod as a string.
+func (m HTTPMethod) MarshalJSON() ([]byte, error) {
+	return json.Marshal(m.String())
+}
+
 // QueryParam describes a declared query parameter.
 type QueryParam struct {
-	Name     string
-	Type     TypeRef
-	Required bool
-	Default  ExprIR
-	IsArray  bool
+	Name     string  `json:"name"`
+	Type     TypeRef `json:"type"`
+	Required bool    `json:"required"`
+	Default  ExprIR  `json:"-"`
+	IsArray  bool    `json:"is_array,omitempty"`
 }
 
 // AuthRequirement describes the authentication needed for a route.
 type AuthRequirement struct {
-	AuthType string // e.g., "jwt", "apikey", "basic"
-	Required bool
-	Roles    []string
+	AuthType string   `json:"auth_type"` // e.g., "jwt", "apikey", "basic"
+	Required bool     `json:"required"`
+	Roles    []string `json:"roles,omitempty"`
 }
 
 // RateLimitConfig describes rate limiting for a route.
 type RateLimitConfig struct {
-	Requests uint32
-	Window   string
+	Requests uint32 `json:"requests"`
+	Window   string `json:"window"`
 }
 
 // MiddlewareRef is a reference to a named middleware with optional arguments.
 type MiddlewareRef struct {
-	Name string
-	Args []ExprIR
+	Name string   `json:"name"`
+	Args []ExprIR `json:"-"`
 }
 
 // InjectionRef describes a provider injection into a handler.
 type InjectionRef struct {
-	Name         string // Local variable name (e.g., "db")
-	ProviderType string // Provider type name (e.g., "Database")
+	Name         string `json:"name"`          // Local variable name (e.g., "db")
+	ProviderType string `json:"provider_type"` // Provider type name (e.g., "Database")
 }
 
 // EventBinding describes an event handler.
 type EventBinding struct {
-	EventType string
-	Async     bool
-	Providers []InjectionRef
-	Body      []StmtIR
+	EventType string         `json:"event_type"`
+	Async     bool           `json:"async"`
+	Providers []InjectionRef `json:"providers,omitempty"`
+	Body      []StmtIR       `json:"-"`
 }
 
 // CronBinding describes a scheduled task.
 type CronBinding struct {
-	Name      string
-	Schedule  string
-	Timezone  string
-	Retries   int
-	Providers []InjectionRef
-	Body      []StmtIR
+	Name      string         `json:"name"`
+	Schedule  string         `json:"schedule"`
+	Timezone  string         `json:"timezone,omitempty"`
+	Retries   int            `json:"retries,omitempty"`
+	Providers []InjectionRef `json:"providers,omitempty"`
+	Body      []StmtIR       `json:"-"`
 }
 
 // QueueBinding describes a queue worker.
 type QueueBinding struct {
-	QueueName   string
-	Concurrency int
-	MaxRetries  int
-	Timeout     int
-	Providers   []InjectionRef
-	Body        []StmtIR
+	QueueName   string         `json:"queue_name"`
+	Concurrency int            `json:"concurrency,omitempty"`
+	MaxRetries  int            `json:"max_retries,omitempty"`
+	Timeout     int            `json:"timeout,omitempty"`
+	Providers   []InjectionRef `json:"providers,omitempty"`
+	Body        []StmtIR       `json:"-"`
 }
 
 // CommandDef describes a CLI command.
 type CommandDef struct {
-	Name        string
-	Description string
-	Params      []CommandParam
-	ReturnType  *TypeRef
-	Body        []StmtIR
+	Name        string         `json:"name"`
+	Description string         `json:"description,omitempty"`
+	Params      []CommandParam `json:"params,omitempty"`
+	ReturnType  *TypeRef       `json:"return_type,omitempty"`
+	Body        []StmtIR       `json:"-"`
 }
 
 // CommandParam describes a CLI command parameter.
 type CommandParam struct {
-	Name     string
-	Type     TypeRef
-	Required bool
-	Default  ExprIR
-	IsFlag   bool
+	Name     string  `json:"name"`
+	Type     TypeRef `json:"type"`
+	Required bool    `json:"required"`
+	Default  ExprIR  `json:"-"`
+	IsFlag   bool    `json:"is_flag,omitempty"`
 }
 
 // FunctionDef describes a standalone function.
 type FunctionDef struct {
-	Name       string
-	TypeParams []string
-	Params     []FieldSchema
-	ReturnType *TypeRef
-	Body       []StmtIR
+	Name       string        `json:"name"`
+	TypeParams []string      `json:"type_params,omitempty"`
+	Params     []FieldSchema `json:"params,omitempty"`
+	ReturnType *TypeRef      `json:"return_type,omitempty"`
+	Body       []StmtIR      `json:"-"`
 }
 
 // GRPCServiceDef describes a gRPC service definition.
 type GRPCServiceDef struct {
-	Name     string
-	Methods  []GRPCMethodDef
-	Handlers []GRPCHandlerDef
+	Name     string           `json:"name"`
+	Methods  []GRPCMethodDef  `json:"methods,omitempty"`
+	Handlers []GRPCHandlerDef `json:"handlers,omitempty"`
 }
 
 // GRPCMethodDef describes a gRPC method signature.
 type GRPCMethodDef struct {
-	Name       string
-	InputType  TypeRef
-	ReturnType TypeRef
-	StreamType GRPCStreamType
+	Name       string         `json:"name"`
+	InputType  TypeRef        `json:"input_type"`
+	ReturnType TypeRef        `json:"return_type"`
+	StreamType GRPCStreamType `json:"stream_type"`
 }
 
 // GRPCStreamType indicates gRPC streaming mode.
@@ -265,27 +311,48 @@ const (
 	GRPCBidirectional
 )
 
+// String returns the GRPCStreamType as a string.
+func (s GRPCStreamType) String() string {
+	switch s {
+	case GRPCUnary:
+		return "unary"
+	case GRPCServerStream:
+		return "server_stream"
+	case GRPCClientStream:
+		return "client_stream"
+	case GRPCBidirectional:
+		return "bidirectional"
+	default:
+		return "unary"
+	}
+}
+
+// MarshalJSON serializes GRPCStreamType as a string.
+func (s GRPCStreamType) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
+}
+
 // GRPCHandlerDef describes a gRPC handler implementation.
 type GRPCHandlerDef struct {
-	ServiceName string
-	MethodName  string
-	Params      []FieldSchema
-	ReturnType  *TypeRef
-	StreamType  GRPCStreamType
-	Auth        *AuthRequirement
-	Providers   []InjectionRef
-	Body        []StmtIR
+	ServiceName string           `json:"service_name"`
+	MethodName  string           `json:"method_name"`
+	Params      []FieldSchema    `json:"params,omitempty"`
+	ReturnType  *TypeRef         `json:"return_type,omitempty"`
+	StreamType  GRPCStreamType   `json:"stream_type"`
+	Auth        *AuthRequirement `json:"auth,omitempty"`
+	Providers   []InjectionRef   `json:"providers,omitempty"`
+	Body        []StmtIR         `json:"-"`
 }
 
 // GraphQLDef describes a GraphQL resolver.
 type GraphQLDef struct {
-	Operation  GraphQLOp
-	FieldName  string
-	Params     []FieldSchema
-	ReturnType *TypeRef
-	Auth       *AuthRequirement
-	Providers  []InjectionRef
-	Body       []StmtIR
+	Operation  GraphQLOp        `json:"operation"`
+	FieldName  string           `json:"field_name"`
+	Params     []FieldSchema    `json:"params,omitempty"`
+	ReturnType *TypeRef         `json:"return_type,omitempty"`
+	Auth       *AuthRequirement `json:"auth,omitempty"`
+	Providers  []InjectionRef   `json:"providers,omitempty"`
+	Body       []StmtIR         `json:"-"`
 }
 
 // GraphQLOp is the GraphQL operation type.
@@ -297,16 +364,35 @@ const (
 	GraphQLSubscription
 )
 
+// String returns the GraphQLOp as a string.
+func (o GraphQLOp) String() string {
+	switch o {
+	case GraphQLQuery:
+		return "query"
+	case GraphQLMutation:
+		return "mutation"
+	case GraphQLSubscription:
+		return "subscription"
+	default:
+		return "query"
+	}
+}
+
+// MarshalJSON serializes GraphQLOp as a string.
+func (o GraphQLOp) MarshalJSON() ([]byte, error) {
+	return json.Marshal(o.String())
+}
+
 // WebSocketDef describes a WebSocket route.
 type WebSocketDef struct {
-	Path   string
-	Events []WSEventDef
+	Path   string       `json:"path"`
+	Events []WSEventDef `json:"events,omitempty"`
 }
 
 // WSEventDef describes a WebSocket event handler.
 type WSEventDef struct {
-	EventType WSEventType
-	Body      []StmtIR
+	EventType WSEventType `json:"event_type"`
+	Body      []StmtIR    `json:"-"`
 }
 
 // WSEventType identifies a WebSocket event.
@@ -319,11 +405,32 @@ const (
 	WSError
 )
 
+// String returns the WSEventType as a string.
+func (t WSEventType) String() string {
+	switch t {
+	case WSConnect:
+		return "connect"
+	case WSDisconnect:
+		return "disconnect"
+	case WSMessage:
+		return "message"
+	case WSError:
+		return "error"
+	default:
+		return "message"
+	}
+}
+
+// MarshalJSON serializes WSEventType as a string.
+func (t WSEventType) MarshalJSON() ([]byte, error) {
+	return json.Marshal(t.String())
+}
+
 // ConstantDef describes a module-level constant.
 type ConstantDef struct {
-	Name  string
-	Type  *TypeRef
-	Value ExprIR
+	Name  string   `json:"name"`
+	Type  *TypeRef `json:"type,omitempty"`
+	Value ExprIR   `json:"-"`
 }
 
 // StmtIR represents a statement in the IR.
