@@ -5,6 +5,13 @@ All notable changes to GlyphLang will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `glyph ir` command: export any GlyphLang service as machine-readable JSON (`--format json`), a flattened Aetheros-compatible `ServiceCatalog` (`--format catalog`), or a human-readable notation summary (`--format compact`)
+- `ServiceCatalog` type in `pkg/ir`: a flat list of named operations (id, kind, notation, params, returns, auth, providers) designed for ingestion by external agent and orchestration systems
+- JSON serialization for all IR types: `ServiceIR` and all nested structs now marshal to clean snake_case JSON; body and expression fields are excluded from output
+
 ## [0.3.5] - 2026-01-25
 
 ### Added
