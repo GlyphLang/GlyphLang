@@ -8,9 +8,12 @@ Thank you for your interest in contributing to GlyphLang! This document outlines
 - [Development Setup](#development-setup)
 - [Making Changes](#making-changes)
 - [Code Style](#code-style)
+- [GlyphLang-Specific Conventions](#glyphlang-specific-conventions)
 - [Testing](#testing)
+- [Test Writing Guidelines](#test-writing-guidelines)
 - [Commit Messages](#commit-messages)
 - [Pull Requests](#pull-requests)
+- [PR Review Checklist](#pr-review-checklist)
 - [Reporting Issues](#reporting-issues)
 - [Issue Labels](#issue-labels)
 - [Feature Requests](#feature-requests)
@@ -126,6 +129,33 @@ golangci-lint run
 - Test files should be named `*_test.go`
 - Keep related functionality together
 
+## GlyphLang-Specific Conventions
+
+### Package ownership
+
+Each package has a single, well-defined concern. Before adding code, confirm it belongs in the target package:
+
+- Changes to **syntax** (new keywords, symbols) → `pkg/parser/` (lexer + parser) and `pkg/ast/`
+- Changes to **runtime behavior** → `pkg/interpreter/` (evaluator, executor, or a new `builtins_*.go`)
+- Changes to **compiled output** → `pkg/compiler/compiler.go` and/or `pkg/vm/vm.go`
+- Changes to **code generation targets** → `pkg/ir/` and `pkg/codegen/`
+- Changes to **HTTP routing or middleware** → `pkg/server/`
+- Changes to **CLI commands** → `cmd/glyph/commands.go` and `cmd/glyph/handlers.go`
+
+Avoid placing logic in `cmd/glyph/` that belongs in a package — the CLI layer should be thin and delegate to `pkg/`.
+
+### Interpreter vs. compiler
+
+GlyphLang has two execution paths: the tree-walking interpreter (`pkg/interpreter/`) used by `glyph run` and `glyph dev`, and the bytecode compiler + VM (`pkg/compiler/` + `pkg/vm/`) used by `glyph compile`. New language features should be implemented in the interpreter first, then added to the compiler once the semantics are settled. A feature is not complete until both paths support it and both have test coverage.
+
+### Error messages
+
+Error messages are user-facing. Follow the existing style: lowercase, no trailing punctuation, include the specific value or token that caused the problem. The `pkg/validate/` package produces structured JSON output for AI tooling — if your change adds new error conditions, ensure they surface correctly through the validate command as well.
+
+### No new .md files without explicit direction
+
+Documentation files should be created only when explicitly requested. If a feature requires a new doc, check first.
+
 ## Testing
 
 - Write tests for new functionality
@@ -161,6 +191,74 @@ func TestFunctionName(t *testing.T) {
     }
 }
 ```
+
+## Test Writing Guidelines
+
+### Use testify, not reflect.DeepEqual
+
+GlyphLang tests use [testify](https://github.com/testify/testify). Prefer `assert` and `require` over manual comparisons:
+
+```go
+import (
+    "testing"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
+)
+
+func TestMyFeature(t *testing.T) {
+    result, err := MyFunction(input)
+    require.NoError(t, err)           // fatal: stops the test immediately on failure
+    assert.Equal(t, expected, result) // non-fatal: test continues to collect more failures
+}
+```
+
+Use `require` when a failure makes subsequent assertions meaningless (e.g., checking fields on a nil pointer). Use `assert` otherwise.
+
+### Table-driven tests
+
+Prefer table-driven tests for any function with multiple input/output cases:
+
+```go
+func TestLexer(t *testing.T) {
+    tests := []struct {
+        name     string
+        input    string
+        expected []TokenType
+        wantErr  bool
+    }{
+        {"empty input", "", []TokenType{EOF}, false},
+        {"single symbol", "@", []TokenType{AT, EOF}, false},
+        {"invalid char", "\x00", nil, true},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            tokens, err := Tokenize(tt.input)
+            if tt.wantErr {
+                require.Error(t, err)
+                return
+            }
+            require.NoError(t, err)
+            assert.Equal(t, tt.expected, tokenTypes(tokens))
+        })
+    }
+}
+```
+
+### Subtest naming
+
+Use `t.Run` for all table-driven subtests. Name subtests descriptively — they become part of the `-run` filter, so `"empty object literal"` is better than `"case 3"`.
+
+### Test file placement
+
+Place test files in the same package as the code under test (`package foo`, not `package foo_test`), unless you are specifically testing the public API surface. This gives tests access to unexported symbols, which is often necessary for compiler and VM tests.
+
+### What to test at each layer
+
+- **Parser tests** (`pkg/parser/parser_test.go`) — input source string → verify AST node types and values
+- **Interpreter tests** (`pkg/interpreter/interpreter_test.go`) — input source string → verify runtime output or error
+- **Compiler tests** (`pkg/compiler/compiler_test.go`) — input source string → verify bytecode contains expected opcodes, or verify end-to-end behavior
+- **VM tests** (`pkg/vm/vm_test.go`) — construct raw bytecode manually → verify stack state after execution
 
 ## Commit Messages
 
@@ -222,6 +320,36 @@ Use the pull request template and include:
 1. A maintainer will review your PR
 2. Address any feedback or requested changes
 3. Once approved, a maintainer will merge the PR
+
+## PR Review Checklist
+
+Reviewers use this checklist in addition to the submission checklist above. As an author, reviewing your own PR against these criteria before submitting will speed up the review cycle.
+
+### Correctness
+
+- [ ] Does the change do what the issue or PR description says it does?
+- [ ] Are error paths handled and tested?
+- [ ] Does the change work correctly at both the interpreter and compiler layers (if both are affected)?
+- [ ] Are edge cases covered (empty input, nil values, zero values, large inputs)?
+
+### Consistency
+
+- [ ] Does the code follow the package ownership conventions in [GlyphLang-Specific Conventions](#glyphlang-specific-conventions)?
+- [ ] Are error messages lowercase and consistent with adjacent error messages?
+- [ ] Does the change use `assert`/`require` from testify rather than manual `reflect.DeepEqual`?
+
+### Documentation and examples
+
+- [ ] If the change adds or modifies language syntax, is `docs/LANGUAGE_SPECIFICATION.md` updated?
+- [ ] If the change adds a user-facing feature, is there an example in `examples/` or an update to an existing one?
+- [ ] If the change adds a new CLI command or flag, is `docs/CLI.md` updated?
+- [ ] If the change modifies the bytecode format or adds an opcode, is `docs/BINARY_FORMAT.md` updated?
+
+### Tests
+
+- [ ] New behavior is covered by tests at the appropriate layer(s)
+- [ ] `go test ./...` passes
+- [ ] `go vet ./...` passes
 
 ## Reporting Issues
 
