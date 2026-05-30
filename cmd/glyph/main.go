@@ -389,6 +389,30 @@ Example:
 `)
 
 	// Add commands to root
+
+	// IR command - export Intermediate Representation for Aetheros catalog ingestion
+	var irCmd = &cobra.Command{
+		Use:   "ir <file>",
+		Short: "Export service IR as JSON for Aetheros catalog ingestion",
+		Long: `Export the GlyphLang Intermediate Representation (IR) as machine-readable JSON.
+
+Formats:
+  json:    Full ServiceIR with all types, routes, functions, providers (default)
+  catalog: Flattened Aetheros-compatible ServiceCatalog with named operations
+  compact: Human-readable operation summary using GlyphLang notation
+
+Examples:
+  glyph ir main.glyph
+  glyph ir main.glyph --format catalog
+  glyph ir main.glyph --format catalog -o catalog.json
+  glyph ir main.glyph --format compact`,
+		Args: cobra.ExactArgs(1),
+		RunE: runIR,
+	}
+	irCmd.Flags().StringP("format", "f", "json", "Output format: json, catalog, compact")
+	irCmd.Flags().StringP("output", "o", "", "Output file (default: stdout)")
+	irCmd.Flags().Bool("pretty", true, "Pretty-print JSON output")
+
 	rootCmd.AddCommand(compileCmd)
 	rootCmd.AddCommand(decompileCmd)
 	rootCmd.AddCommand(runCmd)
@@ -406,6 +430,7 @@ Example:
 	rootCmd.AddCommand(docsCmd)
 	rootCmd.AddCommand(clientCmd)
 	rootCmd.AddCommand(codegenCmd)
+	rootCmd.AddCommand(irCmd)
 	rootCmd.AddCommand(testCmd)
 	rootCmd.AddCommand(versionCmd)
 
