@@ -63,8 +63,8 @@ type Annotation struct {
 // TypeRef is a target-neutral type reference.
 type TypeRef struct {
 	Kind     TypeKind  `json:"kind"`
-	Name     string    `json:"name,omitempty"` // For Named, Provider kinds
-	Inner    *TypeRef  `json:"inner,omitempty"` // For Array, Optional, Future kinds
+	Name     string    `json:"name,omitempty"`     // For Named, Provider kinds
+	Inner    *TypeRef  `json:"inner,omitempty"`    // For Array, Optional, Future kinds
 	Elements []TypeRef `json:"elements,omitempty"` // For Union, Generic type args
 }
 
@@ -129,9 +129,9 @@ func (k TypeKind) MarshalJSON() ([]byte, error) {
 // ProviderRef describes a provider dependency required by the service.
 // This is the generalized form of Database, Redis, MongoDB, LLM, etc.
 type ProviderRef struct {
-	Name         string      `json:"name"`          // Instance name as used in code (e.g., "db")
-	ProviderType string      `json:"provider_type"` // Provider type name (e.g., "Database", "Redis", "ImageProcessor")
-	IsStandard   bool        `json:"is_standard"`   // True for built-in providers (Database, Redis, MongoDB, LLM)
+	Name         string      `json:"name"`              // Instance name as used in code (e.g., "db")
+	ProviderType string      `json:"provider_type"`     // Provider type name (e.g., "Database", "Redis", "ImageProcessor")
+	IsStandard   bool        `json:"is_standard"`       // True for built-in providers (Database, Redis, MongoDB, LLM)
 	Methods      []MethodSig `json:"methods,omitempty"` // Known methods on this provider (from contract)
 }
 

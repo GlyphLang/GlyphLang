@@ -360,8 +360,8 @@ func TestToCatalog_GraphQL(t *testing.T) {
 	svc := &ServiceIR{
 		GraphQL: []GraphQLDef{
 			{
-				Operation: GraphQLQuery,
-				FieldName: "posts",
+				Operation:  GraphQLQuery,
+				FieldName:  "posts",
 				ReturnType: &retType,
 			},
 		},
