@@ -94,6 +94,19 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 				quote := tok.Literal[len("unterminated_string:"):]
 				return nil, l.unterminatedStringError(tok.Line, tok.Column, quote[0])
 			}
+			// readString (and other sub-lexers) return a descriptive message,
+			// which is longer than the single offending byte of a plain invalid
+			// character. Surface that message at the token's position instead of
+			// masking it as a generic "unexpected character" pointing at the
+			// wrong column (e.g. "\U" in a Windows path -> "unknown escape").
+			if len(tok.Literal) > 1 {
+				return nil, &LexError{
+					Message: tok.Literal,
+					Line:    tok.Line,
+					Column:  tok.Column,
+					Source:  l.input,
+				}
+			}
 			return nil, l.invalidCharacterError()
 		}
 
