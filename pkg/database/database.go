@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -49,6 +50,24 @@ type Config struct {
 
 // ParseConnectionString parses a database connection string
 func ParseConnectionString(connStr string) (*Config, error) {
+	// SQLite connection strings are file paths, not URLs. Handle them before
+	// url.Parse: an absolute Windows path like sqlite://C:\db.sqlite makes
+	// url.Parse read the "C:" drive letter as host:port and fail. Everything
+	// after the scheme is the literal path (or ":memory:").
+	for _, prefix := range []string{"sqlite://", "sqlite3://"} {
+		if strings.HasPrefix(connStr, prefix) {
+			return &Config{
+				Driver:          strings.TrimSuffix(prefix, "://"),
+				Database:        strings.TrimPrefix(connStr, prefix),
+				SSLMode:         "prefer",
+				MaxOpenConns:    25,
+				MaxIdleConns:    5,
+				ConnMaxLifetime: 5 * time.Minute,
+				ConnMaxIdleTime: 5 * time.Minute,
+			}, nil
+		}
+	}
+
 	u, err := url.Parse(connStr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid connection string: %w", err)
@@ -69,19 +88,8 @@ func ParseConnectionString(connStr string) (*Config, error) {
 		ConnMaxIdleTime: 5 * time.Minute,
 	}
 
-	// Handle SQLite file-based paths
-	switch config.Driver {
-	case "sqlite", "sqlite3":
-		// SQLite uses file paths: sqlite:///path/to/db.sqlite or sqlite://:memory:
-		config.Database = u.Path
-		if config.Database == "" {
-			config.Database = u.Host // Handle sqlite://:memory:
-		}
-		return config, nil
-	default:
-		if len(u.Path) > 1 {
-			config.Database = u.Path[1:] // Remove leading slash
-		}
+	if len(u.Path) > 1 {
+		config.Database = u.Path[1:] // Remove leading slash
 	}
 
 	// Parse port
