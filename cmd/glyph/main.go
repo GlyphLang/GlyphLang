@@ -413,6 +413,32 @@ Examples:
 	irCmd.Flags().StringP("output", "o", "", "Output file (default: stdout)")
 	irCmd.Flags().Bool("pretty", true, "Pretty-print JSON output")
 
+	// Fmt command - canonical zero-option formatter
+	var fmtCmd = &cobra.Command{
+		Use:   "fmt <file|dir>",
+		Short: "Format .glyph files with the canonical zero-option style",
+		Long: `Fmt rewrites .glyph files in place using the canonical GlyphLang style.
+It is zero-option by design: there is exactly one valid formatting.
+
+Content within a line is never reflowed, so a one-line change stays a
+one-line diff. Comments and strings are preserved byte-for-byte.
+
+Canonical rules:
+  1. Line endings normalized to LF
+  2. Trailing whitespace stripped
+  3. Indentation is 2 spaces per bracket depth
+  4. At most one consecutive blank line, none at file start
+  5. Exactly one trailing newline
+
+Examples:
+  glyph fmt main.glyph          # Format a single file in place
+  glyph fmt ./src               # Format all .glyph files in a directory
+  glyph fmt ./src --check       # Exit 1 if any file is not formatted (CI)`,
+		Args: cobra.ExactArgs(1),
+		RunE: runFmt,
+	}
+	fmtCmd.Flags().Bool("check", false, "Do not write; exit non-zero if files are not formatted")
+
 	rootCmd.AddCommand(compileCmd)
 	rootCmd.AddCommand(decompileCmd)
 	rootCmd.AddCommand(runCmd)
@@ -425,6 +451,7 @@ Examples:
 	rootCmd.AddCommand(validateCmd)
 	rootCmd.AddCommand(expandCmd)
 	rootCmd.AddCommand(compactCmd)
+	rootCmd.AddCommand(fmtCmd)
 	rootCmd.AddCommand(replCmd)
 	rootCmd.AddCommand(openapiCmd)
 	rootCmd.AddCommand(docsCmd)

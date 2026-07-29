@@ -265,7 +265,7 @@ func TestIrTypeToTypeScript(t *testing.T) {
 		{"float", ir.TypeRef{Kind: ir.TypeFloat}, "number"},
 		{"string", ir.TypeRef{Kind: ir.TypeString}, "string"},
 		{"bool", ir.TypeRef{Kind: ir.TypeBool}, "boolean"},
-		{"any", ir.TypeRef{Kind: ir.TypeAny}, "any"},
+		{"any", ir.TypeRef{Kind: ir.TypeAny}, "unknown"},
 		{"named", ir.TypeRef{Kind: ir.TypeNamed, Name: "User"}, "User"},
 		{"array", ir.TypeRef{Kind: ir.TypeArray, Inner: &ir.TypeRef{Kind: ir.TypeInt}}, "number[]"},
 		{"optional", ir.TypeRef{Kind: ir.TypeOptional, Inner: &ir.TypeRef{Kind: ir.TypeString}}, "string | null"},
@@ -274,9 +274,9 @@ func TestIrTypeToTypeScript(t *testing.T) {
 			{Kind: ir.TypeString},
 			{Kind: ir.TypeInt},
 		}}, "string | number"},
-		{"array_nil_inner", ir.TypeRef{Kind: ir.TypeArray}, "any[]"},
-		{"optional_nil_inner", ir.TypeRef{Kind: ir.TypeOptional}, "any | null"},
-		{"union_empty", ir.TypeRef{Kind: ir.TypeUnion}, "any"},
+		{"array_nil_inner", ir.TypeRef{Kind: ir.TypeArray}, "unknown[]"},
+		{"optional_nil_inner", ir.TypeRef{Kind: ir.TypeOptional}, "unknown | null"},
+		{"union_empty", ir.TypeRef{Kind: ir.TypeUnion}, "unknown"},
 	}
 
 	for _, tt := range tests {
@@ -284,6 +284,27 @@ func TestIrTypeToTypeScript(t *testing.T) {
 			result := irTypeToTypeScript(tt.input)
 			if result != tt.expected {
 				t.Errorf("irTypeToTypeScript(%v) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestTsTypeNameForInput(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    *ir.TypeRef
+		expected string
+	}{
+		{"nil", nil, "unknown"},
+		{"named", &ir.TypeRef{Kind: ir.TypeNamed, Name: "User"}, "User"},
+		{"array_of_named", &ir.TypeRef{Kind: ir.TypeArray, Inner: &ir.TypeRef{Kind: ir.TypeNamed, Name: "Item"}}, "Item[]"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tsTypeNameForInput(tt.input)
+			if result != tt.expected {
+				t.Errorf("tsTypeNameForInput(%v) = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
 	}
