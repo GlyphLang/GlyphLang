@@ -23,11 +23,8 @@ func TestStaticRouteParseThenServe(t *testing.T) {
 	testContent := []byte("hello from static file")
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "test.txt"), testContent, 0644))
 
-	// Parse a static route directive. Use forward slashes so the Windows
-	// temp path (C:\...) does not read as escape sequences inside the string
-	// literal; forward-slash paths work for file serving on all platforms.
-	rootDir := filepath.ToSlash(tmpDir)
-	source := `@ static /assets "` + rootDir + `"`
+	// Parse a static route directive
+	source := `@ static /assets "` + tmpDir + `"`
 	lexer := parser.NewLexer(source)
 	tokens, err := lexer.Tokenize()
 	require.NoError(t, err)
@@ -40,7 +37,7 @@ func TestStaticRouteParseThenServe(t *testing.T) {
 	sr, ok := module.Items[0].(*ast.StaticRoute)
 	require.True(t, ok)
 	assert.Equal(t, "/assets", sr.Path)
-	assert.Equal(t, rootDir, sr.RootDir)
+	assert.Equal(t, tmpDir, sr.RootDir)
 
 	// Wire it up the same way routes.go does
 	staticServer, err := web.NewStaticFileServer(sr.RootDir, web.WithPrefix(sr.Path))
