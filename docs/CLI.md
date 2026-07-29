@@ -176,6 +176,30 @@ INSTRUCTIONS:
 $ glyph decompile --disasm build/hello.glyphc
 ```
 
+### `glyph fmt <file|dir>`
+
+Format .glyph files with the canonical zero-option style. There is exactly one valid formatting, so there is nothing to configure.
+
+```bash
+glyph fmt main.glyph          # Format a single file in place
+glyph fmt ./src               # Format all .glyph files in a directory
+glyph fmt ./src --check       # Exit 1 if any file is not formatted (CI)
+
+# Options:
+#   --check   Do not write; exit non-zero if files are not formatted
+```
+
+**Canonical rules:**
+1. Line endings normalized to LF
+2. Trailing whitespace stripped
+3. Indentation is 2 spaces per bracket depth
+4. At most one consecutive blank line, none at file start
+5. Exactly one trailing newline
+
+Content within a line is never reflowed, so a one-line change stays a one-line diff. Comments and strings are preserved byte-for-byte. Already-canonical files are not rewritten, keeping modification times stable.
+
+**CI usage:** run `glyph fmt . --check` in your pipeline to reject unformatted code.
+
 ### `glyph exec <file> <command> [args...]`
 
 Execute a CLI command defined in a Glyph source file.
@@ -451,6 +475,7 @@ Available Commands:
   context     Generate AI-optimized project context
   decompile   Decompile bytecode to readable format
   dev         Start development server with hot reload
+  fmt         Format .glyph files with the canonical zero-option style
   init        Initialize new project
   run         Run Glyph source file or bytecode
   exec        Execute a CLI command from a Glyph file

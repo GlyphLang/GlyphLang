@@ -48,11 +48,11 @@ from "./utils" import { formatDisplayName, isAdult }
   }
 
   $ newUser = db.users.create({
-    email: input.email,
-    firstName: input.firstName,
-    lastName: input.lastName,
-    age: input.age,
-    role: "user"
+      email: input.email,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      age: input.age,
+      role: "user"
   })
 
   > newUser

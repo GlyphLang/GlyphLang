@@ -135,10 +135,10 @@
 
             # Generate JWT token
             $ token = jwt.sign({
-              user_id: saved.id,
-              username: saved.username,
-              role: saved.role
-            }, "7d")
+                user_id: saved.id,
+                username: saved.username,
+                role: saved.role
+              }, "7d")
 
             # Remove password from response
             $ userResponse = {
@@ -209,10 +209,10 @@
 
           # Generate JWT token
           $ token = jwt.sign({
-            user_id: user.id,
-            username: user.username,
-            role: user.role
-          }, "7d")
+              user_id: user.id,
+              username: user.username,
+              role: user.role
+            }, "7d")
 
           # Remove password from response
           $ userResponse = {
@@ -389,10 +389,10 @@
 
   # Generate new token
   $ newToken = jwt.sign({
-    user_id: userId,
-    username: username,
-    role: role
-  }, "7d")
+      user_id: userId,
+      username: username,
+      role: role
+    }, "7d")
 
   $ expiresAt = now() + (7 * 24 * 60 * 60)
 
