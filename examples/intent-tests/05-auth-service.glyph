@@ -50,20 +50,20 @@
     $ hashedPassword = crypto.hash(input.password)
 
     $ user = db.users.Create({
-      id: generateId(),
-      email: input.email,
-      name: input.name,
-      password_hash: hashedPassword,
-      role: "user",
-      created_at: now()
+        id: generateId(),
+        email: input.email,
+        name: input.name,
+        password_hash: hashedPassword,
+        role: "user",
+        created_at: now()
     })
 
     # jwt.sign maps to proper JWT library in target language
     $ token = jwt.sign({
-      user_id: user.id,
-      email: user.email,
-      role: user.role
-    }, "7d")
+        user_id: user.id,
+        email: user.email,
+        role: user.role
+      }, "7d")
 
     > {
       token: token,
@@ -94,10 +94,10 @@
       $ updated = db.users.Update(user.id, {last_login: now()})
 
       $ token = jwt.sign({
-        user_id: user.id,
-        email: user.email,
-        role: user.role
-      }, "7d")
+          user_id: user.id,
+          email: user.email,
+          role: user.role
+        }, "7d")
 
       > {
         token: token,
@@ -122,9 +122,9 @@
     $ first_session = sessions[0]
 
     $ token = jwt.sign({
-      user_id: auth.user.id,
-      role: auth.user.role
-    }, "7d")
+        user_id: auth.user.id,
+        role: auth.user.role
+      }, "7d")
 
     > {
       token: token,
