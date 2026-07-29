@@ -25,10 +25,10 @@
   < input: CreateRoomInput
   % db: Database
   $ room = db.rooms.Create({
-    id: generateId(),
-    name: input.name,
-    created_by: auth.user.id,
-    created_at: now()
+      id: generateId(),
+      name: input.name,
+      created_by: auth.user.id,
+      created_at: now()
   })
   > room
 }
