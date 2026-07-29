@@ -674,6 +674,9 @@ func TestMetrics_Reset(t *testing.T) {
 
 func TestMetrics_GetSnapshot(t *testing.T) {
 	m := NewMetrics()
+	// Guarantee measurable uptime; on coarse-resolution clocks (Windows)
+	// time.Since can otherwise return exactly 0 for a sub-tick interval.
+	time.Sleep(time.Millisecond)
 
 	// Populate various metrics
 	m.IncrementConnections()
@@ -793,6 +796,9 @@ func TestMetrics_GetSnapshot_ZeroUptime(t *testing.T) {
 
 func TestMetrics_TimeMetrics(t *testing.T) {
 	m := NewMetrics()
+	// Guarantee measurable uptime; on coarse-resolution clocks (Windows)
+	// time.Since can otherwise return exactly 0 for a sub-tick interval.
+	time.Sleep(time.Millisecond)
 
 	startTime := m.GetStartTime()
 	if startTime.IsZero() {
