@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 // Lexer tokenizes GLYPH source code
@@ -93,6 +94,21 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 			if strings.HasPrefix(tok.Literal, "unterminated_string:") {
 				quote := tok.Literal[len("unterminated_string:"):]
 				return nil, l.unterminatedStringError(tok.Line, tok.Column, quote[0])
+			}
+			// readString (and other sub-lexers) return a descriptive message,
+			// which is many runes long; a plain invalid character is always
+			// exactly one rune. Surface the message at the token's position
+			// instead of masking it as a generic "unexpected character"
+			// pointing at the wrong column (e.g. "\U" in a Windows path ->
+			// "unknown escape"). Count runes, not bytes: ch is a byte, so
+			// string(ch) for any byte >= 0x80 is 2 bytes but still one rune.
+			if utf8.RuneCountInString(tok.Literal) > 1 {
+				return nil, &LexError{
+					Message: tok.Literal,
+					Line:    tok.Line,
+					Column:  tok.Column,
+					Source:  l.input,
+				}
 			}
 			return nil, l.invalidCharacterError()
 		}

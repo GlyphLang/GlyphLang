@@ -74,6 +74,24 @@ func TestImprovedErrorMessages(t *testing.T) {
 			},
 		},
 		{
+			name: "non-ASCII character keeps the ASCII-only hint",
+			input: `@ GET /test
+  $ msg = "hello" — invalid dash`,
+			expectError: true,
+			errorCheck: func(err error) bool {
+				return strings.Contains(err.Error(), "Unexpected character") &&
+					strings.Contains(err.Error(), "ASCII characters only")
+			},
+		},
+		{
+			name:        "escape error surfaces its own message",
+			input:       `@ static /assets "C:\Users\test"`,
+			expectError: true,
+			errorCheck: func(err error) bool {
+				return strings.Contains(err.Error(), `unknown escape sequence: \U`)
+			},
+		},
+		{
 			name: "type error with hint",
 			input: `: User {
   name: 123!
