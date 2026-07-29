@@ -21,9 +21,9 @@
   # Log the incoming webhook
   $ event_id = generateId()
   db.webhook_logs.Create({
-    id: event_id,
-    event: input.event,
-    received_at: now()
+      id: event_id,
+      event: input.event,
+      received_at: now()
   })
 
   # Route by event type
@@ -49,10 +49,10 @@
 
   $ event_id = generateId()
   db.webhook_logs.Create({
-    id: event_id,
-    source: "github",
-    event: input.event,
-    received_at: now()
+      id: event_id,
+      source: "github",
+      event: input.event,
+      received_at: now()
   })
 
   > {processed: true, event_id: event_id}
