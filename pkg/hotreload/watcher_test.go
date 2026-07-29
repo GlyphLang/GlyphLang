@@ -171,12 +171,9 @@ func TestFileWatcher_NewFile(t *testing.T) {
 }
 
 func TestFileWatcher_DeleteFile(t *testing.T) {
-	// Create temp directory
-	tmpDir, err := os.MkdirTemp("", "hotreload-delete-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	// t.TempDir cleans up after the watcher's context is cancelled (deferred
+	// below), avoiding a cleanup race with the polling goroutine on Windows.
+	tmpDir := t.TempDir()
 
 	// Create initial file
 	testFile := filepath.Join(tmpDir, "delete.glyph")
@@ -200,10 +197,18 @@ func TestFileWatcher_DeleteFile(t *testing.T) {
 		t.Fatalf("Failed to start watcher: %v", err)
 	}
 
-	// Delete file
+	// Delete file. On Windows the watcher briefly holds the file open while
+	// hashing it during a poll, which blocks deletion; retry past that window.
 	time.Sleep(100 * time.Millisecond)
-	if err := os.Remove(testFile); err != nil {
-		t.Fatalf("Failed to delete test file: %v", err)
+	var rmErr error
+	for range 50 {
+		if rmErr = os.Remove(testFile); rmErr == nil {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if rmErr != nil {
+		t.Fatalf("Failed to delete test file: %v", rmErr)
 	}
 
 	// Wait for detection
