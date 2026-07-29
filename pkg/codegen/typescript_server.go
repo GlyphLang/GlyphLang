@@ -974,12 +974,12 @@ func irTypeToTypeScript(t ir.TypeRef) string {
 		if t.Inner != nil {
 			return irTypeToTypeScript(*t.Inner) + "[]"
 		}
-		return "any[]"
+		return "unknown[]"
 	case ir.TypeOptional:
 		if t.Inner != nil {
 			return irTypeToTypeScript(*t.Inner) + " | null"
 		}
-		return "any | null"
+		return "unknown | null"
 	case ir.TypeNamed:
 		return t.Name
 	case ir.TypeProvider:
@@ -992,11 +992,11 @@ func irTypeToTypeScript(t ir.TypeRef) string {
 			}
 			return strings.Join(parts, " | ")
 		}
-		return "any"
+		return "unknown"
 	case ir.TypeAny:
-		return "any"
+		return "unknown"
 	default:
-		return "any"
+		return "unknown"
 	}
 }
 
@@ -1018,12 +1018,12 @@ func tsProviderToGetterFunc(providerType string) string {
 
 func tsTypeNameForInput(t *ir.TypeRef) string {
 	if t == nil {
-		return "any"
+		return "unknown"
 	}
 	if t.Kind == ir.TypeNamed {
 		return t.Name
 	}
-	return "any"
+	return irTypeToTypeScript(*t)
 }
 
 func tsCamelCase(s string) string {

@@ -157,12 +157,12 @@ type ChatMessage {
     } else {
       # Create the user
       $ new_user = db.users.create({
-        username: username,
-        email: email,
-        role: "user",
-        age: input.age,
-        active: true,
-        created_at: now()
+          username: username,
+          email: email,
+          role: "user",
+          age: input.age,
+          active: true,
+          created_at: now()
       })
 
       > {success: true, message: "User created", data: new_user}
@@ -210,11 +210,11 @@ type ChatMessage {
     > {success: false, message: "User not found"}
   } else {
     $ updated = db.users.update(id, {
-      username: input.username,
-      email: input.email,
-      role: input.role,
-      age: input.age,
-      active: input.active
+        username: input.username,
+        email: input.email,
+        role: input.role,
+        age: input.age,
+        active: input.active
     })
 
     > {success: true, message: "User updated", data: updated}
@@ -720,11 +720,11 @@ type ChatMessage {
   switch operation {
     case "create" {
       $ new_record = db.users.create({
-        username: input.data.username,
-        email: input.data.email,
-        role: "user",
-        active: true,
-        created_at: now()
+          username: input.data.username,
+          email: input.data.email,
+          role: "user",
+          active: true,
+          created_at: now()
       })
       > {success: true, message: "Created", data: new_record}
     }
@@ -753,8 +753,8 @@ type ChatMessage {
 @ ws /chat {
   on connect {
     ws.send({
-      type: "system",
-      message: "Welcome to the chat!"
+        type: "system",
+        message: "Welcome to the chat!"
     })
   }
 
@@ -764,43 +764,43 @@ type ChatMessage {
     if data.type == "join_room" {
       ws.join(data.room)
       ws.send({
-        type: "system",
-        message: "You joined room: " + data.room
+          type: "system",
+          message: "You joined room: " + data.room
       })
       ws.broadcast_to_room(data.room, {
-        type: "system",
-        message: data.username + " joined the room"
+          type: "system",
+          message: data.username + " joined the room"
       })
     }
     else if data.type == "leave_room" {
       ws.broadcast_to_room(data.room, {
-        type: "system",
-        message: data.username + " left the room"
+          type: "system",
+          message: data.username + " left the room"
       })
       ws.leave(data.room)
     }
     else if data.type == "chat_message" {
       if data.room != "" {
         ws.broadcast_to_room(data.room, {
-          type: "chat",
-          username: data.username,
-          text: data.text,
-          room: data.room,
-          timestamp: now()
+            type: "chat",
+            username: data.username,
+            text: data.text,
+            room: data.room,
+            timestamp: now()
         })
       } else {
         ws.broadcast({
-          type: "chat",
-          username: data.username,
-          text: data.text,
-          timestamp: now()
+            type: "chat",
+            username: data.username,
+            text: data.text,
+            timestamp: now()
         })
       }
     }
     else if data.type == "ping" {
       ws.send({
-        type: "pong",
-        timestamp: now()
+          type: "pong",
+          timestamp: now()
       })
     }
   }
@@ -1069,18 +1069,18 @@ type ChatMessage {
     } else {
       # Create the order
       $ order = db.orders.create({
-        user_id: auth.user.id,
-        cart_id: cart_id,
-        items: cart.items,
-        subtotal: subtotal,
-        tax: tax,
-        shipping: shipping,
-        discount: discount,
-        total: total,
-        status: "pending",
-        payment_method: payment_method,
-        shipping_address: shipping_address,
-        created_at: now()
+          user_id: auth.user.id,
+          cart_id: cart_id,
+          items: cart.items,
+          subtotal: subtotal,
+          tax: tax,
+          shipping: shipping,
+          discount: discount,
+          total: total,
+          status: "pending",
+          payment_method: payment_method,
+          shipping_address: shipping_address,
+          created_at: now()
       })
 
       # Clear the cart

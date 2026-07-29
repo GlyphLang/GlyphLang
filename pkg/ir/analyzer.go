@@ -232,6 +232,11 @@ func (a *Analyzer) convertType(t ast.Type) TypeRef {
 		inner := a.convertType(v.InnerType)
 		return TypeRef{Kind: TypeOptional, Inner: &inner}
 	case ast.NamedType:
+		// The parser represents the builtin any type as a NamedType; map it
+		// to TypeAny so consumers never treat "any" as a user-defined type.
+		if v.Name == "any" {
+			return TypeRef{Kind: TypeAny}
+		}
 		return TypeRef{Kind: TypeNamed, Name: v.Name}
 	case ast.DatabaseType:
 		return TypeRef{Kind: TypeProvider, Name: "Database"}

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -198,6 +199,84 @@ func compactDirectory(dirPath, outputDir string) error {
 
 		return compactFile(path, outPath)
 	})
+}
+
+// runFmt handles the fmt command - canonicalizes .glyph file formatting in place
+func runFmt(cmd *cobra.Command, args []string) error {
+	filePath := args[0]
+	check, _ := cmd.Flags().GetBool("check")
+
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path: %w", err)
+	}
+
+	info, err := os.Stat(absPath)
+	if err != nil {
+		return fmt.Errorf("failed to access path: %w", err)
+	}
+
+	var unformatted []string
+	if info.IsDir() {
+		err = filepath.Walk(absPath, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() || filepath.Ext(path) != ".glyph" {
+				return nil
+			}
+			changed, err := fmtFile(path, check)
+			if err != nil {
+				return err
+			}
+			if changed {
+				unformatted = append(unformatted, path)
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+	} else {
+		changed, err := fmtFile(absPath, check)
+		if err != nil {
+			return err
+		}
+		if changed {
+			unformatted = append(unformatted, absPath)
+		}
+	}
+
+	if check && len(unformatted) > 0 {
+		return fmt.Errorf("files not formatted: %s", strings.Join(unformatted, ", "))
+	}
+	return nil
+}
+
+// fmtFile canonicalizes a single .glyph file. In check mode it only reports
+// whether the file would change; otherwise it rewrites the file in place.
+// Already-canonical files are never rewritten, so mtimes stay stable.
+func fmtFile(path string, check bool) (bool, error) {
+	source, err := os.ReadFile(path)
+	if err != nil {
+		return false, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	formatted := formatter.CanonicalizeSource(string(source))
+	if formatted == string(source) {
+		return false, nil
+	}
+
+	if check {
+		printWarning(fmt.Sprintf("%s is not formatted", path))
+		return true, nil
+	}
+
+	if err := os.WriteFile(path, []byte(formatted), 0600); err != nil {
+		return false, fmt.Errorf("failed to write file: %w", err)
+	}
+	printSuccess(fmt.Sprintf("Formatted %s", path))
+	return true, nil
 }
 
 // runOpenAPI handles the openapi command

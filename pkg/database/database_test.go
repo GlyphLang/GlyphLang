@@ -46,6 +46,33 @@ func TestParseConnectionString(t *testing.T) {
 			},
 		},
 		{
+			name:    "SQLite Windows absolute path",
+			connStr: `sqlite://C:\tmp\test.db`,
+			wantErr: false,
+			validate: func(t *testing.T, cfg *Config) {
+				assert.Equal(t, "sqlite", cfg.Driver)
+				assert.Equal(t, `C:\tmp\test.db`, cfg.Database)
+			},
+		},
+		{
+			name:    "SQLite in-memory",
+			connStr: "sqlite://:memory:",
+			wantErr: false,
+			validate: func(t *testing.T, cfg *Config) {
+				assert.Equal(t, "sqlite", cfg.Driver)
+				assert.Equal(t, ":memory:", cfg.Database)
+			},
+		},
+		{
+			name:    "SQLite unix path",
+			connStr: "sqlite:///path/to/db.sqlite",
+			wantErr: false,
+			validate: func(t *testing.T, cfg *Config) {
+				assert.Equal(t, "sqlite", cfg.Driver)
+				assert.Equal(t, "/path/to/db.sqlite", cfg.Database)
+			},
+		},
+		{
 			name:    "Invalid connection string",
 			connStr: "not-a-valid-url",
 			wantErr: true,

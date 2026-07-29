@@ -197,10 +197,10 @@
               $ itemTotal = product.price * item.quantity
               $ total = total + itemTotal
               $ validatedItems = validatedItems + [{
-                product_id: product.id,
-                name: product.name,
-                quantity: item.quantity,
-                price: product.price
+                  product_id: product.id,
+                  name: product.name,
+                  quantity: item.quantity,
+                  price: product.price
               }]
             }
           }
@@ -223,11 +223,11 @@
     } else {
       # Create the order
       $ newOrder = db.orders.create({
-        user_id: userId,
-        items: validatedItems,
-        total: total,
-        status: "pending",
-        created_at: now()
+          user_id: userId,
+          items: validatedItems,
+          total: total,
+          status: "pending",
+          created_at: now()
       })
 
       # Update inventory for each item
@@ -414,12 +414,12 @@
             } else {
               # Process payment (simulated)
               $ payment = db.payments.create({
-                order_id: order.id,
-                user_id: userId,
-                amount: order.total,
-                method: input.payment_method,
-                status: "completed",
-                processed_at: now()
+                  order_id: order.id,
+                  user_id: userId,
+                  amount: order.total,
+                  method: input.payment_method,
+                  status: "completed",
+                  processed_at: now()
               })
 
               # Update order status
@@ -473,8 +473,8 @@
       if update.id == null {
         $ failureCount = failureCount + 1
         $ failures = failures + [{
-          id: null,
-          error: "Product ID is required"
+            id: null,
+            error: "Product ID is required"
         }]
       } else {
         $ product = db.products.get(update.id)
@@ -482,8 +482,8 @@
         if product == null {
           $ failureCount = failureCount + 1
           $ failures = failures + [{
-            id: update.id,
-            error: "Product not found"
+              id: update.id,
+              error: "Product not found"
           }]
         } else {
           # Update product fields
@@ -631,12 +631,12 @@
           } else {
             # Create refund request
             $ refund = db.refunds.create({
-              order_id: order.id,
-              user_id: userId,
-              amount: order.total,
-              reason: input.reason,
-              status: "pending",
-              created_at: now()
+                order_id: order.id,
+                user_id: userId,
+                amount: order.total,
+                reason: input.reason,
+                status: "pending",
+                created_at: now()
             })
 
             # Update order status

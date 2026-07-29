@@ -14,6 +14,21 @@ updates:
       - "go"
     reviewers:
       - "GlyphLang"
+    groups:
+      # Group the OpenTelemetry module family into a single PR so coordinated
+      # releases (e.g. otel, sdk, trace, exporters) don't fragment into many PRs.
+      opentelemetry:
+        patterns:
+          - "go.opentelemetry.io/otel*"
+      # Batch remaining minor/patch Go module updates into one PR to reduce churn.
+      go-dependencies:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "go.opentelemetry.io/otel*"
+        update-types:
+          - "minor"
+          - "patch"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
