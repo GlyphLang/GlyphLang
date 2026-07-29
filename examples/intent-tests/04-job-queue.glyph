@@ -66,13 +66,13 @@
   % db: Database
   $ job_id = generateId()
   $ created = db.email_queue.Create({
-    id: job_id,
-    to: input.to,
-    subject: input.subject,
-    template: input.template,
-    data: input.data,
-    status: "pending",
-    created_at: now()
+      id: job_id,
+      to: input.to,
+      subject: input.subject,
+      template: input.template,
+      data: input.data,
+      status: "pending",
+      created_at: now()
   })
   > {job_id: job_id, status: "pending"}
 }
