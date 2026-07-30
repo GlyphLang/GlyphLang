@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // TestWebSocketPackage is a meta-test to verify all components
@@ -1461,10 +1463,9 @@ func TestHubOnConnectHandlerError(t *testing.T) {
 		if hub.GetConnectionCount() != 1 {
 			t.Error("Connection should be registered even if handler errors")
 		}
-		// Verify handler error was counted in metrics
-		if hub.metrics.GetHandlerErrors() < 1 {
-			t.Error("Handler error should be tracked in metrics")
-		}
+		// The hub increments the metric after the handler returns, so poll
+		assert.Eventually(t, func() bool { return hub.metrics.GetHandlerErrors() >= 1 },
+			2*time.Second, 10*time.Millisecond, "handler error should be tracked in metrics")
 	case <-time.After(2 * time.Second):
 		t.Fatal("OnConnect handler was not called")
 	}
@@ -1584,11 +1585,8 @@ func TestHubRunMessageHandlerError(t *testing.T) {
 
 	select {
 	case <-handlerCalled:
-		// Give the hub a moment to process the error
-		time.Sleep(50 * time.Millisecond)
-		if hub.metrics.GetHandlerErrors() < 1 {
-			t.Error("Message handler error should be tracked in metrics")
-		}
+		assert.Eventually(t, func() bool { return hub.metrics.GetHandlerErrors() >= 1 },
+			2*time.Second, 10*time.Millisecond, "message handler error should be tracked in metrics")
 	case <-time.After(2 * time.Second):
 		t.Fatal("Handler was not called")
 	}
@@ -1735,10 +1733,8 @@ func TestHubOnConnectRouteHandlerError(t *testing.T) {
 
 	select {
 	case <-handlerDone:
-		time.Sleep(50 * time.Millisecond)
-		if hub.metrics.GetHandlerErrors() < 1 {
-			t.Error("Route handler error should be tracked in metrics")
-		}
+		assert.Eventually(t, func() bool { return hub.metrics.GetHandlerErrors() >= 1 },
+			2*time.Second, 10*time.Millisecond, "route handler error should be tracked in metrics")
 	case <-time.After(2 * time.Second):
 		t.Fatal("Route OnConnect handler was not called")
 	}
@@ -1782,10 +1778,8 @@ func TestHubOnDisconnectRouteHandlerError(t *testing.T) {
 	hub.unregister <- conn
 	select {
 	case <-disconnectDone:
-		time.Sleep(50 * time.Millisecond)
-		if hub.metrics.GetHandlerErrors() < 1 {
-			t.Error("Route disconnect handler error should be tracked")
-		}
+		assert.Eventually(t, func() bool { return hub.metrics.GetHandlerErrors() >= 1 },
+			2*time.Second, 10*time.Millisecond, "route disconnect handler error should be tracked")
 	case <-time.After(2 * time.Second):
 		t.Fatal("Route OnDisconnect handler not called")
 	}
