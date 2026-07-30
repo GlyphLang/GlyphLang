@@ -73,6 +73,7 @@ Java:   @GetMapping("/users/{id}")...  (28 tokens)
 - **Minimal Ceremony** - Skip the boilerplate—routes and types are the program
 - **Context Command** - Generate project summaries optimized for LLM context windows
 - **Structured Validation** - JSON error output for AI agents to parse and fix
+- **MCP Server** - `glyph mcp` exposes validation and the syntax spec to any MCP-capable agent
 - **Consistent Patterns** - Every route and type definition follows the same structure
 
 ### Core Language
