@@ -70,10 +70,10 @@ This document contains performance benchmarks for the Glyph compiler and runtime
 
 | Operation | Time/op | Allocs/op | Memory/op |
 |-----------|---------|-----------|-----------|
-| Push/Pop | 2.95 ns | 0 | 0 B |
-| Simple Arithmetic | 9.03 ns | 0 | 0 B |
-| Complex Operation | 24.6 ns | 1 | 8 B |
-| Global Variable Access | 7.45 ns | 0 | 0 B |
+| Push/Pop | 3.08 ns | 0 | 0 B |
+| Simple Arithmetic | 8.80 ns | 0 | 0 B |
+| Complex Operation | 25.6 ns | 1 | 8 B |
+| Global Variable Access | 7.23 ns | 0 | 0 B |
 
 **Analysis**: Basic VM operations are extremely fast, with stack operations under 3ns and arithmetic under 10ns. This exceeds the 10us target by **~1000x**.
 
@@ -90,7 +90,18 @@ This document contains performance benchmarks for the Glyph compiler and runtime
 
 ### Route Execution
 
-**Note**: Full bytecode route execution benchmarks are pending VM bytecode interpreter completion. Current VM supports basic validation and will be extended to execute full bytecode programs.
+| Operation | Time/op | Allocs/op | Memory/op |
+|-----------|---------|-----------|-----------|
+| VM Route Execution (bytecode) | 110 ns | 2 | 104 B |
+
+## HTTP Layer Performance
+
+| Benchmark | Time/op | Notes |
+|-----------|---------|-------|
+| Route Matching (100 routes, worst case) | 3.09 us | `BenchmarkRouterMatch`, linear scan |
+| Handler + JSON (mock interpreter) | 1.16 us | Server plumbing only, no route execution |
+| Full Compiled Route Request | 3.91 us | `BenchmarkCompiledRouteHTTP`, real production path: dispatch, match, fresh VM, JSON |
+| Interpreter Full Pipeline (lex+parse+execute) | 1.81 us | Tree-walking interpreter, hello-world route |
 
 ## Compilation Speed Tests
 
@@ -108,38 +119,6 @@ Rate: ~37,000 routes/second compilation throughput
 - **Parser**: 30-100K tokens/s
 - **Full compilation**: > 100K routes/second
 
-## Binary Format Efficiency
-
-### Size Comparison
-
-| Example | Source Size | Binary Size | Compression |
-|---------|-------------|-------------|-------------|
-| Hello World | 47 bytes | TBD | TBD |
-| Medium API | 186 bytes | TBD | TBD |
-| Large API | 797 bytes | TBD | TBD |
-
-**Note**: Binary format uses compact type codes and efficient encoding. Exact sizes will be measured once bytecode generation is complete.
-
-## Interpreter vs Bytecode Comparison
-
-### Execution Speed
-
-| Scenario | Interpreter | Bytecode VM | Speedup |
-|----------|-------------|-------------|---------|
-| Simple route | TBD | TBD | TBD |
-| Route with DB | TBD | TBD | TBD |
-| Complex logic | TBD | TBD | TBD |
-
-**Expected**: Bytecode VM should provide 2-10x speedup over tree-walking interpreter for compute-intensive operations.
-
-### Memory Usage
-
-| Scenario | Interpreter | Bytecode VM | Savings |
-|----------|-------------|-------------|---------|
-| Simple route | TBD | TBD | TBD |
-| 10-route API | TBD | TBD | TBD |
-| 100-route API | TBD | TBD | TBD |
-
 ## Performance Conclusions
 
 ### Compilation Performance
@@ -150,7 +129,7 @@ Rate: ~37,000 routes/second compilation throughput
 
 ### VM Execution
 
-- **Sub-nanosecond Operations**: Basic operations complete in 3-10ns
+- **Nanosecond-scale Operations**: Basic operations complete in 3-10ns
 - **Zero-allocation Hot Path**: Core VM operations don't allocate
 - **Target Exceeded**: Performance exceeds 10us target by 1000x
 
@@ -163,11 +142,10 @@ Rate: ~37,000 routes/second compilation throughput
 
 ### Next Steps
 
-1. Complete bytecode instruction set implementation
-2. Add full route execution support to VM
-3. Benchmark interpreter vs bytecode comparison
-4. Measure real-world API performance
-5. Optimize serialization format for size
+1. Benchmark interpreter vs bytecode comparison
+2. Measure real-world API performance under load
+3. Optimize serialization format for size
+4. Reduce allocations in route matching (linear scan, 100 routes costs ~3 us)
 
 ## Benchmark Reproduction
 
@@ -214,5 +192,5 @@ go test ./tests -v -run=Benchmark
 
 ---
 
-*Last updated: 2025-01-20*
+*Last updated: 2026-07-30*
 *Benchmarks run on: AMD Ryzen 7 7800X3D, Windows, Go 1.24+*
