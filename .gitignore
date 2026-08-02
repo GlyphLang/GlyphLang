@@ -75,7 +75,7 @@ __pycache__/
 
 # Coverage
 *.coverprofile
-coverage/
+coverage
 .coverage
 
 # Docker
