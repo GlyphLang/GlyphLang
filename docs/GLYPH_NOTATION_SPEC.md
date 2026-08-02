@@ -25,9 +25,8 @@ Each glyph symbol maps to a semantic concept, not a language keyword.
 | `?` | `validate` | Validation assertion |
 | `~` | `handle` | Event handler binding |
 | `*` | `cron` | Scheduled task |
-| `!` | `command` | CLI command definition |
+| `!` | `command` | CLI command or function definition |
 | `&` | `queue` | Queue worker definition |
-| `=` | `func` | Function definition |
 
 ### 2.1 Context Rules
 
@@ -320,7 +319,7 @@ item        = type_def | route | function | cron | event | queue
 
 type_def    = ":" IDENT [ "<" type_params ">" ] [ "impl" traits ] "{" { field } "}" ;
 route       = "@" method path "{" { route_stmt } "}" ;
-function    = "=" IDENT "(" params ")" [ "->" type ] "{" { statement } "}" ;
+function    = "!" IDENT "(" params ")" [ ( ":" | "->" ) type ] "{" { statement } "}" ;
 cron        = "*" STRING [ IDENT ] "{" { statement } "}" ;
 event       = "~" STRING "{" { statement } "}" ;
 queue       = "&" STRING "{" { statement } "}" ;
