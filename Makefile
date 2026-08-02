@@ -139,3 +139,10 @@ run:
 dev:
 	@echo "Running Glyph in dev mode..."
 	go run ./cmd/glyph dev examples/rest-api/main.glyph --port 8080
+
+# Regenerate llms.txt (AI agent primer served at glyphlang.dev/llms.txt)
+llms.txt:
+	head -n 35 llms.txt > llms_header.tmp
+	cat llms_header.tmp docs/GLYPH_NOTATION_SPEC.md > llms.txt
+	rm llms_header.tmp
+.PHONY: llms.txt
