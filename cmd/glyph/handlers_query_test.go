@@ -17,7 +17,7 @@ import (
 // compileFirstRoute parses GLYPH source and returns the first route and its
 // compiled bytecode. Used by tests that need to exercise the compiled route
 // handler directly.
-func compileFirstRoute(t *testing.T, source string) (*ast.Route, []byte) {
+func compileFirstRoute(t testing.TB, source string) (*ast.Route, []byte) {
 	t.Helper()
 	module, err := parseSource(source)
 	require.NoError(t, err, "parse source")
