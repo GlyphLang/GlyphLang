@@ -142,9 +142,9 @@ Standard database provider methods follow CRUD semantics:
 @ METHOD /path/:param {
   + middleware(args)
   + ratelimit(N/window)
-  < InputType
+  < input: InputType
   % provider: ProviderType
-  ? condition :: statusCode "message"
+  ? validate_fn(args)
   $ variable = expression
   > returnValue :: statusCode
 }
@@ -172,6 +172,25 @@ Prefixed with `:` — e.g., `/users/:id/posts/:postId`
 + ratelimit(100/min)
 + ratelimit(1000/hour)
 ```
+
+### 5.5 Error Responses
+
+There is no one-line conditional guard. Handle error cases with `if` and an
+early return:
+
+```glyph
+@ GET /users/:id {
+  % db: Database
+  $ user = db.users.Get(id)
+  if user == null {
+    > {error: "user not found"}
+  }
+  > user :: 200
+}
+```
+
+A `:: statusCode` suffix is supported on returns at the top level of a route
+body; returns inside conditional blocks use the default status.
 
 ## 6. Background Tasks
 
@@ -311,8 +330,8 @@ provider    = "provider" IDENT "{" { method_sig } "}" ;
 route_stmt  = middleware | injection | input_decl | validate | statement ;
 middleware  = "+" IDENT "(" args ")" ;
 injection   = "%" IDENT ":" type ;
-input_decl  = "<" type ;
-validate    = "?" expr "::" INTEGER [ STRING ] ;
+input_decl  = "<" IDENT ":" type ;
+validate    = "?" IDENT "(" [ args ] ")" ;
 statement   = assign | reassign | return | if | for | while | switch | expr_stmt ;
 assign      = "$" IDENT "=" expr ;
 return      = ">" expr [ "::" INTEGER ] ;
