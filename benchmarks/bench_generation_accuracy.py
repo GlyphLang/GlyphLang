@@ -18,13 +18,26 @@ Refusals and API errors are recorded as their own outcomes, not failures.
 No model fallback is configured on purpose: the eval must measure the named
 model, not a silent substitute.
 
+Backends:
+  - api:        Anthropic Messages API via the anthropic SDK. Requires
+                ANTHROPIC_API_KEY (or an `ant auth login` profile). The clean
+                raw-model measurement.
+  - claude-cli: Claude Code headless mode (`claude -p`). Runs on the local
+                Claude Code login (subscription auth, no API key).
+                --system-prompt replaces the default harness prompt, tools
+                are disabled, --safe-mode drops hooks/plugins/CLAUDE.md, and
+                each trial runs in an empty temp directory - so the model
+                sees only the spec, close to a raw-model call, though served
+                through Claude Code's request path rather than the bare API.
+
 Requirements:
-    pip install anthropic
-    ANTHROPIC_API_KEY set (or an `ant auth login` profile)
     Go toolchain (to build the glyph binary if not on PATH)
+    api backend:        pip install anthropic, ANTHROPIC_API_KEY set
+    claude-cli backend: claude CLI on PATH and logged in
 
 Usage:
-    python benchmarks/bench_generation_accuracy.py [--model claude-opus-5] [--trials 1]
+    python benchmarks/bench_generation_accuracy.py [--backend api|claude-cli]
+        [--model claude-opus-5] [--trials 1]
 """
 
 import argparse
@@ -36,11 +49,6 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-
-try:
-    from anthropic import Anthropic
-except ImportError:
-    sys.exit("The anthropic SDK is required. Install with: pip install anthropic")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SPEC_PATH = REPO_ROOT / "docs" / "GLYPH_NOTATION_SPEC.md"
@@ -121,7 +129,7 @@ def validate_python(code: str) -> tuple[bool, str]:
         return False, str(e)
 
 
-def run_trial(client: Anthropic, model: str, system: str, prompt: str) -> tuple[str, str]:
+def run_trial_api(client, model: str, system: str, prompt: str) -> tuple[str, str]:
     """Returns (status, payload): status is 'ok', 'refusal', or 'error'."""
     try:
         resp = client.messages.create(
@@ -138,15 +146,65 @@ def run_trial(client: Anthropic, model: str, system: str, prompt: str) -> tuple[
     return "ok", extract_code(text)
 
 
+def run_trial_cli(claude_bin: str, workdir: str, model: str, system: str,
+                  prompt: str) -> tuple[str, str]:
+    """Same contract as run_trial_api, via `claude -p` on subscription auth.
+
+    Tools disabled and --safe-mode so local hooks/plugins/CLAUDE.md cannot
+    contaminate the measurement; cwd is an empty temp dir so the glyph
+    condition sees only the spec.
+    """
+    cmd = [claude_bin, "-p", prompt,
+           "--output-format", "json",
+           "--model", model,
+           "--system-prompt", system,
+           "--tools", "",
+           "--safe-mode",
+           # plan mode can leak in from user settings and turn output into a
+           # plan document instead of code; tools are disabled so any
+           # non-plan permission mode is equivalent
+           "--permission-mode", "dontAsk",
+           "--no-session-persistence"]
+    try:
+        result = subprocess.run(cmd, cwd=workdir, capture_output=True,
+                                text=True, encoding="utf-8", timeout=300)
+    except subprocess.TimeoutExpired:
+        return "error", "claude -p timed out after 300s"
+    if result.returncode != 0:
+        return "error", (result.stderr or result.stdout).strip()[:200]
+    try:
+        envelope = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return "error", f"unparseable claude output: {result.stdout[:200]}"
+    if envelope.get("is_error"):
+        return "error", str(envelope.get("result", ""))[:200]
+    return "ok", extract_code(str(envelope.get("result", "")))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--backend", choices=("api", "claude-cli"), default="api")
     parser.add_argument("--model", default="claude-opus-5")
     parser.add_argument("--trials", type=int, default=1)
     parser.add_argument("--tasks", nargs="*", help="Subset of task names to run")
     args = parser.parse_args()
 
     glyph_bin = find_glyph_binary()
-    client = Anthropic()
+    if args.backend == "api":
+        try:
+            from anthropic import Anthropic
+        except ImportError:
+            sys.exit("The anthropic SDK is required for --backend api. "
+                     "Install with: pip install anthropic")
+        client = Anthropic()
+        run_trial = lambda system, prompt: run_trial_api(client, args.model, system, prompt)
+    else:
+        claude_bin = shutil.which("claude")
+        if not claude_bin:
+            sys.exit("--backend claude-cli requires the claude CLI on PATH")
+        workdir = tempfile.mkdtemp(prefix="glyph_eval_cwd_")
+        run_trial = lambda system, prompt: run_trial_cli(claude_bin, workdir, args.model,
+                                                         system, prompt)
     glyph_system = build_glyph_system()
 
     tasks = [t for t in TASKS if not args.tasks or t[0] in args.tasks]
@@ -158,7 +216,7 @@ def main() -> None:
             ("fastapi", FASTAPI_SYSTEM, f"Write {desc} using FastAPI."),
         ):
             for trial in range(args.trials):
-                status, payload = run_trial(client, args.model, system, phrasing)
+                status, payload = run_trial(system, phrasing)
                 if status == "ok":
                     if condition == "glyph":
                         passed, detail = validate_glyph(payload, glyph_bin)
@@ -187,6 +245,7 @@ def main() -> None:
     print()
     print(json.dumps({
         "model": args.model,
+        "backend": args.backend,
         "note": "glyph checked with `glyph validate` (syntax+semantics); "
                 "fastapi checked with ast.parse (syntax only, lenient bar)",
         "summary": summary,
