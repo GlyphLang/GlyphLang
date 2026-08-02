@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -507,28 +508,19 @@ func TestRouteRegistration(t *testing.T) {
 	assert.Len(t, allRoutes[DELETE], 1)
 }
 
-// BenchmarkRouterMatch benchmarks route matching performance
+// BenchmarkRouterMatch benchmarks route matching with 100 registered routes,
+// matching against the last-registered route (worst case for linear scan)
 func BenchmarkRouterMatch(b *testing.B) {
 	router := NewRouter()
 
-	routes := []*Route{
-		{Method: GET, Path: "/api/users"},
-		{Method: GET, Path: "/api/users/:id"},
-		{Method: GET, Path: "/api/users/:id/posts"},
-		{Method: GET, Path: "/api/users/:id/posts/:postId"},
-		{Method: POST, Path: "/api/users"},
-		{Method: PUT, Path: "/api/users/:id"},
-		{Method: DELETE, Path: "/api/users/:id"},
-	}
-
-	for _, route := range routes {
-		router.RegisterRoute(route)
+	for i := 0; i < 100; i++ {
+		router.RegisterRoute(&Route{Method: GET, Path: fmt.Sprintf("/api/resource%d/:id/posts/:postId", i)})
 	}
 
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		router.Match(GET, "/api/users/123/posts/456")
+		router.Match(GET, "/api/resource99/123/posts/456")
 	}
 }
 

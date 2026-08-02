@@ -380,6 +380,25 @@ $ glyph validate main.glyph --ai
 }
 ```
 
+### `glyph mcp`
+
+Start a Model Context Protocol server over stdio, exposing GlyphLang tools to AI agents.
+
+```bash
+glyph mcp
+```
+
+**Tools exposed:**
+- `validate_glyph` - Validate GlyphLang source (inline or by path); returns the same structured errors as `glyph validate --ai`
+- `syntax_reference` - Return the full GlyphLang notation specification
+
+**Register with Claude Code:**
+```bash
+claude mcp add glyphlang -- glyph mcp
+```
+
+Any MCP-capable agent can then generate GlyphLang code, validate it, and fix errors in a loop without leaving the conversation.
+
 ### `glyph ir <file>`
 
 Export a GlyphLang service as a machine-readable Intermediate Representation.

@@ -2,7 +2,7 @@
 
 [![AI Token Savings](https://img.shields.io/badge/AI%20tokens-23%25%20fewer%20than%20FastAPI-blueviolet)](#ai-token-efficiency)
 [![CI](https://img.shields.io/github/actions/workflow/status/GlyphLang/GlyphLang/ci.yml?branch=main&label=CI)](https://github.com/GlyphLang/GlyphLang/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-78%25-green)](#performance)
+[![Coverage](https://img.shields.io/badge/coverage-81%25-green)](#performance)
 [![Version](https://img.shields.io/github/v/release/GlyphLang/GlyphLang?label=version&color=blue)](https://github.com/GlyphLang/GlyphLang/releases/latest)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![CLA](https://cla-assistant.io/readme/badge/GlyphLang/GlyphLang)](https://cla-assistant.io/GlyphLang/GlyphLang)
@@ -73,6 +73,7 @@ Java:   @GetMapping("/users/{id}")...  (28 tokens)
 - **Minimal Ceremony** - Skip the boilerplate—routes and types are the program
 - **Context Command** - Generate project summaries optimized for LLM context windows
 - **Structured Validation** - JSON error output for AI agents to parse and fix
+- **MCP Server** - `glyph mcp` exposes validation and the syntax spec to any MCP-capable agent
 - **Consistent Patterns** - Every route and type definition follows the same structure
 
 ### Core Language
@@ -617,9 +618,10 @@ Even against FastAPI (the most concise Python framework), Glyph saves 23% by eli
 
 | Metric | Value |
 |--------|-------|
-| Compilation | ~867 ns |
-| Execution | 2.95-37.6 ns/op |
-| Test Coverage | 78% (24 packages) |
+| Compilation | ~867 ns (lex+parse, 47-byte route) |
+| VM Execution | 3-40 ns/op |
+| HTTP Request (compiled route) | ~3.9 us end-to-end |
+| Test Coverage | 81% (45 packages) |
 | Examples | 100% compatibility |
 
 ## Project Structure

@@ -445,6 +445,7 @@ Examples:
 	rootCmd.AddCommand(devCmd)
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(lspCmd)
+	rootCmd.AddCommand(newMCPCmd())
 	rootCmd.AddCommand(execCmd)
 	rootCmd.AddCommand(listCmdsCmd)
 	rootCmd.AddCommand(contextCmd)
