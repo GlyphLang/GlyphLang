@@ -567,9 +567,14 @@ func (f *Formatter) formatStatement(stmt ast.Statement) {
 		f.formatReassign(v.Target, v.Value)
 
 	case ast.ReturnStatement:
-		f.formatReturn(v.Value)
+		f.formatReturn(v.Value, v.Status)
 	case *ast.ReturnStatement:
-		f.formatReturn(v.Value)
+		f.formatReturn(v.Value, v.Status)
+
+	case ast.GuardStatement:
+		f.formatGuard(v)
+	case *ast.GuardStatement:
+		f.formatGuard(*v)
 
 	case ast.IfStatement:
 		f.formatIf(v.Condition, v.ThenBlock, v.ElseBlock)
@@ -690,13 +695,30 @@ func (f *Formatter) formatReassign(target string, value ast.Expr) {
 	f.writeln("")
 }
 
-func (f *Formatter) formatReturn(value ast.Expr) {
+func (f *Formatter) formatReturn(value ast.Expr, status int) {
 	if f.mode == Expanded {
 		f.write("return ")
 	} else {
 		f.write("> ")
 	}
 	f.formatExpr(value)
+	if status != 0 {
+		f.write(fmt.Sprintf(" :: %d", status))
+	}
+	f.writeln("")
+}
+
+func (f *Formatter) formatGuard(stmt ast.GuardStatement) {
+	if f.mode == Expanded {
+		f.write("validate ")
+	} else {
+		f.write("? ")
+	}
+	f.formatExpr(stmt.Condition)
+	f.write(fmt.Sprintf(" :: %d", stmt.Status))
+	if stmt.Message != "" {
+		f.write(fmt.Sprintf(" %q", stmt.Message))
+	}
 	f.writeln("")
 }
 

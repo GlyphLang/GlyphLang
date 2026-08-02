@@ -275,12 +275,43 @@ type DbQueryStatement struct {
 
 func (DbQueryStatement) isStatement() {}
 
-// ReturnStatement represents a return statement
+// ReturnStatement represents a return statement.
+// Status is the optional HTTP status code from `> value :: 201`;
+// 0 means unspecified (routes default to 200).
 type ReturnStatement struct {
-	Value Expr
+	Value  Expr
+	Status int
 }
 
 func (ReturnStatement) isStatement() {}
+
+// GuardStatement represents a route guard: `? condition :: statusCode "message"`.
+// If the condition evaluates to false, the route responds immediately with
+// Status and the body {"error": Message}; otherwise execution continues.
+type GuardStatement struct {
+	Condition Expr
+	Status    int
+	Message   string
+}
+
+func (GuardStatement) isStatement() {}
+
+// Desugar converts the guard into the equivalent if-statement so that
+// consumers (compiler, interpreter, IR) can reuse their existing
+// if/return handling.
+func (g GuardStatement) Desugar() IfStatement {
+	return IfStatement{
+		Condition: UnaryOpExpr{Op: Not, Right: g.Condition},
+		ThenBlock: []Statement{
+			ReturnStatement{
+				Value: ObjectExpr{Fields: []ObjectField{
+					{Key: "error", Value: LiteralExpr{Value: StringLiteral{Value: g.Message}}},
+				}},
+				Status: g.Status,
+			},
+		},
+	}
+}
 
 // BreakStatement represents a break statement to exit a loop
 type BreakStatement struct{}
@@ -1055,6 +1086,7 @@ func (WsSendStatement) isNode()      {}
 func (WsBroadcastStatement) isNode() {}
 func (WsCloseStatement) isNode()     {}
 func (ValidationStatement) isNode()  {}
+func (GuardStatement) isNode()       {}
 func (ExpressionStatement) isNode()  {}
 func (YieldStatement) isNode()       {}
 func (WebSocketEvent) isNode()       {}

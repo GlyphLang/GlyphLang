@@ -328,6 +328,8 @@ func normalizeStatement(stmt ast.Statement) ast.Statement {
 		return *s
 	case *ast.ValidationStatement:
 		return *s
+	case *ast.GuardStatement:
+		return *s
 	case *ast.ForStatement:
 		return *s
 	case *ast.SwitchStatement:
@@ -359,6 +361,10 @@ func (c *Compiler) compileStatement(stmt ast.Statement) error {
 		return c.compileWhileStatement(&s)
 	case ast.ValidationStatement:
 		return c.compileValidationStatement(&s)
+	case ast.GuardStatement:
+		// Compile via the equivalent if/return so no new opcodes are needed.
+		desugared := s.Desugar()
+		return c.compileIfStatement(&desugared)
 	case ast.ForStatement:
 		return c.compileForStatement(&s)
 	case ast.SwitchStatement:
@@ -439,8 +445,20 @@ func (c *Compiler) compileReassignStatement(stmt *ast.ReassignStatement) error {
 
 // compileReturnStatement compiles return statement
 func (c *Compiler) compileReturnStatement(stmt *ast.ReturnStatement) error {
+	value := stmt.Value
+
+	// A status-carrying return (`> value :: 201`) is wrapped in a marker
+	// object the HTTP handler unwraps into the response status line. This
+	// avoids a new opcode and a VM-level response type.
+	if stmt.Status != 0 {
+		value = ast.ObjectExpr{Fields: []ast.ObjectField{
+			{Key: StatusKey, Value: ast.LiteralExpr{Value: ast.IntLiteral{Value: int64(stmt.Status)}}},
+			{Key: BodyKey, Value: stmt.Value},
+		}}
+	}
+
 	// Compile return value
-	if err := c.compileExpression(stmt.Value); err != nil {
+	if err := c.compileExpression(value); err != nil {
 		return err
 	}
 
@@ -449,6 +467,15 @@ func (c *Compiler) compileReturnStatement(stmt *ast.ReturnStatement) error {
 
 	return nil
 }
+
+// StatusKey and BodyKey are the reserved object keys used to carry an HTTP
+// status code from compiled bytecode to the HTTP handler. User objects with
+// these keys would be misinterpreted; the keys are namespaced to make a
+// collision implausible.
+const (
+	StatusKey = "__glyph_status"
+	BodyKey   = "__glyph_body"
+)
 
 // compileIfStatement compiles if statement
 func (c *Compiler) compileIfStatement(stmt *ast.IfStatement) error {

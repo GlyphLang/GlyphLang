@@ -19,6 +19,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/glyphlang/glyph/pkg/ast"
+	"github.com/glyphlang/glyph/pkg/compiler"
 	"github.com/glyphlang/glyph/pkg/database"
 	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/parser"
@@ -199,11 +200,38 @@ func createCompiledRouteHandler(route *ast.Route, bytecode []byte, wsHub *websoc
 			})
 		}
 
+		// Unwrap status-carrying results from guards and `> value :: N`
+		// (see compiler.StatusKey).
+		if body, status, ok := unwrapStatusResult(result); ok {
+			ctx.StatusCode = status
+			ctx.ResponseWriter.Header().Set("Content-Type", "application/json")
+			ctx.ResponseWriter.WriteHeader(status)
+			return json.NewEncoder(ctx.ResponseWriter).Encode(body)
+		}
+
 		// Set response
 		ctx.StatusCode = http.StatusOK
 		ctx.ResponseWriter.Header().Set("Content-Type", "application/json")
 		return json.NewEncoder(ctx.ResponseWriter).Encode(result)
 	}
+}
+
+// unwrapStatusResult detects the compiler's status marker object in a VM
+// result and returns its body and HTTP status code.
+func unwrapStatusResult(result vm.Value) (vm.Value, int, bool) {
+	obj, ok := result.(vm.ObjectValue)
+	if !ok {
+		return nil, 0, false
+	}
+	statusVal, ok := obj.Val[compiler.StatusKey]
+	if !ok {
+		return nil, 0, false
+	}
+	intVal, ok := statusVal.(vm.IntValue)
+	if !ok {
+		return nil, 0, false
+	}
+	return obj.Val[compiler.BodyKey], int(intVal.Val), true
 }
 
 // createRouteHandler creates an HTTP handler for a route
@@ -248,9 +276,13 @@ func createRouteHandler(route *ast.Route, interp *interpreter.Interpreter) serve
 			}
 		}
 
-		// Default JSON response
-		ctx.StatusCode = http.StatusOK
+		// Default JSON response, honoring the interpreter's status code
+		// (guards and `> value :: N` set non-200 values).
+		ctx.StatusCode = response.StatusCode
 		ctx.ResponseWriter.Header().Set("Content-Type", "application/json")
+		if response.StatusCode != http.StatusOK {
+			ctx.ResponseWriter.WriteHeader(response.StatusCode)
+		}
 		return json.NewEncoder(ctx.ResponseWriter).Encode(response.Body)
 	}
 }

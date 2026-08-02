@@ -22,7 +22,7 @@ Each glyph symbol maps to a semantic concept, not a language keyword.
 | `+` | `middleware` | Attach middleware/modifier |
 | `%` | `use` | Inject a provider dependency |
 | `<` | `expects` | Declare expected input type |
-| `?` | `validate` | Validation assertion |
+| `?` | `validate` | Validation assertion or route guard |
 | `~` | `handle` | Event handler binding |
 | `*` | `cron` | Scheduled task |
 | `!` | `command` | CLI command or function definition |
@@ -144,6 +144,7 @@ Standard database provider methods follow CRUD semantics:
   < input: InputType
   % provider: ProviderType
   ? validate_fn(args)
+  ? condition :: statusCode "message"
   $ variable = expression
   > returnValue :: statusCode
 }
@@ -174,22 +175,33 @@ Prefixed with `:` — e.g., `/users/:id/posts/:postId`
 
 ### 5.5 Error Responses
 
-There is no one-line conditional guard. Handle error cases with `if` and an
-early return:
+A guard is the one-line form: if the condition is false, the route responds
+immediately with the given status code and the body `{"error": "message"}`.
+If the condition is true, execution continues.
 
 ```glyph
 @ GET /users/:id {
   % db: Database
   $ user = db.users.Get(id)
-  if user == null {
-    > {error: "user not found"}
-  }
+  ? user != null :: 404 "user not found"
   > user :: 200
 }
 ```
 
-A `:: statusCode` suffix is supported on returns at the top level of a route
-body; returns inside conditional blocks use the default status.
+The `?` sigil covers both forms, distinguished by what follows the condition:
+`? validate_fn(args)` is a validation assertion, `? condition :: 404 "msg"` is
+a guard. The message is optional (`? user != null :: 404`).
+
+For multi-statement error handling, use `if` with an early return:
+
+```glyph
+if user == null {
+  > {error: "user not found", code: "NOT_FOUND"}
+}
+```
+
+A `:: statusCode` suffix is supported on any return; without it, routes
+respond `200`.
 
 ## 6. Background Tasks
 
@@ -326,11 +338,12 @@ queue       = "&" STRING "{" { statement } "}" ;
 command     = "!" IDENT { param } "{" { statement } "}" ;
 provider    = "provider" IDENT "{" { method_sig } "}" ;
 
-route_stmt  = middleware | injection | input_decl | validate | statement ;
+route_stmt  = middleware | injection | input_decl | validate | guard | statement ;
 middleware  = "+" IDENT "(" args ")" ;
 injection   = "%" IDENT ":" type ;
 input_decl  = "<" IDENT ":" type ;
 validate    = "?" IDENT "(" [ args ] ")" ;
+guard       = "?" expr "::" INTEGER [ STRING ] ;
 statement   = assign | reassign | return | if | for | while | switch | expr_stmt ;
 assign      = "$" IDENT "=" expr ;
 return      = ">" expr [ "::" INTEGER ] ;

@@ -669,6 +669,17 @@ func (i *Interpreter) ExecuteRoute(route *Route, request *Request) (*Response, e
 		}, nil
 	}
 
+	// Status-carrying JSON responses (guards and `> value :: N`) skip the
+	// declared-return-type check: guard error bodies intentionally differ
+	// from the route's success type.
+	if sr, ok := result.(*StatusResponse); ok {
+		return &Response{
+			StatusCode: sr.StatusCode,
+			Body:       sr.Body,
+			Headers:    make(map[string]string),
+		}, nil
+	}
+
 	// Validate return value matches declared return type
 	if route.ReturnType != nil {
 		if err := i.typeChecker.CheckType(result, route.ReturnType); err != nil {
