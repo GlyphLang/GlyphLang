@@ -97,6 +97,9 @@ func (i *Interpreter) ExecuteStatement(stmt Statement, env *Environment) (interf
 	case ValidationStatement:
 		return i.executeValidation(s, env)
 
+	case GuardStatement:
+		return i.executeGuard(s, env)
+
 	case ReassignStatement:
 		return i.executeReassign(s, env)
 
@@ -277,7 +280,37 @@ func (i *Interpreter) executeReturn(stmt ReturnStatement, env *Environment) (int
 		return nil, err
 	}
 
+	// A status-carrying return (`> value :: 201`) becomes a StatusResponse
+	// that the route executor maps onto the HTTP status line.
+	if stmt.Status != 0 {
+		value = &StatusResponse{Body: value, StatusCode: stmt.Status}
+	}
+
 	// Return a special error to signal a return statement
+	return value, &returnValue{value: value}
+}
+
+// executeGuard executes a route guard: if the condition is false, respond
+// immediately with the guard's status code and {"error": message}.
+func (i *Interpreter) executeGuard(stmt GuardStatement, env *Environment) (interface{}, error) {
+	condition, err := i.EvaluateExpression(stmt.Condition, env)
+	if err != nil {
+		return nil, err
+	}
+
+	condBool, ok := condition.(bool)
+	if !ok {
+		return nil, fmt.Errorf("guard condition must be a boolean, got %T", condition)
+	}
+
+	if condBool {
+		return nil, nil
+	}
+
+	value := &StatusResponse{
+		Body:       map[string]interface{}{"error": stmt.Message},
+		StatusCode: stmt.Status,
+	}
 	return value, &returnValue{value: value}
 }
 

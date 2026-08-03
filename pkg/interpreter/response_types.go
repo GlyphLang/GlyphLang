@@ -30,6 +30,14 @@ type RedirectResponse struct {
 	StatusCode int
 }
 
+// StatusResponse signals that the route wants to send a JSON response with an
+// explicit status code, from `> value :: 201` or a failed guard
+// (`? condition :: 404 "message"`).
+type StatusResponse struct {
+	Body       interface{}
+	StatusCode int
+}
+
 // ValidateRedirect checks that the URL is well-formed and the status code is a valid redirect code.
 func ValidateRedirect(rawURL string, statusCode int) error {
 	if _, err := url.Parse(rawURL); err != nil {

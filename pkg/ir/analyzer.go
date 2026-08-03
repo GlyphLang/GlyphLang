@@ -777,6 +777,10 @@ func (a *Analyzer) convertStatement(stmt ast.Statement) StmtIR {
 	case ast.ValidationStatement:
 		expr := a.convertExpr(&s.Call)
 		return StmtIR{Kind: StmtValidate, Validate: &ValidateStmt{Call: expr}}
+	case *ast.GuardStatement:
+		return a.convertStatement(s.Desugar())
+	case ast.GuardStatement:
+		return a.convertStatement(s.Desugar())
 	case *ast.BreakStatement, ast.BreakStatement:
 		return StmtIR{Kind: StmtBreak, Break: true}
 	case *ast.ContinueStatement, ast.ContinueStatement:

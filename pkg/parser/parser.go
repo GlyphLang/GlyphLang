@@ -1520,8 +1520,10 @@ func (p *Parser) parseRoute() (ast.Item, error) {
 			p.skipNewlines()
 
 		case QUESTION:
-			// Check if this is query param declaration (? name: type) or validation (? validate_fn())
-			if p.peek(1).Type == IDENT && p.peek(2).Type == COLON {
+			// Check if this is query param declaration (? name: type) or
+			// validation/guard (parsed by parseStatement). A double colon
+			// means a guard (? name :: 404), not a query param.
+			if p.peek(1).Type == IDENT && p.peek(2).Type == COLON && p.peek(3).Type != COLON {
 				p.advance() // consume ?
 				param, err := p.parseQueryParamDecl()
 				if err != nil {
@@ -1946,42 +1948,43 @@ func (p *Parser) parseRateLimit() (*ast.RateLimit, error) {
 func (p *Parser) parseStatement() (ast.Statement, error) {
 	switch p.current().Type {
 	case QUESTION:
-		// ? validate_fn(args)
+		// ? validate_fn(args)                 -- validation assertion
+		// ? condition :: statusCode "message" -- route guard
 		p.advance()
 
-		// Expect function call
-		funcName, err := p.expectIdent()
+		cond, err := p.parseExpr()
 		if err != nil {
 			return nil, err
 		}
 
-		if err := p.expect(LPAREN); err != nil {
-			return nil, err
-		}
-
-		var args []ast.Expr
-		for !p.check(RPAREN) && !p.isAtEnd() {
-			arg, err := p.parseExpr()
+		if p.check(COLON) && p.peek(1).Type == COLON {
+			p.advance()
+			p.advance()
+			status, err := p.expectStatusCode()
 			if err != nil {
 				return nil, err
 			}
-			args = append(args, arg)
-
-			if !p.match(COMMA) {
-				break
+			message := ""
+			if p.check(STRING) {
+				message = p.current().Literal
+				p.advance()
 			}
+			return ast.GuardStatement{
+				Condition: cond,
+				Status:    status,
+				Message:   message,
+			}, nil
 		}
 
-		if err := p.expect(RPAREN); err != nil {
-			return nil, err
+		if call, ok := cond.(ast.FunctionCallExpr); ok {
+			return ast.ValidationStatement{Call: call}, nil
 		}
 
-		return ast.ValidationStatement{
-			Call: ast.FunctionCallExpr{
-				Name: funcName,
-				Args: args,
-			},
-		}, nil
+		return nil, p.errorWithHint(
+			fmt.Sprintf("Expected '::' or a validation call after '?', but found %s", p.current().Type),
+			p.current(),
+			"Use '? validate_fn(args)' for validation or '? condition :: statusCode \"message\"' for a guard",
+		)
 
 	case DOLLAR:
 		// $ var = expr or $ obj.field = expr or $ var: Type = expr
@@ -2075,15 +2078,26 @@ func (p *Parser) parseStatement() (ast.Statement, error) {
 		}, nil
 
 	case GREATER:
-		// > expr
+		// > expr [:: statusCode]
 		p.advance()
 		value, err := p.parseExpr()
 		if err != nil {
 			return nil, err
 		}
 
+		status := 0
+		if p.check(COLON) && p.peek(1).Type == COLON {
+			p.advance()
+			p.advance()
+			status, err = p.expectStatusCode()
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		return ast.ReturnStatement{
-			Value: value,
+			Value:  value,
+			Status: status,
 		}, nil
 
 	case IDENT:
@@ -3277,6 +3291,27 @@ func (p *Parser) expect(t TokenType) error {
 		return nil
 	}
 	return p.expectError(t, p.current())
+}
+
+// expectStatusCode consumes an INTEGER token and returns it as an HTTP status code.
+func (p *Parser) expectStatusCode() (int, error) {
+	if p.current().Type != INTEGER {
+		return 0, p.errorWithHint(
+			fmt.Sprintf("Expected HTTP status code after '::', but found %s", p.current().Type),
+			p.current(),
+			"Use an integer status code, e.g. ':: 404'",
+		)
+	}
+	status, err := strconv.Atoi(p.current().Literal)
+	if err != nil || status < 100 || status > 599 {
+		return 0, p.errorWithHint(
+			fmt.Sprintf("Invalid HTTP status code %q after '::'", p.current().Literal),
+			p.current(),
+			"Status codes must be integers between 100 and 599",
+		)
+	}
+	p.advance()
+	return status, nil
 }
 
 func (p *Parser) expectIdent() (string, error) {
