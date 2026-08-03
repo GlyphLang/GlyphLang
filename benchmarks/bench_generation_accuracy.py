@@ -89,9 +89,9 @@ FASTAPI_SYSTEM = (
 
 
 def find_glyph_binary() -> str:
-    exe = shutil.which("glyph")
-    if exe:
-        return exe
+    # Always build from the working tree. A `glyph` on PATH is whatever the user
+    # last installed, which silently scores generated code against an older
+    # language version - syntax this repo supports gets counted as a failure.
     out = Path(tempfile.mkdtemp(prefix="glyph_eval_")) / ("glyph.exe" if os.name == "nt" else "glyph")
     subprocess.run(["go", "build", "-o", str(out), "./cmd/glyph"], cwd=REPO_ROOT, check=True)
     return str(out)
