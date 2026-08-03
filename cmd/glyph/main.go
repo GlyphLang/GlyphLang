@@ -10,7 +10,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var version = "0.4.0"
+// version is overridden at release time via -ldflags "-X main.version=$VERSION".
+// The default deliberately is not a release number: an unstamped binary was
+// built from source, and claiming a version it may not correspond to has
+// already caused confusion when debugging against an installed glyph.
+var version = "0.0.0-dev"
 
 func main() {
 	// Check if invoked with just a .glyph file (e.g., double-click on Windows)
