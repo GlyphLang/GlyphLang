@@ -36,6 +36,9 @@ jobs:
       - name: Run go vet
         run: go vet ./...
 
+      - name: Check llms.txt is current
+        run: make llms.txt && git diff --exit-code llms.txt
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         continue-on-error: true  # Don't fail CI on lint issues for now
