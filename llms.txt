@@ -4,6 +4,9 @@
 
 Deploy target: https://glyphlang.dev/llms.txt
 Source of truth: docs/GLYPH_NOTATION_SPEC.md in https://github.com/GlyphLang/GlyphLang (regenerate this file when the spec changes: make llms.txt)
+GlyphLang is symbol notation: every declaration begins with a glyph at the start of a line, and
+there are no keyword declaration forms. It runs `.glyph` sources directly on a single static
+binary — install from GitHub Releases (https://github.com/GlyphLang/GlyphLang/releases).
 
 ## Quick example
 
@@ -33,16 +36,16 @@ Source of truth: docs/GLYPH_NOTATION_SPEC.md in https://github.com/GlyphLang/Gly
 
 ---
 
-# Glyph Notation Specification
+# GlyphLang Notation Specification
 
 **Version:** 0.1.0-draft
 **Status:** Working draft
 
 ## 1. Overview
 
-Glyph notation is a compact, typed, language-neutral notation for describing backend services. It is designed to be consumed by both humans and AI systems, and can be compiled, interpreted, or used as a structured intent language for code generation in any target language.
+GlyphLang notation is a compact, typed, language-neutral notation for describing backend services. It is designed to be consumed by both humans and AI systems, and can be compiled, interpreted, or used as a structured intent language for code generation in any target language.
 
-A Glyph program describes **what a service does**, not how it does it in any specific language.
+A GlyphLang program describes **what a service does**, not how it does it in any specific language.
 
 ## 2. Symbol Vocabulary
 
@@ -111,8 +114,8 @@ Fields marked with `!` are required. Fields marked with `?` are optional. Fields
 
 ### 3.4 Target Language Type Mapping
 
-| Glyph | Python | TypeScript | Go | Java | Rust |
-|-------|--------|------------|-----|------|------|
+| GlyphLang | Python | TypeScript | Go | Java | Rust |
+|-----------|--------|------------|-----|------|------|
 | `int` | `int` | `number` | `int64` | `long` | `i64` |
 | `float` | `float` | `number` | `float64` | `double` | `f64` |
 | `str` | `str` | `string` | `string` | `String` | `String` |
@@ -271,7 +274,7 @@ respond `200`.
 
 ## 7. Semantic IR
 
-The Semantic IR is the language-neutral intermediate representation produced by analyzing a Glyph program. It captures intent independent of any target language.
+The Semantic IR is the language-neutral intermediate representation produced by analyzing a GlyphLang program. It captures intent independent of any target language.
 
 ### 7.1 IR Structure
 
@@ -318,7 +321,7 @@ All expressions are normalized into a flat, discriminated union:
 
 ## 8. Compact vs Expanded Syntax
 
-Every Glyph program has two equivalent representations:
+Every GlyphLang program has two equivalent representations:
 
 **Compact** (`.glyph`): Uses symbols for maximum token efficiency
 ```
@@ -394,7 +397,7 @@ method      = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "ws" | "sse" ;
 
 ## 11. Design Principles
 
-1. **Intent over implementation**: Glyph describes what a service does, not how.
+1. **Intent over implementation**: GlyphLang describes what a service does, not how.
 2. **Provider abstraction**: Services depend on capabilities, not specific libraries.
 3. **Two syntaxes, one semantics**: Compact for AI, expanded for humans.
 4. **Verifiable**: The type system catches mismatches at analysis time.
