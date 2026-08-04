@@ -414,7 +414,7 @@ Indicate which part of the codebase is affected:
 | `area:compiler` | Compiler and code generation |
 | `area:vm` | Virtual machine |
 | `area:interpreter` | Interpreter |
-| `area:server` | Glyph server |
+| `area:server` | GlyphLang server |
 | `area:lsp` | Language Server Protocol implementation |
 | `area:cli` | Command-line interface |
 | `area:database` | Database functionality |

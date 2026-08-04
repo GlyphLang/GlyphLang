@@ -28,7 +28,7 @@ import (
 	"github.com/glyphlang/glyph/pkg/websocket"
 )
 
-// parseSource parses GLYPH source using the Go parser
+// parseSource parses GlyphLang source using the Go parser
 func parseSource(source string) (*ast.Module, error) {
 	// Use Go parser
 	lexer := parser.NewLexer(source)
@@ -350,7 +350,7 @@ func executeRoute(route *ast.Route, ctx *server.Context, interp *interpreter.Int
 }
 
 // extractDevAuthData parses auth data from a bearer token for interpreted
-// (dev) mode. The interpreter does not have a JWT library, so GLYPH apps
+// (dev) mode. The interpreter does not have a JWT library, so GlyphLang apps
 // running in --interpret mode issue demo tokens with the format
 // "demo-token-<userID>-<username>". This function extracts user claims
 // from that format so routes declaring + auth(jwt) can access auth.user.
@@ -516,7 +516,7 @@ func changeExtension(path, newExt string) string {
 // Template content getters
 func getHelloWorldTemplate() string {
 	return `# Hello World Example
-# This is a simple GLYPH program
+# This is a simple GlyphLang program
 
 : Message {
   text: str!
@@ -536,7 +536,7 @@ func getHelloWorldTemplate() string {
 }
 
 func getRestAPITemplate() string {
-	return `# Example REST API in GLYPH
+	return `# Example REST API in GlyphLang
 
 : User {
   id: int!

@@ -1,6 +1,6 @@
-# Glyph Performance Benchmarks
+# GlyphLang Performance Benchmarks
 
-This document contains performance benchmarks for the Glyph compiler and runtime, demonstrating compilation speed, bytecode efficiency, and VM execution performance.
+This document contains performance benchmarks for the GlyphLang compiler and runtime, demonstrating compilation speed, bytecode efficiency, and VM execution performance.
 
 ## System Information
 
@@ -183,12 +183,12 @@ go test ./tests -v -run=Benchmark
 
 | Tool | Compilation | Execution | Notes |
 |------|-------------|-----------|-------|
-| Glyph | < 1us | ~10ns/op | This project |
+| GlyphLang | < 1us | ~10ns/op | This project |
 | Python | N/A | ~100ns/op | Interpreted |
 | Node.js | ~10ms | ~50ns/op | JIT compiled |
 | Go | ~100ms | ~5ns/op | Native compiled |
 
-**Note**: Glyph provides near-native execution speed with instant compilation times.
+**Note**: GlyphLang provides near-native execution speed with instant compilation times.
 
 ---
 

@@ -34,7 +34,7 @@ func main() {
 	var rootCmd = &cobra.Command{
 		Use:   "glyph",
 		Short: "AI Backend Compiler - A language for AI-generated backends",
-		Long: `GLYPH is a programming language specifically designed for AI agents
+		Long: `GlyphLang is a programming language specifically designed for AI agents
 to rapidly build high-performance, secure backend applications.`,
 		Version: version,
 	}
@@ -62,7 +62,7 @@ to rapidly build high-performance, secure backend applications.`,
 	// Run command
 	var runCmd = &cobra.Command{
 		Use:   "run <file>",
-		Short: "Run GLYPH source file",
+		Short: "Run GlyphLang source file",
 		Args:  cobra.ExactArgs(1),
 		RunE:  runRun,
 	}
@@ -101,8 +101,8 @@ to rapidly build high-performance, secure backend applications.`,
 	// Exec command - execute CLI commands defined with @ command
 	var execCmd = &cobra.Command{
 		Use:   "exec <file> <command> [args...]",
-		Short: "Execute a CLI command defined in a GLYPH file",
-		Long: `Execute CLI commands defined with @ command in a GLYPH file.
+		Short: "Execute a CLI command defined in a GlyphLang file",
+		Long: `Execute CLI commands defined with @ command in a GlyphLang file.
 
 Example:
   # In my-cli.glyph:
@@ -116,10 +116,10 @@ Example:
 		RunE: runExec,
 	}
 
-	// List commands - list all commands in a GLYPH file
+	// List commands - list all commands in a GlyphLang file
 	var listCmdsCmd = &cobra.Command{
 		Use:   "commands <file>",
-		Short: "List all CLI commands defined in a GLYPH file",
+		Short: "List all CLI commands defined in a GlyphLang file",
 		Args:  cobra.ExactArgs(1),
 		RunE:  runListCommands,
 	}
@@ -128,7 +128,7 @@ Example:
 	var contextCmd = &cobra.Command{
 		Use:   "context [path]",
 		Short: "Generate AI-optimized context for the project",
-		Long: `Generate compact, cacheable context for AI agents working with this Glyph project.
+		Long: `Generate compact, cacheable context for AI agents working with this GlyphLang project.
 
 The context includes:
 - Type definitions with field signatures
@@ -162,8 +162,8 @@ Examples:
 	// Validate command - validate source files with structured errors
 	var validateCmd = &cobra.Command{
 		Use:   "validate <file>",
-		Short: "Validate a GLYPH source file",
-		Long: `Validate a GLYPH source file and report errors.
+		Short: "Validate a GlyphLang source file",
+		Long: `Validate a GlyphLang source file and report errors.
 
 By default, outputs human-readable error messages. Use --ai for structured
 JSON output optimized for AI agents to parse and fix issues.
@@ -238,8 +238,8 @@ Examples:
 	// OpenAPI command - generate OpenAPI 3.0 specification
 	var openapiCmd = &cobra.Command{
 		Use:   "openapi <file>",
-		Short: "Generate OpenAPI 3.0 specification from GLYPH source",
-		Long: `Generate an OpenAPI 3.0 specification from your GLYPH source code.
+		Short: "Generate OpenAPI 3.0 specification from GlyphLang source",
+		Long: `Generate an OpenAPI 3.0 specification from your GlyphLang source code.
 
 Analyzes route definitions, type definitions, authentication middleware,
 and query parameters to produce a complete OpenAPI 3.0 specification.
@@ -264,8 +264,8 @@ Examples:
 	// Docs command - generate API documentation
 	var docsCmd = &cobra.Command{
 		Use:   "docs <file>",
-		Short: "Generate API documentation from GLYPH source",
-		Long: `Generate API documentation from your GLYPH source code.
+		Short: "Generate API documentation from GlyphLang source",
+		Long: `Generate API documentation from your GlyphLang source code.
 
 Reads route definitions and type definitions to produce documentation
 with endpoint listings, request/response schemas, and type definitions.
@@ -289,8 +289,8 @@ Examples:
 	// Client command - generate API client code
 	var clientCmd = &cobra.Command{
 		Use:   "client <file>",
-		Short: "Generate API client code from GLYPH source",
-		Long: `Generate a typed API client from your GLYPH source code.
+		Short: "Generate API client code from GlyphLang source",
+		Long: `Generate a typed API client from your GlyphLang source code.
 
 Reads route definitions and type definitions to produce a fully typed
 API client with methods for each endpoint.
@@ -312,8 +312,8 @@ Examples:
 	// Codegen command - generate server code for target languages
 	var codegenCmd = &cobra.Command{
 		Use:   "codegen <file>",
-		Short: "Generate server code for a target language from GLYPH source",
-		Long: `Generate a complete server application from your GLYPH source code.
+		Short: "Generate server code for a target language from GlyphLang source",
+		Long: `Generate a complete server application from your GlyphLang source code.
 
 Parses the .glyph file, transforms it through the Semantic IR, and generates
 a working server application in the target language.
@@ -340,7 +340,7 @@ Examples:
 		Long: `Start an interactive Read-Eval-Print Loop (REPL) for GlyphLang.
 
 The REPL allows you to:
-- Execute Glyph expressions and statements interactively
+- Execute GlyphLang expressions and statements interactively
 - Explore language features and test code snippets
 - Inspect variables and their values
 
@@ -361,8 +361,8 @@ Examples:
 	// Test command
 	var testCmd = &cobra.Command{
 		Use:   "test <file>",
-		Short: "Run tests defined in a GLYPH file",
-		Long: `Execute all test blocks defined with 'test' keyword in a GLYPH file.
+		Short: "Run tests defined in a GlyphLang file",
+		Long: `Execute all test blocks defined with 'test' keyword in a GlyphLang file.
 
 Example:
   test "should add numbers" {

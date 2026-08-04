@@ -1,7 +1,7 @@
 // Package formatter provides bidirectional conversion between compact glyph syntax
 // and expanded human-readable syntax.
 //
-// Compact (Glyph) syntax uses symbols:
+// Compact (glyph) syntax uses symbols:
 //
 //	: -> type definition
 //	@ -> route

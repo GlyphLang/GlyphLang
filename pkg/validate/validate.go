@@ -1,4 +1,4 @@
-// Package validate provides AI-friendly validation for Glyph source files.
+// Package validate provides AI-friendly validation for GlyphLang source files.
 // It returns structured errors that AI agents can easily parse and act upon.
 package validate
 
@@ -13,7 +13,7 @@ import (
 	"github.com/glyphlang/glyph/pkg/parser"
 )
 
-// ValidationResult contains the results of validating a Glyph file
+// ValidationResult contains the results of validating a GlyphLang file
 type ValidationResult struct {
 	Valid    bool               `json:"valid"`
 	FilePath string             `json:"file_path"`
@@ -63,7 +63,7 @@ const (
 	ErrTypeInvalidType  = "invalid_type"
 )
 
-// Validator validates Glyph source code
+// Validator validates GlyphLang source code
 type Validator struct {
 	source   string
 	filePath string
@@ -543,7 +543,7 @@ func (v *Validator) suggestParseFix(errStr string) string {
 		return "complete the statement or block"
 	}
 
-	return "review Glyph syntax documentation"
+	return "review GlyphLang syntax documentation"
 }
 
 // ToJSON serializes the result to JSON

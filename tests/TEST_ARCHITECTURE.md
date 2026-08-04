@@ -1,12 +1,12 @@
-# Glyph Test Architecture
+# GlyphLang Test Architecture
 
-Visual representation of the test infrastructure and how it validates the Glyph system.
+Visual representation of the test infrastructure and how it validates the GlyphLang system.
 
 ## Test Organization
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Glyph Test Infrastructure                     │
+│                    GlyphLang Test Infrastructure                     │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌───────────────────────────────────────────────────────────┐ │
@@ -93,7 +93,7 @@ Visual representation of the test infrastructure and how it validates the Glyph 
 │  │  json_response.glyph     │  post_route.glyph                 │ │
 │  │  invalid_syntax.glyph    │  error_handling.glyph             │ │
 │  │                                                           │ │
-│  │  Fixtures: 8 realistic Glyph programs for testing         │ │
+│  │  Fixtures: 8 realistic GlyphLang programs for testing         │ │
 │  └───────────────────────────────────────────────────────────┘ │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
@@ -106,7 +106,7 @@ Visual representation of the test infrastructure and how it validates the Glyph 
 │                     Test Execution Flow                         │
 └─────────────────────────────────────────────────────────────────┘
 
-Developer writes Glyph code
+Developer writes GlyphLang code
          │
          ├─────────────────────────────────┐
          │                                 │
@@ -337,7 +337,7 @@ fixtures/simple_route.glyph
     │ compiler.Compile()
     ↓
 ┌────────────────────────┐
-│ Bytecode: Glyph\x01...  │
+│ Bytecode: GlyphLang\x01...  │
 └────────────────────────┘
     │
     │ vm.Execute()

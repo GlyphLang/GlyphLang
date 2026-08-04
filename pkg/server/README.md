@@ -1,6 +1,6 @@
-# Glyph HTTP Server
+# GlyphLang HTTP Server
 
-A production-ready HTTP server implementation for the Glyph language that handles route registration, request/response processing, and middleware execution.
+A production-ready HTTP server implementation for the GlyphLang language that handles route registration, request/response processing, and middleware execution.
 
 ## Features
 
@@ -18,11 +18,11 @@ A production-ready HTTP server implementation for the Glyph language that handle
 The server is composed of several components:
 
 ### Core Types (`types.go`)
-- `Route`: Represents an Glyph route definition
+- `Route`: Represents an GlyphLang route definition
 - `Context`: Request context with parsed parameters
 - `RouteHandler`: Function signature for route handlers
 - `Middleware`: Function signature for middleware
-- `Interpreter`: Interface for executing Glyph route logic
+- `Interpreter`: Interface for executing GlyphLang route logic
 
 ### Router (`router.go`)
 - Route registration and storage
@@ -310,12 +310,12 @@ srv := server.NewServer(server.WithInterpreter(interpreter))
 
 The mock will echo back request details (path, method, params, body) if no custom response is set.
 
-## Integration with Glyph
+## Integration with GlyphLang
 
-When integrated with the Glyph compiler and interpreter, routes will be registered from parsed Glyph source files:
+When integrated with the GlyphLang compiler and interpreter, routes will be registered from parsed GlyphLang source files:
 
 ```go
-// Parse Glyph file
+// Parse GlyphLang file
 routes := parser.Parse("main.glyph")
 
 // Register with server
@@ -325,7 +325,7 @@ srv.RegisterRoutes(routes)
 srv.Start(":8080")
 ```
 
-The interpreter will execute the Glyph route logic when requests are received.
+The interpreter will execute the GlyphLang route logic when requests are received.
 
 ## Performance
 

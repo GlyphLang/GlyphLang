@@ -421,7 +421,7 @@ func TestWebSocketPathParamsFullFlow(t *testing.T) {
 
 	t.Log("=== Testing WebSocket Path Parameters End-to-End ===")
 
-	// Step 1: Parse Glyph source with WebSocket path params
+	// Step 1: Parse GlyphLang source with WebSocket path params
 	t.Log("Step 1: Parsing source with path parameters...")
 	source := `
 @ ws /chat/:room {

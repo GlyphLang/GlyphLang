@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Schema represents a GraphQL schema built from Glyph type definitions and resolvers.
+// Schema represents a GraphQL schema built from GlyphLang type definitions and resolvers.
 type Schema struct {
 	Types     map[string]*ObjectType
 	Query     *ObjectType
@@ -44,7 +44,7 @@ func BuildSchema(typeDefs map[string]ast.TypeDef, resolvers map[string]ast.Graph
 		Resolvers: resolvers,
 	}
 
-	// Convert Glyph type definitions to GraphQL object types
+	// Convert GlyphLang type definitions to GraphQL object types
 	for name, td := range typeDefs {
 		objType := &ObjectType{
 			Name:   name,

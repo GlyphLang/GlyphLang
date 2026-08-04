@@ -1,7 +1,7 @@
-# Glyph Binary Format Specification
+# GlyphLang Binary Format Specification
 
 **Version:** 1.0
-**Purpose:** AI-optimized compact representation of Glyph programs
+**Purpose:** AI-optimized compact representation of GlyphLang programs
 
 ## Design Principles
 
@@ -14,9 +14,9 @@
 
 ```
 ┌──────────────────────────────────────────────┐
-│ Glyph Binary Format (.glyphc)                   │
+│ GlyphLang Binary Format (.glyphc)                   │
 ├──────────────────────────────────────────────┤
-│ [Magic Number: 4 bytes] "Glyph"               │
+│ [Magic Number: 4 bytes] "GlyphLang"               │
 │ [Version: 1 byte] 0x01                       │
 │ [Flags: 1 byte] compression, etc.            │
 │ [Item Count: 2 bytes] number of items        │
@@ -97,7 +97,7 @@
 
 **Binary format (.glyphc) - Hex dump:**
 ```
-41 49 42 43        // Magic: "Glyph"
+41 49 42 43        // Magic: "GlyphLang"
 01                 // Version: 1
 00                 // Flags: none
 01 00              // Item count: 1

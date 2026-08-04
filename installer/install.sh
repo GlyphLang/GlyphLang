@@ -126,7 +126,9 @@ setup_path() {
     fi
 
     if [ -n "$PROFILE" ] && [ -f "$PROFILE" ]; then
-        # Check if export already exists
+        # Check if export already exists. Match on "Glyph" rather than "GlyphLang"
+        # so profiles written by older installers (marker "# Glyph") are still
+        # detected and we do not append a duplicate PATH entry.
         if grep -q "Glyph" "$PROFILE" 2>/dev/null; then
             info "PATH entry already exists in $PROFILE"
         else

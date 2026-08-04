@@ -6,14 +6,14 @@
 
 ## Summary
 
-Successfully implemented a fully functional AST interpreter for the Glyph language in Go. The interpreter can execute Glyph routes, evaluate expressions, manage variable scopes, and handle user-defined functions.
+Successfully implemented a fully functional AST interpreter for the GlyphLang language in Go. The interpreter can execute GlyphLang routes, evaluate expressions, manage variable scopes, and handle user-defined functions.
 
 ## Files Created
 
 ### Core Implementation (5 files)
 
 1. **`ast.go`** (4,245 bytes)
-   - Complete AST type definitions for the Glyph language
+   - Complete AST type definitions for the GlyphLang language
    - Includes: Module, Item, TypeDef, Route, Function, Statement, Expression, Literal, BinOp types
    - Interface-based design for type safety
 
@@ -257,7 +257,7 @@ fn add(a: int, b: int) -> int:
 
 ### Parser Integration
 The interpreter expects AST nodes as defined in `ast.go`. The parser should:
-- Convert Glyph source code to these AST structures
+- Convert GlyphLang source code to these AST structures
 - Validate syntax and basic type correctness
 - Handle operator precedence
 
@@ -347,7 +347,7 @@ The AST interpreter is **fully functional** and ready for integration with the p
 - Conditional statements
 - Variable scoping
 
-All core features are implemented and tested. The interpreter provides a solid foundation for executing Glyph programs and can be extended as the language evolves.
+All core features are implemented and tested. The interpreter provides a solid foundation for executing GlyphLang programs and can be extended as the language evolves.
 
 ## Next Steps
 

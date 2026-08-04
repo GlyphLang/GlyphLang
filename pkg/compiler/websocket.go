@@ -333,7 +333,7 @@ func (c *Compiler) CompileModule(module *ast.Module) (*CompiledModule, error) {
 	return result, nil
 }
 
-// CompiledModule represents a fully compiled Glyph module
+// CompiledModule represents a fully compiled GlyphLang module
 type CompiledModule struct {
 	Routes          map[string][]byte                  // HTTP routes: "METHOD /path" -> bytecode
 	WebSocketRoutes map[string]*CompiledWebSocketRoute // WS routes: "/path" -> compiled handlers

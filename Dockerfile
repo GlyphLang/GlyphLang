@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for Glyph
+# Multi-stage Dockerfile for GlyphLang
 # Stage 1: Build Go CLI
 FROM golang:1.24-alpine AS builder
 

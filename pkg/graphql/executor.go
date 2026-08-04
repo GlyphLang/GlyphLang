@@ -6,7 +6,7 @@ import (
 	"github.com/glyphlang/glyph/pkg/interpreter"
 )
 
-// Executor handles GraphQL query execution against a schema using the Glyph interpreter.
+// Executor handles GraphQL query execution against a schema using the GlyphLang interpreter.
 type Executor struct {
 	schema *Schema
 	interp *interpreter.Interpreter

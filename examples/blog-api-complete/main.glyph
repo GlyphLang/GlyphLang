@@ -42,10 +42,10 @@
   $ all_posts = [
     {
       :id = 1,
-      :title = "Getting Started with Glyph",
+      :title = "Getting Started with GlyphLang",
       :slug = "getting-started-with-glyph",
-      :content = "Glyph is a revolutionary backend language designed for AI-generated code. With sub-microsecond compilation times and built-in security scanning, it's the perfect choice for modern backends.",
-      :excerpt = "Learn the basics of Glyph in this comprehensive guide.",
+      :content = "GlyphLang is a revolutionary backend language designed for AI-generated code. With sub-microsecond compilation times and built-in security scanning, it's the perfect choice for modern backends.",
+      :excerpt = "Learn the basics of GlyphLang in this comprehensive guide.",
       :author = "Alice Johnson",
       :author_id = 1,
       :category = "Tutorial",
@@ -61,10 +61,10 @@
     },
     {
       :id = 2,
-      :title = "Building REST APIs with Glyph",
+      :title = "Building REST APIs with GlyphLang",
       :slug = "building-rest-apis",
-      :content = "Learn how to build production-ready REST APIs using Glyph. We'll cover routing, validation, error handling, and best practices.",
-      :excerpt = "Master REST API development with Glyph.",
+      :content = "Learn how to build production-ready REST APIs using GlyphLang. We'll cover routing, validation, error handling, and best practices.",
+      :excerpt = "Master REST API development with GlyphLang.",
       :author = "Bob Smith",
       :author_id = 2,
       :category = "Tutorial",
@@ -80,10 +80,10 @@
     },
     {
       :id = 3,
-      :title = "Advanced Glyph Patterns",
+      :title = "Advanced GlyphLang Patterns",
       :slug = "advanced-glyph-patterns",
-      :content = "Dive deep into advanced patterns, optimization techniques, and architectural best practices for Glyph applications.",
-      :excerpt = "Take your Glyph skills to the next level.",
+      :content = "Dive deep into advanced patterns, optimization techniques, and architectural best practices for GlyphLang applications.",
+      :excerpt = "Take your GlyphLang skills to the next level.",
       :author = "Charlie Davis",
       :author_id = 3,
       :category = "Advanced",
@@ -101,8 +101,8 @@
       :id = 4,
       :title = "Database Integration Guide",
       :slug = "database-integration",
-      :content = "Connect your Glyph application to PostgreSQL, MySQL, or MongoDB. Learn about connection pooling, transactions, and ORMs.",
-      :excerpt = "Master database integration in Glyph.",
+      :content = "Connect your GlyphLang application to PostgreSQL, MySQL, or MongoDB. Learn about connection pooling, transactions, and ORMs.",
+      :excerpt = "Master database integration in GlyphLang.",
       :author = "Alice Johnson",
       :author_id = 1,
       :category = "Tutorial",
@@ -120,8 +120,8 @@
       :id = 5,
       :title = "Real-time Features with WebSockets",
       :slug = "websockets-guide",
-      :content = "Build real-time applications using Glyph's WebSocket support. Create chat apps, live notifications, and collaborative tools.",
-      :excerpt = "Add real-time capabilities to your Glyph apps.",
+      :content = "Build real-time applications using GlyphLang's WebSocket support. Create chat apps, live notifications, and collaborative tools.",
+      :excerpt = "Add real-time capabilities to your GlyphLang apps.",
       :author = "Bob Smith",
       :author_id = 2,
       :category = "Tutorial",
@@ -382,7 +382,7 @@
   ? validate_length(query, 1, 100)
 
   $ results = [
-    {:id = 1, :title = "Getting Started with Glyph", :excerpt = "Learn Glyph basics...", :score = 0.95},
+    {:id = 1, :title = "Getting Started with GlyphLang", :excerpt = "Learn GlyphLang basics...", :score = 0.95},
     {:id = 4, :title = "Database Integration Guide", :excerpt = "Connect to databases...", :score = 0.87}
   ]
 

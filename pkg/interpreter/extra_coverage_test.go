@@ -1153,7 +1153,7 @@ func TestFieldAccessOnArray(t *testing.T) {
 		Object: VariableExpr{Name: "arr"},
 		Field:  "length",
 	}, env)
-	// Arrays don't have field access in Glyph - this should fail or return nil
+	// Arrays don't have field access in GlyphLang - this should fail or return nil
 	// Just exercise the code path
 	_ = err
 }

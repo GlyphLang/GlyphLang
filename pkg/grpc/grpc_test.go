@@ -93,7 +93,7 @@ func TestGenerateProtoWithStreaming(t *testing.T) {
 	assert.Contains(t, output, "rpc Chat (stream Message) returns (stream Message)")
 }
 
-// TestGenerateProtoFieldTypes verifies type mapping from Glyph to proto types
+// TestGenerateProtoFieldTypes verifies type mapping from GlyphLang to proto types
 func TestGenerateProtoFieldTypes(t *testing.T) {
 	typeDefs := map[string]ast.TypeDef{
 		"Item": {

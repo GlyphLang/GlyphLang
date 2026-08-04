@@ -1,6 +1,6 @@
 # Todo List API
 
-A comprehensive todo list API demonstrating CRUD operations in Glyph.
+A comprehensive todo list API demonstrating CRUD operations in GlyphLang.
 
 ## Features
 
@@ -41,7 +41,7 @@ Returns a specific todo by its ID.
 {
   "id": 1,
   "title": "Complete project",
-  "description": "Finish the Glyph implementation",
+  "description": "Finish the GlyphLang implementation",
   "completed": false,
   "priority": "high",
   "created_at": 1234567890,

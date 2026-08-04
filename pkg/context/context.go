@@ -1,5 +1,5 @@
-// Package context provides AI-optimized context generation for Glyph projects.
-// This enables AI agents to efficiently understand and work with Glyph codebases
+// Package context provides AI-optimized context generation for GlyphLang projects.
+// This enables AI agents to efficiently understand and work with GlyphLang codebases
 // by providing compact, cacheable representations of project structure.
 package context
 
@@ -18,7 +18,7 @@ import (
 	"github.com/glyphlang/glyph/pkg/parser"
 )
 
-// ProjectContext represents the complete AI-optimized context for a Glyph project
+// ProjectContext represents the complete AI-optimized context for a GlyphLang project
 type ProjectContext struct {
 	Version     string                   `json:"version"`
 	Generated   time.Time                `json:"generated"`
@@ -76,7 +76,7 @@ type CommandInfo struct {
 	Hash        string   `json:"hash"`
 }
 
-// Generator generates AI context from Glyph source files
+// Generator generates AI context from GlyphLang source files
 type Generator struct {
 	rootDir string
 }
@@ -184,7 +184,7 @@ func (g *Generator) findGlyphFiles() ([]string, error) {
 	return files, err
 }
 
-// processFile processes a single Glyph file and extracts context
+// processFile processes a single GlyphLang file and extracts context
 func (g *Generator) processFile(relPath string, ctx *ProjectContext) (*FileContext, error) {
 	fullPath := filepath.Join(g.rootDir, relPath)
 
@@ -548,7 +548,7 @@ func (ctx *ProjectContext) ToJSON(pretty bool) ([]byte, error) {
 func (ctx *ProjectContext) ToCompact() string {
 	var sb strings.Builder
 
-	sb.WriteString("# Glyph Project Context\n")
+	sb.WriteString("# GlyphLang Project Context\n")
 	sb.WriteString(fmt.Sprintf("# Hash: %s\n\n", ctx.ProjectHash[:12]))
 
 	// Types section (sorted for deterministic output)
@@ -946,7 +946,7 @@ func (d *ContextDiff) ToJSON(pretty bool) ([]byte, error) {
 func (d *ContextDiff) ToCompact(ctx *ProjectContext) string {
 	var sb strings.Builder
 
-	sb.WriteString("# Glyph Context Changes\n")
+	sb.WriteString("# GlyphLang Context Changes\n")
 	sb.WriteString(fmt.Sprintf("# Previous: %s\n", truncateHash(d.PreviousHash)))
 	sb.WriteString(fmt.Sprintf("# Current:  %s\n\n", truncateHash(d.CurrentHash)))
 
@@ -1072,7 +1072,7 @@ type TargetedContext struct {
 	Syntax      *SyntaxGuide             `json:"syntax,omitempty"`
 }
 
-// SyntaxGuide provides quick reference for Glyph syntax
+// SyntaxGuide provides quick reference for GlyphLang syntax
 type SyntaxGuide struct {
 	Examples []string `json:"examples"`
 	Notes    []string `json:"notes,omitempty"`
@@ -1229,7 +1229,7 @@ func (tc *TargetedContext) ToJSON(pretty bool) ([]byte, error) {
 func (tc *TargetedContext) ToCompact() string {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("# Glyph Context: %s\n", tc.Task))
+	sb.WriteString(fmt.Sprintf("# GlyphLang Context: %s\n", tc.Task))
 	sb.WriteString(fmt.Sprintf("# %s\n\n", tc.Description))
 
 	// Syntax guide first (most important for AI)
@@ -1334,7 +1334,7 @@ func (tc *TargetedContext) ToCompact() string {
 func (ctx *ProjectContext) GenerateStubs() string {
 	var sb strings.Builder
 
-	sb.WriteString("# Auto-generated Glyph type stubs\n")
+	sb.WriteString("# Auto-generated GlyphLang type stubs\n")
 	sb.WriteString(fmt.Sprintf("# Generated: %s\n", ctx.Generated.Format(time.RFC3339)))
 	sb.WriteString(fmt.Sprintf("# Hash: %s\n\n", ctx.ProjectHash[:12]))
 

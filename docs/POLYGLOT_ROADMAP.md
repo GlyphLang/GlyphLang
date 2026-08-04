@@ -64,11 +64,11 @@ The Semantic IR, generalized provider system, and Python/FastAPI codegen are mer
 - [x] Compare results across the 5 intent-test scenarios
 - [x] Document findings
 
-**Results**: Glyph scored 9.93/10 avg vs 9.20/10 for natural language (checklist-validated, 3 independent evaluators). Largest advantage in structural precision (+1.0) and completeness (+0.8). See `tests/intent-hypothesis/RESULTS.md` for full analysis.
+**Results**: GlyphLang scored 9.93/10 avg vs 9.20/10 for natural language (checklist-validated, 3 independent evaluators). Largest advantage in structural precision (+1.0) and completeness (+0.8). See `tests/intent-hypothesis/RESULTS.md` for full analysis.
 
 ## Phase 6: Expand IR Coverage (complete)
 
-**Goal**: Handle all Glyph language features in the IR.
+**Goal**: Handle all GlyphLang language features in the IR.
 
 - [x] WebSocket details (connect/message/disconnect handlers, room management)
 - [x] GraphQL schema/resolver generation

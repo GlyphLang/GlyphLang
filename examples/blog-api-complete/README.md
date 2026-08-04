@@ -1,6 +1,6 @@
 # Blog API - Complete Example
 
-A full-featured blog API demonstrating Glyph's capabilities.
+A full-featured blog API demonstrating GlyphLang's capabilities.
 
 ## Features
 
@@ -103,7 +103,7 @@ curl "http://localhost:3000/search?query=database&category=tutorial"
   "posts": [
     {
       "id": 1,
-      "title": "Getting Started with Glyph",
+      "title": "Getting Started with GlyphLang",
       "slug": "getting-started-with-glyph",
       "excerpt": "Learn the basics...",
       "author": "Alice Johnson",

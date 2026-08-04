@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 AI Efficiency Benchmark - Compare token usage and generation efficiency
-across Glyph, FastAPI, Flask, and Java for equivalent functionality.
+across GlyphLang, FastAPI, Flask, and Java for equivalent functionality.
 
-This measures the token efficiency of Glyph's minimal-ceremony design.
+This measures the token efficiency of GlyphLang's minimal-ceremony design.
 Token counts are measured using tiktoken (OpenAI's tokenizer).
 
 Requirements:
@@ -479,7 +479,7 @@ def run_analysis():
     """Run full analysis and print results"""
 
     print("=" * 100)
-    print("AI EFFICIENCY BENCHMARK: Glyph vs FastAPI vs Flask vs Java")
+    print("AI EFFICIENCY BENCHMARK: GlyphLang vs FastAPI vs Flask vs Java")
     print("=" * 100)
     print("\nMeasuring token efficiency for AI/LLM code generation")
     print("Lower tokens = faster generation, lower cost\n")
@@ -507,7 +507,7 @@ def run_analysis():
             totals[lang]['tokens'] += analysis[lang]['tokens']
 
     # Print per-sample results
-    print(f"{'Sample':<25} {'Glyph':<8} {'FastAPI':<8} {'Flask':<8} {'Java':<8} {'Fast/Gly':<9} {'Flsk/Gly':<9} {'Java/Gly':<9}")
+    print(f"{'Sample':<25} {'GlyphLang':<8} {'FastAPI':<8} {'Flask':<8} {'Java':<8} {'Fast/Gly':<9} {'Flsk/Gly':<9} {'Java/Gly':<9}")
     print(f"{'(tokens)':<25} {'tok':<8} {'tok':<8} {'tok':<8} {'tok':<8} {'ratio':<9} {'ratio':<9} {'ratio':<9}")
     print("-" * 100)
 
@@ -524,7 +524,7 @@ def run_analysis():
 
     print(f"\n{'Language':<15} {'Total Chars':<15} {'Total Lines':<15} {'Total Tokens':<15}")
     print("-" * 60)
-    print(f"{'Glyph':<15} {totals['glyph']['chars']:<15} {totals['glyph']['lines']:<15} {totals['glyph']['tokens']:<15}")
+    print(f"{'GlyphLang':<15} {totals['glyph']['chars']:<15} {totals['glyph']['lines']:<15} {totals['glyph']['tokens']:<15}")
     print(f"{'FastAPI':<15} {totals['fastapi']['chars']:<15} {totals['fastapi']['lines']:<15} {totals['fastapi']['tokens']:<15}")
     print(f"{'Flask':<15} {totals['flask']['chars']:<15} {totals['flask']['lines']:<15} {totals['flask']['tokens']:<15}")
     print(f"{'Java':<15} {totals['java']['chars']:<15} {totals['java']['lines']:<15} {totals['java']['tokens']:<15}")
@@ -534,7 +534,7 @@ def run_analysis():
     flask_savings = round((1 - totals['glyph']['tokens'] / totals['flask']['tokens']) * 100, 1)
     java_savings = round((1 - totals['glyph']['tokens'] / totals['java']['tokens']) * 100, 1)
 
-    print(f"\n{'TOKEN SAVINGS WITH Glyph:':<40}")
+    print(f"\n{'TOKEN SAVINGS WITH GlyphLang:':<40}")
     print(f"  vs FastAPI: {fastapi_savings}% fewer tokens")
     print(f"  vs Flask:   {flask_savings}% fewer tokens")
     print(f"  vs Java:    {java_savings}% fewer tokens")
@@ -546,7 +546,7 @@ def run_analysis():
 
     models = ['gpt-4', 'claude-opus', 'claude-sonnet', 'gpt-3.5']
 
-    print(f"\n{'Model':<18} {'Glyph':<12} {'FastAPI':<12} {'Flask':<12} {'Java':<12} {'Glyph Savings':<15}")
+    print(f"\n{'Model':<18} {'GlyphLang':<12} {'FastAPI':<12} {'Flask':<12} {'Java':<12} {'GlyphLang Savings':<15}")
     print("-" * 100)
 
     for model in models:
@@ -566,7 +566,7 @@ def run_analysis():
 
     print("""
 +--------------------------------------------------------------------------------------------------+
-| Glyph's AI-First Design Advantages:                                                              |
+| GlyphLang's AI-First Design Advantages:                                                              |
 +--------------------------------------------------------------------------------------------------+
 |                                                                                                  |
 | 1. TOKEN EFFICIENCY                                                                              |

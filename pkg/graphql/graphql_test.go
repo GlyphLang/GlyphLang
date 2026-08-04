@@ -261,7 +261,7 @@ func TestGenerateSDL(t *testing.T) {
 	assert.Contains(t, sdl, "user(id: Int!): User")
 }
 
-// TestTypeToGraphQL verifies Glyph type to GraphQL type conversion
+// TestTypeToGraphQL verifies GlyphLang type to GraphQL type conversion
 func TestTypeToGraphQL(t *testing.T) {
 	tests := []struct {
 		input    ast.Type

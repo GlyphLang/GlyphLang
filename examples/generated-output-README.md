@@ -29,7 +29,7 @@ examples/<name>/
 
 ## Regenerating
 
-To regenerate these files, build the Glyph compiler and run:
+To regenerate these files, build the GlyphLang compiler and run:
 
 ```bash
 go build -o glyph ./cmd/glyph

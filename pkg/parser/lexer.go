@@ -8,7 +8,7 @@ import (
 	"unicode/utf8"
 )
 
-// Lexer tokenizes GLYPH source code
+// Lexer tokenizes GlyphLang source code
 type Lexer struct {
 	input             string
 	position          int

@@ -1,6 +1,6 @@
 {
   "dashboard": {
-    "title": "Glyph Application Metrics",
+    "title": "GlyphLang Application Metrics",
     "tags": ["glyph", "application"],
     "timezone": "browser",
     "panels": [

@@ -40,7 +40,7 @@ defer db.Close()
 ### 3. Use in Go Code
 
 ```go
-// Create handler for Glyph integration
+// Create handler for GlyphLang integration
 handler := database.NewHandler(db)
 
 // Or use ORM directly
@@ -71,7 +71,7 @@ users, err := orm.NewQueryBuilder().
     Get(ctx)
 ```
 
-### 4. Use in Glyph Code
+### 4. Use in GlyphLang Code
 
 Create a route with database injection:
 

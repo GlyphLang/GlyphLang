@@ -1,8 +1,8 @@
 #!/bin/bash
-# Test script for Glyph Demo Server
+# Test script for GlyphLang Demo Server
 # Make sure the server is running before executing this script
 
-echo "Testing Glyph Demo Server Endpoints"
+echo "Testing GlyphLang Demo Server Endpoints"
 echo "===================================="
 echo ""
 

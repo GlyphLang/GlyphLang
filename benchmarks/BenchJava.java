@@ -2,7 +2,7 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Java Benchmark Suite for comparison with Glyph Language
+ * Java Benchmark Suite for comparison with GlyphLang Language
  * Compile: javac BenchJava.java
  * Run: java BenchJava
  */

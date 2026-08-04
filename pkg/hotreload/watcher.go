@@ -351,7 +351,7 @@ func (w *FileWatcher) hashFile(path string) (string, error) {
 // Hot Reload Manager
 // ========================================
 
-// ReloadManager manages hot-reloading of Glyph applications
+// ReloadManager manages hot-reloading of GlyphLang applications
 type ReloadManager struct {
 	mu           sync.RWMutex
 	watcher      *FileWatcher
@@ -364,12 +364,12 @@ type ReloadManager struct {
 	onReload     func(ReloadEvent)
 }
 
-// CompilerInterface defines the interface for the Glyph compiler
+// CompilerInterface defines the interface for the GlyphLang compiler
 type CompilerInterface interface {
 	CompileFile(path string) ([]byte, error)
 }
 
-// ServerInterface defines the interface for the Glyph server
+// ServerInterface defines the interface for the GlyphLang server
 type ServerInterface interface {
 	Reload(bytecode []byte) error
 	GetState() map[string]interface{}

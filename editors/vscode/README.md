@@ -1,6 +1,6 @@
 # GlyphLang VS Code Extension
 
-Syntax highlighting and language support for Glyph (`.glyph`) and expanded Glyph (`.glyphx`) files.
+Syntax highlighting and language support for GlyphLang (`.glyph`) and expanded GlyphLang (`.glyphx`) files.
 
 ## Features
 
@@ -49,7 +49,7 @@ The `.glyphx` format uses human-readable keywords instead of symbols:
 
 ### LSP Setup
 
-The extension uses the Glyph CLI's built-in language server. Ensure `glyph` is in your PATH:
+The extension uses the GlyphLang CLI's built-in language server. Ensure `glyph` is in your PATH:
 
 ```bash
 go install github.com/glyphlang/glyph/cmd/glyph@latest
@@ -61,12 +61,12 @@ The LSP server is started automatically when opening `.glyph` or `.glyphx` files
 
 | Setting                    | Default  | Description                              |
 |----------------------------|----------|------------------------------------------|
-| `glyph.lsp.enabled`       | `true`   | Enable the Glyph Language Server         |
+| `glyph.lsp.enabled`       | `true`   | Enable the GlyphLang Language Server         |
 | `glyph.lsp.path`          | `glyph`  | Path to the glyph CLI binary             |
 | `glyph.autoExpandOnOpen`  | `false`  | Auto-expand .glyph to .glyphx on open    |
 | `glyph.autoCompactOnSave` | `false`  | Auto-compact .glyphx to .glyph on save   |
 
 ## Commands
 
-- **Glyph: Expand to .glyphx** - Convert current `.glyph` file to expanded syntax
-- **Glyph: Compact to .glyph** - Convert current `.glyphx` file to compact syntax
+- **GlyphLang: Expand to .glyphx** - Convert current `.glyph` file to expanded syntax
+- **GlyphLang: Compact to .glyph** - Convert current `.glyphx` file to compact syntax

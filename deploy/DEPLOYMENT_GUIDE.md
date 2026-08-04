@@ -1,6 +1,6 @@
-# Glyph Deployment Guide
+# GlyphLang Deployment Guide
 
-This guide covers deploying Glyph applications to production environments using Docker, Kubernetes, and cloud providers.
+This guide covers deploying GlyphLang applications to production environments using Docker, Kubernetes, and cloud providers.
 
 ## Table of Contents
 
@@ -17,7 +17,7 @@ This guide covers deploying Glyph applications to production environments using 
 ### Quick Start with Docker Compose
 
 ```bash
-# Start all services (Glyph app + PostgreSQL + Redis + Monitoring)
+# Start all services (GlyphLang app + PostgreSQL + Redis + Monitoring)
 docker-compose up -d
 
 # View logs
@@ -88,7 +88,7 @@ kubectl apply -f deploy/kubernetes/postgres.yaml
 # Deploy Redis
 kubectl apply -f deploy/kubernetes/redis.yaml
 
-# Deploy Glyph application
+# Deploy GlyphLang application
 kubectl apply -f deploy/kubernetes/deployment.yaml
 
 # Create ingress (optional)
@@ -201,7 +201,7 @@ kubectl apply -f deploy/kubernetes/
 
 ### Prometheus Metrics
 
-Glyph exposes metrics at `/metrics`:
+GlyphLang exposes metrics at `/metrics`:
 
 ```
 # Request metrics
@@ -227,7 +227,7 @@ glyph_database_queries_total
 kubectl port-forward svc/grafana 3000:3000 -n glyph
 
 # Login: admin / admin
-# Pre-configured dashboard at: Glyph Application Metrics
+# Pre-configured dashboard at: GlyphLang Application Metrics
 ```
 
 ### Log Aggregation
@@ -391,4 +391,4 @@ For deployment issues:
 ---
 
 *Last Updated: 2025-12-09*
-*Glyph Version: 1.0.0-production*
+*GlyphLang Version: 1.0.0-production*

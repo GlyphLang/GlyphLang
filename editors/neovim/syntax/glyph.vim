@@ -1,5 +1,5 @@
 " Vim syntax file
-" Language: Glyph
+" Language: GlyphLang
 " Maintainer: GlyphLang Team
 " Latest Revision: 2024
 

@@ -1740,7 +1740,7 @@ func generateSourceActions(doc *Document) []CodeAction {
 	var actions []CodeAction
 
 	// Add organize imports action (if applicable)
-	// For Glyph, this could organize type definitions
+	// For GlyphLang, this could organize type definitions
 	if doc.AST != nil {
 		hasTypes := false
 		hasRoutes := false

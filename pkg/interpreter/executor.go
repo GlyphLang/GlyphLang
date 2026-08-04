@@ -496,7 +496,7 @@ func (i *Interpreter) executeSwitch(stmt SwitchStatement, env *Environment) (int
 				return result, err
 			}
 
-			// In GLYPH, switch cases don't fall through by default
+			// In GlyphLang, switch cases don't fall through by default
 			return result, nil
 		}
 	}

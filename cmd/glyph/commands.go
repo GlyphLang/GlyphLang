@@ -149,7 +149,7 @@ func runDecompile(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// runTest handles the test command - executes test blocks in a GLYPH file.
+// runTest handles the test command - executes test blocks in a GlyphLang file.
 // Argument count is validated by cobra.ExactArgs(1) before this function is called.
 // printWarning, printInfo are defined in this file (see helper functions section).
 func runTest(cmd *cobra.Command, args []string) error {
@@ -423,7 +423,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 func runLSP(cmd *cobra.Command, args []string) error {
 	logFile, _ := cmd.Flags().GetString("log")
 
-	printInfo("Starting GLYPH Language Server...")
+	printInfo("Starting GlyphLang Language Server...")
 	if logFile != "" {
 		printInfo(fmt.Sprintf("Logging to: %s", logFile))
 	}

@@ -358,7 +358,7 @@ func TestProjectContextToCompact(t *testing.T) {
 	compact := ctx.ToCompact()
 
 	// Verify sections are present
-	if !strings.Contains(compact, "# Glyph Project Context") {
+	if !strings.Contains(compact, "# GlyphLang Project Context") {
 		t.Error("missing header")
 	}
 	if !strings.Contains(compact, "## Types") {
@@ -539,7 +539,7 @@ func TestContextDiffToCompact(t *testing.T) {
 
 	compact := diff.ToCompact(ctx)
 
-	if !strings.Contains(compact, "# Glyph Context Changes") {
+	if !strings.Contains(compact, "# GlyphLang Context Changes") {
 		t.Error("missing header")
 	}
 	if !strings.Contains(compact, "+ new.glyph") {
@@ -698,7 +698,7 @@ func TestTargetedContextToCompact(t *testing.T) {
 
 	compact := tc.ToCompact()
 
-	if !strings.Contains(compact, "# Glyph Context: route") {
+	if !strings.Contains(compact, "# GlyphLang Context: route") {
 		t.Error("missing header")
 	}
 	if !strings.Contains(compact, "## Syntax") {
@@ -729,7 +729,7 @@ func TestGenerateStubs(t *testing.T) {
 
 	stubs := ctx.GenerateStubs()
 
-	if !strings.Contains(stubs, "# Auto-generated Glyph type stubs") {
+	if !strings.Contains(stubs, "# Auto-generated GlyphLang type stubs") {
 		t.Error("missing header")
 	}
 	if !strings.Contains(stubs, ": User") {

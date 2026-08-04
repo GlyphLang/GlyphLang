@@ -16,9 +16,9 @@ import (
 
 func TestStaticRouteParseThenServe(t *testing.T) {
 	// Create a temp directory with a test file. Use forward slashes in the
-	// path so it can be embedded in a Glyph string literal: on Windows
+	// path so it can be embedded in a GlyphLang string literal: on Windows
 	// t.TempDir() returns a backslash path, and backslashes are escape
-	// sequences in Glyph strings. Windows accepts forward slashes for file I/O.
+	// sequences in GlyphLang strings. Windows accepts forward slashes for file I/O.
 	tmpDir := filepath.ToSlash(t.TempDir())
 	testContent := []byte("hello from static file")
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "test.txt"), testContent, 0644))

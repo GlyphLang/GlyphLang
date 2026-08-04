@@ -1,10 +1,10 @@
-# Glyph Interpreter
+# GlyphLang Interpreter
 
-A Go-based AST interpreter for the Glyph language.
+A Go-based AST interpreter for the GlyphLang language.
 
 ## Overview
 
-This interpreter executes Glyph AST nodes directly without compilation to bytecode. It supports:
+This interpreter executes GlyphLang AST nodes directly without compilation to bytecode. It supports:
 
 - Expression evaluation (literals, variables, binary operations, field access, function calls)
 - Statement execution (variable assignment, return, if statements, database queries)
@@ -14,7 +14,7 @@ This interpreter executes Glyph AST nodes directly without compilation to byteco
 
 ## Files
 
-- `ast.go` - AST type definitions for the Glyph language
+- `ast.go` - AST type definitions for the GlyphLang language
 - `environment.go` - Variable scope management
 - `evaluator.go` - Expression evaluation logic
 - `executor.go` - Statement execution logic
@@ -319,7 +319,7 @@ interpreter/
 ## Integration
 
 This interpreter is designed to work with:
-- **Parser** (pending): Converts Glyph source code to AST
+- **Parser** (pending): Converts GlyphLang source code to AST
 - **Runtime**: Provides HTTP server to route requests to interpreter
 - **Cache**: Stores compiled/parsed modules
 - **Database**: Executes database queries from routes

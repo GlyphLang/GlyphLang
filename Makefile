@@ -133,11 +133,11 @@ lint:
 
 # Run the application
 run:
-	@echo "Running Glyph..."
+	@echo "Running GlyphLang..."
 	go run ./cmd/glyph run examples/hello-world/main.glyph
 
 dev:
-	@echo "Running Glyph in dev mode..."
+	@echo "Running GlyphLang in dev mode..."
 	go run ./cmd/glyph dev examples/rest-api/main.glyph --port 8080
 
 # Regenerate llms.txt (AI agent primer served at glyphlang.dev/llms.txt)

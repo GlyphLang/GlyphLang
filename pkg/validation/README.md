@@ -1,6 +1,6 @@
-# Glyph Validation Package
+# GlyphLang Validation Package
 
-The validation package provides comprehensive validation rule enforcement for the Glyph language. It includes built-in validators for common validation scenarios and a flexible framework for custom validation logic.
+The validation package provides comprehensive validation rule enforcement for the GlyphLang language. It includes built-in validators for common validation scenarios and a flexible framework for custom validation logic.
 
 ## Features
 
@@ -15,7 +15,7 @@ The validation package provides comprehensive validation rule enforcement for th
 
 ## Installation
 
-The validation package is part of the Glyph project and can be imported as:
+The validation package is part of the GlyphLang project and can be imported as:
 
 ```go
 import "github.com/glyphlang/glyph/pkg/validation"
@@ -509,4 +509,4 @@ Test coverage includes:
 
 ## License
 
-Part of the Glyph language project.
+Part of the GlyphLang language project.

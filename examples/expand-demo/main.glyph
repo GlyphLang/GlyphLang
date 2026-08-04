@@ -9,7 +9,7 @@
 # Simple hello endpoint
 @ GET / {
   > {
-    message: "Welcome to Glyph!",
+    message: "Welcome to GlyphLang!",
     version: "1.0.0"
   }
 }

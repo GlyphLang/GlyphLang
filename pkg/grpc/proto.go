@@ -42,7 +42,7 @@ type ProtoField struct {
 	Repeated bool
 }
 
-// GenerateProto generates a .proto file from Glyph service definitions and type definitions.
+// GenerateProto generates a .proto file from GlyphLang service definitions and type definitions.
 func GenerateProto(packageName string, services map[string]ast.GRPCService, typeDefs map[string]ast.TypeDef) *ProtoFile {
 	proto := &ProtoFile{
 		Package: packageName,

@@ -198,7 +198,7 @@ func TestExampleProgramModuleStructure(t *testing.T) {
 func TestInterpreterRouteExecution(t *testing.T) {
 	t.Run("simple route returns response", func(t *testing.T) {
 		source := `@ GET /test {
-  > {status: "ok", message: "Hello from Glyph"}
+  > {status: "ok", message: "Hello from GlyphLang"}
 }`
 		module, err := parseSource(source)
 		if err != nil {
@@ -408,7 +408,7 @@ func TestFullPipelineHTTPServer(t *testing.T) {
 		mockInterp := &MockConcurrentInterpreter{
 			response: map[string]interface{}{
 				"status":  "ok",
-				"message": "Hello from Glyph E2E test",
+				"message": "Hello from GlyphLang E2E test",
 			},
 		}
 

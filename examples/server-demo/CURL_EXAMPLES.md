@@ -1,6 +1,6 @@
-# Glyph Server - curl Examples
+# GlyphLang Server - curl Examples
 
-Quick reference for testing the Glyph HTTP server with curl commands.
+Quick reference for testing the GlyphLang HTTP server with curl commands.
 
 ## Prerequisites
 

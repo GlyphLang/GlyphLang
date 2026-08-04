@@ -1,6 +1,6 @@
-# Glyph Database Package
+# GlyphLang Database Package
 
-Complete database integration layer for Glyph with PostgreSQL driver and ORM capabilities.
+Complete database integration layer for GlyphLang with PostgreSQL driver and ORM capabilities.
 
 ## Features
 
@@ -76,7 +76,7 @@ users, err := orm.NewQueryBuilder().
     Get(ctx)
 ```
 
-### Using the Handler (for Glyph integration)
+### Using the Handler (for GlyphLang integration)
 
 ```go
 // Create handler
@@ -94,9 +94,9 @@ err := users.Delete(1)
 count, err := users.Count("status", "active")
 ```
 
-## Glyph Language Integration
+## GlyphLang Integration
 
-In your Glyph code, inject the database using `% db: Database`:
+In your GlyphLang code, inject the database using `% db: Database`:
 
 ```glyph
 @ route /api/users/:id [GET] -> User
@@ -339,4 +339,4 @@ See `examples/database-demo/main.glyph` for a complete CRUD application example.
 
 ## License
 
-Part of the Glyph project.
+Part of the GlyphLang project.

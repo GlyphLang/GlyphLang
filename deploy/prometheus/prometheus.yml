@@ -18,7 +18,7 @@ rule_files:
 
 # Scrape configurations
 scrape_configs:
-  # Glyph application metrics
+  # GlyphLang application metrics
   - job_name: 'glyph-app'
     kubernetes_sd_configs:
       - role: pod

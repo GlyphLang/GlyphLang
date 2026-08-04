@@ -1,6 +1,6 @@
-# Glyph CLI Documentation
+# GlyphLang CLI Documentation
 
-The Glyph command-line interface (CLI) provides tools for developing, running, and deploying Glyph applications.
+The GlyphLang command-line interface (CLI) provides tools for developing, running, and deploying GlyphLang applications.
 
 ## Installation
 
@@ -64,7 +64,7 @@ When you save changes, you'll see:
 
 ### `glyph run <file>`
 
-Run a Glyph source file or bytecode (production mode).
+Run a GlyphLang source file or bytecode (production mode).
 
 ```bash
 glyph run examples/rest-api/main.glyph
@@ -76,7 +76,7 @@ glyph run examples/rest-api/main.glyph
 ```
 
 **Features:**
-- Compiles and runs Glyph source using VM (default)
+- Compiles and runs GlyphLang source using VM (default)
 - Falls back to interpreter if compilation fails
 - Supports direct bytecode execution with `--bytecode`
 - Starts HTTP server
@@ -104,7 +104,7 @@ $ glyph run examples/rest-api/main.glyph --interpret
 
 ### `glyph compile <file>`
 
-Compile Glyph source code to bytecode.
+Compile GlyphLang source code to bytecode.
 
 ```bash
 glyph compile examples/hello-world/main.glyph
@@ -202,13 +202,13 @@ Content within a line is never reflowed, so a one-line change stays a one-line d
 
 ### `glyph exec <file> <command> [args...]`
 
-Execute a CLI command defined in a Glyph source file.
+Execute a CLI command defined in a GlyphLang source file.
 
 ```bash
 glyph exec main.glyph hello --name="Alice"
 
 # Arguments and flags:
-#   <file>        The Glyph source file containing commands
+#   <file>        The GlyphLang source file containing commands
 #   <command>     The name of the command to execute
 #   [args...]     Command-specific arguments and flags
 ```
@@ -252,7 +252,7 @@ $ glyph exec examples/cli-demo/main.glyph greet --name="Bob" --formal
 
 ### `glyph commands <file>`
 
-List all available CLI commands defined in a Glyph source file.
+List all available CLI commands defined in a GlyphLang source file.
 
 ```bash
 glyph commands main.glyph
@@ -292,7 +292,7 @@ Available commands in examples/cli-demo/main.glyph:
 
 ### `glyph context [directory]`
 
-Generate AI-optimized project context for AI agents working with Glyph codebases.
+Generate AI-optimized project context for AI agents working with GlyphLang codebases.
 
 ```bash
 glyph context              # Generate context for current directory
@@ -331,7 +331,7 @@ Changed: User.email type modified
 
 ### `glyph validate <file>`
 
-Validate Glyph source files with structured, AI-friendly error output.
+Validate GlyphLang source files with structured, AI-friendly error output.
 
 ```bash
 glyph validate main.glyph       # Human-readable output
@@ -444,7 +444,7 @@ $ glyph ir api.glyph --format catalog --pretty
 
 ### `glyph init <name>`
 
-Initialize a new Glyph project.
+Initialize a new GlyphLang project.
 
 ```bash
 glyph init my-project
@@ -470,11 +470,11 @@ $ glyph init my-api -t rest-api
 
 ### `glyph --version`
 
-Display Glyph version.
+Display GlyphLang version.
 
 ```bash
 $ glyph --version
-Glyph version 0.3.2
+GlyphLang v0.3.2
 ```
 
 ### `glyph --help`
@@ -483,7 +483,7 @@ Display help information.
 
 ```bash
 $ glyph --help
-Glyph is a programming language specifically designed for AI agents
+GlyphLang is a programming language specifically designed for AI agents
 to rapidly build high-performance, secure backend applications.
 
 Usage:
@@ -496,9 +496,9 @@ Available Commands:
   dev         Start development server with hot reload
   fmt         Format .glyph files with the canonical zero-option style
   init        Initialize new project
-  run         Run Glyph source file or bytecode
-  exec        Execute a CLI command from a Glyph file
-  commands    List all CLI commands in a Glyph file
+  run         Run GlyphLang source file or bytecode
+  exec        Execute a CLI command from a GlyphLang file
+  commands    List all CLI commands in a GlyphLang file
   validate    Validate source with structured errors
   lsp         Start Language Server Protocol server
   help        Help about any command
@@ -700,7 +700,7 @@ The CLI orchestrates four main components:
 
 ```
 ┌─────────────────┐
-│   Glyph CLI     │
+│   GlyphLang CLI     │
 │   (main.go)     │
 └────────┬────────┘
          │
@@ -739,7 +739,7 @@ The [VS Code extension](https://github.com/GlyphLang/vscode-glyph) automatically
 
 ## JIT Compilation
 
-Glyph includes a JIT (Just-In-Time) compiler that automatically optimizes frequently executed routes for better performance.
+GlyphLang includes a JIT (Just-In-Time) compiler that automatically optimizes frequently executed routes for better performance.
 
 ### How It Works
 
@@ -762,7 +762,7 @@ JIT compilation is **enabled by default** in production mode. The runtime automa
 
 ### Configuration
 
-JIT behavior can be tuned programmatically when embedding Glyph:
+JIT behavior can be tuned programmatically when embedding GlyphLang:
 
 ```go
 import "github.com/glyphlang/glyph/pkg/jit"
@@ -801,11 +801,11 @@ The JIT compiler tracks runtime types and generates specialized code for monomor
 
 ## Observability
 
-Glyph provides built-in observability through Prometheus metrics and OpenTelemetry tracing.
+GlyphLang provides built-in observability through Prometheus metrics and OpenTelemetry tracing.
 
 ### Prometheus Metrics
 
-Glyph exposes metrics at the `/metrics` endpoint in Prometheus format.
+GlyphLang exposes metrics at the `/metrics` endpoint in Prometheus format.
 
 #### Enabling Metrics
 
@@ -877,7 +877,7 @@ scrape_configs:
 
 ### OpenTelemetry Tracing
 
-Glyph supports distributed tracing via OpenTelemetry with W3C Trace Context propagation.
+GlyphLang supports distributed tracing via OpenTelemetry with W3C Trace Context propagation.
 
 #### Enabling Tracing
 
@@ -962,7 +962,7 @@ docker run -d --name jaeger \
 
 ## Environment Variables
 
-Glyph applications can be configured via environment variables.
+GlyphLang applications can be configured via environment variables.
 
 ### Core Variables
 

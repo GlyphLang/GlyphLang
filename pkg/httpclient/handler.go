@@ -168,7 +168,7 @@ func validateURL(rawURL string) error {
 	return nil
 }
 
-// doRequest executes an HTTP request and returns the response as a Glyph-friendly map.
+// doRequest executes an HTTP request and returns the response as a GlyphLang-friendly map.
 func (h *Handler) doRequest(method, reqURL string, opts *requestOptions) (map[string]interface{}, error) {
 	// Append query parameters
 	if len(opts.Query) > 0 {

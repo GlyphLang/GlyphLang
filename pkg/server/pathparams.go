@@ -63,7 +63,7 @@ func ExtractPathParamValues(pattern, actualPath string) map[string]string {
 	return params
 }
 
-// ConvertPatternToMuxFormat converts Glyph's :param syntax to Go's {param} syntax
+// ConvertPatternToMuxFormat converts GlyphLang's :param syntax to Go's {param} syntax
 // for http.ServeMux pattern matching.
 // e.g., "/chat/:room" becomes "/chat/{room}"
 func ConvertPatternToMuxFormat(pattern string) string {
