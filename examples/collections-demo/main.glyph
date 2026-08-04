@@ -130,7 +130,7 @@
     $ limit = 20
   }
   if limit > 100 {
-    $ limit = 100
+    limit = 100
   }
 
   $ startIndex = (page - 1) * limit
@@ -248,16 +248,16 @@
     $ categoryList = categoryList + [{name: "electronics", count: electronicsCount, total_value: electronicsValue}]
   }
   if clothingCount > 0 {
-    $ categoryList = categoryList + [{name: "clothing", count: clothingCount, total_value: clothingValue}]
+    categoryList = categoryList + [{name: "clothing", count: clothingCount, total_value: clothingValue}]
   }
   if foodCount > 0 {
-    $ categoryList = categoryList + [{name: "food", count: foodCount, total_value: foodValue}]
+    categoryList = categoryList + [{name: "food", count: foodCount, total_value: foodValue}]
   }
   if homeCount > 0 {
-    $ categoryList = categoryList + [{name: "home", count: homeCount, total_value: homeValue}]
+    categoryList = categoryList + [{name: "home", count: homeCount, total_value: homeValue}]
   }
   if otherCount > 0 {
-    $ categoryList = categoryList + [{name: "other", count: otherCount, total_value: otherValue}]
+    categoryList = categoryList + [{name: "other", count: otherCount, total_value: otherValue}]
   }
 
   > {
@@ -420,7 +420,7 @@
                     quantity: newQuantity
                 }]
               } else {
-                $ newItems = newItems + [item]
+                newItems = newItems + [item]
               }
               $ itemIndex = itemIndex + 1
             }
@@ -538,7 +538,7 @@
         }
       }
       if categoryMatch == false {
-        $ matches = false
+        matches = false
       }
     }
 
@@ -553,14 +553,14 @@
         }
       }
       if tagMatch == false {
-        $ matches = false
+        matches = false
       }
     }
 
     # In stock filter
     if matches == true && inStockOnly == true {
       if product.inventory < 1 || product.active == false {
-        $ matches = false
+        matches = false
       }
     }
 

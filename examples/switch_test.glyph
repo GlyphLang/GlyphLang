@@ -40,13 +40,13 @@
       $ grade = "A"
     }
     case 80 {
-      $ grade = "B"
+      grade = "B"
     }
     case 70 {
-      $ grade = "C"
+      grade = "C"
     }
     default {
-      $ grade = "F"
+      grade = "F"
     }
   }
   > {grade: grade, score: score}

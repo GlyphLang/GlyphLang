@@ -192,12 +192,7 @@ func createCompiledRouteHandler(route *ast.Route, bytecode []byte, wsHub *websoc
 		result, err := vmInstance.Execute(bytecode)
 		if err != nil {
 			// Log full error server-side, return generic message to client
-			printError(fmt.Errorf("bytecode execution failed: %w", err))
-			ctx.StatusCode = http.StatusInternalServerError
-			ctx.ResponseWriter.Header().Set("Content-Type", "application/json")
-			return json.NewEncoder(ctx.ResponseWriter).Encode(map[string]interface{}{
-				"error": "Internal server error",
-			})
+			return writeInternalError(ctx, fmt.Errorf("bytecode execution failed: %w", err))
 		}
 
 		// Unwrap status-carrying results from guards and `> value :: N`
@@ -240,13 +235,7 @@ func createRouteHandler(route *ast.Route, interp *interpreter.Interpreter) serve
 		// Execute route body using the interpreter
 		response, err := executeRoute(route, ctx, interp)
 		if err != nil {
-			// Log full error server-side, return generic message to client
-			printError(fmt.Errorf("route execution error: %w", err))
-			ctx.StatusCode = http.StatusInternalServerError
-			ctx.ResponseWriter.Header().Set("Content-Type", "application/json")
-			return json.NewEncoder(ctx.ResponseWriter).Encode(map[string]interface{}{
-				"error": "Internal server error",
-			})
+			return writeInternalError(ctx, fmt.Errorf("route execution error: %w", err))
 		}
 
 		// Check for redirect response (Location header set by interpreter)
@@ -635,6 +624,20 @@ func printWarning(msg string) {
 
 func printError(err error) {
 	errorColor.Printf("[ERROR] %s\n", err.Error())
+}
+
+// writeInternalError logs the full error server-side and sends a generic 500 to
+// the client. WriteHeader must be called before the body is written: writing
+// first makes net/http commit an implicit 200, so a failed route would report
+// success to the caller.
+func writeInternalError(ctx *server.Context, err error) error {
+	printError(err)
+	ctx.StatusCode = http.StatusInternalServerError
+	ctx.ResponseWriter.Header().Set("Content-Type", "application/json")
+	ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
+	return json.NewEncoder(ctx.ResponseWriter).Encode(map[string]interface{}{
+		"error": "Internal server error",
+	})
 }
 
 func printRequest(method, path string) {

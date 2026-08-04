@@ -23,7 +23,7 @@
   if formal {
     $ msg = "Good day, " + name + ". How may I assist you?"
   } else {
-    $ msg = "Hey " + name + "!"
+    msg = "Hey " + name + "!"
   }
   > {greeting: msg}
 }

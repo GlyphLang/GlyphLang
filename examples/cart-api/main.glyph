@@ -76,7 +76,7 @@
     $ allProducts = db.products.filter("category", query.category)
     $ category = query.category
   } else {
-    $ allProducts = db.products.all()
+    allProducts = db.products.all()
   }
 
   $ total = allProducts.length()
@@ -417,12 +417,12 @@
           if discount.type == "percentage" {
             $ discountAmount = cart.subtotal * (discount.value / 100.0)
           } else {
-            $ discountAmount = discount.value
+            discountAmount = discount.value
           }
 
           # Ensure discount doesn't exceed subtotal
           if discountAmount > cart.subtotal {
-            $ discountAmount = cart.subtotal
+            discountAmount = cart.subtotal
           }
 
           $ cart.discount = discountAmount

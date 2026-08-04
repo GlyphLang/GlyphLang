@@ -77,72 +77,72 @@
 
   # Validate email - required, valid format, unique
   if input.email == null || input.email == "" {
-    $ errors = errors + [{
+    errors = errors + [{
         field: "email",
         message: "Email is required",
         code: "REQUIRED"
     }]
-    $ hasErrors = true
+    hasErrors = true
   } else {
     # Check basic email format (contains @ and .)
     $ emailValid = input.email.contains("@")
     if emailValid == false {
-      $ errors = errors + [{
+      errors = errors + [{
           field: "email",
           message: "Invalid email format",
           code: "INVALID_FORMAT"
       }]
-      $ hasErrors = true
+      hasErrors = true
     } else {
       # Check uniqueness
       $ existingEmail = db.users.findOne("email", input.email)
       if existingEmail != null {
-        $ errors = errors + [{
+        errors = errors + [{
             field: "email",
             message: "Email already registered",
             code: "ALREADY_EXISTS"
         }]
-        $ hasErrors = true
+        hasErrors = true
       }
     }
   }
 
   # Validate password - required, minimum 8 chars
   if input.password == null || input.password == "" {
-    $ errors = errors + [{
+    errors = errors + [{
         field: "password",
         message: "Password is required",
         code: "REQUIRED"
     }]
-    $ hasErrors = true
+    hasErrors = true
   } else {
     if input.password.length() < 8 {
-      $ errors = errors + [{
+      errors = errors + [{
           field: "password",
           message: "Password must be at least 8 characters",
           code: "MIN_LENGTH"
       }]
-      $ hasErrors = true
+      hasErrors = true
     }
   }
 
   # Validate age - optional, but if provided must be 0-150
   if input.age != null {
     if input.age < 0 {
-      $ errors = errors + [{
+      errors = errors + [{
           field: "age",
           message: "Age cannot be negative",
           code: "MIN_VALUE"
       }]
-      $ hasErrors = true
+      hasErrors = true
     } else {
       if input.age > 150 {
-        $ errors = errors + [{
+        errors = errors + [{
             field: "age",
             message: "Age cannot exceed 150",
             code: "MAX_VALUE"
         }]
-        $ hasErrors = true
+        hasErrors = true
       }
     }
   }
@@ -150,12 +150,12 @@
   # Validate phone - optional, but if provided must be valid format
   if input.phone != null && input.phone != "" {
     if input.phone.length() < 10 || input.phone.length() > 15 {
-      $ errors = errors + [{
+      errors = errors + [{
           field: "phone",
           message: "Phone must be 10-15 digits",
           code: "INVALID_FORMAT"
       }]
-      $ hasErrors = true
+      hasErrors = true
     }
   }
 
@@ -242,24 +242,24 @@
     # Validate age if provided
     if input.age != null {
       if input.age < 0 || input.age > 150 {
-        $ errors = errors + [{
+        errors = errors + [{
             field: "age",
             message: "Age must be between 0 and 150",
             code: "OUT_OF_RANGE"
         }]
-        $ hasErrors = true
+        hasErrors = true
       }
     }
 
     # Validate phone if provided
     if input.phone != null && input.phone != "" {
       if input.phone.length() < 10 || input.phone.length() > 15 {
-        $ errors = errors + [{
+        errors = errors + [{
             field: "phone",
             message: "Phone must be 10-15 digits",
             code: "INVALID_FORMAT"
         }]
-        $ hasErrors = true
+        hasErrors = true
       }
     }
 
@@ -337,20 +337,20 @@
 
   # Validate price - required, must be positive
   if input.price == null {
-    $ errors = errors + [{
+    errors = errors + [{
         field: "price",
         message: "Price is required",
         code: "REQUIRED"
     }]
-    $ hasErrors = true
+    hasErrors = true
   } else {
     if input.price <= 0 {
-      $ errors = errors + [{
+      errors = errors + [{
           field: "price",
           message: "Price must be greater than 0",
           code: "MIN_VALUE"
       }]
-      $ hasErrors = true
+      hasErrors = true
     } else {
       if input.price > 999999.99 {
         $ errors = errors + [{
@@ -365,20 +365,20 @@
 
   # Validate quantity - required, non-negative integer
   if input.quantity == null {
-    $ errors = errors + [{
+    errors = errors + [{
         field: "quantity",
         message: "Quantity is required",
         code: "REQUIRED"
     }]
-    $ hasErrors = true
+    hasErrors = true
   } else {
     if input.quantity < 0 {
-      $ errors = errors + [{
+      errors = errors + [{
           field: "quantity",
           message: "Quantity cannot be negative",
           code: "MIN_VALUE"
       }]
-      $ hasErrors = true
+      hasErrors = true
     }
   }
 
@@ -386,46 +386,46 @@
   $ categoryValid = false
 
   if input.category == null || input.category == "" {
-    $ errors = errors + [{
+    errors = errors + [{
         field: "category",
         message: "Category is required",
         code: "REQUIRED"
     }]
-    $ hasErrors = true
+    hasErrors = true
   } else {
     if input.category == "electronics" || input.category == "clothing" || input.category == "food" || input.category == "home" || input.category == "other" {
       $ categoryValid = true
     }
 
     if categoryValid == false {
-      $ errors = errors + [{
+      errors = errors + [{
           field: "category",
           message: "Invalid category. Must be: electronics, clothing, food, home, or other",
           code: "INVALID_VALUE"
       }]
-      $ hasErrors = true
+      hasErrors = true
     }
   }
 
   # Validate SKU if provided - must be alphanumeric and 8-20 chars
   if input.sku != null && input.sku != "" {
     if input.sku.length() < 8 || input.sku.length() > 20 {
-      $ errors = errors + [{
+      errors = errors + [{
           field: "sku",
           message: "SKU must be 8-20 characters",
           code: "LENGTH_ERROR"
       }]
-      $ hasErrors = true
+      hasErrors = true
     } else {
       # Check uniqueness
       $ existingSku = db.products.findOne("sku", input.sku)
       if existingSku != null {
-        $ errors = errors + [{
+        errors = errors + [{
             field: "sku",
             message: "SKU already exists",
             code: "ALREADY_EXISTS"
         }]
-        $ hasErrors = true
+        hasErrors = true
       }
     }
   }
@@ -495,24 +495,24 @@
   # Validate page number if provided
   if input.page != null {
     if input.page < 1 {
-      $ errors = errors + [{
+      errors = errors + [{
           field: "page",
           message: "Page number must be at least 1",
           code: "MIN_VALUE"
       }]
-      $ hasErrors = true
+      hasErrors = true
     }
   }
 
   # Validate limit if provided
   if input.limit != null {
     if input.limit < 1 || input.limit > 100 {
-      $ errors = errors + [{
+      errors = errors + [{
           field: "limit",
           message: "Limit must be between 1 and 100",
           code: "OUT_OF_RANGE"
       }]
-      $ hasErrors = true
+      hasErrors = true
     }
   }
 
