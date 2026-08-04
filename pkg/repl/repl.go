@@ -490,7 +490,7 @@ func (r *REPL) GetInterpreter() *interpreter.Interpreter {
 	return r.interp
 }
 
-// LoadFile loads and executes a GlyphLang file.
+// LoadFile loads and executes a .glyph file.
 func (r *REPL) LoadFile(filepath string) error {
 	source, err := os.ReadFile(filepath)
 	if err != nil {

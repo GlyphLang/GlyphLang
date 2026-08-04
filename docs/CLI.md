@@ -64,7 +64,7 @@ When you save changes, you'll see:
 
 ### `glyph run <file>`
 
-Run a GlyphLang source file or bytecode (production mode).
+Run a `.glyph` source file or bytecode (production mode).
 
 ```bash
 glyph run examples/rest-api/main.glyph
@@ -202,13 +202,13 @@ Content within a line is never reflowed, so a one-line change stays a one-line d
 
 ### `glyph exec <file> <command> [args...]`
 
-Execute a CLI command defined in a GlyphLang source file.
+Execute a CLI command defined in a `.glyph` source file.
 
 ```bash
 glyph exec main.glyph hello --name="Alice"
 
 # Arguments and flags:
-#   <file>        The GlyphLang source file containing commands
+#   <file>        The `.glyph` source file containing commands
 #   <command>     The name of the command to execute
 #   [args...]     Command-specific arguments and flags
 ```
@@ -252,7 +252,7 @@ $ glyph exec examples/cli-demo/main.glyph greet --name="Bob" --formal
 
 ### `glyph commands <file>`
 
-List all available CLI commands defined in a GlyphLang source file.
+List all available CLI commands defined in a `.glyph` source file.
 
 ```bash
 glyph commands main.glyph
@@ -331,7 +331,7 @@ Changed: User.email type modified
 
 ### `glyph validate <file>`
 
-Validate GlyphLang source files with structured, AI-friendly error output.
+Validate `.glyph` source files with structured, AI-friendly error output.
 
 ```bash
 glyph validate main.glyph       # Human-readable output
@@ -496,9 +496,9 @@ Available Commands:
   dev         Start development server with hot reload
   fmt         Format .glyph files with the canonical zero-option style
   init        Initialize new project
-  run         Run GlyphLang source file or bytecode
-  exec        Execute a CLI command from a GlyphLang file
-  commands    List all CLI commands in a GlyphLang file
+  run         Run `.glyph` source file or bytecode
+  exec        Execute a CLI command from a `.glyph` file
+  commands    List all CLI commands in a `.glyph` file
   validate    Validate source with structured errors
   lsp         Start Language Server Protocol server
   help        Help about any command

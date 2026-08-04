@@ -278,7 +278,7 @@ The following could be added in future iterations:
 The server is ready to integrate with the GlyphLang compiler and interpreter:
 
 ```go
-// Parse GlyphLang file
+// Parse `.glyph` file
 ast := parser.Parse("main.glyph")
 
 // Extract routes from AST

@@ -76,7 +76,7 @@ type CommandInfo struct {
 	Hash        string   `json:"hash"`
 }
 
-// Generator generates AI context from GlyphLang source files
+// Generator generates AI context from .glyph source files
 type Generator struct {
 	rootDir string
 }
@@ -184,7 +184,7 @@ func (g *Generator) findGlyphFiles() ([]string, error) {
 	return files, err
 }
 
-// processFile processes a single GlyphLang file and extracts context
+// processFile processes a single .glyph file and extracts context
 func (g *Generator) processFile(relPath string, ctx *ProjectContext) (*FileContext, error) {
 	fullPath := filepath.Join(g.rootDir, relPath)
 

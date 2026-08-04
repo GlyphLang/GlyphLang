@@ -785,7 +785,7 @@ func TestLoadCommandWithExtension(t *testing.T) {
 	}
 }
 
-// TestLoadFileValidFile tests LoadFile with a valid GlyphLang file.
+// TestLoadFileValidFile tests LoadFile with a valid .glyph file.
 func TestLoadFileValidFile(t *testing.T) {
 	// Create a temporary .glyph file
 	tmpDir := t.TempDir()

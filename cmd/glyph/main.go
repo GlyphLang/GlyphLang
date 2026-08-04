@@ -62,7 +62,7 @@ to rapidly build high-performance, secure backend applications.`,
 	// Run command
 	var runCmd = &cobra.Command{
 		Use:   "run <file>",
-		Short: "Run GlyphLang source file",
+		Short: "Run .glyph source file",
 		Args:  cobra.ExactArgs(1),
 		RunE:  runRun,
 	}
@@ -101,8 +101,8 @@ to rapidly build high-performance, secure backend applications.`,
 	// Exec command - execute CLI commands defined with @ command
 	var execCmd = &cobra.Command{
 		Use:   "exec <file> <command> [args...]",
-		Short: "Execute a CLI command defined in a GlyphLang file",
-		Long: `Execute CLI commands defined with @ command in a GlyphLang file.
+		Short: "Execute a CLI command defined in a .glyph file",
+		Long: `Execute CLI commands defined with @ command in a .glyph file.
 
 Example:
   # In my-cli.glyph:
@@ -116,10 +116,10 @@ Example:
 		RunE: runExec,
 	}
 
-	// List commands - list all commands in a GlyphLang file
+	// List commands - list all commands in a .glyph file
 	var listCmdsCmd = &cobra.Command{
 		Use:   "commands <file>",
-		Short: "List all CLI commands defined in a GlyphLang file",
+		Short: "List all CLI commands defined in a .glyph file",
 		Args:  cobra.ExactArgs(1),
 		RunE:  runListCommands,
 	}
@@ -162,8 +162,8 @@ Examples:
 	// Validate command - validate source files with structured errors
 	var validateCmd = &cobra.Command{
 		Use:   "validate <file>",
-		Short: "Validate a GlyphLang source file",
-		Long: `Validate a GlyphLang source file and report errors.
+		Short: "Validate a .glyph source file",
+		Long: `Validate a .glyph source file and report errors.
 
 By default, outputs human-readable error messages. Use --ai for structured
 JSON output optimized for AI agents to parse and fix issues.
@@ -361,8 +361,8 @@ Examples:
 	// Test command
 	var testCmd = &cobra.Command{
 		Use:   "test <file>",
-		Short: "Run tests defined in a GlyphLang file",
-		Long: `Execute all test blocks defined with 'test' keyword in a GlyphLang file.
+		Short: "Run tests defined in a .glyph file",
+		Long: `Execute all test blocks defined with 'test' keyword in a .glyph file.
 
 Example:
   test "should add numbers" {

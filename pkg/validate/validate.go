@@ -1,4 +1,4 @@
-// Package validate provides AI-friendly validation for GlyphLang source files.
+// Package validate provides AI-friendly validation for .glyph source files.
 // It returns structured errors that AI agents can easily parse and act upon.
 package validate
 
@@ -13,7 +13,7 @@ import (
 	"github.com/glyphlang/glyph/pkg/parser"
 )
 
-// ValidationResult contains the results of validating a GlyphLang file
+// ValidationResult contains the results of validating a .glyph file
 type ValidationResult struct {
 	Valid    bool               `json:"valid"`
 	FilePath string             `json:"file_path"`

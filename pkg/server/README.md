@@ -312,10 +312,10 @@ The mock will echo back request details (path, method, params, body) if no custo
 
 ## Integration with GlyphLang
 
-When integrated with the GlyphLang compiler and interpreter, routes will be registered from parsed GlyphLang source files:
+When integrated with the GlyphLang compiler and interpreter, routes will be registered from parsed `.glyph` source files:
 
 ```go
-// Parse GlyphLang file
+// Parse `.glyph` file
 routes := parser.Parse("main.glyph")
 
 // Register with server
