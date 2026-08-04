@@ -13,7 +13,7 @@ const (
 	PATCH  HTTPMethod = "PATCH"
 )
 
-// Route represents a parsed GLYPH route definition
+// Route represents a parsed GlyphLang route definition
 type Route struct {
 	Method      HTTPMethod
 	Path        string
@@ -37,7 +37,7 @@ type Context struct {
 // Middleware is a function that wraps a handler
 type Middleware func(next RouteHandler) RouteHandler
 
-// Interpreter interface for executing GLYPH route logic
+// Interpreter interface for executing GlyphLang route logic
 // This will be properly implemented later - for now we mock it
 type Interpreter interface {
 	Execute(route *Route, ctx *Context) (interface{}, error)

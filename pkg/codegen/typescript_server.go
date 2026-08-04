@@ -1001,7 +1001,7 @@ func irTypeToTypeScript(t ir.TypeRef) string {
 }
 
 func glyphPathToExpress(path string) string {
-	// Express uses :param syntax (same as Glyph), so no conversion needed
+	// Express uses :param syntax (same as GlyphLang), so no conversion needed
 	return path
 }
 

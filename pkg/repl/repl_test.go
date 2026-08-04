@@ -785,7 +785,7 @@ func TestLoadCommandWithExtension(t *testing.T) {
 	}
 }
 
-// TestLoadFileValidFile tests LoadFile with a valid Glyph file.
+// TestLoadFileValidFile tests LoadFile with a valid .glyph file.
 func TestLoadFileValidFile(t *testing.T) {
 	// Create a temporary .glyph file
 	tmpDir := t.TempDir()
@@ -828,7 +828,7 @@ func TestLoadFileNonexistent(t *testing.T) {
 	}
 }
 
-// TestLoadFileInvalidSyntax tests LoadFile with invalid Glyph syntax.
+// TestLoadFileInvalidSyntax tests LoadFile with invalid GlyphLang syntax.
 func TestLoadFileInvalidSyntax(t *testing.T) {
 	tmpDir := t.TempDir()
 	filePath := filepath.Join(tmpDir, "bad.glyph")
@@ -1033,7 +1033,7 @@ func TestHelpShortAlias(t *testing.T) {
 	r.Start()
 
 	result := output.String()
-	if !strings.Contains(result, "Glyph REPL Commands") {
+	if !strings.Contains(result, "GlyphLang REPL Commands") {
 		t.Errorf("Expected :h alias to show help, got %q", result)
 	}
 }
@@ -1380,7 +1380,7 @@ func TestExecuteCommandDirectly(t *testing.T) {
 		expected string
 		wantErr  bool
 	}{
-		{"help", ":help", "Glyph REPL Commands", false},
+		{"help", ":help", "GlyphLang REPL Commands", false},
 		{"types", ":types", "Type definitions", false},
 		{"functions no fns", ":functions", "No functions defined", false},
 		{"fns alias", ":fns", "No functions defined", false},

@@ -1,4 +1,4 @@
--- Glyph Database Initialization Script
+-- GlyphLang Database Initialization Script
 
 -- Create extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 -- Create schemas
 CREATE SCHEMA IF NOT EXISTS glyph;
 
--- Example tables for Glyph applications
+-- Example tables for GlyphLang applications
 
 -- Users table
 CREATE TABLE IF NOT EXISTS glyph.users (

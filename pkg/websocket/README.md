@@ -1,6 +1,6 @@
-# WebSocket Support for Glyph
+# WebSocket Support for GlyphLang
 
-Production-ready WebSocket implementation for real-time bidirectional communication in Glyph.
+Production-ready WebSocket implementation for real-time bidirectional communication in GlyphLang.
 
 ## Features
 
@@ -10,7 +10,7 @@ Production-ready WebSocket implementation for real-time bidirectional communicat
 - **Broadcast Operations**: Send to all connections, specific rooms, or individual clients
 - **Ping/Pong Keep-Alive**: Automatic connection health monitoring
 - **Event Handlers**: Custom event handling for connect, disconnect, and messages
-- **Integration Ready**: Seamlessly integrates with Glyph HTTP server
+- **Integration Ready**: Seamlessly integrates with GlyphLang HTTP server
 
 ## Architecture
 
@@ -59,7 +59,7 @@ func main() {
 }
 ```
 
-### Glyph Language Syntax
+### GlyphLang Syntax
 
 ```glyph
 // WebSocket route
@@ -132,7 +132,7 @@ See `examples/websocket-chat/` for a complete chat application with:
 - Multiple chat rooms
 - User presence
 - HTML/JavaScript client
-- Glyph backend
+- GlyphLang backend
 
 ## Production Considerations
 
@@ -188,9 +188,9 @@ See `examples/websocket-chat/` for a complete chat application with:
 - `Size()`: Get room size
 - `SetMetadata(key, value)`: Set room metadata
 
-## Integration with Glyph Server
+## Integration with GlyphLang Server
 
-The WebSocket server integrates seamlessly with the Glyph HTTP server:
+The WebSocket server integrates seamlessly with the GlyphLang HTTP server:
 
 ```go
 server := server.NewServer()
@@ -202,4 +202,4 @@ server.RegisterWebSocketRoute("/chat", wsServer.HandleWebSocket)
 
 ## License
 
-Part of the Glyph project.
+Part of the GlyphLang project.

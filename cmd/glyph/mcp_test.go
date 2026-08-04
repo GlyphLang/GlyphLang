@@ -34,5 +34,5 @@ func TestMCPValidateNoInput(t *testing.T) {
 func TestMCPSyntaxReference(t *testing.T) {
 	_, out, err := mcpSyntax(context.Background(), nil, syntaxInput{})
 	require.NoError(t, err)
-	assert.Contains(t, out.Spec, "Glyph Notation Specification")
+	assert.Contains(t, out.Spec, "GlyphLang Notation Specification")
 }

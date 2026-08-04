@@ -1,22 +1,22 @@
--- Glyph LSP Configuration for Neovim
+-- GlyphLang LSP Configuration for Neovim
 -- Add this to your Neovim configuration (init.lua or lua/plugins/lsp.lua)
 
 local M = {}
 
--- Setup function to configure Glyph LSP
+-- Setup function to configure GlyphLang LSP
 function M.setup(opts)
   opts = opts or {}
 
   -- Check if lspconfig is available
   local ok, lspconfig = pcall(require, 'lspconfig')
   if not ok then
-    vim.notify("nvim-lspconfig is required for Glyph LSP support", vim.log.levels.ERROR)
+    vim.notify("nvim-lspconfig is required for GlyphLang LSP support", vim.log.levels.ERROR)
     return
   end
 
   local configs = require('lspconfig.configs')
 
-  -- Register Glyph LSP if not already registered
+  -- Register GlyphLang LSP if not already registered
   if not configs.glyph then
     configs.glyph = {
       default_config = {

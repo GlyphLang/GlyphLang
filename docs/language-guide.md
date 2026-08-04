@@ -1,4 +1,4 @@
-# GlyphLang Language Guide
+# GlyphLang Guide
 
 ## Syntax Overview
 

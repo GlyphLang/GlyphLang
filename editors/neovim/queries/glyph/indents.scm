@@ -1,4 +1,4 @@
-; Glyph Tree-sitter Indentation Queries
+; GlyphLang Tree-sitter Indentation Queries
 
 ; Indent after opening braces
 [

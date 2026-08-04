@@ -18,6 +18,8 @@ GlyphLang is built from the ground up to be:
 
 It compiles to a single static binary, includes a built-in HTTP server and database access, and minimizes files, syntax and configuration so both humans _and_ AI can move faster.
 
+GlyphLang™ runs `.glyph` sources on its own runtime, written in Go and distributed as a single static binary from [Releases](https://github.com/GlyphLang/GlyphLang/releases) — there is no package-manager install.
+
 ---
 
 **Why GlyphLang?**
@@ -40,9 +42,9 @@ Less code isn't just productivity. It directly reduces:
 - Maintenance surface area
 
 ```
-Glyph:  @ GET /users/:id -> User     (21 tokens)
-Python: @app.route('/users/<id>')... (35 tokens)
-Java:   @GetMapping("/users/{id}")...  (28 tokens)
+GlyphLang: @ GET /users/:id -> User     (21 tokens)
+Python:    @app.route('/users/<id>')... (35 tokens)
+Java:      @GetMapping("/users/{id}")...  (28 tokens)
 ```
 
 ---
@@ -534,7 +536,7 @@ glyph context --changed
 ### Standard Commands
 
 ```bash
-glyph run <file>            # Run a Glyph file
+glyph run <file>            # Run a GlyphLang file
 glyph dev <file>            # Development server with hot reload
 glyph compile <file>        # Compile to bytecode
 glyph decompile <file>      # Decompile bytecode
@@ -565,8 +567,8 @@ Token counts measured with [tiktoken](https://github.com/openai/tiktoken) on equ
 
 #### GPT-4 / GPT-3.5 (cl100k_base encoding)
 
-| Sample | Glyph | FastAPI | Flask | Java |
-|--------|-------|---------|-------|------|
+| Sample | GlyphLang | FastAPI | Flask | Java |
+|--------|-----------|---------|-------|------|
 | Hello World API | 16 | 20 | 37 | 45 |
 | User GET with Param | 24 | 28 | 35 | 28 |
 | Protected Route | 22 | 29 | 27 | 32 |
@@ -575,7 +577,7 @@ Token counts measured with [tiktoken](https://github.com/openai/tiktoken) on equ
 | CRUD API | 122 | 150 | 148 | 186 |
 | WebSocket Handler | 78 | 108 | 144 | 246 |
 | **Total** | **349** | **451** | **535** | **791** |
-| **vs Glyph** | — | **23% more** | **36% more** | **57% more** |
+| **vs GlyphLang** | — | **23% more** | **36% more** | **57% more** |
 
 #### Token Savings Summary
 
@@ -598,19 +600,19 @@ FastAPI Hello World (20 tokens):
       return {"message": "Hello"}      # return statement
 
 Flask Hello World (37 tokens):
-  from flask import Flask, jsonify     # 6 tokens (eliminated in Glyph)
+  from flask import Flask, jsonify     # 6 tokens (eliminated in GlyphLang)
   app = Flask(__name__)                # 6 tokens (eliminated)
   @app.route('/hello', methods=['GET'])# verbose decorator
   def hello():                         # function definition
       return jsonify({...})            # wrapper function
 
-Glyph Hello World (16 tokens):
+GlyphLang Hello World (16 tokens):
   @ GET /hello {
     > {message: "Hello, World!"}
   }
 ```
 
-Even against FastAPI (the most concise Python framework), Glyph saves 23% by eliminating the function definition ceremony.
+Even against FastAPI (the most concise Python framework), GlyphLang saves 23% by eliminating the function definition ceremony.
 
 *Run `python benchmarks/bench_ai_efficiency.py` to reproduce. Verify with tiktoken.*
 
@@ -665,3 +667,6 @@ By contributing, you agree to the [Contributor License Agreement](CONTRIBUTING.m
 ## License
 
 Apache License 2.0 - see [LICENSE](LICENSE) for details.
+
+The license does not grant rights to the GlyphLang name - see [TRADEMARK.md](TRADEMARK.md) for
+what you may use it for without asking (most things).

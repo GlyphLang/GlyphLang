@@ -1,4 +1,4 @@
-# Function Call Examples in Glyph
+# Function Call Examples in GlyphLang
 
 # Example 1: Get current timestamp
 @ GET /time {

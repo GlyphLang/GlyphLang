@@ -1,4 +1,4 @@
-; Glyph Tree-sitter Highlights
+; GlyphLang Tree-sitter Highlights
 ; Note: This file is for future tree-sitter integration
 ; Currently, use the vim syntax file for highlighting
 

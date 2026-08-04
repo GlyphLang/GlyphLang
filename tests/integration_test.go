@@ -7,7 +7,7 @@ import (
 	"github.com/glyphlang/glyph/pkg/vm"
 )
 
-// TestParserIntegration tests the parser with real GLYPH programs
+// TestParserIntegration tests the parser with real GlyphLang programs
 func TestParserIntegration(t *testing.T) {
 	tests := []struct {
 		name        string

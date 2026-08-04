@@ -1,7 +1,7 @@
 # Intent Test: Authentication service with registration, login, and token management
 # NOTE: This is a DSL syntax demonstration for polyglot code generation testing.
 # Actual security (bcrypt hashing, JWT signing, HTTPS) is implemented by target
-# language backends. Glyph DSL functions like crypto.hash() and jwt.sign() map
+# language backends. GlyphLang DSL functions like crypto.hash() and jwt.sign() map
 # to secure implementations in each target (e.g., bcrypt in Go, passlib in Python).
 
 : User {

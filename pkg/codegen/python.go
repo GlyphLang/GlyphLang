@@ -409,7 +409,7 @@ func (g *PythonGenerator) writeExpr(sb *strings.Builder, expr ir.ExprIR) {
 		g.writeExpr(sb, expr.IndexAccess.Index)
 		sb.WriteString("]")
 	case ir.ExprCall:
-		// The Glyph parser converts method calls (obj.method(args)) into function
+		// The GlyphLang parser converts method calls (obj.method(args)) into function
 		// calls where the object is the first argument. Detect this pattern and
 		// render as a method call: if the first arg is a field access or variable
 		// and the function name is simple (no dots), it's a method call.

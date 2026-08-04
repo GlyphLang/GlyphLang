@@ -1,4 +1,4 @@
-// Package repl provides an interactive Read-Eval-Print Loop for Glyph.
+// Package repl provides an interactive Read-Eval-Print Loop for GlyphLang.
 package repl
 
 import (
@@ -13,7 +13,7 @@ import (
 	"github.com/glyphlang/glyph/pkg/parser"
 )
 
-// REPL provides an interactive programming environment for Glyph.
+// REPL provides an interactive programming environment for GlyphLang.
 type REPL struct {
 	interp  *interpreter.Interpreter
 	env     *interpreter.Environment
@@ -406,7 +406,7 @@ func (r *REPL) isInputComplete(input string) bool {
 
 // printWelcome prints the welcome message.
 func (r *REPL) printWelcome() {
-	r.printf("Glyph REPL v%s\n", r.version)
+	r.printf("GlyphLang REPL v%s\n", r.version)
 	r.printf("Type :help for available commands, :quit to exit\n")
 	r.printf("=========================================\n\n")
 }
@@ -490,7 +490,7 @@ func (r *REPL) GetInterpreter() *interpreter.Interpreter {
 	return r.interp
 }
 
-// LoadFile loads and executes a Glyph file.
+// LoadFile loads and executes a .glyph file.
 func (r *REPL) LoadFile(filepath string) error {
 	source, err := os.ReadFile(filepath)
 	if err != nil {

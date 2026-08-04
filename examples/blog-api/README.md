@@ -252,8 +252,8 @@ Increments the upvote count for a comment. Requires authentication.
    ```
    POST /api/posts
    {
-     "title": "Getting Started with Glyph",
-     "content": "Glyph is a language for building APIs...",
+     "title": "Getting Started with GlyphLang",
+     "content": "GlyphLang is a language for building APIs...",
      "tags": ["tutorial", "beginner"]
    }
    ```

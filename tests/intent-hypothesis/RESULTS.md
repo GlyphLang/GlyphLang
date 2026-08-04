@@ -2,7 +2,7 @@
 
 ## Hypothesis
 
-> Glyph notation (`.glyph`) produces more correct, complete, and structurally precise AI-generated code than equivalent natural language descriptions (`.txt`) when used as input prompts for large language models.
+> GlyphLang notation (`.glyph`) produces more correct, complete, and structurally precise AI-generated code than equivalent natural language descriptions (`.txt`) when used as input prompts for large language models.
 
 ## Generation Details
 
@@ -10,7 +10,7 @@
 - **Target language**: Python / FastAPI
 - **Generation protocol**: Each implementation generated in an isolated sub-agent context
 - **Total implementations**: 15 (5 glyph-sourced + 5 text-sourced + 5 openapi-sourced)
-- **Conditions**: Three-way comparison — Glyph (.glyph), natural language (.txt), OpenAPI 3.1.0 (.yaml)
+- **Conditions**: Three-way comparison — GlyphLang (.glyph), natural language (.txt), OpenAPI 3.1.0 (.yaml)
 
 ---
 
@@ -58,7 +58,7 @@ openapi/05-auth-service.py     PASS
 | text/05-auth-service.py | fastapi, jose, passlib, pydantic | 8 | 24 | 6 (get:2, post:4) |
 | openapi/05-auth-service.py | fastapi, pydantic, uvicorn | 8 | 18 | 6 (get:2, post:4) |
 
-**Observation**: Route decorator counts are identical across all three conditions in every scenario — all notations produce the same endpoint structure. The differences are in classes and functions: glyph-generated code averages 7.8 classes vs text's 5.4 vs openapi's 4.4. Glyph produces the most structured abstractions (collection classes, worker classes, bus classes). OpenAPI produces the fewest classes but includes uvicorn as an extra dependency. Notably, OpenAPI-generated code never imports external JWT or crypto libraries — it either implements JWT manually or uses stub auth.
+**Observation**: Route decorator counts are identical across all three conditions in every scenario — all notations produce the same endpoint structure. The differences are in classes and functions: glyph-generated code averages 7.8 classes vs text's 5.4 vs openapi's 4.4. GlyphLang produces the most structured abstractions (collection classes, worker classes, bus classes). OpenAPI produces the fewest classes but includes uvicorn as an extra dependency. Notably, OpenAPI-generated code never imports external JWT or crypto libraries — it either implements JWT manually or uses stub auth.
 
 ### Output File Sizes
 
@@ -174,7 +174,7 @@ Each implementation was scored against its own specification using 15 binary che
 | Completeness | **8** — Missing Database DI pattern. All endpoints and models present. |
 | Structural Precision | **7** — No Depends() DI pattern at all. No Database abstraction. |
 
-**Scenario 01 Summary**: Glyph 29/30, Text 27/30, OpenAPI 25/30. Glyph's minor deduction is error response shape (`detail` vs `error`); text's is the wrong DELETE response body. OpenAPI has the best correctness (exact response shapes from schema) but lacks DI patterns entirely.
+**Scenario 01 Summary**: GlyphLang 29/30, Text 27/30, OpenAPI 25/30. GlyphLang's minor deduction is error response shape (`detail` vs `error`); text's is the wrong DELETE response body. OpenAPI has the best correctness (exact response shapes from schema) but lacks DI patterns entirely.
 
 ---
 
@@ -258,7 +258,7 @@ Each implementation was scored against its own specification using 15 binary che
 | Completeness | **8** — Missing Database DI pattern. All endpoints, models, auth, rate limiting present. |
 | Structural Precision | **8** — Missing Depends() for DB. Good use of Security/APIKeyHeader for auth. |
 
-**Scenario 02 Summary**: Glyph 30/30, Text 21/30, OpenAPI 26/30. Glyph's `+ ratelimit(1000/min)` and `+ auth(apikey)` middleware symbols mapped directly to separate Depends() dependencies. `% db: Database` produced injected collection classes. OpenAPI's security scheme and x-ratelimit produced correct auth and rate limiting but no DI. Text's prose produced the weakest implementation — wrong field names (`payment_id` vs `id`) and no DI.
+**Scenario 02 Summary**: GlyphLang 30/30, Text 21/30, OpenAPI 26/30. GlyphLang's `+ ratelimit(1000/min)` and `+ auth(apikey)` middleware symbols mapped directly to separate Depends() dependencies. `% db: Database` produced injected collection classes. OpenAPI's security scheme and x-ratelimit produced correct auth and rate limiting but no DI. Text's prose produced the weakest implementation — wrong field names (`payment_id` vs `id`) and no DI.
 
 ---
 
@@ -342,7 +342,7 @@ Each implementation was scored against its own specification using 15 binary che
 | Completeness | **6** — Missing real JWT auth and Database DI |
 | Structural Precision | **6** — No DI for DB, missing type annotations, stub auth |
 
-**Scenario 03 Summary**: Glyph 30/30, Text 30/30, OpenAPI 20/30. Both glyph and text produce excellent chat server implementations. OpenAPI's biggest weakness here: `bearerAuth` security scheme declares JWT but the generated code only checks for token presence, never decodes it. x-websocket extension was handled well.
+**Scenario 03 Summary**: GlyphLang 30/30, Text 30/30, OpenAPI 20/30. Both glyph and text produce excellent chat server implementations. OpenAPI's biggest weakness here: `bearerAuth` security scheme declares JWT but the generated code only checks for token presence, never decodes it. x-websocket extension was handled well.
 
 ---
 
@@ -426,7 +426,7 @@ Each implementation was scored against its own specification using 15 binary che
 | Completeness | **6** — Stub JWT auth, no Database DI. Background tasks present but no DB layer. |
 | Structural Precision | **8** — Missing DB Depends(), but workers and cron are async. |
 
-**Scenario 04 Summary**: Glyph 30/30, Text 24/30, OpenAPI 24/30. Text and OpenAPI tie but fail differently. Text has correct response shapes but wrong field names (`recipient` vs `to`, `notification` vs `queued`) and sync workers. OpenAPI has correct field names and async workers but no DI and stub auth. Glyph's `&`, `*`, `~` symbols produce the only complete implementation with full infrastructure classes.
+**Scenario 04 Summary**: GlyphLang 30/30, Text 24/30, OpenAPI 24/30. Text and OpenAPI tie but fail differently. Text has correct response shapes but wrong field names (`recipient` vs `to`, `notification` vs `queued`) and sync workers. OpenAPI has correct field names and async workers but no DI and stub auth. GlyphLang's `&`, `*`, `~` symbols produce the only complete implementation with full infrastructure classes.
 
 ---
 
@@ -510,7 +510,7 @@ Each implementation was scored against its own specification using 15 binary che
 | Completeness | **9** — All endpoints, models, middleware, cron present. Error model and custom handler are good additions. |
 | Structural Precision | **7** — No DB Depends(), missing return type annotations, manual JWT implementation. |
 
-**Scenario 05 Summary**: Glyph 28/30, Text 25/30, OpenAPI 25/30. Glyph leads with best structural precision. Text has type mismatches (str vs int for timestamps). OpenAPI has the most thorough correctness (extra refresh validation, Error schema handler) but lacks DI and return type annotations.
+**Scenario 05 Summary**: GlyphLang 28/30, Text 25/30, OpenAPI 25/30. GlyphLang leads with best structural precision. Text has type mismatches (str vs int for timestamps). OpenAPI has the most thorough correctness (extra refresh validation, Error schema handler) but lacks DI and return type annotations.
 
 ---
 
@@ -518,7 +518,7 @@ Each implementation was scored against its own specification using 15 binary che
 
 ### Score Comparison Table
 
-| Scenario | Complexity | Glyph C | Text C | OA C | Glyph Cm | Text Cm | OA Cm | Glyph SP | Text SP | OA SP | Glyph | Text | OpenAPI |
+| Scenario | Complexity | GlyphLang C | Text C | OA C | GlyphLang Cm | Text Cm | OA Cm | GlyphLang SP | Text SP | OA SP | GlyphLang | Text | OpenAPI |
 |----------|-----------|---------|--------|------|----------|---------|-------|----------|---------|-------|-------|------|---------|
 | 01 CRUD API | Low | 9 | 7 | 10 | 10 | 10 | 8 | 10 | 10 | 7 | **29** | 27 | 25 |
 | 02 Webhook | Medium | 10 | 7 | 10 | 10 | 7 | 8 | 10 | 7 | 8 | **30** | 21 | 26 |
@@ -530,7 +530,7 @@ Each implementation was scored against its own specification using 15 binary che
 
 ### Per-Metric Averages
 
-| Metric | Glyph | Text | OpenAPI | Glyph vs Text | Glyph vs OA |
+| Metric | GlyphLang | Text | OpenAPI | GlyphLang vs Text | GlyphLang vs OA |
 |--------|-------|------|---------|---------------|-------------|
 | Correctness | 9.6 | 7.4 | 9.4 | +2.2 | +0.2 |
 | Completeness | 9.8 | 9.2 | 7.4 | +0.6 | **+2.4** |
@@ -541,11 +541,11 @@ Each implementation was scored against its own specification using 15 binary che
 
 | Condition | Items Passed | Total Items | Pass Rate |
 |-----------|-------------|-------------|-----------|
-| Glyph | 75 | 75 | **100%** |
+| GlyphLang | 75 | 75 | **100%** |
 | Text | 67 | 75 | **89.3%** |
 | OpenAPI | 62 | 75 | **82.7%** |
 
-**Glyph**: 75/75 — zero failures.
+**GlyphLang**: 75/75 — zero failures.
 
 **Text** (8 failures): C1 on 01 (wrong DELETE shape), C4 on 02 (wrong field name `payment_id`), Cm5 on 02 (global stores), S2 on 02 (inline rate limit), C1 on 04 (reduced response shape), C4 on 04 (wrong field names `recipient`/`notification`), S5 on 04 (sync workers), C3 on 05 (str vs int timestamps).
 
@@ -553,7 +553,7 @@ Each implementation was scored against its own specification using 15 binary che
 
 ### Token Efficiency
 
-| Scenario | Glyph In | Text In | OA In | Glyph Score | Text Score | OA Score | Glyph QPW | Text QPW | OA QPW |
+| Scenario | GlyphLang In | Text In | OA In | GlyphLang Score | Text Score | OA Score | GlyphLang QPW | Text QPW | OA QPW |
 |----------|----------|---------|-------|-------------|------------|----------|-----------|----------|--------|
 | 01 CRUD | 176 | 138 | 207 | 9.67 | 9.00 | 8.33 | 5.49 | 6.52 | 4.02 |
 | 02 Webhook | 130 | 151 | 145 | 10.00 | 7.00 | 8.67 | 7.69 | 4.64 | 5.98 |
@@ -564,7 +564,7 @@ Each implementation was scored against its own specification using 15 binary che
 
 *QPW = Quality-Per-Word = Average(Correctness, Completeness, Structural Precision) / Input Words × 100*
 
-**Glyph leads on token efficiency** (5.23 QPW) — it uses more input words than text (236 vs 187) but produces proportionally more quality. OpenAPI is the least token-efficient (3.94 QPW) — its verbose YAML schema notation (avg 227 words) does not produce correspondingly high quality, especially in completeness and structural precision.
+**GlyphLang leads on token efficiency** (5.23 QPW) — it uses more input words than text (236 vs 187) but produces proportionally more quality. OpenAPI is the least token-efficient (3.94 QPW) — its verbose YAML schema notation (avg 227 words) does not produce correspondingly high quality, especially in completeness and structural precision.
 
 ---
 
@@ -572,24 +572,24 @@ Each implementation was scored against its own specification using 15 binary che
 
 *Note: The three-way comparison uses fresh evaluation scores from three independent agents scoring all 15 implementations simultaneously. Scores may differ slightly from the original two-way evaluation above due to inter-evaluator variance — this is expected and documented as a limitation.*
 
-### Finding 1: Glyph Outperforms Both Alternatives
+### Finding 1: GlyphLang Outperforms Both Alternatives
 
-Glyph scored 9.80/10 vs text 8.47/10 (+1.33) and OpenAPI 8.00/10 (+1.80). Glyph won or tied in all 5 scenarios. The advantage over text is driven by correctness (+2.2) and structural precision (+1.2). The advantage over OpenAPI is driven by completeness (+2.4) and structural precision (+2.8).
+GlyphLang scored 9.80/10 vs text 8.47/10 (+1.33) and OpenAPI 8.00/10 (+1.80). GlyphLang won or tied in all 5 scenarios. The advantage over text is driven by correctness (+2.2) and structural precision (+1.2). The advantage over OpenAPI is driven by completeness (+2.4) and structural precision (+2.8).
 
 ### Finding 2: Each Format Has a Distinct Strength Profile
 
-| Strength | Glyph | Text | OpenAPI |
+| Strength | GlyphLang | Text | OpenAPI |
 |----------|-------|------|---------|
 | Best metric | Structural Precision (10.0) | Completeness (9.2) | Correctness (9.4) |
 | Worst metric | Correctness (9.6) | Correctness (7.4) | Structural Precision (7.2) |
 
-- **Glyph** excels at producing idiomatic framework patterns — `Depends()` DI, typed collections, class abstractions. 100% checklist pass rate.
+- **GlyphLang** excels at producing idiomatic framework patterns — `Depends()` DI, typed collections, class abstractions. 100% checklist pass rate.
 - **OpenAPI** excels at response shape correctness — explicit schemas translate to precise API contracts and custom Error handlers. But it fails to convey DI patterns or authentication implementation.
 - **Text** falls between — it captures behavioral intent but introduces field-name drift and structural imprecision.
 
-### Finding 3: Structural Precision Is Glyph's Strongest Advantage
+### Finding 3: Structural Precision Is GlyphLang's Strongest Advantage
 
-Glyph's symbolic notation directly maps to FastAPI patterns:
+GlyphLang's symbolic notation directly maps to FastAPI patterns:
 - `+ auth(jwt)` → `Depends(auth)` middleware
 - `+ ratelimit(N/min)` → `Depends(check_rate_limit)` dependency
 - `% db: Database` → `Depends(get_db)` injection with typed collection classes
@@ -614,9 +614,9 @@ Text's biggest weakness is field-name drift — natural language doesn't pin exa
 - Scenario 04: Returns `recipient` instead of `to`, `notification` instead of `queued`
 - Scenario 05: Uses `str` for timestamps instead of `int`
 
-### Finding 6: Glyph's Advantage Is Concentrated in Middleware-Heavy Scenarios
+### Finding 6: GlyphLang's Advantage Is Concentrated in Middleware-Heavy Scenarios
 
-| Scenario | Glyph | Text | OpenAPI | Glyph Lead vs Text | Glyph Lead vs OA |
+| Scenario | GlyphLang | Text | OpenAPI | GlyphLang Lead vs Text | GlyphLang Lead vs OA |
 |----------|-------|------|---------|---------------------|-------------------|
 | 01 CRUD | 29 | 27 | 25 | +2 | +4 |
 | 02 Webhook | 30 | 21 | 26 | **+9** | +4 |
@@ -631,10 +631,10 @@ Each format captures a different layer of intent:
 | Layer | Best Format | What It Captures |
 |-------|-------------|------------------|
 | HTTP interface | OpenAPI | Paths, methods, schemas, status codes, security declarations |
-| Architecture | Glyph | DI patterns, middleware composition, background infrastructure |
+| Architecture | GlyphLang | DI patterns, middleware composition, background infrastructure |
 | Behavior | Text | Business rules, edge cases, security considerations, protocol semantics |
 
-A hybrid approach — OpenAPI for the API surface, Glyph for the structural scaffold, text annotations for behavioral nuance — could outperform any single format.
+A hybrid approach — OpenAPI for the API surface, GlyphLang for the structural scaffold, text annotations for behavioral nuance — could outperform any single format.
 
 ---
 
@@ -669,16 +669,16 @@ The rubric scores (0-10) supplement the checklists with qualitative judgment, bu
 
 ## Conclusion
 
-**The hypothesis is confirmed across a three-way comparison.** Glyph notation produces code that is more structurally precise (+2.8 vs OpenAPI, +1.2 vs text), more complete (+2.4 vs OpenAPI, +0.6 vs text), and more correct (+0.2 vs OpenAPI, +2.2 vs text) than both alternatives. Glyph achieved a 100% checklist pass rate (75/75) vs text's 89.3% (67/75) and OpenAPI's 82.7% (62/75).
+**The hypothesis is confirmed across a three-way comparison.** GlyphLang notation produces code that is more structurally precise (+2.8 vs OpenAPI, +1.2 vs text), more complete (+2.4 vs OpenAPI, +0.6 vs text), and more correct (+0.2 vs OpenAPI, +2.2 vs text) than both alternatives. GlyphLang achieved a 100% checklist pass rate (75/75) vs text's 89.3% (67/75) and OpenAPI's 82.7% (62/75).
 
 **The three formats occupy distinct niches:**
-- **Glyph** (9.80/10): Best overall — its symbols map directly to framework idioms, producing idiomatic DI, middleware, and infrastructure patterns.
+- **GlyphLang** (9.80/10): Best overall — its symbols map directly to framework idioms, producing idiomatic DI, middleware, and infrastructure patterns.
 - **Text** (8.47/10): Best for behavioral nuance — security patterns, protocol semantics, edge cases. Weakest on exact field names and response shapes.
 - **OpenAPI** (8.00/10): Best for API contracts — explicit schemas produce correct response shapes. Weakest on implementation details (DI, auth verification, return annotations).
 
-**Key insight**: Glyph's value is in making structural intent unambiguous. `+ ratelimit(1000/min)` maps to a `Depends()` dependency. `bearerAuth` in OpenAPI just declares JWT is used. "Rate limited to 1000 requests per minute" gets implemented as an inline function call. The three formats encode intent at different abstraction levels.
+**Key insight**: GlyphLang's value is in making structural intent unambiguous. `+ ratelimit(1000/min)` maps to a `Depends()` dependency. `bearerAuth` in OpenAPI just declares JWT is used. "Rate limited to 1000 requests per minute" gets implemented as an inline function call. The three formats encode intent at different abstraction levels.
 
-**Recommendation**: Glyph notation is most valuable as a structural scaffold for middleware, data models, and service architecture. A hybrid approach — OpenAPI for HTTP contracts, Glyph for architectural patterns, text for behavioral specs — would leverage each format's strength.
+**Recommendation**: GlyphLang notation is most valuable as a structural scaffold for middleware, data models, and service architecture. A hybrid approach — OpenAPI for HTTP contracts, GlyphLang for architectural patterns, text for behavioral specs — would leverage each format's strength.
 
 ---
 

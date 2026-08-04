@@ -55,7 +55,7 @@
 
 - name: "area:server"
   color: "0052cc"
-  description: Related to the Glyph server
+  description: Related to the GlyphLang server
 
 - name: "area:lsp"
   color: "0052cc"

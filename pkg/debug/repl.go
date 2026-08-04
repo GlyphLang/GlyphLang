@@ -63,7 +63,7 @@ func (r *REPL) Stop() {
 
 // printWelcome prints the welcome message
 func (r *REPL) printWelcome() {
-	r.printf("Glyph Debugger REPL\n")
+	r.printf("GlyphLang Debugger REPL\n")
 	r.printf("Type 'help' for available commands\n")
 	r.printf("=====================================\n\n")
 }

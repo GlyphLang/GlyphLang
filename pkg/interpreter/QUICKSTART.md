@@ -419,7 +419,7 @@ json.Marshal(response.Body)
 
 ## FAQ
 
-**Q: Can I execute Glyph source code directly?**
+**Q: Can I execute GlyphLang source code directly?**
 A: No, you need to parse it to AST first. This interpreter works with AST nodes.
 
 **Q: Is the interpreter thread-safe?**

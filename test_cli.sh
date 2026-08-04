@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Glyph CLI Integration Test Script
+# GlyphLang CLI Integration Test Script
 # This script tests the CLI commands with the example files
 
 set -e
 
-echo "=== Glyph CLI Integration Tests ==="
+echo "=== GlyphLang CLI Integration Tests ==="
 echo ""
 
 # Colors for output
@@ -15,7 +15,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Build the CLI
-echo "Building Glyph CLI..."
+echo "Building GlyphLang CLI..."
 go build -o build/glyph ./cmd/glyph
 if [ $? -ne 0 ]; then
     echo -e "${RED}[FAIL]${NC} Build failed"

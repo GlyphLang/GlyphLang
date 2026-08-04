@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # Glyph Application
+  # GlyphLang Application
   glyph:
     build:
       context: .
@@ -14,7 +14,7 @@ services:
       - Glyph_PORT=8080
       - Glyph_LOG_LEVEL=info
     volumes:
-      # Mount your Glyph application
+      # Mount your GlyphLang application
       - ./examples:/app/examples:ro
     restart: unless-stopped
     networks:

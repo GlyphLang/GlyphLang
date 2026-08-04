@@ -1,6 +1,6 @@
-# Glyph Tests - Quick Start Guide
+# GlyphLang Tests - Quick Start Guide
 
-Get up and running with Glyph tests in 5 minutes.
+Get up and running with GlyphLang tests in 5 minutes.
 
 ## Prerequisites
 
@@ -370,7 +370,7 @@ go test ./tests/... -v -timeout 30m
 
 ## Success!
 
-You're ready to start testing Glyph! As components are implemented, enable tests and watch the project come to life.
+You're ready to start testing GlyphLang! As components are implemented, enable tests and watch the project come to life.
 
 ```bash
 # Watch progress with:

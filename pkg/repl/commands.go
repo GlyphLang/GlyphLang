@@ -49,7 +49,7 @@ func (r *REPL) executeCommand(line string) error {
 
 // cmdHelp displays help information.
 func (r *REPL) cmdHelp(args []string) error {
-	r.printf("Glyph REPL Commands:\n")
+	r.printf("GlyphLang REPL Commands:\n")
 	r.printf("====================\n\n")
 	r.printf("Commands:\n")
 	r.printf("  :help, :h              - Show this help message\n")

@@ -1,6 +1,6 @@
-# Glyph HTTP Server - Quick Start Guide
+# GlyphLang HTTP Server - Quick Start Guide
 
-Get the Glyph HTTP server up and running in 5 minutes!
+Get the GlyphLang HTTP server up and running in 5 minutes!
 
 ## Prerequisites
 

@@ -2,7 +2,7 @@
 
 ## Hypothesis
 
-Glyph notation (`.glyph`) produces more correct, complete, and structurally precise AI-generated code than equivalent natural language descriptions (`.txt`) when used as input prompts for large language models.
+GlyphLang notation (`.glyph`) produces more correct, complete, and structurally precise AI-generated code than equivalent natural language descriptions (`.txt`) when used as input prompts for large language models.
 
 ## Experimental Design
 
@@ -24,7 +24,7 @@ Glyph notation (`.glyph`) produces more correct, complete, and structurally prec
 ### Generation Protocol
 
 For each scenario, the LLM receives:
-1. **Glyph condition**: The `.glyph` file + a standard prompt: *"Generate a complete Python/FastAPI implementation from this Glyph specification."*
+1. **GlyphLang condition**: The `.glyph` file + a standard prompt: *"Generate a complete Python/FastAPI implementation from this GlyphLang specification."*
 2. **Text condition**: The `.txt` file + a standard prompt: *"Generate a complete Python/FastAPI implementation from this description."*
 
 Each generation is performed in an isolated context (separate sub-agent) to prevent cross-contamination.

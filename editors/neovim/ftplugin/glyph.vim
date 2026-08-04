@@ -1,5 +1,5 @@
-" Filetype plugin for Glyph files
-" Language: Glyph
+" Filetype plugin for GlyphLang files
+" Language: GlyphLang
 
 if exists("b:did_ftplugin")
   finish

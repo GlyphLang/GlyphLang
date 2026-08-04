@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// TestHelper provides utilities for GLYPH tests
+// TestHelper provides utilities for GlyphLang tests
 type TestHelper struct {
 	t *testing.T
 }
@@ -205,7 +205,7 @@ func (m *CompilerMock) CompileFile(filename string) ([]byte, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-// ParseResult represents parsed GLYPH code for testing
+// ParseResult represents parsed GlyphLang code for testing
 type ParseResult struct {
 	Success bool
 	AST     interface{}

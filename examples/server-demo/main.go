@@ -32,7 +32,7 @@ func main() {
 		server.WithInterpreter(&demoInterpreter{
 			Response: map[string]interface{}{
 				"status": "ok",
-				"server": "Glyph Demo Server",
+				"server": "GlyphLang Demo Server",
 			},
 		}),
 	)
@@ -214,7 +214,7 @@ func main() {
 
 	// Start server in goroutine
 	go func() {
-		log.Printf("Starting Glyph Demo Server on http://localhost:8080")
+		log.Printf("Starting GlyphLang Demo Server on http://localhost:8080")
 		log.Println("\nAvailable endpoints:")
 		log.Println("  GET    /hello")
 		log.Println("  GET    /greet/:name")

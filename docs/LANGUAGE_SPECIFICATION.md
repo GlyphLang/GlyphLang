@@ -1,4 +1,4 @@
-# GlyphLang Language Specification
+# GlyphLang Specification
 
 Version 1.0
 

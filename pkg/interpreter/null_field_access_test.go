@@ -12,7 +12,7 @@ import (
 )
 
 // TestNullFieldAccess_InRoute is a regression test for issue #236.
-// Accessing a field on a null value must produce a clean Glyph-level error
+// Accessing a field on a null value must produce a clean GlyphLang-level error
 // rather than a Go panic from reflect.Value.MethodByName.
 func TestNullFieldAccess_InRoute(t *testing.T) {
 	interp := NewInterpreter()

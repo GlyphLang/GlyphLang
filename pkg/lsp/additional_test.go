@@ -1633,7 +1633,7 @@ func TestGetReferencesWithRoutes(t *testing.T) {
 func TestIsRenameableSymbolEdgeCases(t *testing.T) {
 	dm := NewDocumentManager()
 
-	// Use valid Glyph syntax that parses correctly
+	// Use valid GlyphLang syntax that parses correctly
 	source := `: User {
   name: str!
 }

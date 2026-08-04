@@ -1,8 +1,8 @@
 @echo off
-REM Test script for Glyph Demo Server (Windows)
+REM Test script for GlyphLang Demo Server (Windows)
 REM Make sure the server is running before executing this script
 
-echo Testing Glyph Demo Server Endpoints
+echo Testing GlyphLang Demo Server Endpoints
 echo ====================================
 echo.
 

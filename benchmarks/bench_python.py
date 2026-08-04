@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Python Benchmark Suite for comparison with Glyph Language
+Python Benchmark Suite for comparison with GlyphLang Language
 Run: python bench_python.py
 """
 

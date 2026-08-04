@@ -190,15 +190,15 @@ func (l *Lexer) invalidCharacterError() error {
 	var hint string
 	switch {
 	case char >= 'A' && char <= 'Z':
-		hint = "Identifiers and keywords in GLYPH are case-sensitive"
+		hint = "Identifiers and keywords in GlyphLang are case-sensitive"
 	case char == ';':
-		hint = "GLYPH uses newlines for statement separation, not semicolons"
+		hint = "GlyphLang uses newlines for statement separation, not semicolons"
 	case char == '`':
 		hint = "Use double quotes (\") or single quotes (') for strings"
 	case char > 127:
-		hint = "GLYPH source code must use ASCII characters only"
+		hint = "GlyphLang source code must use ASCII characters only"
 	default:
-		hint = "This character is not valid in GLYPH syntax"
+		hint = "This character is not valid in GlyphLang syntax"
 	}
 
 	if hint != "" {

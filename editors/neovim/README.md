@@ -1,6 +1,6 @@
-# Neovim Support for Glyph
+# Neovim Support for GlyphLang
 
-This directory contains Neovim configuration files for Glyph syntax highlighting and LSP support.
+This directory contains Neovim configuration files for GlyphLang syntax highlighting and LSP support.
 
 ## Installation
 
@@ -106,7 +106,7 @@ The syntax file provides highlighting for:
 
 ### LSP Features
 
-When the Glyph LSP is configured:
+When the GlyphLang LSP is configured:
 - Go to definition (`gd`)
 - Find references (`gr`)
 - Hover documentation (`K`)

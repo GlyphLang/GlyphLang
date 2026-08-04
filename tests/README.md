@@ -1,6 +1,6 @@
-# Glyph Test Suite
+# GlyphLang Test Suite
 
-Comprehensive test infrastructure for the Glyph project.
+Comprehensive test infrastructure for the GlyphLang project.
 
 ## Test Structure
 
@@ -11,7 +11,7 @@ tests/
 ├── e2e_test.go                 # End-to-end integration tests
 ├── integration_test.go         # Component integration tests
 ├── benchmark_test.go           # Performance benchmarks
-└── fixtures/                   # Test Glyph programs
+└── fixtures/                   # Test GlyphLang programs
     ├── simple_route.glyph
     ├── path_param.glyph
     ├── json_response.glyph
@@ -94,7 +94,7 @@ Tests complete workflows from source code to execution:
 
 Tests individual components and their integration:
 
-- **TestParserIntegration**: Tests parser with various Glyph syntax
+- **TestParserIntegration**: Tests parser with various GlyphLang syntax
 - **TestLexerIntegration**: Tests lexer token generation
 - **TestTypeCheckerIntegration**: Tests type checking and validation
 - **TestInterpreterIntegration**: Tests AST interpretation (skipped)
@@ -129,7 +129,7 @@ Measures performance of various operations:
 
 ## Test Fixtures
 
-Test fixtures are small Glyph programs in `fixtures/` directory:
+Test fixtures are small GlyphLang programs in `fixtures/` directory:
 
 1. **simple_route.glyph**: Basic route returning JSON
 2. **path_param.glyph**: Route with path parameter (`:name`)
@@ -379,7 +379,7 @@ Planned test areas:
 - [Go Testing Package](https://pkg.go.dev/testing)
 - [Go Benchmarking](https://dave.cheney.net/2013/06/30/how-to-write-benchmarks-in-go)
 - [Table-Driven Tests](https://dave.cheney.net/2019/05/07/prefer-table-driven-tests)
-- [Glyph Project Context](../CONTEXT.md)
+- [GlyphLang Project Context](../CONTEXT.md)
 
 ---
 

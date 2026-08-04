@@ -1,7 +1,7 @@
 {
   "name": "glyphlang",
   "displayName": "GlyphLang",
-  "description": "Syntax highlighting and language support for Glyph (.glyph) and expanded Glyph (.glyphx) files",
+  "description": "Syntax highlighting and language support for GlyphLang (.glyph) and expanded GlyphLang (.glyphx) files",
   "version": "0.2.0",
   "publisher": "GlyphLang",
   "engines": {
@@ -18,13 +18,13 @@
     "languages": [
       {
         "id": "glyph",
-        "aliases": ["Glyph", "glyph"],
+        "aliases": ["GlyphLang", "Glyph", "glyph"],
         "extensions": [".glyph"],
         "configuration": "./language-configuration.json"
       },
       {
         "id": "glyphx",
-        "aliases": ["GlyphX", "glyphx", "Glyph Expanded"],
+        "aliases": ["GlyphX", "glyphx", "GlyphLang Expanded"],
         "extensions": [".glyphx"],
         "configuration": "./language-configuration.json"
       }
@@ -47,7 +47,7 @@
         "glyph.lsp.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Enable the Glyph Language Server"
+          "description": "Enable the GlyphLang Language Server"
         },
         "glyph.lsp.path": {
           "type": "string",
@@ -69,11 +69,11 @@
     "commands": [
       {
         "command": "glyph.expandToGlyphx",
-        "title": "Glyph: Expand to .glyphx"
+        "title": "GlyphLang: Expand to .glyphx"
       },
       {
         "command": "glyph.compactToGlyph",
-        "title": "Glyph: Compact to .glyph"
+        "title": "GlyphLang: Compact to .glyph"
       }
     ]
   }

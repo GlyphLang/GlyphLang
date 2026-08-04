@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// runListCommands lists all commands in a GLYPH file
+// runListCommands lists all commands in a .glyph file
 func runListCommands(cmd *cobra.Command, args []string) error {
 	filePath := args[0]
 

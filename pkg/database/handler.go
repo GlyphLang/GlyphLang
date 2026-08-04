@@ -62,7 +62,7 @@ func (h *Handler) Close() error {
 	return h.db.Close()
 }
 
-// TableHandler provides high-level database operations for GLYPH
+// TableHandler provides high-level database operations for GlyphLang
 type TableHandler struct {
 	db   Database
 	orm  *ORM
