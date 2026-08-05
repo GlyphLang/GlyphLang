@@ -3,6 +3,7 @@ package interpreter
 import (
 	"fmt"
 	"reflect"
+	"strings"
 )
 
 // providerMethods provides per-provider method whitelists for scoped access control.
@@ -144,11 +145,6 @@ var allowedMethods = map[string]bool{
 // CallMethod calls a method on an object using reflection
 // Only methods in the allowedMethods whitelist can be called for security
 func CallMethod(obj interface{}, methodName string, args ...interface{}) (interface{}, error) {
-	// Check if the method is in the whitelist
-	if !allowedMethods[methodName] {
-		return nil, fmt.Errorf("method %s is not allowed", methodName)
-	}
-
 	// Get the value and type of the object
 	objValue := reflect.ValueOf(obj)
 	if !objValue.IsValid() {
@@ -156,8 +152,14 @@ func CallMethod(obj interface{}, methodName string, args ...interface{}) (interf
 	}
 	objType := objValue.Type()
 
-	// Find the method
-	method := objValue.MethodByName(methodName)
+	// Whitelist first: a name that is not listed is rejected before any lookup
+	// happens, so nothing about the object is reachable through a blocked name.
+	canonical, allowed := canonicalMethodName(methodName)
+	if !allowed {
+		return nil, fmt.Errorf("method %s is not allowed", methodName)
+	}
+
+	method := objValue.MethodByName(canonical)
 	if !method.IsValid() {
 		return nil, fmt.Errorf("method %s not found on type %s", methodName, objType)
 	}
@@ -207,14 +209,38 @@ func CallMethod(obj interface{}, methodName string, args ...interface{}) (interf
 	return results[0].Interface(), nil
 }
 
-// HasMethod checks if an object has a method
+// canonicalMethodName maps a called name to its whitelisted Go spelling.
+//
+// GlyphLang calls provider methods in lowercase (redis.lrange, redis.hgetall)
+// and only the first letter is capitalized before lookup, producing "Lrange"
+// and "Hgetall" - names no Go method has. Matching the whitelist without regard
+// to case makes every multi-word provider method reachable from the notation.
+// The match is against the whitelist itself, so an unlisted name resolves to
+// nothing no matter how it is spelled.
+func canonicalMethodName(methodName string) (string, bool) {
+	if allowedMethods[methodName] {
+		return methodName, true
+	}
+	for candidate := range allowedMethods {
+		if strings.EqualFold(candidate, methodName) {
+			return candidate, true
+		}
+	}
+	return "", false
+}
+
+// HasMethod checks if an object has a callable method under the given name,
+// using the same canonical spelling CallMethod will use.
 func HasMethod(obj interface{}, methodName string) bool {
 	objValue := reflect.ValueOf(obj)
 	if !objValue.IsValid() {
 		return false
 	}
-	method := objValue.MethodByName(methodName)
-	return method.IsValid()
+	if objValue.MethodByName(methodName).IsValid() {
+		return true
+	}
+	canonical, allowed := canonicalMethodName(methodName)
+	return allowed && objValue.MethodByName(canonical).IsValid()
 }
 
 // GetMethodNames returns all method names of an object

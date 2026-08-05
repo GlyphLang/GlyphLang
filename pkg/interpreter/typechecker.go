@@ -120,6 +120,15 @@ func (tc *TypeChecker) CheckType(value interface{}, expectedType Type) error {
 		}
 	}
 
+	// A null value has no runtime type to compare. Whether null is acceptable
+	// is a question of requiredness, which the caller enforces separately with
+	// "missing required field" - only `!` marks a field required. Rejecting
+	// null here made every not-found response ("user: null") fail its own
+	// return type.
+	if value == nil {
+		return nil
+	}
+
 	actualType := GetRuntimeType(value)
 	if actualType == nil {
 		return fmt.Errorf("cannot determine type of value: %T", value)
@@ -161,6 +170,25 @@ func (tc *TypeChecker) TypesCompatible(actual, expected Type) bool {
 	// Nil types are always compatible
 	if actual == nil || expected == nil {
 		return true
+	}
+
+	// A runtime array carries no element type (GetRuntimeType cannot infer one,
+	// and an empty array has none to infer), so it is compatible with any list
+	// type. Without this an empty result set fails `List<Product>` and every
+	// listing route 500s until the first record exists.
+	if actualArray, ok := actual.(ArrayType); ok && actualArray.ElementType == nil {
+		switch exp := expected.(type) {
+		case ArrayType:
+			return true
+		case GenericType:
+			if named, ok := exp.BaseType.(NamedType); ok && named.Name == "List" {
+				return true
+			}
+		case NamedType:
+			if exp.Name == "List" || exp.Name == "any" || exp.Name == "object" {
+				return true
+			}
+		}
 	}
 
 	// Check for exact type match
