@@ -297,7 +297,48 @@ route GET /users/:id { use db: Database let user = db.users.Get(id) return user 
 
 Both are semantically identical and produce the same AST/IR.
 
-## 9. Control Flow
+## 9. Bindings and Reassignment
+
+`$` declares a new binding. Reassigning an existing one drops the sigil:
+
+```glyph
+$ total = 0        # declare
+total = total + 1  # reassign
+```
+
+Declaring the same name twice in one scope is an error - `cannot redeclare
+variable 'total' in the same scope` - so a running total, an accumulator, or a
+value refined by a later step uses the bare form after its first declaration:
+
+```glyph
+@ GET /api/cart/:id {
+  % db: Database
+
+  $ cart = db.carts.Get(id)
+  $ total = 0
+
+  for item in cart.items {
+    total = total + item.price
+  }
+
+  > {cart: cart, total: total}
+}
+```
+
+Path and query parameters are already bound by the route pattern, so they
+cannot be redeclared either. Assign to a different name instead:
+
+```glyph
+@ GET /api/factorial/:n {
+  $ limit = parseInt(n)   # not: $ n = parseInt(n)
+  ...
+}
+```
+
+Field assignment keeps the sigil, since it writes through an existing binding
+rather than introducing a name: `$ user.name = "Ada"`.
+
+## 10. Control Flow
 
 ```glyph
 # Conditionals
@@ -322,7 +363,7 @@ switch value {
 }
 ```
 
-## 10. Grammar (EBNF Summary)
+## 11. Grammar (EBNF Summary)
 
 ```ebnf
 program     = { item } ;
@@ -345,7 +386,8 @@ input_decl  = "<" IDENT ":" type ;
 validate    = "?" IDENT "(" [ args ] ")" ;
 guard       = "?" expr "::" INTEGER [ STRING ] ;
 statement   = assign | reassign | return | if | for | while | switch | expr_stmt ;
-assign      = "$" IDENT "=" expr ;
+assign      = "$" IDENT [ "." IDENT ] "=" expr ;
+reassign    = IDENT "=" expr ;
 return      = ">" expr [ "::" INTEGER ] ;
 
 type        = "int" | "float" | "str" | "bool" | "any"
@@ -357,7 +399,7 @@ type        = "int" | "float" | "str" | "bool" | "any"
 method      = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "ws" | "sse" ;
 ```
 
-## 11. Design Principles
+## 12. Design Principles
 
 1. **Intent over implementation**: GlyphLang describes what a service does, not how.
 2. **Provider abstraction**: Services depend on capabilities, not specific libraries.

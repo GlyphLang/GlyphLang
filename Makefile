@@ -142,7 +142,7 @@ dev:
 
 # Regenerate llms.txt (AI agent primer served at glyphlang.dev/llms.txt)
 llms.txt:
-	head -n 38 llms.txt > llms_header.tmp
+	head -n 39 llms.txt > llms_header.tmp
 	cat llms_header.tmp docs/GLYPH_NOTATION_SPEC.md > llms.txt
 	rm llms_header.tmp
 .PHONY: llms.txt
