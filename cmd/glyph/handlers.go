@@ -21,9 +21,12 @@ import (
 	"github.com/glyphlang/glyph/pkg/ast"
 	"github.com/glyphlang/glyph/pkg/compiler"
 	"github.com/glyphlang/glyph/pkg/database"
+	"github.com/glyphlang/glyph/pkg/httpclient"
 	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/llm"
+	"github.com/glyphlang/glyph/pkg/mongodb"
 	"github.com/glyphlang/glyph/pkg/parser"
+	"github.com/glyphlang/glyph/pkg/redis"
 	"github.com/glyphlang/glyph/pkg/server"
 	"github.com/glyphlang/glyph/pkg/vm"
 	"github.com/glyphlang/glyph/pkg/websocket"
@@ -61,6 +64,15 @@ func newConfiguredInterpreter() *interpreter.Interpreter {
 	} else if handler != nil {
 		interp.SetLLMHandler(handler)
 	}
+
+	// Redis and MongoDB follow the database pattern: an in-memory mock so a
+	// program runs with no infrastructure, replaced by a real client when the
+	// connection is configured.
+	interp.SetRedisHandler(newRedisHandler())
+	interp.SetMongoDBHandler(newMongoDBHandler())
+
+	// The HTTP provider needs no configuration.
+	interp.SetHTTPHandler(httpclient.NewHandler())
 
 	// Set up the parse function for module resolution
 	interp.GetModuleResolver().SetParseFunc(func(source string) (*ast.Module, error) {
@@ -663,6 +675,52 @@ func newLLMHandler() (*llm.Handler, error) {
 		return llm.NewHandlerWithBaseURL(provider, apiKey, baseURL)
 	}
 	return llm.NewHandler(provider, apiKey), nil
+}
+
+// newRedisHandler returns a real Redis client when GLYPH_REDIS_URL is set and
+// reachable, and the in-memory mock otherwise. Falling back rather than failing
+// keeps `glyph run` usable with no infrastructure, which is how the mock
+// database already behaves.
+func newRedisHandler() interface{} {
+	url := strings.TrimSpace(os.Getenv("GLYPH_REDIS_URL"))
+	if url == "" {
+		return redis.NewMockHandler()
+	}
+
+	handler, err := redis.NewHandlerFromURL(url)
+	if err != nil {
+		printWarning(fmt.Sprintf("GLYPH_REDIS_URL is set but unusable (%v): falling back to the in-memory mock", err))
+		return redis.NewMockHandler()
+	}
+	if _, err := handler.Ping(); err != nil {
+		printWarning(fmt.Sprintf("cannot reach Redis at %s (%v): falling back to the in-memory mock", url, err))
+		return redis.NewMockHandler()
+	}
+	printInfo("Connected to Redis at " + url)
+	return handler
+}
+
+// newMongoDBHandler mirrors newRedisHandler: GLYPH_MONGODB_URI selects a real
+// server, GLYPH_MONGODB_DATABASE names the database, and anything missing or
+// unreachable falls back to the in-memory mock.
+func newMongoDBHandler() interface{} {
+	uri := strings.TrimSpace(os.Getenv("GLYPH_MONGODB_URI"))
+	if uri == "" {
+		return mongodb.NewMockHandler()
+	}
+
+	dbName := strings.TrimSpace(os.Getenv("GLYPH_MONGODB_DATABASE"))
+	if dbName == "" {
+		dbName = "glyph"
+	}
+
+	handler, err := mongodb.NewHandlerFromURI(uri, dbName)
+	if err != nil {
+		printWarning(fmt.Sprintf("cannot reach MongoDB at %s (%v): falling back to the in-memory mock", uri, err))
+		return mongodb.NewMockHandler()
+	}
+	printInfo(fmt.Sprintf("Connected to MongoDB at %s (database %s)", uri, dbName))
+	return handler
 }
 
 // writeInternalError logs the full error server-side and sends a generic 500 to

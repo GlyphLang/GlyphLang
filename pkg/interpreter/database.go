@@ -120,6 +120,11 @@ var allowedMethods = map[string]bool{
 	"Aggregate":      true,
 	"CreateIndex":    true,
 	"DropIndex":      true,
+	// HTTP methods. Get and Delete are already listed above for the database
+	// providers; Post, Put and Patch are unique to this one.
+	"Post":  true,
+	"Put":   true,
+	"Patch": true,
 	// LLM methods
 	"Complete":   true,
 	"Chat":       true,
@@ -155,6 +160,20 @@ func CallMethod(obj interface{}, methodName string, args ...interface{}) (interf
 	method := objValue.MethodByName(methodName)
 	if !method.IsValid() {
 		return nil, fmt.Errorf("method %s not found on type %s", methodName, objType)
+	}
+
+	// Reject a wrong argument count before calling. reflect.Call panics on a
+	// mismatch, and a panic in a provider call takes down the request handler
+	// instead of returning an error the route can report.
+	methodType := method.Type()
+	if methodType.IsVariadic() {
+		if len(args) < methodType.NumIn()-1 {
+			return nil, fmt.Errorf("method %s expects at least %d argument(s), got %d",
+				methodName, methodType.NumIn()-1, len(args))
+		}
+	} else if len(args) != methodType.NumIn() {
+		return nil, fmt.Errorf("method %s expects %d argument(s), got %d",
+			methodName, methodType.NumIn(), len(args))
 	}
 
 	// Prepare arguments

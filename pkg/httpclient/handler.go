@@ -41,7 +41,7 @@ func NewHandlerWithTimeout(timeout time.Duration) *Handler {
 
 // Get performs an HTTP GET request.
 // Called from GlyphLang code: http.get("https://api.example.com/data")
-// or http.get("https://api.example.com/data", {headers: {"Authorization": "Bearer token"}})
+// or http.get({url: "https://api.example.com/data", headers: {"Authorization": "Bearer token"}})
 func (h *Handler) Get(args interface{}) (map[string]interface{}, error) {
 	reqURL, opts, err := parseRequestArgs(args)
 	if err != nil {
@@ -51,7 +51,8 @@ func (h *Handler) Get(args interface{}) (map[string]interface{}, error) {
 }
 
 // Post performs an HTTP POST request.
-// Called from GlyphLang code: http.post("https://api.example.com/submit", {body: payload, headers: {…}})
+// Called from GlyphLang code: http.post({url: "https://api.example.com/submit", body: payload, headers: {…}})
+// The url and options are one object: these methods take a single argument.
 func (h *Handler) Post(args interface{}) (map[string]interface{}, error) {
 	reqURL, opts, err := parseRequestArgs(args)
 	if err != nil {
