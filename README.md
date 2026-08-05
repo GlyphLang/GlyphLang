@@ -95,7 +95,7 @@ Java:      @GetMapping("/users/{id}")...  (28 tokens)
 ### Infrastructure
 - **HTTP Server** - routes, middleware, WebSocket support
 - **Database** - PostgreSQL with pooling, transactions, migrations
-- **Security** - JWT auth, rate limiting, CORS, SQL injection prevention
+- **Security** - token auth, rate limiting, CORS, SQL injection prevention. `+ auth(...)` and `+ ratelimit(...)` are enforced by the server; credentials come from `GLYPH_JWT_SECRET` or `GLYPH_API_KEYS`, and a route declaring auth with neither set denies every request
 - **Observability** - logging, Prometheus metrics, OpenTelemetry tracing
 
 ### Code Generation

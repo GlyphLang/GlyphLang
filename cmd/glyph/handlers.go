@@ -93,9 +93,10 @@ func registerRoute(router *server.Router, route *ast.Route, interp *interpreter.
 	handler := createRouteHandler(route, interp)
 
 	serverRoute := &server.Route{
-		Method:  convertHTTPMethod(route.Method),
-		Path:    route.Path,
-		Handler: handler,
+		Method:      convertHTTPMethod(route.Method),
+		Path:        route.Path,
+		Handler:     handler,
+		Middlewares: routeMiddlewares(route),
 	}
 
 	return router.RegisterRoute(serverRoute)
@@ -106,9 +107,10 @@ func registerCompiledRoute(router *server.Router, route *ast.Route, bytecode []b
 	handler := createCompiledRouteHandler(route, bytecode, wsHub)
 
 	serverRoute := &server.Route{
-		Method:  convertHTTPMethod(route.Method),
-		Path:    route.Path,
-		Handler: handler,
+		Method:      convertHTTPMethod(route.Method),
+		Path:        route.Path,
+		Handler:     handler,
+		Middlewares: routeMiddlewares(route),
 	}
 
 	return router.RegisterRoute(serverRoute)
@@ -440,8 +442,16 @@ func createHandler(router *server.Router) http.HandlerFunc {
 			StatusCode:     http.StatusOK,
 		}
 
+		// Apply the route's middlewares, outermost first. This dispatcher used
+		// to call Handler directly, which silently discarded every declared
+		// auth and rate limit.
+		handler := route.Handler
+		for i := len(route.Middlewares) - 1; i >= 0; i-- {
+			handler = route.Middlewares[i](handler)
+		}
+
 		// Execute handler
-		if err := route.Handler(ctx); err != nil {
+		if err := handler(ctx); err != nil {
 			printError(fmt.Errorf("handler error for %s %s: %w", r.Method, r.URL.Path, err))
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusInternalServerError)

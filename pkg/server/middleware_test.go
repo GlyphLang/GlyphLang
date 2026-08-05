@@ -821,7 +821,7 @@ func TestGetClientIP(t *testing.T) {
 			name:       "use RemoteAddr when no proxy headers",
 			remoteAddr: "192.168.1.100:12345",
 			trustProxy: true,
-			expectedIP: "192.168.1.100:12345",
+			expectedIP: "192.168.1.100",
 		},
 		{
 			name:          "prefer X-Forwarded-For over RemoteAddr from trusted proxy",
@@ -858,21 +858,21 @@ func TestGetClientIP(t *testing.T) {
 			xForwardedFor: "203.0.113.195",
 			xRealIP:       "203.0.113.100",
 			trustProxy:    true,
-			expectedIP:    "192.168.1.50:12345",
+			expectedIP:    "192.168.1.50",
 		},
 		{
 			name:          "ignore X-Forwarded-For when trustProxy is false",
 			remoteAddr:    "10.0.0.1:12345",
 			xForwardedFor: "203.0.113.195",
 			trustProxy:    false,
-			expectedIP:    "10.0.0.1:12345",
+			expectedIP:    "10.0.0.1",
 		},
 		{
 			name:       "ignore X-Real-IP when trustProxy is false",
 			remoteAddr: "10.0.0.1:12345",
 			xRealIP:    "203.0.113.100",
 			trustProxy: false,
-			expectedIP: "10.0.0.1:12345",
+			expectedIP: "10.0.0.1",
 		},
 	}
 
