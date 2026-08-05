@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/glyphlang/glyph/pkg/ast"
+	"github.com/glyphlang/glyph/pkg/compiler"
 	"github.com/glyphlang/glyph/pkg/interpreter"
 	"github.com/glyphlang/glyph/pkg/parser"
 )
@@ -111,6 +112,9 @@ func (v *Validator) Validate() *ValidationResult {
 
 	// Phase 3: Semantic validation
 	v.validateSemantics(module, result)
+
+	// Phase 4: Compiler semantic pass
+	v.validateCompilation(module, result)
 
 	// Update stats
 	v.collectStats(module, result.Stats)
@@ -223,6 +227,53 @@ func (v *Validator) validateSemantics(module *ast.Module, result *ValidationResu
 
 	// Check for common issues
 	v.checkCommonIssues(module, result)
+}
+
+// validateCompilation runs the compiler's semantic pass over each route.
+//
+// Parsing and the checks above accept programs the compiler rejects - a
+// variable redeclared with $ being the common one - so without this a file
+// validates clean and then fails on the first request that hits the route.
+// Only semantic errors are reported: other compile failures mean the route
+// falls back to the interpreter, which is a codegen limit rather than a
+// defect in the program.
+func (v *Validator) validateCompilation(module *ast.Module, result *ValidationResult) {
+	for _, item := range module.Items {
+		route, ok := item.(*ast.Route)
+		if !ok {
+			continue
+		}
+
+		_, err := compiler.NewCompiler().CompileRoute(route)
+		if err == nil || !compiler.IsSemanticError(err) {
+			continue
+		}
+
+		result.Errors = append(result.Errors, &ValidationError{
+			Type:      ErrTypeDuplicate,
+			Message:   err.Error(),
+			Severity:  "error",
+			RelatedTo: fmt.Sprintf("route %s %s", route.Method, route.Path),
+			FixHint:   semanticFixHint(err.Error()),
+		})
+		result.Valid = false
+	}
+}
+
+// semanticFixHint maps a compiler semantic error to the action that resolves
+// it. Redeclaration is the case worth spelling out: $ declares a binding and
+// the bare form reassigns one, a distinction the notation spec left implicit.
+func semanticFixHint(msg string) string {
+	switch {
+	case strings.Contains(msg, "redeclare path parameter"):
+		return "the path parameter is already bound by the route pattern; assign to a differently named variable"
+	case strings.Contains(msg, "redeclare query parameter"):
+		return "the query parameter is already bound by the route's query declarations; assign to a differently named variable"
+	case strings.Contains(msg, "redeclare variable"):
+		return "use 'name = expr' to reassign an existing variable; '$ name = expr' declares a new one"
+	default:
+		return ""
+	}
 }
 
 // processImports processes import statements and adds imported types to the defined types map
