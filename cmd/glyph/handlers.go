@@ -22,6 +22,7 @@ import (
 	"github.com/glyphlang/glyph/pkg/compiler"
 	"github.com/glyphlang/glyph/pkg/database"
 	"github.com/glyphlang/glyph/pkg/interpreter"
+	"github.com/glyphlang/glyph/pkg/llm"
 	"github.com/glyphlang/glyph/pkg/parser"
 	"github.com/glyphlang/glyph/pkg/server"
 	"github.com/glyphlang/glyph/pkg/vm"
@@ -52,6 +53,14 @@ func newConfiguredInterpreter() *interpreter.Interpreter {
 	interp := interpreter.NewInterpreter()
 	mockDB := database.NewMockDatabase()
 	interp.SetDatabaseHandler(mockDB)
+
+	// The LLM provider is configured from the environment so a .glyph file
+	// stays portable across providers and carries no credentials.
+	if handler, err := newLLMHandler(); err != nil {
+		printWarning(err.Error())
+	} else if handler != nil {
+		interp.SetLLMHandler(handler)
+	}
 
 	// Set up the parse function for module resolution
 	interp.GetModuleResolver().SetParseFunc(func(source string) (*ast.Module, error) {
@@ -624,6 +633,36 @@ func printWarning(msg string) {
 
 func printError(err error) {
 	errorColor.Printf("[ERROR] %s\n", err.Error())
+}
+
+// llmEnvHint lists the environment variables that configure `% x: LLM`.
+const llmEnvHint = "set GLYPH_LLM_PROVIDER (anthropic|openai|ollama) and GLYPH_LLM_API_KEY"
+
+// newLLMHandler builds the LLM provider handler from the environment.
+// Returns (nil, nil) when GLYPH_LLM_PROVIDER is unset: a program that never
+// injects LLM should not be forced to configure one.
+func newLLMHandler() (*llm.Handler, error) {
+	provider := strings.ToLower(strings.TrimSpace(os.Getenv("GLYPH_LLM_PROVIDER")))
+	if provider == "" {
+		return nil, nil
+	}
+
+	switch llm.Provider(provider) {
+	case llm.ProviderAnthropic, llm.ProviderOpenAI, llm.ProviderOllama:
+	default:
+		return nil, fmt.Errorf("unknown GLYPH_LLM_PROVIDER %q: expected anthropic, openai, or ollama", provider)
+	}
+
+	// Ollama runs locally and takes no credential; the hosted providers do.
+	apiKey := os.Getenv("GLYPH_LLM_API_KEY")
+	if apiKey == "" && llm.Provider(provider) != llm.ProviderOllama {
+		return nil, fmt.Errorf("GLYPH_LLM_PROVIDER=%s but GLYPH_LLM_API_KEY is empty: LLM routes will fail", provider)
+	}
+
+	if baseURL := os.Getenv("GLYPH_LLM_BASE_URL"); baseURL != "" {
+		return llm.NewHandlerWithBaseURL(provider, apiKey, baseURL)
+	}
+	return llm.NewHandler(provider, apiKey), nil
 }
 
 // writeInternalError logs the full error server-side and sends a generic 500 to
