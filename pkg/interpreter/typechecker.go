@@ -110,6 +110,13 @@ func (tc *TypeChecker) CheckType(value interface{}, expectedType Type) error {
 		switch et.Name {
 		case "Database", "Redis", "MongoDB", "LLM":
 			return nil
+		case "any", "object":
+			// `any` accepts every value, null included. Without this the
+			// check below rejects null (which has no runtime type) and every
+			// concrete type (none of which equal NamedType "any"), so a field
+			// declared `any` could hold nothing at all. The parser already
+			// skips literals of these types; this is the runtime half.
+			return nil
 		}
 	}
 
