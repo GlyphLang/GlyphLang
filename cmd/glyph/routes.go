@@ -14,6 +14,25 @@ import (
 	"github.com/glyphlang/glyph/pkg/websocket"
 )
 
+// moduleInjectsLLM reports whether any route in the module injects an LLM provider.
+func moduleInjectsLLM(module *ast.Module) bool {
+	for _, item := range module.Items {
+		route, ok := item.(*ast.Route)
+		if !ok {
+			continue
+		}
+		for _, injection := range route.Injections {
+			if _, isLLM := injection.Type.(ast.LLMType); isLLM {
+				return true
+			}
+			if named, ok := injection.Type.(ast.NamedType); ok && named.Name == "LLM" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // setupRoutes handles the common logic of determining execution mode, compiling routes,
 // and setting up the router. Used by both startServer and startDevServerInternal.
 // filePath is the path to the source file, used for resolving relative module imports.
@@ -24,25 +43,22 @@ func setupRoutes(module *ast.Module, filePath string, forceInterpreter ...bool) 
 	}
 	compiledRoutes = make(map[string][]byte)
 
-	// Check if any route has database injection - VM doesn't support db method calls
+	// Any provider injection forces interpreter mode: the VM cannot execute
+	// provider method calls, so a compiled route fails at request time with
+	// "undefined function". This covers Database, Redis, MongoDB, LLM, HTTP
+	// and custom providers alike.
 	for _, item := range module.Items {
-		if route, ok := item.(*ast.Route); ok {
-			for _, injection := range route.Injections {
-				if _, isDB := injection.Type.(ast.DatabaseType); isDB {
-					printInfo("Routes use database injection, using interpreter mode")
-					useCompiler = false
-					break
-				}
-				if named, ok := injection.Type.(ast.NamedType); ok && named.Name == "Database" {
-					printInfo("Routes use database injection, using interpreter mode")
-					useCompiler = false
-					break
-				}
-			}
-			if !useCompiler {
-				break
-			}
+		if route, ok := item.(*ast.Route); ok && len(route.Injections) > 0 {
+			printInfo("Routes use provider injection, using interpreter mode")
+			useCompiler = false
+			break
 		}
+	}
+
+	// Warn early when an LLM route has no provider configured, rather than
+	// letting every request fail with an opaque "undefined object" error.
+	if os.Getenv("GLYPH_LLM_PROVIDER") == "" && moduleInjectsLLM(module) {
+		printWarning("routes inject LLM but no provider is configured: " + llmEnvHint)
 	}
 
 	// Try to compile routes if using compiler mode

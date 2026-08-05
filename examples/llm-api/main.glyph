@@ -1,0 +1,118 @@
+# Document summarizer with an AI-generated Q&A endpoint.
+#
+# Shows the LLM provider (% ai: LLM) alongside the database provider in the
+# same file: store a document, summarize it with a model, ask questions
+# against it. Routes, types, validation, auth and the model call live in one
+# file with no client library and no glue code.
+#
+# Configure the provider before running:
+#   GLYPH_LLM_PROVIDER=anthropic|openai|ollama
+#   GLYPH_LLM_API_KEY=<key>          # not needed for ollama
+#   GLYPH_LLM_BASE_URL=<url>         # optional, for self-hosted or proxied
+#
+#   glyph run examples/llm-api/main.glyph --port 8080
+
+: Document {
+  id: int!
+  title: str!
+  body: str!
+  summary: str?
+  created_at: int?
+}
+
+: CreateDocumentRequest {
+  title: str!
+  body: str!
+}
+
+: SummaryResponse {
+  id: int!
+  title: str!
+  summary: str!
+  model: str!
+}
+
+: AnswerResponse {
+  question: str!
+  answer: str!
+  document_id: int!
+}
+
+# Store a document. The summary is filled in by POST /documents/:id/summarize.
+@ POST /documents -> Document {
+  + ratelimit(60/min)
+  < input: CreateDocumentRequest
+  % db: Database
+
+  $ doc = db.documents.Create(input)
+  > doc :: 201
+}
+
+@ GET /documents/:id -> Document | Error {
+  % db: Database
+
+  $ doc = db.documents.Get(id)
+  ? doc != null :: 404 "document not found"
+  > doc
+}
+
+# Summarize a stored document and persist the result.
+@ POST /documents/:id/summarize -> SummaryResponse | Error {
+  + auth(apikey)
+  + ratelimit(20/min)
+  % db: Database
+  % ai: LLM
+
+  $ doc = db.documents.Get(id)
+  ? doc != null :: 404 "document not found"
+
+  $ reply = ai.Complete({
+    model: "claude-opus-5",
+    max_tokens: 300,
+    messages: [
+      {role: "user", content: "Summarize the following document in two sentences.\n\n" + doc.body}
+    ]
+  })
+
+  ? reply.content != null :: 502 "model returned no content"
+
+  $ updated = db.documents.Update(id, {summary: reply.content})
+
+  > {
+    id: doc.id,
+    title: doc.title,
+    summary: reply.content,
+    model: reply.model
+  }
+}
+
+# Answer a question grounded in one stored document.
+@ POST /documents/:id/ask -> AnswerResponse | Error {
+  + auth(apikey)
+  + ratelimit(20/min)
+  < input: any
+  % db: Database
+  % ai: LLM
+
+  ? input.question != null :: 400 "question is required"
+
+  $ doc = db.documents.Get(id)
+  ? doc != null :: 404 "document not found"
+
+  $ reply = ai.Complete({
+    model: "claude-opus-5",
+    max_tokens: 500,
+    temperature: 0.2,
+    messages: [
+      {role: "user", content: "Answer using only the document below. If the answer is not in it, say so.\n\nDocument:\n" + doc.body + "\n\nQuestion: " + input.question}
+    ]
+  })
+
+  ? reply.content != null :: 502 "model returned no content"
+
+  > {
+    question: input.question,
+    answer: reply.content,
+    document_id: doc.id
+  }
+}

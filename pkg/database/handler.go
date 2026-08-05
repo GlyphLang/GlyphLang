@@ -240,13 +240,27 @@ func (m *MockTableHandler) All() []interface{} {
 	return result
 }
 
+// sameID reports whether a stored record id and a lookup id identify the same
+// record. Ids reach a handler from path parameters as strings while records
+// store them as numbers, so comparing the interface values directly never
+// matches and every lookup by id returns nothing.
+func sameID(stored, lookup interface{}) bool {
+	if stored == nil || lookup == nil {
+		return false
+	}
+	if stored == lookup {
+		return true
+	}
+	return fmt.Sprint(stored) == fmt.Sprint(lookup)
+}
+
 // Get retrieves a record by ID
 func (m *MockTableHandler) Get(id interface{}) interface{} {
 	m.db.mu.RLock()
 	defer m.db.mu.RUnlock()
 
 	for _, record := range m.db.data[m.name] {
-		if record["id"] == id {
+		if sameID(record["id"], id) {
 			return record
 		}
 	}
@@ -273,7 +287,7 @@ func (m *MockTableHandler) Update(id interface{}, data map[string]interface{}) m
 	defer m.db.mu.Unlock()
 
 	for i, record := range m.db.data[m.name] {
-		if record["id"] == id {
+		if sameID(record["id"], id) {
 			// Merge data
 			for k, v := range data {
 				record[k] = v
@@ -291,7 +305,7 @@ func (m *MockTableHandler) Delete(id interface{}) bool {
 	defer m.db.mu.Unlock()
 
 	for i, record := range m.db.data[m.name] {
-		if record["id"] == id {
+		if sameID(record["id"], id) {
 			m.db.data[m.name] = append(m.db.data[m.name][:i], m.db.data[m.name][i+1:]...)
 			return true
 		}
