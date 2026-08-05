@@ -55,10 +55,6 @@
   $ total = todos.length()
 
   # Count completed and pending
-  $ completed = 0
-  $ pending = 0
-
-  # In a real implementation, this would iterate through todos
   $ completed = db.todos.count("completed", true)
   $ pending = db.todos.count("completed", false)
 

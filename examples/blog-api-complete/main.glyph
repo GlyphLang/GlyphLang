@@ -148,7 +148,7 @@
   } else {
     for post in all_posts {
       if post.published == published {
-        $ filtered_posts = filtered_posts + [post]
+        filtered_posts = filtered_posts + [post]
       }
     }
   }

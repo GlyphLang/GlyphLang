@@ -293,7 +293,7 @@ type ChatMessage {
         if age < 65 {
           $ category = "adult"
         } else {
-          $ category = "senior"
+          category = "senior"
         }
       }
     }
@@ -316,7 +316,7 @@ type ChatMessage {
       $ hasAccess = true
       $ level = "partial-access"
     } else {
-      $ level = "restricted"
+      level = "restricted"
     }
   }
 
@@ -443,24 +443,24 @@ type ChatMessage {
       $ can_cancel = true
     }
     case "processing" {
-      $ status_message = "Your order is being prepared"
-      $ can_cancel = true
+      status_message = "Your order is being prepared"
+      can_cancel = true
     }
     case "shipped" {
-      $ status_message = "Your order is on its way"
-      $ can_cancel = false
+      status_message = "Your order is on its way"
+      can_cancel = false
     }
     case "delivered" {
-      $ status_message = "Your order has been delivered"
-      $ can_cancel = false
+      status_message = "Your order has been delivered"
+      can_cancel = false
     }
     case "cancelled" {
-      $ status_message = "This order was cancelled"
-      $ can_cancel = false
+      status_message = "This order was cancelled"
+      can_cancel = false
     }
     default {
-      $ status_message = "Unknown status"
-      $ can_cancel = false
+      status_message = "Unknown status"
+      can_cancel = false
     }
   }
 
@@ -477,16 +477,16 @@ type ChatMessage {
       $ grade = "A"
     }
     case 80 {
-      $ grade = "B"
+      grade = "B"
     }
     case 70 {
-      $ grade = "C"
+      grade = "C"
     }
     case 60 {
-      $ grade = "D"
+      grade = "D"
     }
     default {
-      $ grade = "F"
+      grade = "F"
     }
   }
 
@@ -1035,7 +1035,7 @@ type ChatMessage {
       if subtotal < 100 {
         $ shipping = 4.99
       } else {
-        $ shipping = 0.0
+        shipping = 0.0
       }
     }
 
@@ -1048,14 +1048,14 @@ type ChatMessage {
           $ discount = subtotal * 0.10
         }
         case "SAVE20" {
-          $ discount = subtotal * 0.20
+          discount = subtotal * 0.20
         }
         case "FREESHIP" {
-          $ discount = shipping
+          discount = shipping
           $ shipping = 0.0
         }
         default {
-          $ discount = 0.0
+          discount = 0.0
         }
       }
     }

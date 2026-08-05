@@ -174,7 +174,7 @@
   if formal {
     $ msg = "Good day, " + name + "."
   } else {
-    $ msg = "Hey " + name + "!"
+    msg = "Hey " + name + "!"
   }
   > {greeting: msg}
 }
