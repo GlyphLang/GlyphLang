@@ -71,6 +71,26 @@ jobs:
         run: |
           go test -v -short -coverprofile=coverage.out -covermode=atomic $(go list ./... | grep -v /websocket)
 
+      - name: Validate every example
+        # Examples are the showcase surface and nothing checked them, so broken
+        # ones shipped. validate runs the compiler's semantic pass, which is
+        # what catches redeclared variables and shadowed path parameters.
+        run: |
+          go build -o glyph-ci ./cmd/glyph
+          status=0
+          while IFS= read -r file; do
+            ./glyph-ci validate "$file" --quiet || status=1
+          done < <(find examples -name '*.glyph')
+          rm -f glyph-ci
+          exit $status
+        shell: bash
+
+      - name: Smoke-test examples over HTTP
+        # Boots each example and requests its parameter-free GET routes,
+        # failing on any 5xx. Excluded from -short above because it spawns
+        # servers, so it needs its own step.
+        run: go test ./tests/ -run TestExamplesServeWithoutServerErrors -count=1
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:
