@@ -61,6 +61,10 @@ func setupRoutes(module *ast.Module, filePath string, forceInterpreter ...bool) 
 		printWarning("routes inject LLM but no provider is configured: " + llmEnvHint)
 	}
 
+	// Same for declared auth with no credential source: those routes deny
+	// every request, and the operator should hear that at startup.
+	warnUnconfiguredAuth(module)
+
 	// Try to compile routes if using compiler mode
 	if useCompiler {
 		c := compiler.NewCompilerWithOptLevel(compiler.OptBasic)

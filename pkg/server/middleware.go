@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"log"
+	"net"
 	"net/http"
 	"runtime/debug"
 	"strings"
@@ -395,18 +396,20 @@ func SetTrustedProxies(proxies []string) {
 // When trustProxy is false (the default), only RemoteAddr is used,
 // preventing clients from spoofing their IP via headers.
 func getClientIP(r *http.Request, trustProxy bool) string {
+	// RemoteAddr is host:port, and the port differs on every connection.
+	// Callers use this as a client identity, so the port must not be part of
+	// it: keyed with the port, each request got its own rate-limit bucket and
+	// its own auth failure tracker, and neither limit could ever be reached.
+	remoteHost := r.RemoteAddr
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		remoteHost = host
+	}
+
 	if trustProxy {
 		// If TrustedProxies is configured, only honor proxy headers from trusted IPs
 		tp := loadTrustedProxies()
-		if len(tp) > 0 {
-			remoteIP := r.RemoteAddr
-			// Strip port from RemoteAddr if present
-			if idx := strings.LastIndex(remoteIP, ":"); idx != -1 {
-				remoteIP = remoteIP[:idx]
-			}
-			if !tp[remoteIP] {
-				return r.RemoteAddr
-			}
+		if len(tp) > 0 && !tp[remoteHost] {
+			return remoteHost
 		}
 
 		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
@@ -418,7 +421,7 @@ func getClientIP(r *http.Request, trustProxy bool) string {
 		}
 	}
 
-	return r.RemoteAddr
+	return remoteHost
 }
 
 // RateLimitMiddleware is a placeholder for rate limiting middleware
