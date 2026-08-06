@@ -22,7 +22,9 @@ RUN go mod download
 # Copy project files
 COPY . .
 
-# Expose ports
+# Expose ports. The server binds loopback unless told otherwise, which would
+# make it unreachable from outside the container.
+ENV GLYPH_HOST=0.0.0.0
 EXPOSE 8080
 
 # Development command with hot-reload

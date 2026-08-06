@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/glyphlang/glyph/pkg/ast"
@@ -31,6 +33,25 @@ func moduleInjectsLLM(module *ast.Module) bool {
 		}
 	}
 	return false
+}
+
+// envHost overrides the interface the server binds to. Containers and hosts
+// that must serve other machines set it to "0.0.0.0".
+const envHost = "GLYPH_HOST"
+
+// listenAddr returns the address to bind, defaulting to loopback.
+//
+// Binding every interface exposes the server to the local network the moment
+// it starts, which is the wrong default for a runtime whose `+ auth` denies
+// nothing until credentials are configured. On Windows it also raises a
+// Defender Firewall prompt on every new binary, which `go test` produces on
+// each run.
+func listenAddr(port int) string {
+	host := os.Getenv(envHost)
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	return net.JoinHostPort(host, strconv.Itoa(port))
 }
 
 // setupRoutes handles the common logic of determining execution mode, compiling routes,
@@ -187,7 +208,7 @@ func startServer(filePath string, port int, forceInterpreter bool) (*http.Server
 	}
 
 	srv := &http.Server{
-		Addr:           fmt.Sprintf(":%d", port),
+		Addr:           listenAddr(port),
 		Handler:        loggingMiddleware(mux),
 		ReadTimeout:    15 * time.Second,
 		WriteTimeout:   15 * time.Second,
@@ -201,7 +222,7 @@ func startServer(filePath string, port int, forceInterpreter bool) (*http.Server
 		if !useCompiler {
 			mode = "interpreted"
 		}
-		printSuccess(fmt.Sprintf("Server listening on http://localhost:%d (%s mode)", port, mode))
+		printSuccess(fmt.Sprintf("Server listening on http://%s (%s mode)", listenAddr(port), mode))
 		printInfo("Press Ctrl+C to stop")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			printError(fmt.Errorf("server error: %w", err))
