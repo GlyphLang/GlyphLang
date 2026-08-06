@@ -666,10 +666,83 @@ func (i *Interpreter) evaluateFieldAccess(expr FieldAccessExpr, env *Environment
 	return nil, fmt.Errorf("cannot access field %s on %T", expr.Field, obj)
 }
 
+// callReceiverMethod resolves the parser's obj.method(args) -> method(obj, args)
+// rewrite when the receiver has a method of that name, so a provider method is
+// not shadowed by a builtin that happens to share its name. handled reports
+// whether the call was taken over; when it is false the builtin should run.
+//
+// Only a plain reference is probed as the receiver. Evaluating an argument here
+// to discover its type would otherwise run it twice, and length(db.users.all())
+// must not issue two queries.
+func (i *Interpreter) callReceiverMethod(expr FunctionCallExpr, env *Environment) (interface{}, bool, error) {
+	if len(expr.Args) == 0 || !isPlainRef(expr.Args[0]) {
+		return nil, false, nil
+	}
+
+	// The whitelist decides before anything is looked up on the receiver, so a
+	// builtin's name cannot become a way to reach an unlisted method.
+	canonical, allowed := canonicalMethodName(expr.Name)
+	if !allowed {
+		return nil, false, nil
+	}
+
+	receiver, err := i.EvaluateExpression(expr.Args[0], env)
+	if err != nil || receiver == nil || !HasMethod(receiver, canonical) {
+		return nil, false, nil
+	}
+
+	args := make([]interface{}, 0, len(expr.Args)-1)
+	for _, arg := range expr.Args[1:] {
+		val, argErr := i.EvaluateExpression(arg, env)
+		if argErr != nil {
+			return nil, true, argErr
+		}
+		args = append(args, val)
+	}
+
+	result, callErr := CallMethod(receiver, canonical, args...)
+	return result, true, callErr
+}
+
+// receiverExprFromPath rebuilds the expression for the segments before a method
+// name, so a builtin fallback can evaluate the receiver itself. Re-evaluating it
+// is a variable lookup and field reads, which the call already performed.
+func receiverExprFromPath(segments []string) Expr {
+	var expr Expr = VariableExpr{Name: segments[0]}
+	for _, field := range segments[1:] {
+		expr = FieldAccessExpr{Object: expr, Field: field}
+	}
+	return expr
+}
+
+// isPlainRef reports whether an expression is a variable or a chain of field
+// accesses over one. Those can be evaluated to inspect the value without
+// running anything the program would not otherwise run twice.
+func isPlainRef(expr Expr) bool {
+	switch e := expr.(type) {
+	case VariableExpr:
+		return true
+	case *VariableExpr:
+		return true
+	case FieldAccessExpr:
+		return isPlainRef(e.Object)
+	case *FieldAccessExpr:
+		return isPlainRef(e.Object)
+	}
+	return false
+}
+
 // evaluateFunctionCall handles function calls and method calls
 func (i *Interpreter) evaluateFunctionCall(expr FunctionCallExpr, env *Environment) (interface{}, error) {
 	// Handle built-in functions via dispatch table
 	if fn, ok := builtinFuncs[expr.Name]; ok {
+		// A builtin whose name a provider also uses must not swallow the
+		// provider's method. db.users.length() reaches here as length(db.users)
+		// and means the table's row count, not the builtin's "length of a
+		// value"; the same collision hides find, filter, keys and set.
+		if result, handled, methodErr := i.callReceiverMethod(expr, env); handled {
+			return result, methodErr
+		}
 		return fn(i, expr.Args, env)
 	}
 
@@ -748,6 +821,20 @@ func (i *Interpreter) evaluateFunctionCall(expr FunctionCallExpr, env *Environme
 		// Call the method using reflection
 		// Capitalize first letter only, preserving camelCase (e.g., "countWhere" -> "CountWhere")
 		capitalizedName := capitalizeFirst(methodName)
+
+		// The receiver may not own this name at all: "hello".length() and
+		// input.email.contains("@") are the builtins' work, and reflection can
+		// only report that a string has no such method. Falling back keeps
+		// obj.method(a) and method(obj, a) meaning the same thing, which is the
+		// other half of the collision callReceiverMethod handles.
+		if !HasMethod(obj, capitalizedName) {
+			if fn, ok := builtinFuncs[methodName]; ok {
+				segments := strings.Split(expr.Name, ".")
+				receiver := receiverExprFromPath(segments[:len(segments)-1])
+				return fn(i, append([]Expr{receiver}, expr.Args...), env)
+			}
+		}
+
 		return CallMethod(obj, capitalizedName, args...)
 	}
 

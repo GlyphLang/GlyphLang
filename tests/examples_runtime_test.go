@@ -26,19 +26,12 @@ import (
 // fails. They are skipped so this test can guard the 14 that work; an entry
 // here is coverage we do not have yet, not a route that is fine.
 //
-// Three themes, none of them a wiring problem: examples calling functions that
-// do not exist, examples reading a query parameter that was not supplied, and
-// examples returning objects missing a required field.
+// What is left is not examples calling things that were never meant to exist.
+// Both remaining entries are surfaces the project documents and does not
+// implement, which is the same shape as the providers that shipped unwired.
 var knownBroken = map[string]string{
-	"mongodb-demo":      "mongo.Collection(x).InsertOne(y): chained provider calls are not dispatched",
-	"auth-demo":         "GET /api/auth/me returns an object missing the required field id",
-	"blog-api":          "calls paginate(), which is not a builtin",
-	"blog-api-complete": "calls timestamp(), which is not a builtin",
-	"e-commerce-api":    "calls timestamp(), which is not a builtin",
-	"macros-demo":       "calls db.insert(), which the database provider does not expose",
-	"cart-api":          "calls filter() with 3 arguments; it takes 2 (array, function)",
-	"feature-showcase":  "calls filter() with 3 arguments; it takes 2 (array, function)",
-	"database-demo":     "calls length() on a table handler rather than a collection",
+	"mongodb-demo":     "mongo.Collection(x).InsertOne(y): chained provider calls are not dispatched",
+	"feature-showcase": "reads ws.get_rooms(); the ws object is documented in LANGUAGE_SPECIFICATION.md but is never bound into a route, and the hub has no rooms or uptime to report",
 }
 
 var paramFreeGetRoute = regexp.MustCompile(`(?m)^@\s+GET\s+(/[^\s:{]*)\s*(->[^{]*)?\{`)

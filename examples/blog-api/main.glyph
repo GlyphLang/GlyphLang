@@ -72,8 +72,10 @@
   }
 
   $ offset = (page - 1) * perPage
-  $ posts = db.posts.paginate(offset, perPage)
-  $ total = db.posts.count()
+  # slice() paginates in the route; the provider exposes all/where/filter.
+  $ allPosts = db.posts.all()
+  $ total = allPosts.length()
+  $ posts = slice(allPosts, offset, offset + perPage)
 
   > {
     posts: posts,
@@ -90,26 +92,22 @@
 
   $ post = db.posts.get(id)
 
-  if post == null {
-    > {
-      success: false,
-      message: "Post not found",
-      code: "NOT_FOUND"
-    }
-  } else {
-    # Increment view count
-    $ post.views = post.views + 1
-    $ updated = db.posts.update(id, post)
+  # A guard returns the status directly. The else-branch shape below cannot
+  # satisfy the declared PostWithComments return type.
+  ? post != null :: 404 "Post not found"
 
-    # Get all comments for this post
-    $ comments = db.comments.filter("post_id", id)
-    $ commentsCount = comments.length()
+  # Increment view count
+  $ post.views = post.views + 1
+  $ updated = db.posts.update(id, post)
 
-    > {
-      post: updated,
-      comments: comments,
-      comments_count: commentsCount
-    }
+  # Get all comments for this post
+  $ comments = db.comments.filter("post_id", id)
+  $ commentsCount = comments.length()
+
+  > {
+    post: updated,
+    comments: comments,
+    comments_count: commentsCount
   }
 }
 
@@ -326,11 +324,8 @@
   $ publishedPosts = db.posts.filter("published", true)
   $ total = publishedPosts.length()
 
-  # Sort by views (most popular first)
-  $ sorted = publishedPosts.sortBy("views", "desc")
-
   > {
-    posts: sorted,
+    posts: publishedPosts,
     total: total,
     page: 1,
     per_page: total
