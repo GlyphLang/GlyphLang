@@ -107,7 +107,7 @@ func (m *hotReloadManager) startDevServerInternal() (*http.Server, error) {
 	}
 
 	srv := &http.Server{
-		Addr:           fmt.Sprintf(":%d", m.port),
+		Addr:           listenAddr(m.port),
 		Handler:        loggingMiddleware(mux),
 		ReadTimeout:    15 * time.Second,
 		WriteTimeout:   15 * time.Second,
@@ -121,7 +121,7 @@ func (m *hotReloadManager) startDevServerInternal() (*http.Server, error) {
 		if !useCompiler {
 			mode = "interpreted"
 		}
-		printSuccess(fmt.Sprintf("Dev server listening on http://localhost:%d (%s mode)", m.port, mode))
+		printSuccess(fmt.Sprintf("Dev server listening on http://%s (%s mode)", listenAddr(m.port), mode))
 		printInfo("Live reload enabled at /__livereload")
 		printInfo("Press Ctrl+C to stop")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {

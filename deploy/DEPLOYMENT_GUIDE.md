@@ -60,6 +60,7 @@ docker run -it \
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `GLYPH_HOST` | Interface to bind. Must be `0.0.0.0` to be reachable from outside the container; the shipped Dockerfiles set it | `127.0.0.1` |
 | `Glyph_ENV` | Environment (development/production) | production |
 | `Glyph_PORT` | HTTP server port | 8080 |
 | `Glyph_LOG_LEVEL` | Log level (debug/info/warn/error) | info |

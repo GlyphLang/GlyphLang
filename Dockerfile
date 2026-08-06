@@ -44,7 +44,9 @@ RUN chown -R glyph:glyph /app
 # Switch to non-root user
 USER glyph
 
-# Expose default port
+# Expose default port. The server binds loopback unless told otherwise, which
+# would make it unreachable from outside the container.
+ENV GLYPH_HOST=0.0.0.0
 EXPOSE 8080
 
 # Health check

@@ -137,7 +137,7 @@ You will see output like:
 
 ```
 [INFO] Starting development server on port 3000...
-[SUCCESS] Dev server listening on http://localhost:3000 (compiled mode)
+[SUCCESS] Dev server listening on http://127.0.0.1:3000 (compiled mode)
 [INFO] Watching main.glyph for changes...
 [INFO] Press Ctrl+C to stop
 ```

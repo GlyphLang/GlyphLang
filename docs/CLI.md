@@ -42,7 +42,7 @@ glyph dev examples/hello-world/main.glyph
 ```bash
 $ glyph dev examples/hello-world/main.glyph -p 8080 --open
 [INFO] Starting development server on port 8080...
-[SUCCESS] Dev server listening on http://localhost:8080 (compiled mode)
+[SUCCESS] Dev server listening on http://127.0.0.1:8080 (compiled mode)
 [INFO] Live reload enabled at /__livereload
 [INFO] Watching examples/hello-world/main.glyph for changes...
 [INFO] Opened http://localhost:8080 in browser
@@ -88,7 +88,7 @@ glyph run examples/rest-api/main.glyph
 # Run source file (compiles to bytecode first)
 $ glyph run examples/rest-api/main.glyph
 [INFO] Compiling and running examples/rest-api/main.glyph...
-[SUCCESS] Server listening on http://localhost:3000 (compiled mode)
+[SUCCESS] Server listening on http://127.0.0.1:3000 (compiled mode)
 [INFO] Press Ctrl+C to stop
 
 # Run pre-compiled bytecode
@@ -99,7 +99,7 @@ $ glyph run build/app.glyphc --bytecode
 # Force interpreter mode
 $ glyph run examples/rest-api/main.glyph --interpret
 [INFO] Running examples/rest-api/main.glyph with interpreter...
-[SUCCESS] Server listening on http://localhost:3000
+[SUCCESS] Server listening on http://127.0.0.1:3000
 ```
 
 ### `glyph compile <file>`
@@ -968,6 +968,7 @@ GlyphLang applications can be configured via environment variables.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `GLYPH_HOST` | Interface `glyph run` and `glyph dev` bind to. Set to `0.0.0.0` to serve other machines, as containers must | `127.0.0.1` |
 | `Glyph_ENV` | Environment (development/production) | `production` |
 | `Glyph_PORT` | HTTP server port | `8080` |
 | `Glyph_LOG_LEVEL` | Log level (debug/info/warn/error) | `info` |
