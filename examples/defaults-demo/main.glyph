@@ -234,24 +234,12 @@
   + ratelimit(100/min)
   % db: Database
 
-  # Use defaults if not provided in query
-  $ page = 1
-  $ per_page = 20
-  $ sort_by = "created_at"
-  $ sort_order = "desc"
-
-  if input.page != null {
-    $ page = parseInt(input.page)
-  }
-  if input.per_page != null {
-    $ per_page = parseInt(input.per_page)
-  }
-  if input.sort_by != null {
-    $ sort_by = input.sort_by
-  }
-  if input.sort_order != null {
-    $ sort_order = input.sort_order
-  }
+  # Declared query parameters carry their own defaults and are converted to
+  # the declared type, so no manual fallback or parseInt is needed.
+  ? page: int = 1
+  ? per_page: int = 20
+  ? sort_by: str = "created_at"
+  ? sort_order: str = "desc"
 
   $ items = db.items.all()
   $ total = items.length()
@@ -262,11 +250,11 @@
     data: {
       items: items,
       pagination: {
-        page: page,
-        per_page: per_page,
+        page: query.page,
+        per_page: query.per_page,
         total: total,
-        sort_by: sort_by,
-        sort_order: sort_order
+        sort_by: query.sort_by,
+        sort_order: query.sort_order
       }
     },
     timestamp: now()

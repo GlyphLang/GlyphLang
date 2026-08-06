@@ -38,12 +38,14 @@ func writeProgram(t *testing.T, source string) string {
 }
 
 // serve boots a program and returns a request helper plus the server log.
-func serve(t *testing.T, binary, source string) (func(method, path, body string) (int, string), func() string) {
+// extraArgs are passed through to `glyph run`, so a caller can pin the
+// execution mode rather than accept whichever one the program selects.
+func serve(t *testing.T, binary, source string, extraArgs ...string) (func(method, path, body string) (int, string), func() string) {
 	t.Helper()
 
 	file := writeProgram(t, source)
 	port := freePort(t)
-	stop, logs := startExample(t, binary, file, port)
+	stop, logs := startExample(t, binary, file, port, extraArgs...)
 	t.Cleanup(stop)
 
 	request := func(method, path, body string) (int, string) {
@@ -119,6 +121,58 @@ func TestSymbolGuard(t *testing.T) {
 	}
 	if strings.Contains(body, "reached") {
 		t.Errorf("guard did not short-circuit the route body: %s", body)
+	}
+}
+
+// TestSymbolQueryParams covers ? in its other sense, a declared query
+// parameter, and pins the two execution modes to the same answers.
+//
+// They read the query string by entirely different means: the compiled path
+// takes it from the request URL, while the interpreted path parses it back out
+// of Request.Path. Path was being set from url.URL.Path, which omits the query
+// string, so no interpreted route ever saw a query parameter and every request
+// silently behaved as though none had been supplied. A declared parameter that
+// the caller omits must also read as null rather than failing the request.
+func TestSymbolQueryParams(t *testing.T) {
+	if testing.Short() {
+		t.Skip("boots a server; skipped in -short")
+	}
+
+	binary := buildGlyphBinary(t)
+	source := `@ GET /search {
+  ? q: str
+  ? page: int = 1
+  > {q: query.q, page: query.page}
+}`
+
+	for _, mode := range []struct {
+		name string
+		args []string
+	}{
+		{"compiled", nil},
+		{"interpreted", []string{"--interpret"}},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			request, logs := serve(t, binary, source, mode.args...)
+
+			status, body := request("GET", "/search?q=laptop&page=3", "")
+			if status != http.StatusOK ||
+				!strings.Contains(body, `"q":"laptop"`) ||
+				!strings.Contains(body, `"page":3`) {
+				t.Fatalf("supplied parameters were not read: got %d %s\nserver log:\n%s",
+					status, body, logs())
+			}
+
+			// Omitted: the declared default applies, and the parameter with no
+			// default reads as null instead of failing the request.
+			status, body = request("GET", "/search", "")
+			if status != http.StatusOK ||
+				!strings.Contains(body, `"q":null`) ||
+				!strings.Contains(body, `"page":1`) {
+				t.Fatalf("omitted parameters were mishandled: got %d %s\nserver log:\n%s",
+					status, body, logs())
+			}
+		})
 	}
 }
 

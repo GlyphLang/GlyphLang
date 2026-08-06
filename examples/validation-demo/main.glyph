@@ -461,11 +461,16 @@
   + ratelimit(100/min)
   % db: Database
 
+  # Declared query parameters: absent optional params read as null.
+  ? q: str
+  ? page: int
+  ? limit: int
+
   $ errors = []
   $ hasErrors = false
 
   # Query parameter validation
-  if input.q == null || input.q == "" {
+  if query.q == null || query.q == "" {
     $ errors = errors + [{
         field: "q",
         message: "Search query is required",
@@ -473,7 +478,7 @@
     }]
     $ hasErrors = true
   } else {
-    if input.q.length() < 2 {
+    if query.q.length() < 2 {
       $ errors = errors + [{
           field: "q",
           message: "Search query must be at least 2 characters",
@@ -481,7 +486,7 @@
       }]
       $ hasErrors = true
     } else {
-      if input.q.length() > 100 {
+      if query.q.length() > 100 {
         $ errors = errors + [{
             field: "q",
             message: "Search query cannot exceed 100 characters",
@@ -493,8 +498,8 @@
   }
 
   # Validate page number if provided
-  if input.page != null {
-    if input.page < 1 {
+  if query.page != null {
+    if query.page < 1 {
       errors = errors + [{
           field: "page",
           message: "Page number must be at least 1",
@@ -505,8 +510,8 @@
   }
 
   # Validate limit if provided
-  if input.limit != null {
-    if input.limit < 1 || input.limit > 100 {
+  if query.limit != null {
+    if query.limit < 1 || query.limit > 100 {
       errors = errors + [{
           field: "limit",
           message: "Limit must be between 1 and 100",
@@ -524,23 +529,24 @@
       errors: errors
     }
   } else {
-    $ page = input.page
+    $ page = query.page
     if page == null {
       $ page = 1
     }
 
-    $ limit = input.limit
+    $ limit = query.limit
     if limit == null {
       $ limit = 20
     }
 
-    $ results = db.products.search(input.q, page, limit)
+    # The database provider exposes all/where/filter/limit, not search.
+    $ results = db.products.all()
 
     > {
       success: true,
       message: "Search completed",
       data: {
-        query: input.q,
+        query: query.q,
         page: page,
         limit: limit,
         results: results
