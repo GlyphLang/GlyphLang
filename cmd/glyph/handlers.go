@@ -189,6 +189,14 @@ func createCompiledRouteHandler(route *ast.Route, bytecode []byte, wsHub *websoc
 				var bodyMap map[string]interface{}
 				decoder := json.NewDecoder(limitedReader)
 				if err := decoder.Decode(&bodyMap); err == nil {
+					// Validate against the declared input type, as the
+					// interpreter path does. Without this a compiled route
+					// accepts any body at all: `< input: NewUser` was enforced
+					// only when a provider injection forced interpreter mode.
+					if err := validateCompiledInput(route, bodyMap); err != nil {
+						ctx.Request.Body.Close()
+						return sendClientError(ctx, err.Error())
+					}
 					vmInstance.SetLocal("input", interfaceToValue(bodyMap))
 				} else {
 					vmInstance.SetLocal("input", vm.NullValue{})
@@ -258,6 +266,16 @@ func createRouteHandler(route *ast.Route, interp *interpreter.Interpreter) serve
 		// Execute route body using the interpreter
 		response, err := executeRoute(route, ctx, interp)
 		if err != nil {
+			// Input validation and similar caller mistakes come back as an
+			// error alongside a response that already carries a 4xx status.
+			// Reporting those as 500 blames the server for a bad request and
+			// tells the caller nothing about what to fix.
+			if response != nil && response.StatusCode >= 400 && response.StatusCode < 500 {
+				ctx.StatusCode = response.StatusCode
+				ctx.ResponseWriter.Header().Set("Content-Type", "application/json")
+				ctx.ResponseWriter.WriteHeader(response.StatusCode)
+				return json.NewEncoder(ctx.ResponseWriter).Encode(response.Body)
+			}
 			return writeInternalError(ctx, fmt.Errorf("route execution error: %w", err))
 		}
 
@@ -355,7 +373,10 @@ func executeRoute(route *ast.Route, ctx *server.Context, interp *interpreter.Int
 	// Use ExecuteRoute instead of ExecuteRouteSimple to handle request body
 	response, err := interp.ExecuteRoute(route, request)
 	if err != nil {
-		return nil, fmt.Errorf("route execution failed: %w", err)
+		// Keep the response: for caller mistakes such as failed input
+		// validation the interpreter returns a 4xx response alongside the
+		// error, and the handler uses it instead of reporting a 500.
+		return response, fmt.Errorf("route execution failed: %w", err)
 	}
 
 	return response, nil
@@ -731,6 +752,59 @@ func newMongoDBHandler() interface{} {
 	}
 	printInfo(fmt.Sprintf("Connected to MongoDB at %s (database %s)", uri, dbName))
 	return handler
+}
+
+// compiledTypeDefs holds the module's type definitions for the compiled route
+// path, which has no interpreter to consult. Set once per server start, before
+// any request is served.
+var compiledTypeDefs = map[string]ast.TypeDef{}
+
+// setCompiledTypeDefs records the module's types so compiled routes can
+// validate request bodies against a declared input type.
+func setCompiledTypeDefs(module *ast.Module) {
+	defs := make(map[string]ast.TypeDef)
+	for _, item := range module.Items {
+		if typeDef, ok := item.(*ast.TypeDef); ok {
+			defs[typeDef.Name] = *typeDef
+		}
+	}
+	compiledTypeDefs = defs
+}
+
+// validateCompiledInput checks a decoded request body against the route's
+// declared input type, mirroring what the interpreter does at
+// interpreter.go:558. Fields carrying a default are not treated as required,
+// so this does not reject bodies the interpreter would accept.
+func validateCompiledInput(route *ast.Route, body map[string]interface{}) error {
+	if route.InputType == nil {
+		return nil
+	}
+	named, ok := route.InputType.(ast.NamedType)
+	if !ok {
+		return nil
+	}
+	typeDef, exists := compiledTypeDefs[named.Name]
+	if !exists {
+		return nil
+	}
+
+	checker := interpreter.NewTypeChecker()
+	checker.SetTypeDefs(compiledTypeDefs)
+	if err := checker.ValidateObjectAgainstTypeDef(body, typeDef); err != nil {
+		return fmt.Errorf("input validation failed: %v", err)
+	}
+	return nil
+}
+
+// sendClientError reports a caller mistake with a 4xx, distinct from the
+// generic 500 used for server faults.
+func sendClientError(ctx *server.Context, message string) error {
+	ctx.StatusCode = http.StatusBadRequest
+	ctx.ResponseWriter.Header().Set("Content-Type", "application/json")
+	ctx.ResponseWriter.WriteHeader(http.StatusBadRequest)
+	return json.NewEncoder(ctx.ResponseWriter).Encode(map[string]interface{}{
+		"error": message,
+	})
 }
 
 // writeInternalError logs the full error server-side and sends a generic 500 to

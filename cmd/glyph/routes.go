@@ -54,6 +54,48 @@ func listenAddr(port int) string {
 	return net.JoinHostPort(host, strconv.Itoa(port))
 }
 
+// warnInertDeclarations reports declarations the running server does not act
+// on. Cron tasks, event handlers and queue workers are parsed, exported to the
+// IR and listed by `glyph commands`, but nothing schedules, emits or consumes
+// them: there is no scheduler, EmitEvent has no caller, and no queue is drained.
+//
+// Silence is exactly what made the unwired providers and the unenforced auth
+// directives so expensive to find, so these say so at startup rather than
+// leaving an operator to conclude from the absence of output that a task ran.
+func warnInertDeclarations(module *ast.Module) {
+	var crons, events, queues int
+	for _, item := range module.Items {
+		switch item.(type) {
+		case *ast.CronTask:
+			crons++
+		case *ast.EventHandler:
+			events++
+		case *ast.QueueWorker:
+			queues++
+		}
+	}
+
+	for _, decl := range []struct {
+		count int
+		what  string
+		why   string
+	}{
+		{crons, "cron task", "no scheduler runs them"},
+		{events, "event handler", "nothing emits events at runtime"},
+		{queues, "queue worker", "no queue is consumed"},
+	} {
+		if decl.count == 0 {
+			continue
+		}
+		plural := "s"
+		if decl.count == 1 {
+			plural = ""
+		}
+		printWarning(fmt.Sprintf("%d %s%s declared but %s: they will not run",
+			decl.count, decl.what, plural, decl.why))
+	}
+}
+
 // setupRoutes handles the common logic of determining execution mode, compiling routes,
 // and setting up the router. Used by both startServer and startDevServerInternal.
 // filePath is the path to the source file, used for resolving relative module imports.
@@ -85,6 +127,13 @@ func setupRoutes(module *ast.Module, filePath string, forceInterpreter ...bool) 
 	// Same for declared auth with no credential source: those routes deny
 	// every request, and the operator should hear that at startup.
 	warnUnconfiguredAuth(module)
+
+	// And for declarations the server does not act on at all.
+	warnInertDeclarations(module)
+
+	// Compiled routes have no interpreter to consult, so hand them the type
+	// definitions they need to validate request bodies.
+	setCompiledTypeDefs(module)
 
 	// Try to compile routes if using compiler mode
 	if useCompiler {

@@ -4,6 +4,7 @@ import (
 	. "github.com/glyphlang/glyph/pkg/ast"
 
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 )
@@ -127,6 +128,16 @@ func (tc *TypeChecker) CheckType(value interface{}, expectedType Type) error {
 	// return type.
 	if value == nil {
 		return nil
+	}
+
+	// JSON has a single number type, so every number in a request body decodes
+	// to float64. Without this, an `int` field rejects the perfectly ordinary
+	// body {"id": 1} with "expected int, got float". A value with a fractional
+	// part is still a mismatch.
+	if _, wantInt := expectedType.(IntType); wantInt {
+		if f, ok := value.(float64); ok && f == math.Trunc(f) && !math.IsInf(f, 0) {
+			return nil
+		}
 	}
 
 	actualType := GetRuntimeType(value)
