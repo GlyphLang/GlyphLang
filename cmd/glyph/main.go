@@ -115,6 +115,11 @@ Example:
 		Args: cobra.MinimumNArgs(2),
 		RunE: runExec,
 	}
+	// Flags after the command name belong to the .glyph command being run, not
+	// to `exec` itself. Without this, the documented form
+	// `glyph exec app.glyph greet --name=ada` fails with "unknown flag: --name"
+	// and callers have to discover an undocumented `--` separator.
+	execCmd.Flags().SetInterspersed(false)
 
 	// List commands - list all commands in a .glyph file
 	var listCmdsCmd = &cobra.Command{
