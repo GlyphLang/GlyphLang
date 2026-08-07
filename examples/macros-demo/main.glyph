@@ -12,36 +12,44 @@
 
 # Example: CRUD pattern for users
 @ GET /users {
-  > db.query("SELECT * FROM users")
+  % db: Database
+  > db.users.all()
 }
 
 @ GET /users/:id {
-  > db.query("SELECT * FROM users WHERE id = ?", id)
+  % db: Database
+  > db.users.get(id)
 }
 
 @ POST /users {
-  > db.insert("users", input)
+  % db: Database
+  > db.users.create(input)
 }
 
 @ DELETE /users/:id {
-  > db.query("DELETE FROM users WHERE id = ?", id)
+  % db: Database
+  > db.users.delete(id)
 }
 
 # Example: CRUD pattern for posts
 @ GET /posts {
-  > db.query("SELECT * FROM posts")
+  % db: Database
+  > db.posts.all()
 }
 
 @ GET /posts/:id {
-  > db.query("SELECT * FROM posts WHERE id = ?", id)
+  % db: Database
+  > db.posts.get(id)
 }
 
 @ POST /posts {
-  > db.insert("posts", input)
+  % db: Database
+  > db.posts.create(input)
 }
 
 @ DELETE /posts/:id {
-  > db.query("DELETE FROM posts WHERE id = ?", id)
+  % db: Database
+  > db.posts.delete(id)
 }
 
 # Endpoint with response wrapper pattern

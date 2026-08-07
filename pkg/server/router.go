@@ -67,11 +67,24 @@ func (r *Router) Match(method HTTPMethod, path string) (*Route, map[string]strin
 
 	pathSegments := splitPath(path)
 
-	// Try to match routes in order
+	// Prefer the most specific match rather than the first registered one. A
+	// route captures fewer segments as parameters the more specific it is, so
+	// /api/posts/published wins over /api/posts/:id no matter which was
+	// declared first - otherwise declaring the parameter route earlier makes
+	// the static one unreachable. Equal specificity keeps declaration order.
+	var best *RouteNode
+	var bestParams map[string]string
 	for _, node := range routes {
-		if params, matched := matchRoute(node, pathSegments); matched {
-			return node.route, params, nil
+		params, matched := matchRoute(node, pathSegments)
+		if !matched {
+			continue
 		}
+		if best == nil || len(params) < len(bestParams) {
+			best, bestParams = node, params
+		}
+	}
+	if best != nil {
+		return best.route, bestParams, nil
 	}
 
 	return nil, nil, fmt.Errorf("no route matches path %s", path)

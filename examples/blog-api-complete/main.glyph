@@ -250,8 +250,8 @@
     :likes = 0,
     :comments_count = 0,
     :read_time = 5,
-    :created_at = timestamp(),
-    :updated_at = timestamp()
+    :created_at = now(),
+    :updated_at = now()
   }
 
   > {
@@ -362,7 +362,7 @@
     :author = author,
     :content = content,
     :likes = 0,
-    :created_at = timestamp()
+    :created_at = now()
   }
 
   > {

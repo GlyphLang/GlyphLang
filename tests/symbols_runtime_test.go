@@ -275,6 +275,74 @@ func TestSymbolProviderInjection(t *testing.T) {
 	}
 }
 
+// TestBuiltinAndProviderMethodsCoexist covers names the builtins and the
+// providers both use. The parser rewrites obj.method(a) into method(obj, a),
+// so db.users.length() and length("hello") arrive at the same place under the
+// same name and each has to reach the right implementation. Before this, the
+// builtin won every time and a table's length() failed with "length() expects
+// a string, array, or object argument, got *database.MockTableHandler", while
+// the reverse path made "hello".length() fail with "method Length not found on
+// type string".
+func TestBuiltinAndProviderMethodsCoexist(t *testing.T) {
+	if testing.Short() {
+		t.Skip("boots a server; skipped in -short")
+	}
+
+	request, logs := serve(t, buildGlyphBinary(t), `@ GET /counts {
+  % db: Database
+  $ text = "hello"
+  $ list = [3, 1, 2]
+  > {
+    tableRows: db.rows.length(),
+    stringLen: text.length(),
+    listLen: list.length(),
+    upper: text.upper(),
+    has: text.contains("ell")
+  }
+}`)
+
+	status, body := request("GET", "/counts", "")
+	if status != http.StatusOK {
+		t.Fatalf("route failed: got %d %s\nserver log:\n%s", status, body, logs())
+	}
+	for _, want := range []string{
+		`"tableRows":0`, // the provider's method, not the builtin
+		`"stringLen":5`, // the builtin, not the provider's
+		`"listLen":3`,
+		`"upper":"HELLO"`,
+		`"has":true`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %s in response: %s", want, body)
+		}
+	}
+}
+
+// TestRouteMatchPrefersStaticSegment covers @ when two routes can match the
+// same path. Matching used to take the first route registered, so declaring
+// /posts/:id before /posts/published made the second unreachable: the request
+// ran the parameter route with id="published".
+func TestRouteMatchPrefersStaticSegment(t *testing.T) {
+	if testing.Short() {
+		t.Skip("boots a server; skipped in -short")
+	}
+
+	request, _ := serve(t, buildGlyphBinary(t), `@ GET /posts/:id {
+  > {matched: "param", id: id}
+}
+
+@ GET /posts/published {
+  > {matched: "static"}
+}`)
+
+	if _, body := request("GET", "/posts/published", ""); !strings.Contains(body, `"matched":"static"`) {
+		t.Errorf("static route lost to the parameter route declared before it: %s", body)
+	}
+	if _, body := request("GET", "/posts/7", ""); !strings.Contains(body, `"matched":"param"`) {
+		t.Errorf("parameter route stopped matching: %s", body)
+	}
+}
+
 // TestSymbolCommand covers ! by invoking a declared command through
 // `glyph exec`, which needs no server.
 func TestSymbolCommand(t *testing.T) {

@@ -135,7 +135,7 @@
     :category = category,
     :stock = stock,
     :sku = sku,
-    :created_at = timestamp()
+    :created_at = now()
   }
 
   > {
@@ -238,7 +238,7 @@
   $ items: array
 
   $ order = {
-    :id = "ORD-" + timestamp(),
+    :id = "ORD-" + now(),
     :user_id = user_id,
     :status = "pending",
     :items = items,
@@ -248,7 +248,7 @@
     :total = 1252.77,
     :payment_method = payment_method,
     :shipping_address = shipping_address,
-    :created_at = timestamp()
+    :created_at = now()
   }
 
   > {
@@ -284,7 +284,7 @@
     :message = "Order status updated",
     :order_id = order_id,
     :status = status,
-    :updated_at = timestamp()
+    :updated_at = now()
   }
 }
 
@@ -337,7 +337,7 @@
     :rating = rating,
     :title = title,
     :comment = comment,
-    :created_at = timestamp()
+    :created_at = now()
   }
 
   > {
