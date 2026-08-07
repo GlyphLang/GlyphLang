@@ -32,7 +32,14 @@ func ProcessQueryParams(
 			if decl.Required && decl.Default == nil {
 				return nil, fmt.Errorf("required query parameter missing: %s", decl.Name)
 			}
-			// Default will be applied by the interpreter
+			// A declared parameter is always present on the query object, so
+			// reading one the caller omitted yields null instead of failing
+			// with "field not found". Params carrying a default stay absent:
+			// the caller fills those, because the interpreter and the VM
+			// evaluate default expressions by different means.
+			if decl.Default == nil {
+				result[decl.Name] = nil
+			}
 			continue
 		}
 

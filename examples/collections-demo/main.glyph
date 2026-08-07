@@ -57,13 +57,23 @@
   + ratelimit(100/min)
   % db: Database
 
+  # Declared query parameters: absent optional params read as null, and each
+  # is converted to its declared type before the route body runs.
+  ? category: str
+  ? active: bool
+  ? min_price: float = 0
+  ? max_price: float = 999999999
+  ? tag: str
+  ? page: int = 1
+  ? limit: int = 20
+
   $ allProducts = db.products.all()
 
   # Apply category filter if provided
   $ filtered = []
-  if input.category != null && input.category != "" {
+  if query.category != null && query.category != "" {
     for product in allProducts {
-      if product.category == input.category {
+      if product.category == query.category {
         $ filtered = filtered + [product]
       }
     }
@@ -73,9 +83,9 @@
 
   # Apply active filter if provided
   $ activeFiltered = []
-  if input.active != null {
+  if query.active != null {
     for product in filtered {
-      if product.active == input.active {
+      if product.active == query.active {
         $ activeFiltered = activeFiltered + [product]
       }
     }
@@ -85,29 +95,19 @@
 
   # Apply price range filter
   $ priceFiltered = []
-  $ minPrice = input.min_price
-  $ maxPrice = input.max_price
-
-  if minPrice == null {
-    $ minPrice = 0
-  }
-  if maxPrice == null {
-    $ maxPrice = 999999999
-  }
-
   for product in activeFiltered {
-    if product.price >= minPrice && product.price <= maxPrice {
+    if product.price >= min_price && product.price <= max_price {
       $ priceFiltered = priceFiltered + [product]
     }
   }
 
   # Apply tag filter if provided
   $ tagFiltered = []
-  if input.tag != null && input.tag != "" {
+  if query.tag != null && query.tag != "" {
     for product in priceFiltered {
       $ hasTag = false
       for tag in product.tags {
-        if tag == input.tag {
+        if tag == query.tag {
           $ hasTag = true
         }
       }
@@ -120,15 +120,7 @@
   }
 
   # Pagination
-  $ page = input.page
-  $ limit = input.limit
-
-  if page == null || page < 1 {
-    $ page = 1
-  }
-  if limit == null || limit < 1 {
-    $ limit = 20
-  }
+  # Declared defaults already applied; only the upper clamp is real logic.
   if limit > 100 {
     limit = 100
   }

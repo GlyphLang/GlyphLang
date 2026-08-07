@@ -348,9 +348,19 @@ func executeRoute(route *ast.Route, ctx *server.Context, interp *interpreter.Int
 		}
 	}
 
+	// ExecuteRoute reads query parameters off Path (extractPathParams strips
+	// anything from "?" on, so it expects them there), and URL.Path omits the
+	// query string. Without this, no interpreted route ever saw a query
+	// parameter. The raw, still-encoded query is what ExtractRawQueryParams
+	// wants: it unescapes each key and value itself.
+	requestPath := ctx.Request.URL.Path
+	if raw := ctx.Request.URL.RawQuery; raw != "" {
+		requestPath += "?" + raw
+	}
+
 	// Create request object for interpreter
 	request := &interpreter.Request{
-		Path:    ctx.Request.URL.Path,
+		Path:    requestPath,
 		Method:  ctx.Request.Method,
 		Params:  ctx.PathParams,
 		Body:    requestBody,

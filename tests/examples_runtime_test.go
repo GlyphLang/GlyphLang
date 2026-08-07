@@ -39,10 +39,6 @@ var knownBroken = map[string]string{
 	"cart-api":          "calls filter() with 3 arguments; it takes 2 (array, function)",
 	"feature-showcase":  "calls filter() with 3 arguments; it takes 2 (array, function)",
 	"database-demo":     "calls length() on a table handler rather than a collection",
-	"collections-demo":  "reads query.category when the parameter is absent, which errors instead of yielding null",
-	"defaults-demo":     "reads query.page when the parameter is absent; declared defaults are not applied",
-	"validation-demo":   "reads query.q when the parameter is absent",
-	"query-params-demo": "field not found: category, when the query parameter is absent",
 }
 
 var paramFreeGetRoute = regexp.MustCompile(`(?m)^@\s+GET\s+(/[^\s:{]*)\s*(->[^{]*)?\{`)
@@ -137,13 +133,14 @@ func buildGlyphBinary(t *testing.T) string {
 // startExample runs one example and waits for it to accept connections.
 // Returns a stop function and an accessor for the server's output, which is
 // what explains a failure.
-func startExample(t *testing.T, binary, file string, port int) (func(), func() string) {
+func startExample(t *testing.T, binary, file string, port int, extraArgs ...string) (func(), func() string) {
 	t.Helper()
 
 	var output strings.Builder
 	// No cmd.Dir: file is already relative to this package's directory, and
 	// examples resolve their module imports from their own path.
-	cmd := exec.Command(binary, "run", file, "--port", fmt.Sprint(port))
+	args := append([]string{"run", file, "--port", fmt.Sprint(port)}, extraArgs...)
+	cmd := exec.Command(binary, args...)
 	cmd.Stdout = &output
 	cmd.Stderr = &output
 
