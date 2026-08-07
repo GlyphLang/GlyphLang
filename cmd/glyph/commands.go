@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/fatih/color"
@@ -16,6 +17,35 @@ import (
 	"github.com/glyphlang/glyph/pkg/vm"
 	"github.com/spf13/cobra"
 )
+
+// envPort names the port to listen on when --port is not given. It sits
+// alongside GLYPH_HOST: between them the listen address is configurable without
+// a command line, which is what a container or a service manager needs.
+const envPort = "GLYPH_PORT"
+
+// resolvePort returns the port to listen on: an explicit --port wins, then
+// GLYPH_PORT, then the compiled-in default.
+//
+// A GLYPH_PORT that is not a usable port fails the command rather than falling
+// back. Serving on a different port than the operator asked for, and saying
+// nothing, is the failure this sweep has spent its time removing.
+func resolvePort(cmd *cobra.Command) (uint16, error) {
+	port, _ := cmd.Flags().GetUint16("port")
+	if cmd.Flags().Changed("port") {
+		return port, nil
+	}
+
+	raw, set := os.LookupEnv(envPort)
+	if !set || raw == "" {
+		return port, nil
+	}
+
+	parsed, err := strconv.ParseUint(raw, 10, 16)
+	if err != nil || parsed == 0 {
+		return 0, fmt.Errorf("%s=%q is not a port between 1 and 65535", envPort, raw)
+	}
+	return uint16(parsed), nil
+}
 
 // runCompile handles the compile command
 func runCompile(cmd *cobra.Command, args []string) error {
@@ -254,7 +284,10 @@ func runTest(cmd *cobra.Command, args []string) error {
 
 func runRun(cmd *cobra.Command, args []string) error {
 	filePath := args[0]
-	port, _ := cmd.Flags().GetUint16("port")
+	port, err := resolvePort(cmd)
+	if err != nil {
+		return err
+	}
 	useBytecode, _ := cmd.Flags().GetBool("bytecode")
 	useInterpreter, _ := cmd.Flags().GetBool("interpret")
 
@@ -303,7 +336,10 @@ func runRun(cmd *cobra.Command, args []string) error {
 // runDev handles the dev command
 func runDev(cmd *cobra.Command, args []string) error {
 	filePath := args[0]
-	port, _ := cmd.Flags().GetUint16("port")
+	port, err := resolvePort(cmd)
+	if err != nil {
+		return err
+	}
 	watch, _ := cmd.Flags().GetBool("watch")
 	openBrowser, _ := cmd.Flags().GetBool("open")
 

@@ -527,3 +527,49 @@ func TestRunAutoDetectBytecode(t *testing.T) {
 	err = runRun(runCmd, []string{compiledFile})
 	require.NoError(t, err)
 }
+
+// TestResolvePort covers the precedence between --port, GLYPH_PORT and the
+// compiled-in default. GLYPH_PORT was documented in docs/CLI.md, the
+// deployment guide and the Kubernetes manifest long before anything read it,
+// so setting it silently did nothing.
+func TestResolvePort(t *testing.T) {
+	newCmd := func(flag string) *cobra.Command {
+		cmd := &cobra.Command{}
+		cmd.Flags().Uint16("port", 3000, "")
+		if flag != "" {
+			require.NoError(t, cmd.Flags().Set("port", flag))
+		}
+		return cmd
+	}
+
+	t.Run("default when neither is given", func(t *testing.T) {
+		t.Setenv("GLYPH_PORT", "")
+		port, err := resolvePort(newCmd(""))
+		require.NoError(t, err)
+		assert.Equal(t, uint16(3000), port)
+	})
+
+	t.Run("environment applies when the flag is absent", func(t *testing.T) {
+		t.Setenv("GLYPH_PORT", "9001")
+		port, err := resolvePort(newCmd(""))
+		require.NoError(t, err)
+		assert.Equal(t, uint16(9001), port)
+	})
+
+	t.Run("explicit flag beats the environment", func(t *testing.T) {
+		t.Setenv("GLYPH_PORT", "9001")
+		port, err := resolvePort(newCmd("9002"))
+		require.NoError(t, err)
+		assert.Equal(t, uint16(9002), port)
+	})
+
+	// A typo must not quietly serve somewhere else.
+	for _, bad := range []string{"abc", "0", "99999", "-1", "8080x"} {
+		t.Run("rejects "+bad, func(t *testing.T) {
+			t.Setenv("GLYPH_PORT", bad)
+			_, err := resolvePort(newCmd(""))
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "GLYPH_PORT")
+		})
+	}
+}

@@ -969,9 +969,11 @@ GlyphLang applications can be configured via environment variables.
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `GLYPH_HOST` | Interface `glyph run` and `glyph dev` bind to. Set to `0.0.0.0` to serve other machines, as containers must | `127.0.0.1` |
-| `Glyph_ENV` | Environment (development/production) | `production` |
-| `Glyph_PORT` | HTTP server port | `8080` |
-| `Glyph_LOG_LEVEL` | Log level (debug/info/warn/error) | `info` |
+| `GLYPH_PORT` | Port to listen on. `--port` takes precedence; a value that is not a port between 1 and 65535 fails the command rather than falling back | `3000` |
+
+`Glyph_ENV` and `Glyph_LOG_LEVEL` were listed here but were never read by
+anything, so setting them had no effect. They have been removed rather than
+left to imply configuration that does not exist.
 
 ### Database Variables
 
@@ -992,9 +994,8 @@ GlyphLang applications can be configured via environment variables.
 
 ```bash
 # Application
-Glyph_ENV=production
-Glyph_PORT=8080
-Glyph_LOG_LEVEL=info
+GLYPH_HOST=0.0.0.0
+GLYPH_PORT=8080
 
 # Database
 DATABASE_URL=postgres://glyph:secret@localhost:5432/glyphdb
@@ -1011,7 +1012,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
 source .env && glyph run main.glyph
 
 # Or export directly
-export Glyph_PORT=3000
+export GLYPH_PORT=3000
 export DATABASE_URL="postgres://..."
 glyph run main.glyph
 ```
