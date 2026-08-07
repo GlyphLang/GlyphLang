@@ -40,12 +40,9 @@ spec:
         # Service can reach.
         - name: GLYPH_HOST
           value: "0.0.0.0"
-        - name: Glyph_ENV
-          value: "production"
-        - name: Glyph_PORT
+        # Must agree with containerPort above and with the probe ports below.
+        - name: GLYPH_PORT
           value: "8080"
-        - name: Glyph_LOG_LEVEL
-          value: "info"
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:

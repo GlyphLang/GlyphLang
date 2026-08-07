@@ -37,7 +37,7 @@ docker build -t glyph:latest .
 docker run -d \
   --name glyph-app \
   -p 8080:8080 \
-  -e Glyph_ENV=production \
+  -e GLYPH_PORT=8080 \
   -e DATABASE_URL=postgresql://user:pass@postgres:5432/db \
   glyph:latest
 ```
@@ -61,9 +61,7 @@ docker run -it \
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `GLYPH_HOST` | Interface to bind. Must be `0.0.0.0` to be reachable from outside the container; the shipped Dockerfiles set it | `127.0.0.1` |
-| `Glyph_ENV` | Environment (development/production) | production |
-| `Glyph_PORT` | HTTP server port | 8080 |
-| `Glyph_LOG_LEVEL` | Log level (debug/info/warn/error) | info |
+| `GLYPH_PORT` | Port to listen on. `--port` takes precedence, and the shipped image passes it explicitly | 3000 |
 | `DATABASE_URL` | PostgreSQL connection string | - |
 | `REDIS_URL` | Redis connection string | - |
 
